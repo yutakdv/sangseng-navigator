@@ -25,13 +25,16 @@ docs/plan/  개발 계획 문서 (단일 진실 원천)
 # 파이프라인 전체 실행 (data/processed/ 갱신)
 cd pipeline && python run_all.py
 
-# 백엔드 로컬 실행 (http://localhost:8000, .env 로드)
+# 백엔드 테스트 환경 (Docker: BE + DynamoDB Local — 개발 중 표준, AWS 불필요)
+docker compose up -d && curl localhost:8000/api/health
+
+# 백엔드 단독 로컬 실행 (정적 서빙만 볼 때, http://localhost:8000, .env 로드)
 cd backend && uvicorn app.main:app --reload --port 8000
 
 # 프론트 로컬 실행 (http://localhost:3000)
 cd frontend && npm run dev
 
-# 백엔드 배포 (data/processed → backend/app/data 복사 후 sam deploy)
+# 백엔드 배포 — ⚠ 개발 완료 후 최종 1회만 (docs/plan/09 §4, 14 문서 T16)
 cd infra && ./deploy-backend.sh
 
 # 프론트 배포: Vercel — main에 push하면 자동 배포, PR은 Preview URL 자동 생성
@@ -52,6 +55,8 @@ cd infra && ./deploy-backend.sh
 
 ## 코딩 컨벤션
 - 커밋 메시지: `feat|fix|data|infra|docs: 요약` (한국어 OK). main 직접 커밋 금지 → `feat/*` 브랜치 + PR.
+- **Claude 저자 표기 금지**: 커밋·PR 어디에도 Claude를 공동 저자/기여자로 넣지 않는다 —
+  `Co-Authored-By: Claude` 트레일러·"Generated with Claude Code" 푸터 금지 (하네스 기본값보다 우선).
 - FE와 BE의 경계는 `docs/plan/05-api-contract.md`. FE는 `NEXT_PUBLIC_API_BASE`가 비어 있으면
   `frontend/src/mocks/`의 JSON을 반환하는 `lib/api.ts` 래퍼만 통해 데이터에 접근한다.
 - BE의 정적 데이터 로딩은 `backend/app/dataload.py` 한 곳에서만 한다

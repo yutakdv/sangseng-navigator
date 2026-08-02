@@ -92,8 +92,13 @@ cd ../frontend && npm install
 # 일상 루프
 source .venv/bin/activate
 cd pipeline && python run_all.py                      # 데이터 갱신 시에만
-cd ../backend && uvicorn app.main:app --reload --port 8000
-cd ../frontend && npm run dev                          # 별도 터미널
+
+# BE + DynamoDB Local (Docker 테스트 환경 — 14 문서 T7, AWS 불필요)
+docker compose up -d && curl localhost:8000/api/health
+# (DynamoDB 없이 정적 서빙만 볼 때는 uvicorn 직접 실행도 가능:
+#  cd backend && uvicorn app.main:app --reload --port 8000)
+
+cd frontend && npm run dev                             # 별도 터미널
 
 # FE에서 실 BE 붙이기: frontend/.env.local 에 NEXT_PUBLIC_API_BASE=http://localhost:8000
 ```

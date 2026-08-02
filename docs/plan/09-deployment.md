@@ -157,13 +157,16 @@ claude-sonnet-5 전환 시 $3/$15(인트로 $2/$10)로 수천 원 수준.
 
 **총계: AWS ≈ $0/월 + Vercel $0 + LLM 사용량(수백 원~) → 실질 비용은 LLM뿐.**
 
-## 4. 배포 리허설 (Phase 1에서 1회 — 10 문서와 동일)
+## 4. 배포 시점 — 개발 완료 후 최종 1회 (2026-08-03 결정 변경)
 
-캠프/본개발 중 처음 배포하지 않도록 미리 왕복을 확인한다.
+**개발 기간에는 AWS에 배포하지 않는다.** 테스트는 Docker(BE+DynamoDB Local, 14 문서 T7)로 완결하고,
+전체 개발이 끝난 뒤 이 문서 §1~§2 절차로 1회 배포한다 (상세 시퀀스: 14 문서 T16).
 
-- [ ] BE: `/api/health`만 있는 상태로 `sam build && sam deploy` → `curl .../api/health` 200
-- [ ] FE: Vercel 연결 + 빈 페이지 배포 → `NEXT_PUBLIC_API_BASE` 넣고 health 표시되는지 확인
-- [ ] 이 왕복이 되면 이후 배포는 "git push + `./deploy-backend.sh`" 두 동작뿐
+사전 검증 완료분 (2026-08-03) — 최종 배포 리스크를 줄이는 근거:
+- [x] `sam validate --lint` 통과, `sam build` 성공 (번들·requirements 문제 없음)
+- [x] deploy 스크립트의 빈 파라미터 형식 오류 수정 완료 (§1 스크립트에 반영)
+- [ ] **미해결 선행조건: IAM 권한** — `Yutak_trading` 사용자에 CloudFormation·API Gateway·DynamoDB
+      권한 없음(AccessDenied 실측). 최종 배포 **전날까지** 인라인 정책 부착 (14 문서 T16 Step 1)
 
 ## 5. 마무리 조이기 (여유 있을 때)
 

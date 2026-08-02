@@ -31,9 +31,11 @@ Phase 0 (준비·블로커 해소)
 - [ ] [유] 03 문서 구조대로 디렉토리·빈 모듈 생성 — 단 `frontend/` 내부는 건드리지 않는다
       (mocks 포함 FE 영역 생성은 F1에서 FE 담당이 일원화 — 03 협업 규칙 1, 이중 생성 충돌 방지)
 - [ ] [F] F1 (Next.js 스캐폴딩 + `lib/api.ts` + mock 렌더 확인)
-- [ ] [유] BE `/api/health`만으로 `sam deploy` 1회 + Vercel 빈 페이지 배포 → **배포 리허설** (09 §4)
+- [x] [유] ~~배포 리허설~~ → **결정 변경 (2026-08-03): 개발 중 AWS 배포 없음.** `sam validate`·`sam build`
+      성공까지 확인 완료. 대신 **Docker 테스트 환경**(14 문서 T7)이 Phase 1 검증을 담당하고,
+      실배포는 개발 완료 후 최종 1회 (09 §4, 14 문서 T16)
 
-**Gate:** `npm run dev`로 mock 첫 화면 렌더 + `curl <ApiUrl>/api/health` 200 + Vercel URL 접속 성공.
+**Gate:** `npm run dev`로 mock 첫 화면 렌더 + `docker compose up` 후 `curl localhost:8000/api/health` 200.
 
 ## Phase 2 — 데이터 파이프라인 (06 문서, [유])
 
