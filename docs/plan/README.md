@@ -57,11 +57,12 @@ DynamoDB(온디맨드) / OpenAI 또는 Claude(어댑터) / 배포: Vercel(FE) + 
 | 11 | [11-demo-and-qa.md](11-demo-and-qa.md) | 데모 클릭 스크립트·발표 구조·예상 질문 대응 (Phase 6) |
 | 12 | [12-submission-compliance.md](12-submission-compliance.md) | **경진대회 제출 요건 대응** — Phase 0(레포 준비)·Phase 6(제출) 전 필수 |
 | 13 | [13-design-guide.md](13-design-guide.md) | 목업(image-1/2) 기반 디자인 가이드 — FE 화면 작업 전 필수 |
+| 14 | [14-execution-plan.md](14-execution-plan.md) | **잔여 개발 실행 런북 (T0~T18)** — 매 태스크 시작 전 여기서 절차 확인. Docker 테스트·AWS 최종 배포 전환 반영 |
 
 ## Phase 게이트 요약 (상세: 10 문서)
 
 - **Phase 0:** API 승인·CSV·.env·Vercel 연결 완료 (블로커 해소)
-- **Phase 1:** 스캐폴딩 + mock 렌더 + 배포 왕복(SAM·Vercel) 확인
+- **Phase 1:** 스캐폴딩 + mock 렌더 + Docker 스모크 (배포는 개발 완료 후 최종 1회로 변경 — 09 §4)
 - **Phase 2:** `python run_all.py` 한 번으로 `data/processed/` 전체 재현
 - **Phase 3:** 허브·대시보드가 로컬 실 BE 데이터로 동작
 - **Phase 4:** AI 카드 생성 + "Score 2위 → AI 1위" 조정 사례 재현

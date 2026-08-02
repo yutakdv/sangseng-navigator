@@ -28,7 +28,7 @@ Kakao 지오코딩 API ──────────┘      │  집계·스�
 | **상태 저장 = DynamoDB 온디맨드 1테이블** | Action Card 승인/상태/타임스탬프만 저장(수십 건). 온디맨드라 유휴 $0, 프리티어 25GB. RDS는 과잉 |
 | **FE = Vercel (Hobby 무료)** | git push 자동 배포 + PR별 Preview URL(2인 협업에 유용), Next.js 네이티브 지원이라 정적 export 제약(동적 라우트 등) 없음, https·CDN 기본 제공. AWS 쪽엔 순수 API 비용만 남는다 |
 | **지도 = MapLibre GL + OpenFreeMap 타일** | Kakao 지도 JS는 도메인 등록·키 발급 이슈(과거 경험), Leaflet은 Safari 렌더 문제 경험 → 아래 "지도 결정" 참조 |
-| **로컬 개발도 실제 DynamoDB 사용** | DynamoDB Local 셋업 시간 절약. 온디맨드 비용은 사실상 0원. AWS 자격증명만 있으면 됨 |
+| **개발 중엔 DynamoDB Local(Docker), AWS 배포는 개발 완료 후 최종 1회** | (2026-08-03 변경) 개발 기간 AWS 의존 제거 — IAM 권한 이슈·비용·네트워크와 무관하게 로컬 완결 테스트. `docker compose up`으로 BE+DynamoDB Local 기동, `db.py`가 `DYNAMO_ENDPOINT` env로 분기 (14 문서 T7). 배포는 전체 개발 완료 후 09 문서 절차로 1회 |
 | **LLM 어댑터 (openai↔anthropic 전환)** | 기획서에는 openAI API, MVP안에는 Claude로 명시가 갈림. `LLM_PROVIDER` env로 양쪽 지원해 발표 자료와 코드의 불일치 리스크 제거. 기본값 openai(`gpt-4o-mini`) — 제출된 기획서와 일치 + 비용 최소 |
 | **IaC = AWS SAM** | 유탁이 AWS SAA/DVA 보유. 템플릿 1장으로 Lambda+API+DDB 재현 가능, 캠프에서 재배포 1분 |
 
