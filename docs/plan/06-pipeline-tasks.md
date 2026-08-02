@@ -1,0 +1,183 @@
+# 06. 데이터 파이프라인 태스크 (유탁 · Phase 2)
+
+> 실행 환경: 로컬 Python 3.12 + `.env`. 산출물은 전부 `data/processed/*.json` (스키마: 05 문서 §6).
+> 각 태스크 끝의 **검증** 커맨드를 통과하면 커밋(`data:` 태그). 실데이터 승인 전에는
+> 각 스크립트의 입력을 소형 목업 CSV로 대체해 골격을 먼저 완성한다.
+
+## 공통 원칙 (모든 스크립트에 적용)
+
+1. **API 원응답 캐시**: 오픈 API 호출 결과는 `data/raw/api_cache/<이름>.json`에 저장하고,
+   캐시가 있으면 API를 다시 호출하지 않는다 (`--refresh` 플래그로만 갱신).
+   일일 호출 한도 보호 + 재실행 재현성 + 오프라인(캠프장 네트워크 불안) 대비. 캐시도 커밋한다.
+   **예외: Kakao 지오코딩 캐시(`geocode.json`)는 커밋하지 않는다** (.gitignore) — 공공데이터가
+   아닌 카카오 응답이라 Public 레포 재배포 제약 (12 문서 §4). 재현성은 `merchants.json`이 담보.
+2. **페이징 완주**: data.go.kr API는 `pageNo`/`numOfRows` 페이징 — `totalCount` 기준으로
+   전 페이지 순회. JSON 파라미터(`_type=json` 등) 미지원이면 `xmltodict`로 XML 파싱.
+3. **기준일 = 데이터 최신 월**: "최근 3개월"·"전분기"·"전월 대비"는 전부 **사용현황 데이터의
+   마지막 월**을 기준으로 계산한다 (오늘 날짜 기준 아님 — 공공데이터는 수개월 지연될 수 있다).
+   기준월은 `dashboard.json`의 `period_note`에 명시.
+4. **분자·분모 기간 정합**: 지역 전환율은 분자(사용현황)와 분모(입장객)의 **겹치는 월 구간만** 사용.
+5. **좌표 유효성 가드**: 모든 좌표는 위도 36.5~38.5 / 경도 127.5~129.5 범위 밖이면 버리고 로그.
+
+## 공통 상수 (`pipeline/common.py`)
+
+```python
+REGIONS = ["고한읍", "사북읍", "정선군", "태백시", "영월군", "삼척시"]
+ANCHOR = {"name": "하이원리조트 정문", "lat": 37.2049, "lng": 128.8358}  # 관광동선 거점(지도로 최종 확인)
+RADIUS_M = 500
+EUP_WEIGHTS = {"v1": 0.5, "v2": 0.5}          # 1단계: 소비저조도·소비증감
+CAND_WEIGHTS = {"w1": 1/3, "w2": 1/3, "w3": 1/3}  # 2단계: 업종공백도·관광동선근접도·기존가맹포화도
+
+import math
+def haversine_m(lat1, lng1, lat2, lng2):
+    r = 6371000
+    p1, p2 = math.radians(lat1), math.radians(lat2)
+    dp, dl = math.radians(lat2 - lat1), math.radians(lng2 - lng1)
+    a = math.sin(dp/2)**2 + math.cos(p1)*math.cos(p2)*math.sin(dl/2)**2
+    return 2 * r * math.asin(math.sqrt(a))
+
+def gini(counts):
+    """지역 간 건수 분포 지니계수. 화면 노출 금지(내부 계산용) — 외부 표시는 0~100 지수."""
+    n = len(counts)
+    mean = sum(counts) / n
+    if mean == 0:
+        return 0.0
+    return sum(abs(a - b) for a in counts for b in counts) / (2 * n * n * mean)
+
+def gini_to_index(g, n=6):
+    """0~100 정규화: gini 최대값 (1 - 1/n) 기준."""
+    return round(g / (1 - 1/n) * 100)
+
+def grade(index):
+    return "높음" if index >= 66 else ("보통" if index >= 33 else "낮음")
+
+def hhi_dispersion_index(counts):
+    """업종별 소비 분산도 = (1 - HHI) 0~100."""
+    total = sum(counts)
+    if total == 0:
+        return 0
+    hhi = sum((c / total) ** 2 for c in counts)
+    return round((1 - hhi) * 100)
+```
+
+---
+
+### Task P1: 사용현황 집계 (`p1_usage.py`)
+
+**입력:** `data/raw/highone_point_usage.csv` — **헤더 실측 완료 (04 문서 §2): 기획 가정과 일치.**
+cp949 · 데이터 5,831행 · 일 단위(`YYYY-MM-DD`) · 최신 월 **2025-12** (= 모든 "최근 3개월"·"전분기"의 기준월).
+
+```python
+# 실측 확정 (2026-08-03) — 이 표가 곧 검증 증거 (발표 "실제 CSV 열어봤나" 대비)
+COLMAP = {
+    "가맹점 영업일자": "date",
+    "업종": "category",
+    "고한읍 건수": "고한읍",
+    "사북읍 건수": "사북읍",
+    "정선군 건수": "정선군",
+    "태백시 건수": "태백시",
+    "영월군 건수": "영월군",
+    "삼척시 건수": "삼척시",
+}
+```
+
+- [ ] CSV 로드(pandas, `encoding="cp949"` — 실측 확정, utf-8 폴백 유지) → COLMAP 적용
+- [ ] **지역 컬럼 정의 확인**: 고한읍·사북읍은 행정구역상 정선군 소속 — CSV의 "정선군" 컬럼이
+      두 읍을 **포함**하는지, **제외한 나머지**인지 실데이터로 확인하고 결론을 코드 주석에 남긴다
+      (포함이면 이중집계로 집중도·1단계 스코어가 왜곡됨 → 발표 Q&A 대비 필수)
+- [ ] 월(`YYYY-MM`) 단위로 지역×업종 건수 합산 → `usage_monthly.json` 저장
+- [ ] **검증:** `python p1_usage.py && python -c "import json;d=json.load(open('../data/processed/usage_monthly.json'));print(len(d['months']), d['months'][:2])"` — 월 수·샘플 출력이 CSV 기간과 일치
+
+### Task P2: 카지노 입장객 (`p2_visitors.py`)
+
+- [ ] 일자별 카지노 입장객 현황 오픈 API 호출 (`DATA_GO_KR_API_KEY`, 엔드포인트는 승인 페이지 확인)
+- [ ] 내국인+외국인 합산 → 월별 총 입장객 → `usage_monthly.json`에 `visitors_monthly` 병합
+- [ ] **검증:** 월별 입장객 수가 상식 범위(수만~수십만/월)인지 출력 확인. API 실패 시 재시도 3회 후 명확한 에러
+
+### Task P3: 가맹점 지오코딩 (`p3_merchants.py`)
+
+- [ ] 하이원포인트 가맹점 상세정보 API → 가맹점명·주소·업종 수집 (페이징 완주 + api_cache)
+- [ ] `geocode(addr) -> (lat, lng) | None` 함수: Kakao Local API
+      (`https://dapi.kakao.com/v2/local/search/address.json`, 헤더 `Authorization: KakaoAK {키}`)
+      → 실패/키 부재 시 VWorld 폴백. 0.1초 간격 호출
+- [ ] **지오코딩 캐시**: 주소→좌표 결과를 `data/raw/api_cache/geocode.json`에 누적 저장 —
+      재실행 시 이미 변환된 주소는 호출 생략. 결과는 `data/processed/merchants.json`
+      (캐시 파일 자체는 **커밋 제외** — 공통 원칙 1의 예외, 12 문서 §4)
+- [ ] 지오코딩 실패분은 `geocode_failed` 리스트로 별도 기록 (실패율 발표 명시용)
+- [ ] Kakao REST 키 발급이 막히는 경우 VWorld 지오코더 폴백:
+      `https://api.vworld.kr/req/address?service=address&request=getcoord&type=ROAD&address=...&key=...`
+      (호출 인터페이스는 `geocode(addr) -> (lat, lng) | None` 함수 하나로 감싸 provider 교체 가능하게)
+- [ ] **검증:** 성공률 출력 (목표 ≥ 90%). 좌표가 공통 원칙 5의 유효 범위(위도 36.5~38.5, 경도 127.5~129.5) 안인지 샘플 확인
+
+### Task P4: 소진공 상가정보 (`p4_stores.py`)
+
+**수집 전략: 읍 단위 일괄 수집 후 반경 계산은 로컬에서.** 후보 지점마다 API 반경 조회를
+반복하면 호출 수가 폭발하고 재현성이 깨진다. 대상 읍의 상가를 통째로 받아 캐시하고,
+500m 반경 필터는 `haversine_m`으로 로컬 계산한다.
+
+- [ ] 수집: PublicDataReader의 소상공인 상가업소 모듈 시도 → 실패 시 직접 호출 폴백.
+      직접 호출은 `storeListInDong`(행정동 단위, 6개 지역의 행정동 코드로 조회)을 우선,
+      행정동 코드 확보가 번거로우면 `storeListInRectangle`(읍 경계를 덮는 사각형)로 대체.
+      승인 페이지의 파라미터 명세 기준으로 확정 (04 문서 §1-2)
+- [ ] **업종 매핑 표 작성**: 하이원포인트 사용현황의 업종 명칭 ↔ 소진공 업종 대분류(`indsLclsNm`)
+      대응표를 `pipeline/category_map.py`에 dict로 명시 (예: "음식점" ↔ "음식", "카페" ↔ 소분류 매칭).
+      실데이터 확인 후 채우고, 매핑 불가 업종은 명시적으로 제외 목록에 기록
+- [ ] 필요한 필드만 저장: 상호명·업종 대분류·경도·위도 → `data/raw/api_cache/stores_<읍>.json`
+- [ ] **검증:** 선정 읍 중심 좌표 반경 500m 내 상가 수가 0이 아님을 로컬 haversine으로 확인
+
+### Task P5: 진단 지표 (`p5_metrics.py`)
+
+- [ ] `usage_monthly.json`으로 월별: 지역 소비 집중도(gini→index), 업종별 분산도(1−HHI), 지역별 비중
+- [ ] 지역 전환율: `월별 6개 지역 건수 합 ÷ 월별 총 입장객 × 100`, `is_proxy: true` 고정
+- [ ] 전월 대비 증감(`growth.mom_pct`) 계산 → **05 문서 §1 스키마 그대로** `dashboard.json` 저장
+- [ ] **검증:** `dashboard.json`을 FE mock 디렉토리에 복사해 대시보드 화면이 그대로 렌더되는지 (FE 팀원과 크로스체크)
+
+### Task P6: 2단계 스코어링 (`p6_scoring.py`)
+
+```python
+# 1단계 — 읍 우선순위 (읍 단위 데이터만)
+# 소비저조도_i = 1 - (해당 읍 최근 3개월 건수 / 6개 읍 평균 건수), 0~1로 클리핑
+# 소비증감_i  = 전분기 대비 건수 감소율을 0~1 min-max 정규화 (감소가 클수록 1)
+# 읍Score = v1*소비저조도 + v2*소비증감  → 상위 1~2개 읍 = selected_eups
+
+# 2단계 — 후보 지점 (선정 읍 내부, 좌표 데이터만)
+# 후보 = 선정 읍 내 소진공 상가 지점(업종 대분류별)
+# 업종공백도   = 1 - (반경500m 내 하이원 가맹점 수 / 반경500m 내 소진공 전체 상가 수)
+# 관광동선근접도 = (1 / ANCHOR까지 거리) 를 후보군 내 0~1 정규화
+# 기존가맹포화도 = 반경500m 내 동일 업종 하이원 가맹점 수를 0~1 정규화
+# 후보Score = w1*업종공백도 + w2*관광동선근접도 - w3*기존가맹포화도
+# 업종별 최고점 지점을 대표 후보로 → 상위 5개 candidates.json
+```
+
+- [ ] 1단계 계산 → `eup_scores.json` (05 문서 `eup_ranking` 스키마).
+      "최근 3개월"·"전분기"는 **데이터 최신 월 기준**(공통 원칙 3) — 기준월을 JSON에 함께 기록
+- [ ] 2단계 계산 → `candidates.json`. 업종 구분은 P4의 `category_map.py` 매핑 표만 사용
+- [ ] **예외처리:** 선정 읍에서 후보가 0개면 차순위 읍으로 자동 재시도 (기획안 리스크 대응)
+- [ ] **검증:** 상위 후보를 지도에 찍어(FE 지도 or geojson.io) 상식적으로 타당한지 눈으로 확인. 1·2단계에 서로 다른 단위 데이터가 섞이지 않았는지 코드 리뷰
+
+### Task P7: 국세청 파생지표 (`p7_risk.py`) — 컷 후보 4순위
+
+**⚠ 실측 주의 (04 문서 §2):** 두 파일 모두 utf-8 **BOM** (`encoding="utf-8-sig"`), 컬럼명에
+앞뒤 공백(`" 당월 "`) → 로드 직후 `df.columns = df.columns.str.strip()`. 존속연수별 파일은
+5·6번째 컬럼 헤더가 오염(`(전체전월`·`(전체전년동월` — 괄호 미닫힘) — **컬럼명 문자열에 의존하지
+말고 위치 기반 매핑** 사용. 존속연수는 실측 결과 **배타적 9구간**(6개월 미만/6개월 이상/1년 이상/
+2년 이상/3년 이상/5년 이상/10년 이상/20년 이상/30년 이상)이며 **"2년 미만" = 6개월 미만 +
+6개월 이상 + 1년 이상** 합산. 두 파일 모두 전국 단위 — 강원 4개 시군구만 필터하되 **시도
+리터럴은 `강원특별자치도`**(`"강원"` 완전일치는 0행).
+
+- [ ] 100대 생활업종 × 존속연수별 CSV 결합 → 시군구별 `운영 2년 미만 사업자 수 / 전체 사업자 수`
+- [ ] 정선군·태백시·영월군·삼척시만 추려 `risk_signal.json` 저장 (산식은 발표 슬라이드에 명시)
+- [ ] **검증:** 비중이 0~1 범위, 시군구 4곳 모두 존재
+
+### Task P8: 가중치 민감도 분석 (`p8_sensitivity.py`) — 컷 후보 2순위
+
+- [ ] v1 ∈ {0.3, 0.4, 0.5, 0.6, 0.7} × 2단계 가중치 조합(각 0.2~0.47, 합=1 격자)으로 재계산
+- [ ] 각 조합의 Top3 후보가 기본 가중치의 Top3와 같은 비율 → `sensitivity.json`
+      `{"combos": N, "top3_stable_ratio": 0.88, "detail": [...]}`
+- [ ] **검증:** `top3_stable_ratio` 출력 → 발표 슬라이드 1장으로 제작 (발표 필수 소재 — Phase 5에서 실행)
+
+### Task P9: 통합 실행 (`run_all.py`)
+
+- [ ] P1→P8 순차 실행 + 각 단계 성공/실패 로그 + 실패 시 중단
+- [ ] 완료 시 `data/processed/` 목록·파일 크기 출력
+- [ ] **검증:** 클린 체크아웃에서 `python run_all.py` 한 번으로 전체 재현
