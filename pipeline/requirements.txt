@@ -1,0 +1,5 @@
+pandas
+requests
+PublicDataReader
+python-dotenv
+xmltodict

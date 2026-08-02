@@ -1,0 +1,56 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: sangseng-navigator backend
+
+Parameters:
+  LlmProvider:      { Type: String, Default: openai }
+  OpenAiApiKey:     { Type: String, Default: '', NoEcho: true }
+  AnthropicApiKey:  { Type: String, Default: '', NoEcho: true }
+
+Globals:
+  Function:
+    Runtime: python3.12
+    Timeout: 30          # LLM 호출 여유
+    MemorySize: 512
+
+Resources:
+  HttpApi:
+    Type: AWS::Serverless::HttpApi
+    Properties:
+      CorsConfiguration:
+        AllowOrigins: ['*']   # 1차 배포용. Vercel 도메인 확정 후 09 문서 §5에서 좁힌다
+        AllowMethods: [GET, POST, OPTIONS]
+        AllowHeaders: ['*']
+
+  ApiFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: ../backend
+      Handler: app.main.handler
+      Environment:
+        Variables:
+          CARDS_TABLE: !Ref CardsTable
+          LLM_PROVIDER: !Ref LlmProvider
+          OPENAI_API_KEY: !Ref OpenAiApiKey
+          ANTHROPIC_API_KEY: !Ref AnthropicApiKey
+      Policies:
+        - DynamoDBCrudPolicy: { TableName: !Ref CardsTable }
+      Events:
+        Proxy:
+          Type: HttpApi
+          Properties: { ApiId: !Ref HttpApi, Path: '/{proxy+}', Method: ANY }
+
+  CardsTable:
+    Type: AWS::Serverless::SimpleTable        # PAY_PER_REQUEST(온디맨드) 기본
+    Properties:
+      PrimaryKey: { Name: id, Type: String }
+
+  ApiLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub /aws/lambda/${ApiFunction}
+      RetentionInDays: 7                      # 로그 비용 방지
+
+Outputs:
+  ApiUrl:     { Value: !Sub 'https://${HttpApi}.execute-api.${AWS::Region}.amazonaws.com' }
+  CardsTable: { Value: !Ref CardsTable }
