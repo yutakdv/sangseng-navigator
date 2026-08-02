@@ -1,0 +1,40 @@
+# env / secrets
+.env
+.env.local
+.env*.local
+
+# python
+__pycache__/
+*.pyc
+.venv/
+venv/
+.pytest_cache/
+.ruff_cache/
+
+# node / next
+node_modules/
+frontend/.next/
+frontend/out/
+frontend/next-env.d.ts
+
+# aws sam
+infra/.aws-sam/
+samconfig.toml.bak
+
+# backend에 번들되는 데이터 사본 (원본은 data/processed/)
+backend/app/data/
+
+# os / editor
+.DS_Store
+.idea/
+.vscode/
+
+# 제출 서류 원본 — 개인정보(연락처) 포함, Public 레포에 커밋 금지 (docs/plan/12 §4)
+기획서_V.I.B.E.pdf
+MVP_상생나침반_개정판.pdf
+
+# 캠프 배포 원본 폴더 — data/raw/ 로 복사한 사본이 커밋 정본 (docs/plan/04 §2)
+바이브코딩캠프_파일데이터/
+
+# Kakao 지오코딩 응답 캐시 — 공공데이터 아님, 재배포 제약 (docs/plan/12 §4, 06 P3)
+data/raw/api_cache/geocode.json
