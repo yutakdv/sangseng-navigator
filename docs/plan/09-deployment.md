@@ -85,15 +85,17 @@ source ../.env   # LLM 키 로드
 # processed 데이터를 Lambda 번들에 포함
 rm -rf ../backend/app/data && cp -r ../data/processed ../backend/app/data
 
+# 빈 값 파라미터는 제외 — SAM이 "Key=" 형식을 거부함 (2026-08-03 실측, template Default: '' 활용)
+PARAMS=("LlmProvider=${LLM_PROVIDER:-openai}")
+[ -n "${OPENAI_API_KEY:-}" ] && PARAMS+=("OpenAiApiKey=${OPENAI_API_KEY}")
+[ -n "${ANTHROPIC_API_KEY:-}" ] && PARAMS+=("AnthropicApiKey=${ANTHROPIC_API_KEY}")
+
 sam build -t template.yaml
 sam deploy -t template.yaml \
   --stack-name sangseng-backend \
   --resolve-s3 --capabilities CAPABILITY_IAM \
   --region ap-northeast-2 \
-  --parameter-overrides \
-    LlmProvider="${LLM_PROVIDER:-openai}" \
-    OpenAiApiKey="${OPENAI_API_KEY:-}" \
-    AnthropicApiKey="${ANTHROPIC_API_KEY:-}" \
+  --parameter-overrides "${PARAMS[@]}" \
   --no-confirm-changeset
 
 aws cloudformation describe-stacks --stack-name sangseng-backend \

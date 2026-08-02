@@ -1,0 +1,80 @@
+"""P1: 하이원포인트 사용현황 CSV → 월×지역×업종 집계 (usage_monthly.json).
+
+입력 실측 (2026-08-03, docs/plan/04 §2): cp949, 일 단위, 2025-01~2025-12, 5,831행.
+"""
+import json
+
+import pandas as pd
+
+from common import PROCESSED_DIR, RAW_DIR, REGIONS
+
+# 실측 확정 컬럼 매핑 (발표 "실제 CSV 열어봤나" 증거 — docs/plan/06 P1)
+COLMAP = {
+    "가맹점 영업일자": "date",
+    "업종": "category",
+    "고한읍 건수": "고한읍",
+    "사북읍 건수": "사북읍",
+    "정선군 건수": "정선군",
+    "태백시 건수": "태백시",
+    "영월군 건수": "영월군",
+    "삼척시 건수": "삼척시",
+}
+
+
+def load_usage() -> pd.DataFrame:
+    path = RAW_DIR / "highone_point_usage.csv"
+    try:
+        df = pd.read_csv(path, encoding="cp949")
+    except UnicodeDecodeError:
+        df = pd.read_csv(path, encoding="utf-8-sig")
+    missing = set(COLMAP) - set(df.columns)
+    if missing:
+        raise SystemExit(f"P1 실패: 예상 컬럼 누락 {missing} — COLMAP과 원본 헤더를 대조할 것")
+    df = df.rename(columns=COLMAP)
+    df["month"] = df["date"].str[:7]
+    df[REGIONS] = df[REGIONS].fillna(0).astype(int)
+    return df
+
+
+def check_region_overlap(df: pd.DataFrame) -> str:
+    """'정선군' 컬럼이 고한읍·사북읍을 포함하는지 실데이터로 판정 (06 P1 필수 확인).
+
+    포함이라면 모든 행에서 정선군 >= 고한읍+사북읍 이어야 한다. 반례가 나오면 배타(잔여 지역)로 결론.
+    """
+    violations = int((df["정선군"] < df["고한읍"] + df["사북읍"]).sum())
+    total = len(df)
+    if violations > 0:
+        return (
+            f"정선군 컬럼은 고한읍·사북읍을 제외한 잔여 지역 (반례 {violations}/{total}행: "
+            "정선군 < 고한+사북 — 포함 관계라면 불가능). 6개 컬럼 합산에 이중집계 없음"
+        )
+    return f"주의: 반례 0/{total}행 — 포함 관계 가능성 있음, 수동 확인 필요"
+
+
+def main():
+    df = load_usage()
+    region_note = check_region_overlap(df)
+
+    monthly = df.groupby(["month", "category"], as_index=False)[REGIONS].sum()
+    months = sorted(df["month"].unique())
+    out = {
+        "source": "data/raw/highone_point_usage.csv",
+        "base_month": months[-1],
+        "months": months,
+        "categories": sorted(df["category"].unique()),
+        "region_note": region_note,
+        "usage": monthly.to_dict(orient="records"),
+        "visitors_monthly": None,  # P2(카지노 입장객 API)가 병합 — 승인 후
+    }
+    PROCESSED_DIR.mkdir(parents=True, exist_ok=True)
+    path = PROCESSED_DIR / "usage_monthly.json"
+    path.write_text(json.dumps(out, ensure_ascii=False, indent=2), encoding="utf-8")
+
+    total = int(df[REGIONS].to_numpy().sum())
+    print(f"P1 완료: {path}")
+    print(f"  월 {len(months)}개 ({months[0]}~{months[-1]}), 업종 {len(out['categories'])}종, 총 {total:,}건")
+    print(f"  지역 컬럼 판정: {region_note}")
+
+
+if __name__ == "__main__":
+    main()
