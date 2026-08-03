@@ -32,11 +32,12 @@
 4. **실 AWS 보호 가드** — `DYNAMO_ENDPOINT`가 없으면 모듈 단위 skip. 시드/리셋이 테이블을
    비우기 때문에, 환경변수를 빠뜨린 실행이 실 `sangseng-cards` 테이블을 파괴하는 것을 막는다.
    반대로 엔드포인트는 있는데 컨테이너가 안 떠 있으면 fixture가 원인·조치를 적은 RuntimeError로 죽는다.
+   → **픽스 라운드 1에서 skip을 폐기하고 실패(exit 2)로 바꿨다** (아래 픽스 라운드 1-1).
 5. **`CARDS_TABLE` 선점** — `.env`/`.env.example`의 `CARDS_TABLE=`은 T17 배포 전까지 빈 값이라
    그대로 두면 테이블명이 `""`가 된다. app import 전에 `os.environ.setdefault("CARDS_TABLE",
    "sangseng-cards")`로 선점했다(python-dotenv는 기존 환경변수를 덮지 않는다).
 
-## 테스트 목록 (21건)
+## 테스트 목록 (21건 → 픽스 라운드 1에서 24건)
 
 | # | 테스트 | 검증 대상 |
 |---|---|---|
@@ -61,6 +62,9 @@
 | 19 | `test_widget_promotes_completed_targets_and_payback` | 완료 카드 전/후 추천 **순서 변화**, `badge:"신규"`, payback rate 5, LLM blurb 채택 |
 | 20 | `test_widget_blurb_falls_back_when_llm_fails` | LLM 실패 시 05 §8 규칙 문구 |
 | 21 | `test_widget_returns_empty_for_unknown_region` | 0건 → `{"recommendations":[],"policy_note":...}` + LLM 호출 0회 |
+| 22 | `test_simulate_rejects_narrative_missing_required_words` | (픽스 라운드 1) "예상"·"가정" 없는 narrative → 규칙 문구 대체 |
+| 23 | `test_simulate_rejects_narrative_with_wrong_direction` | (픽스 라운드 1) 음수 delta에 "개선" 서술 → 규칙 문구 대체 |
+| 24 | `test_widget_fills_missing_blurbs` | (픽스 라운드 1) blurbs 길이 부족 → 부족분만 규칙 문구 보충 |
 
 ## 검증
 
@@ -131,13 +135,8 @@ Lambda 번들 오염 없음.
 
 ### 4. 실 AWS 보호 가드
 
-`DYNAMO_ENDPOINT` 없이 실행:
-
-```
-SKIPPED [1] tests/test_smoke.py:28: DYNAMO_ENDPOINT 미설정 — `docker compose up -d dynamodb` 후
-DYNAMO_ENDPOINT=http://localhost:8001 로 실행하세요 (실 AWS 테이블 보호)
-1 skipped in 0.00s
-```
+`DYNAMO_ENDPOINT` 없이 실행하면 안내와 함께 멈춘다. (이 시점 구현은 skip이었고,
+**픽스 라운드 1에서 실패(exit 2)로 교체** — 최신 출력은 픽스 라운드 1-1 참조.)
 
 ### 5. 뒷정리
 
@@ -164,3 +163,69 @@ DYNAMO_ENDPOINT=http://localhost:8001 로 실행하세요 (실 AWS 테이블 보
 4. **회귀 기준선으로서의 한계** — 스모크는 계약·상태 전이·에러 코드를 박제하지만 LLM 출력 품질
    (프롬프트 준수, 문구 자연스러움)은 검증하지 않는다. LLM 실호출 검증은 T11·T13 보고서의 수동
    기록이 유일한 근거이므로, 프롬프트를 고칠 때는 스모크 통과만으로 안심하면 안 된다.
+
+---
+
+## 픽스 라운드 1 (리뷰 Important 2건)
+
+### 1. 스킵 가드 → 명확한 실패 (Important)
+
+지적: `DYNAMO_ENDPOINT` 미설정 시 전건 skip + exit 0이라 "안 돌았는데 통과"로 보인다.
+표준 스모크가 모든 PR의 통과 기준이므로 치명적이다.
+
+`pytest.skip(allow_module_level=True)` → `pytest.fail(msg, pytrace=False)`로 교체(수집 단계 실패,
+**exit code 2**). 실 AWS 보호는 그대로다 — 미설정은 "실패"지 "실 AWS로 진행"이 아니다.
+리뷰가 허용한 범위에서 한 겹 더 막았다: 엔드포인트 호스트가 로컬 계열
+(`localhost`/`127.0.0.1`/`::1`/`dynamodb` — 마지막은 compose 서비스명, BE 컨테이너 안 실행 대비)이
+아니면 같은 방식으로 실패시킨다. 시드 리셋이 테이블을 통째로 비우기 때문.
+
+```
+### A) DYNAMO_ENDPOINT 미설정                                          exit=2
+ERROR tests/test_smoke.py - Failed: DYNAMO_ENDPOINT가 설정되지 않아 스모크를 ...
+!!!!!!!!!!!!!!!!!!!! Interrupted: 1 error during collection !!!!!!!!!!!!!!!!!!!!
+
+### B) DYNAMO_ENDPOINT=https://dynamodb.ap-northeast-2.amazonaws.com   exit=2
+ERROR tests/test_smoke.py - Failed: DYNAMO_ENDPOINT=https://dynamodb.ap-north...
+!!!!!!!!!!!!!!!!!!!! Interrupted: 1 error during collection !!!!!!!!!!!!!!!!!!!!
+
+### C) DYNAMO_ENDPOINT=http://localhost:8001                           exit=0
+........................                                                 [100%]
+24 passed in 0.63s
+```
+
+전문(A):
+
+```
+DYNAMO_ENDPOINT가 설정되지 않아 스모크를 실행할 수 없습니다 — `docker compose up -d dynamodb` 후
+`cd backend && DYNAMO_ENDPOINT=http://localhost:8001 ../.venv/bin/python -m pytest tests -q`
+```
+
+### 2. "형식은 맞는데 내용이 틀린" LLM 응답 가드 3건 추가 (Important)
+
+기존 fallback 테스트는 LLM **예외** 경로만 덮었고, 스키마는 지켰는데 내용이 틀려 호출부 가드가
+걸리는 경로는 커버리지 0이었다. `FakeLLM`에 `narrative`·`blurbs` 속성을 추가해 테스트가
+응답 내용을 갈아끼울 수 있게 하고(예외가 아니라 정상 반환), 3건을 추가했다.
+
+| 테스트 | 대상 가드 | 검증 |
+|---|---|---|
+| `test_simulate_rejects_narrative_missing_required_words` | `cards.py` "예상"·"가정" 누락 | `{"narrative": "짧은 문장입니다."}` → 채택되지 않고 규칙 기반 문구("영월군 소매점 업종에 …")로 대체, `fake.calls == ["narrative"]`로 예외가 아님을 확인 |
+| `test_simulate_rejects_narrative_with_wrong_direction` | `cards.py` wrong_direction | 사북읍×카페 카드를 직접 put(음수 delta 확보, `sum(delta_pp) < 0` 단언) 후 "…개선될 것으로 예상됩니다. 가정에 기반한…" 반환 → 채택되지 않고 `상승(집중 심화)` 문구로 대체 |
+| `test_widget_fills_missing_blurbs` | `widget.py` blurbs 길이 부족 | `{"blurbs": ["하나만"]}` → 0번만 LLM 문구, 1·2번은 `"영월군의 {업종} 하이원포인트 가맹점이에요"` 규칙 문구로 보충 |
+
+사북읍은 이미 소비가 몰린 지역이라 신규 가맹점을 더하면 집중도가 **오르는**(delta 음수) 유일한
+구성 — 후보(candidates.json)가 전부 영월군이라 generate로는 만들 수 없어 `_put_expansion` 헬퍼로
+카드를 직접 put했다.
+
+### 3. 재검증
+
+```
+$ cd backend && DYNAMO_ENDPOINT=http://localhost:8001 ../.venv/bin/python -m pytest tests -q
+........................                                                 [100%]
+24 passed in 1.04s
+```
+
+- 21건 → **24건**, 경고 0건 유지.
+- 24건 각각 단독 실행 → 전부 `1 passed` (독립성 유지). 추가한 사북읍 카드는 다음 테스트의
+  `seeded` fixture가 테이블을 비우면서 정리된다.
+- 레포 루트 `pytest backend/tests -q`도 `24 passed`.
+- `docker compose down` + `.env` 사본 삭제 + `git status` 클린.

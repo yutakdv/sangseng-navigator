@@ -8,7 +8,8 @@
 원칙:
 - LLM은 전 테스트에서 monkeypatch — 실호출 금지(요금·비결정성). 목업은 프롬프트가 아니라
   **요청 스키마**로 분기해 호출부가 기대하는 필드를 정확히 채운다.
-- DynamoDB는 DynamoDB Local 전용. `DYNAMO_ENDPOINT`가 없으면 실 AWS 테이블을 비울 수 있으므로 스킵한다.
+- DynamoDB는 DynamoDB Local 전용. 시드 리셋이 테이블을 비우므로 `DYNAMO_ENDPOINT`가 없거나
+  로컬을 가리키지 않으면 **실패**시킨다 — 스킵하면 "안 돌았는데 exit 0"이라 스모크 기준이 무의미해진다.
 - 테스트는 실데이터(data/processed)를 읽으므로 값을 하드코딩하지 않고 구조·타입·범위만 검증한다.
   문자열을 하드코딩하는 곳은 05 문서가 고정한 계약 문구(가정 기반 전망 등)뿐 — 바뀌면 잡아야 하는 값이다.
 - 상태 의존을 없애기 위해 매 테스트 전에 `seed_demo` 재사용으로 `--reset`과 같은 상태로 되돌린다.
@@ -18,16 +19,26 @@ import os
 import sys
 from datetime import datetime
 from pathlib import Path
+from urllib.parse import urlparse
 
 import pytest
 
 BACKEND_DIR = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(BACKEND_DIR))          # 어느 디렉터리에서 실행해도 `import app`이 되도록
 
-if not os.environ.get("DYNAMO_ENDPOINT"):
-    pytest.skip("DYNAMO_ENDPOINT 미설정 — `docker compose up -d dynamodb` 후 "
-                "DYNAMO_ENDPOINT=http://localhost:8001 로 실행하세요 (실 AWS 테이블 보호)",
-                allow_module_level=True)
+# DynamoDB Local로 인정하는 호스트 — localhost 계열 + docker compose 서비스명(컨테이너 안에서 실행할 때)
+LOCAL_HOSTS = {"localhost", "127.0.0.1", "::1", "dynamodb"}
+RUN_HINT = ("`docker compose up -d dynamodb` 후 "
+            "`cd backend && DYNAMO_ENDPOINT=http://localhost:8001 ../.venv/bin/python -m pytest tests -q`")
+
+# 스킵하지 않고 실패시킨다 — 이 스모크는 모든 PR의 통과 기준이라 "안 돌았는데 exit 0"이면 안 된다.
+_endpoint = os.environ.get("DYNAMO_ENDPOINT")
+if not _endpoint:
+    pytest.fail(f"DYNAMO_ENDPOINT가 설정되지 않아 스모크를 실행할 수 없습니다 — {RUN_HINT}", pytrace=False)
+if urlparse(_endpoint).hostname not in LOCAL_HOSTS:
+    # 시드 리셋이 테이블을 통째로 비우므로 실 AWS 엔드포인트로는 절대 돌리지 않는다.
+    pytest.fail(f"DYNAMO_ENDPOINT={_endpoint} 는 DynamoDB Local이 아닙니다 — 이 스모크는 테이블을 "
+                f"비우므로 로컬({'/'.join(sorted(LOCAL_HOSTS))})에서만 실행합니다. {RUN_HINT}", pytrace=False)
 
 os.environ.setdefault("AWS_ACCESS_KEY_ID", "local")     # DynamoDB Local은 자격증명 "형식"만 요구
 os.environ.setdefault("AWS_SECRET_ACCESS_KEY", "local")
@@ -68,18 +79,26 @@ FAKE_BLURB = "목업 추천 문구"
 
 
 class FakeLLM:
-    """`app.llm.generate_json` 대체 — 요청 스키마의 properties로 호출부를 식별해 응답을 맞춘다."""
+    """`app.llm.generate_json` 대체 — 요청 스키마의 properties로 호출부를 식별해 응답을 맞춘다.
+
+    속성 3개를 테스트에서 갈아끼워 "형식은 맞는데 내용이 틀린" 응답도 재현한다
+    (스키마는 지키므로 LLM 예외가 아니라 **호출부의 내용 가드**가 걸리는 경로).
+    """
 
     def __init__(self):
         self.calls = []
         self.ai_rank_target = FAKE_AI["ai_rank_target"]
+        self.narrative = FAKE_NARRATIVE
+        self.blurbs = None                                          # None이면 가맹점 수만큼 자동 생성
 
     def __call__(self, system, user, schema, schema_name="result", timeout=None):
         self.calls.append(schema_name)
         props = schema.get("properties", {})
         if "narrative" in props:                                    # cards.simulate
-            return {"narrative": FAKE_NARRATIVE}
+            return {"narrative": self.narrative}
         if "blurbs" in props:                                       # widget.recommend
+            if self.blurbs is not None:
+                return {"blurbs": self.blurbs}
             n = len(json.loads(user)["가맹점"])
             return {"blurbs": [f"{FAKE_BLURB} {i + 1}" for i in range(n)]}
         return {**FAKE_AI, "ai_rank_target": self.ai_rank_target}   # cardgen (CARD_AI_SCHEMA)
@@ -118,6 +137,14 @@ def _cards():
 
 def _generate(card_type="EXPANSION"):
     return client.post("/api/cards/generate", json={"type": card_type})
+
+
+def _put_expansion(cid, eup, category):
+    """최소 EXPANSION 카드 직접 put — candidates.json에 없는 타깃이 필요할 때만 쓴다."""
+    db.put_card({"id": cid, "type": "EXPANSION", "status": "pending", "progress": None,
+                 "title": f"{eup} {category} 업종 가맹점 확충",
+                 "target": {"eup": eup, "category": category},
+                 "created_at": db.now_iso(), "decided_at": None, "events": []})
 
 
 # ── 1. health / 정적 서빙 ────────────────────────────────────────────────
@@ -333,6 +360,29 @@ def test_simulate_falls_back_when_llm_fails(monkeypatch):
     assert sim["assumption_note"] == ASSUMPTION_NOTE
 
 
+def test_simulate_rejects_narrative_missing_required_words(fake_llm):
+    """스키마는 맞지만 '예상'·'가정'이 빠진 narrative는 규칙 기반 문구로 대체된다 (절대 규칙 3)."""
+    fake_llm.narrative = "짧은 문장입니다."
+    sim = client.post("/api/cards/AC-002/simulate").json()["simulation"]
+
+    assert fake_llm.calls == ["narrative"]                     # 예외가 아니라 내용 가드가 걸린 경로
+    assert sim["narrative"] != fake_llm.narrative
+    assert "예상" in sim["narrative"] and "가정" in sim["narrative"]
+    assert "영월군 소매점" in sim["narrative"]                  # 규칙 기반 문구 형태
+
+
+def test_simulate_rejects_narrative_with_wrong_direction(fake_llm):
+    """집중 심화(음수 delta)를 '개선'으로 서술한 narrative는 채택하지 않는다 (cards.py wrong_direction)."""
+    _put_expansion("AC-900", "사북읍", "카페")                  # 이미 소비가 몰린 지역 = 음수 delta
+    fake_llm.narrative = "지역 소비 집중도가 개선될 것으로 예상됩니다. 가정에 기반한 수치입니다."
+    sim = client.post("/api/cards/AC-900/simulate").json()["simulation"]
+
+    assert sum(sim["delta_pp"]) < 0                            # 전제: 집중 심화 방향
+    assert sim["narrative"] != fake_llm.narrative
+    assert "상승(집중 심화)" in sim["narrative"]
+    assert "예상" in sim["narrative"] and "가정" in sim["narrative"]
+
+
 def test_simulate_error_paths():
     assert client.post("/api/cards/INC-001/simulate").status_code == 400     # EXPANSION 전용
     assert client.post("/api/cards/AC-999/simulate").status_code == 404
@@ -406,6 +456,16 @@ def test_widget_blurb_falls_back_when_llm_fails(monkeypatch):
     recs = client.get("/api/widget/recommend",
                       params={"region": "영월군", "category": "카페"}).json()["recommendations"]
     assert recs and all("영월군" in r["blurb"] and "카페" in r["blurb"] for r in recs)
+
+
+def test_widget_fills_missing_blurbs(fake_llm):
+    """LLM이 요청 수보다 적게 돌려줘도 부족분만 규칙 기반 문구로 채운다 (widget._blurbs)."""
+    fake_llm.blurbs = ["하나만"]
+    recs = client.get("/api/widget/recommend", params={"region": "영월군"}).json()["recommendations"]
+
+    assert len(recs) == 3
+    assert recs[0]["blurb"] == "하나만"
+    assert all(r["blurb"] == f"영월군의 {r['category']} 하이원포인트 가맹점이에요" for r in recs[1:])
 
 
 def test_widget_returns_empty_for_unknown_region(fake_llm):
