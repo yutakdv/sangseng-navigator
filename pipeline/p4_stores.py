@@ -19,8 +19,11 @@ divId 실측: adongCd=행정동 **8자리**(51770253 고한읍 / 51770256 사북
 응답 형태(실측):
   {"header": {"resultCode":"00","resultMsg":"NORMAL SERVICE","stdrYm":"202606","columns":[...]},
    "body": {"totalCount":533,"pageNo":1,"numOfRows":1000,"items":[{...}]}}
-items 주요 필드: bizesNm(상호명) indsLclsNm(업종 대분류명) lon(경도) lat(위도)
-                adongCd/adongNm(행정동) signguCd/signguNm(시군구) bizesId(상가업소번호)
+items 주요 필드: bizesNm(상호명) lon(경도) lat(위도) bizesId(상가업소번호)
+                indsLclsNm(대분류) indsMclsNm(중분류) indsSclsNm(소분류)
+                adongCd/adongNm(행정동) signguCd/signguNm(시군구)
+  ※ 중분류·소분류까지 저장한다 — 대분류만으로는 카페("음식")·편의점("소매")을 분리할 수 없어
+    05 계약의 `candidates[].category: "카페"` 를 만들 수 없다 (06 P4 "카페 ↔ 소분류 매칭")
 페이징 실측: totalCount 3009(정선군)을 1000행 4페이지로 완주, 페이지 간 bizesId 중복 0건
 
 PublicDataReader(SmallShop, 1.1.1) 시도 결과 → **직접 호출로 확정**. 실측한 탈락 사유 3가지:
@@ -34,6 +37,7 @@ PublicDataReader(SmallShop, 1.1.1) 시도 결과 → **직접 호출로 확정**
 import argparse
 import json
 import os
+import re
 import time
 from datetime import date
 from pathlib import Path
@@ -41,7 +45,12 @@ from pathlib import Path
 import requests
 from dotenv import load_dotenv
 
-from category_map import LCLS_EXCLUDED, LCLS_TO_DISPLAY
+from category_map import (
+    DISPLAY_CATEGORIES,
+    LCLS_EXCLUDED,
+    LCLS_TO_DISPLAY,
+    store_display_category,
+)
 from common import ANCHOR, RADIUS_M, RAW_DIR, REGIONS, haversine_m
 
 load_dotenv(Path(__file__).parents[1] / ".env")
@@ -55,6 +64,7 @@ RETRIES = 3             # 실패 시 3회 후 중단 (silent 실패 금지)
 TIMEOUT_S = 30
 LAT_RANGE = (36.5, 38.5)   # 06 공통 원칙 5
 LNG_RANGE = (127.5, 129.5)
+KEY_PATTERN = re.compile(r"serviceKey=[^&\s]*")  # 에러 메시지의 URL 에서 키를 가린다
 
 # REGIONS 6종의 조회 키 — 전부 실호출로 확정 (2026-08-03, totalCount 병기)
 REGION_QUERY = {
@@ -88,8 +98,9 @@ def _get(params: dict) -> dict:
             res.raise_for_status()
             body = res.json()
         except Exception as exc:  # 통신·JSON 파싱 실패
-            # requests 의 HTTPError 메시지에는 serviceKey 가 박힌 전체 URL 이 들어간다 → 마스킹
-            last = f"{type(exc).__name__}: {exc}".replace(params["serviceKey"], "***")
+            # requests 의 HTTPError 메시지에는 serviceKey 가 박힌 전체 URL 이 들어간다 → 마스킹.
+            # 키 리터럴 replace 는 Encoding 키(%2B 등)일 때 URL 안의 형태와 달라 못 잡는다 → 패턴으로.
+            last = KEY_PATTERN.sub("serviceKey=***", f"{type(exc).__name__}: {exc}")
         else:
             header = body.get("header", {})
             if header.get("resultCode") == "00":
@@ -133,6 +144,12 @@ def build_cache(region: str, items: list[dict], total: int, stdr_ym: str) -> dic
     if wrong:
         raise SystemExit(f"P4 실패: {region} 조회 키({div_id}={key})가 다른 지역을 반환 — {wrong}")
 
+    # 중분류·소분류는 카페/편의점 분리에 필수다 (대분류만으로는 음식→음식점, 소매→소매점뿐).
+    # 첫 응답에서 필드 존재를 확인하고, 없으면 조용히 빈 값으로 흘리지 말고 중단한다.
+    missing = [f for f in ("indsMclsNm", "indsSclsNm") if items and f not in items[0]]
+    if missing:
+        raise SystemExit(f"P4 실패: {region} 응답에 업종 분류 필드 없음 {missing} — API 스펙 변경 확인")
+
     exclude = REGION_EXCLUDE_ADONG.get(region, ())
     stores, seen = [], set()
     excluded = dup = 0
@@ -154,9 +171,12 @@ def build_cache(region: str, items: list[dict], total: int, stdr_ym: str) -> dic
         if not (LAT_RANGE[0] <= lat <= LAT_RANGE[1] and LNG_RANGE[0] <= lng <= LNG_RANGE[1]):
             dropped.append(f"{it.get('bizesNm')}(범위밖 {lat:.5f},{lng:.5f})")
             continue
+        # 업종명 리터럴에 뒤쪽 공백 오염이 있다("비알코올 ", "법무관련 ", "장례식장 ") → 여기서 정규화
         stores.append({
-            "name": it.get("bizesNm", ""),
-            "lcls": it.get("indsLclsNm", ""),
+            "name": (it.get("bizesNm") or "").strip(),
+            "lcls": (it.get("indsLclsNm") or "").strip(),
+            "mcls": (it.get("indsMclsNm") or "").strip(),
+            "scls": (it.get("indsSclsNm") or "").strip(),
             "lat": round(lat, 6),
             "lng": round(lng, 6),
         })
@@ -181,7 +201,11 @@ def build_cache(region: str, items: list[dict], total: int, stdr_ym: str) -> dic
 
 
 def load_stores(eup: str) -> list[dict]:
-    """<eup> 상가 목록 → [{"name","lcls","lat","lng"}]. P6(2단계 스코어링)·B6(nearby_stores)가 소비."""
+    """<eup> 상가 목록 → [{"name","lcls","mcls","scls","lat","lng"}].
+
+    P6(2단계 스코어링)·B6(nearby_stores)가 소비. 표시 분류가 필요하면 직접 분기하지 말고
+    category_map.store_display_category(store) 를 쓴다 (분류 규칙 정본이 거기 하나뿐이다).
+    """
     path = CACHE_DIR / f"stores_{eup}.json"
     if not path.exists():
         raise FileNotFoundError(f"{path} 없음 — pipeline/p4_stores.py 를 먼저 실행할 것")
@@ -193,7 +217,7 @@ def _centroid(stores: list[dict]) -> tuple[float, float]:
 
 
 def verify(caches: list[dict]) -> None:
-    """06 P4 검증: 업종 대분류 실측 목록 + 고한읍·사북읍 반경 500m 내 상가 수 > 0."""
+    """06 P4 검증: 업종 분류 실측 목록 + 고한읍·사북읍 반경 500m 내 상가 수 > 0 + 표시 분류 분포."""
     known = set(LCLS_TO_DISPLAY) | set(LCLS_EXCLUDED)
     counts: dict[str, int] = {}
     for cache in caches:
@@ -219,6 +243,21 @@ def verify(caches: list[dict]) -> None:
         print(f"  {eup}: 상가 {len(stores)}건 / 중심({c_lat:.5f}, {c_lng:.5f}) 500m 내 {near_c}건 "
               f"/ {ANCHOR['name']} 500m 내 {near_a}건")
         ok = ok and near_c > 0
+
+    # 표시 6분류 후보 생성 가능성 — 05 candidates 예시가 "category": "카페" 라 카페·편의점이 0이면
+    # T5가 그 분류의 후보를 못 만든다. 0이어도 중단하지 않고 사실만 남긴다(T5 예외처리 근거).
+    print("\n표시 분류별 상가 수 (category_map.store_display_category 단일 경로):")
+    for eup in ("고한읍", "사북읍"):
+        stores = load_stores(eup)
+        dist: dict[str, int] = {}
+        for s in stores:
+            key = store_display_category(s) or "— 후보 제외"
+            dist[key] = dist.get(key, 0) + 1
+        line = " / ".join(f"{d} {dist.get(d, 0)}" for d in DISPLAY_CATEGORIES)
+        print(f"  {eup}: {line} / 후보제외 {dist.get('— 후보 제외', 0)}")
+        for must in ("카페", "편의점"):
+            if not dist.get(must):
+                print(f"    [주의] {eup}에 '{must}' 상가 0건 — T5는 이 분류의 후보를 만들 수 없다")
     if not ok:
         raise SystemExit("P4 실패: 읍 중심 반경 500m 내 상가 0건 — 좌표·수집 범위 확인")
 
