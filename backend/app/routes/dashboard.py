@@ -25,6 +25,6 @@ def get_candidates():
     return {
         "eup_ranking": eup_scores["eup_ranking"],
         "selected_eups": eup_scores["selected_eups"],
-        "candidates": candidates["candidates"],
-        "merchants": merchants["merchants"],
+        "candidates": candidates,
+        "merchants": merchants,
     }
