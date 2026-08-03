@@ -29,7 +29,7 @@
 
 ### 3-1. `infra/deploy-backend.sh` — `sam deploy -t template.yaml`이 빌드 산출물을 무시
 
-- [ ] deploy 줄에서 `-t template.yaml` 제거 (build 줄은 유지)
+- [x] deploy 줄에서 `-t template.yaml` 제거 (build 줄은 유지)
 
 현재 (14~15행):
 
@@ -54,7 +54,7 @@ sam deploy \                       # 인자 없으면 .aws-sam/build/template.ya
 
 ### 3-2. 14 문서 T17 Step 1 — 기재된 IAM 인라인 정책으로는 `sam deploy` 불가
 
-- [ ] 14 문서 T17 Step 1을 "한시 `AdministratorAccess` 부착(04 §5 후주와 동일) → 캠프 종료 후 회수"로 교체
+- [x] 14 문서 T17 Step 1을 "한시 `AdministratorAccess` 부착(04 §5 후주와 동일) → 캠프 종료 후 회수"로 교체
 
 현행 정책(`cloudformation:* / apigateway:* / dynamodb:*`)에 빠진 필수 권한:
 
@@ -109,7 +109,7 @@ CLI로 불가하므로 **콘솔(관리자 권한) 경로**로 수행한다.
 
 ## 6. 문서 참조 정정 (off-by-one) — 착수 첫 커밋에서 일괄
 
-- [ ] 아래 4곳의 "14 문서 T16" → **T17** (T7 Docker 태스크 삽입으로 넘버링이 밀림; T16=로컬 풀루프, T17=AWS 최종 배포)
+- [x] 아래 4곳의 "14 문서 T16" → **T17** (T7 Docker 태스크 삽입으로 넘버링이 밀림; T16=로컬 풀루프, T17=AWS 최종 배포)
 
 | 위치 | 현재 문구 |
 |---|---|
@@ -120,7 +120,7 @@ CLI로 불가하므로 **콘솔(관리자 권한) 경로**로 수행한다.
 
 ## 7. 진행 방식 제안 — Vercel Import 조기화 (채택 시 14 문서 수정)
 
-- [ ] Vercel Import+첫 Deploy를 T17 Step 5에서 **F1 머지 직후**로 이동
+- [x] Vercel Import+첫 Deploy를 T17 Step 5에서 **F1 머지 직후**로 이동
 
 근거: F9 검증이 요구하는 PR Preview URL 스모크가 현재 순서(T17에서 최초 Import)로는
 개발 기간 내내 불가능. Import는 AWS와 무관하고 비용 0. `NEXT_PUBLIC_API_BASE` 미설정

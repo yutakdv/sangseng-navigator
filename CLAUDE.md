@@ -34,7 +34,7 @@ cd backend && uvicorn app.main:app --reload --port 8000
 # 프론트 로컬 실행 (http://localhost:3000)
 cd frontend && npm run dev
 
-# 백엔드 배포 — ⚠ 개발 완료 후 최종 1회만 (docs/plan/09 §4, 14 문서 T16)
+# 백엔드 배포 — ⚠ 개발 완료 후 최종 1회만 (docs/plan/09 §4, 14 문서 T17)
 cd infra && ./deploy-backend.sh
 
 # 프론트 배포: Vercel — main에 push하면 자동 배포, PR은 Preview URL 자동 생성
