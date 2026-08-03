@@ -9,6 +9,9 @@
 # 사용법: 레포 루트에서  ./scripts/sync-mocks.sh
 # 선행:   cd pipeline && python run_all.py   (data/processed/ 갱신)
 #
+# 생성 결과(frontend/src/mocks/*)는 커밋한다 — 정적 import 대상이라 레포에 없으면 Vercel
+# 빌드가 실패하고, mock 모드(NEXT_PUBLIC_API_BASE 미설정) 비상 폴백도 성립하지 않는다.
+#
 # candidates.json 만 예외 — 파일 복사가 아니라 `GET /api/candidates` 의 병합 응답
 # (eup_ranking + selected_eups + candidates + merchants) 형태로 만든다.
 # 병합 정본은 backend/app/routes/dashboard.py 의 get_candidates() 이며, 형태가 바뀌면 둘 다 고친다.

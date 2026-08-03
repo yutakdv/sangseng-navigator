@@ -42,7 +42,7 @@ Phase 0 (준비·블로커 해소)
 
 - [ ] P1 사용현황 집계 → P2 카지노 입장객 → P3 가맹점 지오코딩 → P4 소진공 상가
 - [ ] P5 진단 지표(`dashboard.json`) → P6 1·2단계 스코어링 → P9 `run_all.py` 통합
-- [ ] 산출 JSON을 FE mock에 복사(실데이터 mock으로 교체) → `data:` 커밋
+- [ ] `data/processed/` 산출 JSON을 `data:` 커밋 (FE mock은 `./scripts/sync-mocks.sh`로 별도 생성한 뒤 커밋)
 - (P7 국세청 파생지표, P8 민감도 분석은 Phase 5로 미뤄도 됨 — 컷 후보)
 
 **Gate:** 클린 체크아웃에서 `python run_all.py` 한 번으로 `data/processed/` 재현,
