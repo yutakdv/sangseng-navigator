@@ -20,6 +20,26 @@ BE 위젯 업종 선택이 모두 이 표를 참조한다. 05 문서 §1에 "표
    ※ 고한읍·사북읍 실수집분(1,044건)에 실제로 등장한 대분류는 10종뿐:
      음식·소매·숙박·수리·개인·시설관리·임대·예술·스포츠·과학·기술·교육·보건의료·부동산
 
+②-1 소진공 **중분류**(`indsMclsNm`) 실측 unique — 전 수집분 12,780건에 등장한 74종 (건수 병기).
+   대분류만으로는 카페·편의점을 만들 수 없어(음식→음식점, 소매→소매점) 중분류까지 수집했다.
+   음식[4547]: 한식(2379) 기타 간이(749) 비알코올(560) 주점(557) 중식(141) 서양식(76)
+               일식(41) 구내식당·뷔페(35) 동남아시아(9)
+   소매[3374]: 식료품 소매(855) 종합 소매(818) 섬유·의복·신발 소매(426) 연료 소매(200)
+               의약·화장품 소매(177) 오락용품 소매(151) 철물·건설자재 소매(150) 가전·통신 소매(115)
+               기타 상품 소매(81) 기타 생활용품 소매(77) 식물 소매(76) 자동차 부품 소매(46)
+               장식품 소매(41) 시계·귀금속 소매(40) 안경·정밀기기 소매(30) 담배 소매(23)
+               중고 상품 소매(23) 애완동물·용품 소매(16) 가구 소매(14) 음료 소매(14) 모터사이클 소매(1)
+   숙박[1352]: 일반 숙박(1342) 기타 숙박(10)
+   수리·개인[1213]: 이용·미용(589) 자동차 수리·세차(273) 세탁(103) 욕탕·신체관리(67) 장례식장(57)
+               기타 가정용품 수리(46) 가전제품 수리(44) 모터사이클 수리(15) 컴퓨터 수리(10)
+               기타 개인(5) 통신장비 수리(4)
+   예술·스포츠[502]: 유원지·오락(286) 스포츠 서비스(196) 도서관·사적지(20)
+   (후보 제외 대분류) 시설관리·임대[562] 과학·기술[513] 교육[463] 보건의료[145] 부동산[109]
+   ※ 카페 분리 근거: 중분류 "비알코올"의 소분류는 560건 전부 "카페" 단일값 — 잡음 없음
+   ※ 편의점 분리 근거: 중분류 "종합 소매"의 소분류 = 슈퍼마켓(508)·편의점(284)·그 외 종합(26)
+   ※ 원본 리터럴에 뒤쪽 공백 오염이 있다("비알코올 ", "법무관련 ", "장례식장 ").
+     p4_stores.py 가 수집 시 strip 하고, 이 파일의 헬퍼도 한 번 더 strip 한다
+
 ③ 하이원포인트 **가맹점 API(getStoreInfo) 응답에는 업종 필드가 없다** (2026-08-03 실측 —
    필드: FRCS_REG_NO / FRCS_NM / FRCS_BRNO / FRCS_ADDR / FRCS_TELNO / PNT_USABLE_AMT).
    따라서 "가맹점 업종명 → 표시 분류" 매핑은 이 태스크에서 확정할 수 없다.
@@ -31,15 +51,17 @@ BE 위젯 업종 선택이 모두 이 표를 참조한다. 05 문서 §1에 "표
 DISPLAY_CATEGORIES = ["카페", "음식점", "편의점", "숙박업", "소매점", "기타"]
 
 # --- 매핑 ① 하이원 18종 → 표시 6분류 (도넛 category_share, 지도 마커 범례) ---
-# 롤업 근거: 커피=카페 / 음식·주점=음식점 / 식품·생필품 소매=편의점 / 그 외 상품 소매=소매점 /
+# 롤업 근거: 커피=카페 / 음식·주점=음식점 / 종합소매(슈퍼·편의점)=편의점 / 그 외 상품 소매=소매점 /
 #           개인서비스·차량정비·연료소매·실내스포츠 = 기타(관광 동선 상점으로 보기 어려움)
+# 소진공 쪽 규칙(STORE_MCLS_TO_DISPLAY)과 같은 기준을 쓴다 — 편의점은 "종합 소매"만, 식품 전문
+# 소매는 소매점. 양쪽이 어긋나면 업종공백도(하이원 vs 소진공)가 다른 축을 비교하게 된다.
 HIGHONE_TO_DISPLAY = {
     "커피전문점": "카페",
     "일반음식점업": "음식점",
     "휴게음식점업": "음식점",
     "일반주점업": "음식점",
     "슈퍼마켓": "편의점",
-    "식품판매업": "편의점",
+    "식품판매업": "소매점",   # 정육·청과·건어물 등 식품 전문 소매 — 소진공 "식료품 소매"와 같은 묶음
     "소매업": "소매점",
     "숙박업": "숙박업",
     "주유소·LPG충전소": "기타",
@@ -54,23 +76,18 @@ HIGHONE_TO_DISPLAY = {
     "기타": "기타",
 }
 
-# --- 매핑 ② 표시 6분류 ↔ 소진공 대분류(indsLclsNm) ---
-# 대분류는 거칠어서 1:1이 아니다. 정방향은 1:N, 역방향은 손실이 있다(아래 주석).
-DISPLAY_TO_LCLS = {
-    "카페": ["음식"],          # 대분류에 카페가 없다. 중분류 "커피점/카페"에 해당
-    "음식점": ["음식"],
-    "편의점": ["소매"],        # 대분류에 편의점이 없다. 중분류 "종합소매점"에 해당
-    "숙박업": ["숙박"],
-    "소매점": ["소매"],
-    # 표시 "기타"는 개인서비스·실내스포츠만 잡는다. 하이원 "주유소·LPG충전소"도 표시상 기타지만
-    # 소진공에서는 대분류 "소매"(차량연료 소매)라 여기 넣으면 소매점·편의점과 겹친다 → 뺀다.
-    "기타": ["수리·개인", "예술·스포츠"],
+# --- 매핑 ② 소진공 상가 → 표시 6분류 : (대분류, 중분류) 2단 규칙 ---
+# 중분류 예외를 먼저 보고, 없으면 대분류 기본값으로 떨어진다.
+# 이 두 표는 store_display_category() 를 통해서만 쓴다 (소비자가 직접 분기하면 경로가 갈린다).
+STORE_MCLS_TO_DISPLAY = {
+    ("음식", "비알코올"): "카페",      # 소분류 560건 전부 "카페" — 대분류로는 못 만드는 분류
+    ("소매", "종합 소매"): "편의점",   # 소분류 = 슈퍼마켓·편의점·그 외 종합
+    ("소매", "연료 소매"): "기타",     # 주유소·가스충전소 — 하이원 "주유소·LPG충전소"와 같은 취급
 }
 
-# 역방향(소진공 대분류 → 표시 분류). 손실 주의:
-#   음식 → "음식점"으로만 내려온다(대분류 레벨에서 카페를 분리할 수 없음).
-#   소매 → "소매점"으로만 내려온다(편의점을 분리할 수 없음).
-# 카페/편의점을 구분해야 하면 중분류(indsMclsNm)까지 받아야 한다 — 현재 수집 범위 밖.
+# 중분류 예외에 안 걸릴 때의 대분류 기본값. 여기 없는 대분류(LCLS_EXCLUDED)는 후보 대상이 아니다.
+# 남는 한계: 음식/"기타 간이"의 "빵/도넛"(제과점 107건)은 음식점으로 둔다 —
+# 하이원 "커피전문점" ↔ 소진공 "비알코올"의 1:1 대응을 깨지 않기 위해서다.
 LCLS_TO_DISPLAY = {
     "음식": "음식점",
     "소매": "소매점",
@@ -126,8 +143,17 @@ def display_of_highone(category: str) -> str:
     return HIGHONE_TO_DISPLAY.get(category, "기타")
 
 
-def display_of_lcls(lcls: str) -> str | None:
-    """소진공 대분류명 → 표시 분류. 후보 대상이 아니면 None."""
+def store_display_category(store: dict) -> str | None:
+    """소진공 상가 1건 → 표시 6분류. 후보 대상이 아닌 대분류면 None.
+
+    **상가의 표시 분류는 이 함수 하나로만 구한다** (T5/P6 후보 category, B6 nearby_stores 포함).
+    호출부에서 lcls/mcls 를 직접 분기하면 규칙이 두 갈래로 갈라진다 — 그러지 말 것.
+    인자는 p4_stores.load_stores() 가 주는 {"name","lcls","mcls","scls","lat","lng"} 항목.
+    """
+    lcls = (store.get("lcls") or "").strip()
+    mcls = (store.get("mcls") or "").strip()
+    if (lcls, mcls) in STORE_MCLS_TO_DISPLAY:
+        return STORE_MCLS_TO_DISPLAY[(lcls, mcls)]
     return LCLS_TO_DISPLAY.get(lcls)
 
 
@@ -144,9 +170,13 @@ if __name__ == "__main__":  # 매핑 정합성 자체 점검 (절차 ①②와 �
     assert not stray, f"실데이터에 없는 업종이 표에 있음: {stray}"
     assert set(HIGHONE_TO_DISPLAY) == set(cats), "HIGHONE_TO_DISPLAY가 18종을 정확히 덮지 않음"
     assert set(HIGHONE_TO_DISPLAY.values()) <= set(DISPLAY_CATEGORIES)
-    assert set(LCLS_TO_DISPLAY) == {l for v in DISPLAY_TO_LCLS.values() for l in v}
     assert not (set(LCLS_TO_DISPLAY) & set(LCLS_EXCLUDED)), "대분류가 매핑·제외 양쪽에 있음"
     assert len(set(LCLS_TO_DISPLAY) | set(LCLS_EXCLUDED)) == 25, "소진공 대분류 25종을 덮지 않음"
+    assert set(STORE_MCLS_TO_DISPLAY.values()) <= set(DISPLAY_CATEGORIES)
+    assert all(l in LCLS_TO_DISPLAY for l, _ in STORE_MCLS_TO_DISPLAY), "중분류 예외의 대분류가 후보 대상 밖"
+    # 표시 6분류가 모두 상가에서 생성 가능해야 한다 (05 candidates 예시의 "카페" 포함)
+    producible = set(LCLS_TO_DISPLAY.values()) | set(STORE_MCLS_TO_DISPLAY.values())
+    assert producible == set(DISPLAY_CATEGORIES), f"상가로 만들 수 없는 표시 분류: {set(DISPLAY_CATEGORIES) - producible}"
 
     print(f"하이원 업종 {len(cats)}종 (usage_monthly.json)")
     for c in cats:
@@ -154,4 +184,10 @@ if __name__ == "__main__":  # 매핑 정합성 자체 점검 (절차 ①②와 �
         print(f"  {c:<16} → 표시 {display_of_highone(c):<4} / 소진공 {lcls}")
     print(f"\nEXCLUDED(매핑 불가 하이원 업종): {EXCLUDED}")
     print(f"후보 대상 소진공 대분류 {len(LCLS_TO_DISPLAY)}종 / 제외 {len(LCLS_EXCLUDED)}종 = 25종")
+    print("상가 → 표시 분류 규칙 (store_display_category, 중분류 예외 우선):")
+    for (l, m), d in STORE_MCLS_TO_DISPLAY.items():
+        print(f"  ({l}, {m}) → {d}")
+    for l, d in LCLS_TO_DISPLAY.items():
+        print(f"  ({l}, *) → {d}")
+    print(f"  그 외 대분류 {len(LCLS_EXCLUDED)}종 → None (후보 제외, nearby_stores 분모에는 포함)")
     print("매핑 ③ (가맹점 업종명 → 표시 분류): 미확정 — 가맹점 API에 업종 필드 없음, T2에서 확정")
