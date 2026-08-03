@@ -1,0 +1,72 @@
+[
+  {
+    "id": "CAND-001",
+    "eup": "영월군",
+    "category": "숙박업",
+    "name": "동빈네민박&캠핑장",
+    "lat": 37.174218,
+    "lng": 128.780242,
+    "score": 0.67,
+    "gap": 1.0,
+    "proximity": 1.0,
+    "saturation": 0.0,
+    "nearby_stores": 1,
+    "nearby_merchants": 0
+  },
+  {
+    "id": "CAND-002",
+    "eup": "영월군",
+    "category": "소매점",
+    "name": "강원선바위협동조합",
+    "lat": 37.155258,
+    "lng": 128.803142,
+    "score": 0.65,
+    "gap": 1.0,
+    "proximity": 0.96,
+    "saturation": 0.0,
+    "nearby_stores": 2,
+    "nearby_merchants": 0
+  },
+  {
+    "id": "CAND-003",
+    "eup": "영월군",
+    "category": "음식점",
+    "name": "동원각",
+    "lat": 37.145829,
+    "lng": 128.843322,
+    "score": 0.63,
+    "gap": 1.0,
+    "proximity": 0.9,
+    "saturation": 0.0,
+    "nearby_stores": 3,
+    "nearby_merchants": 0
+  },
+  {
+    "id": "CAND-004",
+    "eup": "영월군",
+    "category": "편의점",
+    "name": "메이플",
+    "lat": 37.14395,
+    "lng": 128.840148,
+    "score": 0.62,
+    "gap": 1.0,
+    "proximity": 0.87,
+    "saturation": 0.0,
+    "nearby_stores": 4,
+    "nearby_merchants": 0
+  },
+  {
+    "id": "CAND-005",
+    "eup": "영월군",
+    "category": "카페",
+    "name": "문갤러리",
+    "lat": 37.147547,
+    "lng": 128.709522,
+    "score": 0.47,
+    "gap": 1.0,
+    "proximity": 0.41,
+    "saturation": 0.0,
+    "nearby_stores": 3,
+    "nearby_merchants": 0
+  }
+]
