@@ -23,7 +23,7 @@ sangseng-navigator/
 │       │   └── tracking/page.tsx      # ⑥ 실행 상태 트래킹
 │       ├── components/                # KpiCard, Badge(근사지표/가정기반), CardItem, MapView ...
 │       ├── lib/api.ts                 # 단일 데이터 접근 계층 (mock ↔ 실 API 전환)
-│       └── mocks/                     # data/processed 실산출 → ./scripts/sync-mocks.sh 로 생성, 커밋 안 함
+│       └── mocks/                     # data/processed 실산출 → ./scripts/sync-mocks.sh 로 생성한 뒤 커밋 (FE가 커밋)
 │                                       #   (cards/kpi/widget/simulate 등 스크립트 대상 외는 05 예시 구조 참조)
 │
 ├── backend/                   # ← 유탁 전담 영역

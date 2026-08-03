@@ -17,9 +17,6 @@ frontend/.next/
 frontend/out/
 frontend/next-env.d.ts
 
-# FE mock 산출물 — data/processed 원천에서 ./scripts/sync-mocks.sh 로 생성, 커밋 안 함 (05 문서)
-frontend/src/mocks/
-
 # aws sam
 infra/.aws-sam/
 samconfig.toml.bak
