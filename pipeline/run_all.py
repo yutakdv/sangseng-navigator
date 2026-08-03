@@ -1,6 +1,7 @@
 """전체 파이프라인 실행 진입점 — 각 단계 성공/실패 로그, 실패 시 즉시 중단 (docs/plan/06 P9).
 
-data.go.kr 키가 필요한 단계(P2~P4)는 스크립트가 생기는 대로 STEPS에 추가한다.
+P1~P8 전 단계가 STEPS에 등록돼 있다. data.go.kr 키가 필요한 단계(P2~P4)는 인자 없이 실행하므로
+data/raw/api_cache/ 를 재사용한다 — 원본을 갱신하려면 해당 스크립트만 `--refresh` 로 직접 실행한다.
 """
 import subprocess
 import sys

@@ -185,7 +185,7 @@ import boto3
 ddb = boto3.resource("dynamodb", endpoint_url=os.environ.get("DYNAMO_ENDPOINT", "http://localhost:8001"),
                      region_name="ap-northeast-2",
                      aws_access_key_id="local", aws_secret_access_key="local")
-name = os.environ.get("CARDS_TABLE", "sangseng-cards")
+name = os.environ.get("CARDS_TABLE") or "sangseng-cards"   # 빈 문자열 방어 — .env의 `CARDS_TABLE=`
 if name not in [t.name for t in ddb.tables.all()]:
     ddb.create_table(TableName=name, KeySchema=[{"AttributeName": "id", "KeyType": "HASH"}],
                      AttributeDefinitions=[{"AttributeName": "id", "AttributeType": "S"}],
@@ -220,7 +220,7 @@ else:
 _kw = {"region_name": os.environ.get("AWS_REGION", "ap-northeast-2")}
 if os.environ.get("DYNAMO_ENDPOINT"):          # Docker/로컬 테스트 (T7)
     _kw["endpoint_url"] = os.environ["DYNAMO_ENDPOINT"]
-_table = boto3.resource("dynamodb", **_kw).Table(os.environ.get("CARDS_TABLE", "sangseng-cards"))
+_table = boto3.resource("dynamodb", **_kw).Table(os.environ.get("CARDS_TABLE") or "sangseng-cards")
 ```
 
 - [ ] 상태 전이·에러 규칙은 05 §8 표 그대로 (409/400/404, Decimal 변환, INCENTIVE selected_rate)
@@ -243,7 +243,7 @@ _table = boto3.resource("dynamodb", **_kw).Table(os.environ.get("CARDS_TABLE", "
 - [ ] 07 B4 그대로: AI 입력 ①~⑥ 조립(JSON 직렬화 → user 메시지) → `CARD_AI_SCHEMA` 강제 → Card 생성
       → 중복 가드(05 §8) → `original_ranking` 항상 포함 → INCENTIVE 3/5/7% 골격
 - [ ] `seed_demo.py`: `--init`(T7 local_init 겸용) / `--reset`(테이블 비우고 데모 초기 상태 —
-      "고한 편의점 approved+추진중" + "사북 카페 pending(Score2위→AI1위)" + INCENTIVE pending, 11 §1 사전 상태)
+      "영월군 카페 approved+추진중" + "영월군 소매점 pending(Score2위→AI1위)" + INCENTIVE pending, 11 §1 사전 상태)
 - **검증:** Docker에서 generate 2회 → 카드 2장, 조정 사유에 "추진중" 언급 재현 (데모 핵심 사례)
 - **커밋:** `feat: B4 카드 생성(AI 입력 6종)+seed_demo`
 
@@ -267,7 +267,8 @@ _table = boto3.resource("dynamodb", **_kw).Table(os.environ.get("CARDS_TABLE", "
 ### T14. B7 통합 스모크 (`backend/tests/test_smoke.py`)
 
 - [ ] 07 B7 그대로: TestClient로 health→dashboard→generate→decision→progress→kpi→widget
-      (LLM은 monkeypatch, DynamoDB는 `DYNAMO_ENDPOINT`로 Docker Local 사용). `httpx` dev 의존성 추가
+      (LLM은 monkeypatch, DynamoDB는 `DYNAMO_ENDPOINT`로 Docker Local 사용). `httpx2` dev 의존성 추가
+      (starlette 1.3+ TestClient의 HTTP 클라이언트 — `httpx`는 deprecation 경고)
 - **검증:** `DYNAMO_ENDPOINT=http://localhost:8001 ../.venv/bin/python -m pytest tests -q` 전체 통과 —
   **이 명령이 이후 모든 PR의 스모크 기준**
 - **커밋:** `feat: B7 통합 스모크 테스트`

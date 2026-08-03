@@ -74,7 +74,7 @@ import os, boto3
 from decimal import Decimal
 from datetime import datetime, timezone, timedelta
 KST = timezone(timedelta(hours=9))
-_table = boto3.resource("dynamodb").Table(os.environ.get("CARDS_TABLE", "sangseng-cards"))
+_table = boto3.resource("dynamodb").Table(os.environ.get("CARDS_TABLE") or "sangseng-cards")
 
 def _clean(v):
     """boto3의 Decimal → int/float 변환 (FastAPI JSON 직렬화 깨짐 방지 — 05 문서 §8)."""

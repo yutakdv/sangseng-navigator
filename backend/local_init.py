@@ -5,7 +5,7 @@ import boto3
 ddb = boto3.resource("dynamodb", endpoint_url=os.environ.get("DYNAMO_ENDPOINT", "http://localhost:8001"),
                      region_name="ap-northeast-2",
                      aws_access_key_id="local", aws_secret_access_key="local")
-name = os.environ.get("CARDS_TABLE", "sangseng-cards")
+name = os.environ.get("CARDS_TABLE") or "sangseng-cards"   # 빈 문자열 방어 — db.py 와 동일
 if name not in [t.name for t in ddb.tables.all()]:
     ddb.create_table(TableName=name, KeySchema=[{"AttributeName": "id", "KeyType": "HASH"}],
                      AttributeDefinitions=[{"AttributeName": "id", "AttributeType": "S"}],

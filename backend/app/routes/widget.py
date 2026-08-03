@@ -56,6 +56,8 @@ def _blurbs(picked: list) -> list:
 
     응답 지연 방지를 위해 타임아웃 5초 (05 문서 §8). 목록당 호출 1회로 묶어
     3곳을 각각 호출할 때의 지연 누적을 피한다.
+    재시도도 끈다(attempts=1) — 기본 2회면 최악 10초라 위젯 체감 지연이 커진다.
+    문구는 없어도 fallback 으로 대체되는 부가 정보라 재시도보다 상한 5초가 낫다.
     """
     fallback = [_fallback_blurb(m, is_new) for m, is_new in picked]
     payload = {
@@ -66,7 +68,7 @@ def _blurbs(picked: list) -> list:
     }
     try:
         out = llm.generate_json(prompts.WIDGET_BLURB_PROMPT, json.dumps(payload, ensure_ascii=False),
-                                BLURB_SCHEMA, schema_name="blurbs", timeout=5)
+                                BLURB_SCHEMA, schema_name="blurbs", timeout=5, attempts=1)
         blurbs = out.get("blurbs") or []
     except Exception:
         return fallback

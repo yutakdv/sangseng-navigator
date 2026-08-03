@@ -8,14 +8,18 @@ GET https://apis.data.go.kr/B552525/pbdata/getStoreInfo
 파라미터(전부 필수): serviceKey(.env DATA_GO_KR_API_KEY) / pageNo / numOfRows
 응답(JSON, 실측):
   {"resultCode":0,"resultMsg":"Success","numOfRows":"2","pageNo":"1","totalCount":1679,
-   "data":[{"FRCS_REG_NO":3526,"FRCS_NM":"#감동","FRCS_BRNO":"1856600097",
-            "FRCS_ADDR":"강원도 태백시 번영로 348(황지동) ","FRCS_TELNO":"0335521239",
-            "PNT_USABLE_AMT":4000000}, ...]}
+   "data":[{"FRCS_REG_NO":3526,"FRCS_NM":"#감동","FRCS_BRNO":"<사업자등록번호 10자리>",
+            "FRCS_ADDR":"강원도 태백시 번영로 348(황지동) ","FRCS_TELNO":"<전화번호>",
+            "PNT_USABLE_AMT":4000000}, ...]}   ← 두 식별자는 캐시 저장 시 제외한다(아래 DROP_FIELDS)
   numOfRows 는 1000 까지 실측 확인 (1679건 = 2페이지). totalCount 기준으로 완주한다(06 공통 원칙 2).
 ⚠ **업종 필드가 없다** — category 는 category_map.py 매핑 ③ 규칙으로 부여한다(아래 §category).
 ⚠ FRCS_ADDR 끝에 trailing space 가 있다 — strip 필수.
 ⚠ 시도 표기가 "강원도"(825) / "강원특별자치도"(798) / "강원"(56) 세 가지로 섞여 있다.
    Kakao 는 셋 다 인식하므로 주소 문자열은 건드리지 않고 그대로 질의한다.
+
+⚠ 원응답 캐시(merchants_raw.json)는 커밋 대상이라 **FRCS_TELNO(전화번호)·FRCS_BRNO(사업자등록번호)를
+   저장 전에 떨군다** (DROP_FIELDS). 개인사업자 식별자를 Public 레포에 싣지 않기 위함이며(12 문서 §4),
+   파이프라인은 두 필드를 소비하지 않으므로 merchants.json 산출에는 영향이 0 이다.
 
 --- 지오코딩 -----------------------------------------------------------------------
 geocode(addr) -> (lat, lng) | None 함수 하나로 감싼다 (provider 교체 가능, 06 P3).
@@ -70,6 +74,10 @@ RAW_CACHE = CACHE_DIR / "merchants_raw.json"
 GEOCODE_CACHE = CACHE_DIR / "geocode.json"          # 커밋 금지 (.gitignore)
 GEOCODE_FAILED = CACHE_DIR / "geocode_failed.json"  # 커밋 대상 (실패율 발표 명시용)
 OUT_PATH = PROCESSED_DIR / "merchants.json"
+
+# 커밋되는 원응답 캐시에서 제외하는 개인사업자 식별자 (12 문서 §4 — Public 전환 대비).
+# 파이프라인이 읽는 필드는 FRCS_NM·FRCS_ADDR 뿐이라 산출물에는 영향이 없다.
+DROP_FIELDS = ("FRCS_TELNO", "FRCS_BRNO")
 
 PAGE_SIZE = 1000        # 실측 상한
 RETRIES = 3             # 실패 시 3회 후 명확한 에러로 중단 (silent 실패 금지)
@@ -146,6 +154,11 @@ def fetch_all() -> tuple[list[dict], int]:
     return rows, total
 
 
+def strip_pii(rows: list[dict]) -> list[dict]:
+    """캐시 저장 전 개인사업자 식별자 제거 — 나머지 필드는 원응답 순서 그대로 남긴다."""
+    return [{k: v for k, v in row.items() if k not in DROP_FIELDS} for row in rows]
+
+
 def load_raw(refresh: bool) -> dict:
     if RAW_CACHE.exists() and not refresh:
         cache = json.loads(RAW_CACHE.read_text(encoding="utf-8"))
@@ -161,11 +174,11 @@ def load_raw(refresh: bool) -> dict:
         "params_note": f"serviceKey/pageNo/numOfRows 필수, numOfRows={PAGE_SIZE}, "
                        "totalCount 기준 페이징 완주",
         "total_count": total,
-        "data": rows,
+        "data": strip_pii(rows),   # 전화번호·사업자등록번호는 커밋 대상 캐시에 남기지 않는다
     }
     CACHE_DIR.mkdir(parents=True, exist_ok=True)
     RAW_CACHE.write_text(json.dumps(cache, ensure_ascii=False, indent=1), encoding="utf-8")
-    print(f"  캐시 저장: {RAW_CACHE} ({len(rows):,}건)")
+    print(f"  캐시 저장: {RAW_CACHE} ({len(rows):,}건, {'·'.join(DROP_FIELDS)} 제외)")
     return cache
 
 
