@@ -71,7 +71,7 @@ CLI로 불가하므로 **콘솔(관리자 권한) 경로**로 수행한다.
 
 ### 4-1. `merchants.json`에 `address` 필드 없음 — T2 진입 전
 
-- [ ] 05 §1 `merchants` 스키마와 §6 표에 `address` 추가 → T2(P3) 산출물이 채움
+- [x] 05 §1 `merchants` 스키마와 §6 표에 `address` 추가 → T2(P3) 산출물이 채움
 
 위젯 응답(05 §4)은 `address`를 내려주는데, 원천인 merchants 스키마(05 §1)는
 `{name, category, eup, lat, lng}`뿐이라 B6이 채울 데이터가 없다. P3가 지오코딩 입력으로
