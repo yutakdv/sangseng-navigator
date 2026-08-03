@@ -28,7 +28,7 @@ if os.environ.get("DYNAMO_ENDPOINT"):       # DynamoDB Local은 자격증명 "�
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))   # backend/ 밖에서 실행해도 app import
 from app import db  # noqa: E402  (환경변수 세팅 뒤에 import해야 boto3 리소스가 올바로 붙는다)
 
-TABLE_NAME = os.environ.get("CARDS_TABLE", "sangseng-cards")
+TABLE_NAME = os.environ.get("CARDS_TABLE") or "sangseng-cards"   # 빈 문자열 방어 — db.py 와 동일
 
 
 def _iso(hours_ago: float) -> str:
@@ -36,18 +36,44 @@ def _iso(hours_ago: float) -> str:
 
 
 # ── 실측 정량 순위 (data/processed/candidates.json, 2026-08-03 산출분) — 전 카드 공통 병기 ──
+# 05 §2 계약 형태(rank/candidate/score)라 상호명은 넣지 않는다. 상호명은 아래 별도 상수로 대조한다.
 ORIGINAL_RANKING = [
-    {"rank": 1, "candidate": "영월군 숙박업", "score": 0.67},   # 동빈네민박&캠핑장
-    {"rank": 2, "candidate": "영월군 소매점", "score": 0.65},   # 강원선바위협동조합
-    {"rank": 3, "candidate": "영월군 음식점", "score": 0.63},   # 동원각
-    {"rank": 4, "candidate": "영월군 편의점", "score": 0.62},   # 메이플
-    {"rank": 5, "candidate": "영월군 카페", "score": 0.47},     # 문갤러리
+    {"rank": 1, "candidate": "영월군 숙박업", "score": 0.67},
+    {"rank": 2, "candidate": "영월군 소매점", "score": 0.65},
+    {"rank": 3, "candidate": "영월군 음식점", "score": 0.63},
+    {"rank": 4, "candidate": "영월군 편의점", "score": 0.62},
+    {"rank": 5, "candidate": "영월군 카페", "score": 0.47},
 ]
+# 카드 문구(비교문·근거)에 상호명이 직접 박혀 있다 — 순위·점수가 같아도 대표 상가는 바뀔 수 있어 함께 대조
+ORIGINAL_CANDIDATE_NAMES = ["동빈네민박&캠핑장", "강원선바위협동조합", "동원각", "메이플", "문갤러리"]
 EXPANSION_SOURCES = ["하이원포인트 사용현황", "가맹점 상세정보", "소진공 상가정보"]
+
+
+def assert_ranking_matches_pipeline() -> None:
+    """하드코딩 순위·점수·상호명이 현재 candidates.json 과 어긋나면 즉시 중단한다.
+
+    데모 카드 문구는 사람이 실데이터로 검증한 값이라 동적으로 조립하지 않는다. 대신 파이프라인을
+    다시 돌려 점수가 바뀌면 여기서 크게 실패시킨다 — 조용히 어긋나면 '정량 순위 병기'(절대 규칙 5)가
+    거짓이 되고, 감사 가능성 주장 자체가 무너진다. 실패하면 문구를 새 산출에 맞춰 갱신할 것.
+    """
+    from app import dataload
+
+    rows = dataload.load("candidates")
+    actual = [{"rank": i, "candidate": f"{c['eup']} {c['category']}", "score": c["score"]}
+              for i, c in enumerate(rows, 1)]
+    names = [c["name"] for c in rows]
+    if actual != ORIGINAL_RANKING or names != ORIGINAL_CANDIDATE_NAMES:
+        raise SystemExit(
+            "seed_demo 중단: 하드코딩 정량 순위가 data/processed/candidates.json 과 다릅니다 "
+            "(파이프라인 재산출 후 데모 카드 문구를 갱신해야 합니다).\n"
+            f"  하드코딩: {ORIGINAL_RANKING} / {ORIGINAL_CANDIDATE_NAMES}\n"
+            f"  실산출  : {actual} / {names}"
+        )
 
 
 def demo_cards() -> list:
     """데모 3장 — 문구의 수치는 전부 실데이터 검증본 (task-11-report.md 근거 기재)."""
+    assert_ranking_matches_pipeline()
     # 카드 A: approved+추진중 — 위젯 배지 조건(영월군×카페 가맹점 2곳)으로 타깃 선정 (T13 인계)
     card_a = {
         "id": "AC-001", "type": "EXPANSION", "status": "approved", "progress": "추진중",
