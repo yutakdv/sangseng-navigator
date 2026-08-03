@@ -117,7 +117,11 @@ def _fallback_narrative(r: dict) -> str:
 
 @router.post("/cards/{cid}/simulate")
 def simulate_card(cid: str):
-    """확보 시 예상 효과 — EXPANSION 반사실 재계산 + LLM 설명 (05 문서 §2, 07 문서 B5)."""
+    """가맹 전환 시 예상 효과 — EXPANSION 반사실 재계산 + LLM 설명 (05 문서 §2, 07 문서 B5).
+
+    표시 문구에 "확보"를 쓰지 않는다 — 가맹점은 강원랜드가 지정하는 게 아니라 사업자가 신청하고
+    강원랜드가 서류접수→현장실사→계약으로 심사한다 (05 §2 표현 규칙). 필드명·경로는 그대로다.
+    """
     card = _get_or_404(cid)
     if card.get("type") != "EXPANSION":     # EXPANSION 전용 — 400 규칙이 우선 (05 문서 §8)
         raise HTTPException(status_code=400, detail="INCENTIVE 카드는 scenarios를 사용합니다")
@@ -141,7 +145,7 @@ def simulate_card(cid: str):
     user_payload = {
         "대상": f"{result['eup']} {result['category']} 업종 신규 가맹점 1곳",
         "현재 지역 소비 집중도": result["current_index"],
-        "확보 시 예상 집중도": result["projected_index"],
+        "가맹 전환 시 예상 집중도": result["projected_index"],
         "예상 변화(부호 해석 완료)": direction,
         "신규 가맹점 예상 월 이용 건수(가정치)": result["expected_monthly_count"],
         "작성 지침": "'예상 변화'의 방향(개선/상승)을 그대로 서술하고, '예상'과 '가정' 두 단어를 반드시 포함할 것",
