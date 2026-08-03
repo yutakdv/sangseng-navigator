@@ -275,6 +275,7 @@ _table = boto3.resource("dynamodb", **_kw).Table(os.environ.get("CARDS_TABLE", "
 ### T15. FE 트랙 (FE 팀원 — 08 문서가 정본, 13 문서가 디자인 기준)
 
 - [ ] 선행: GitHub 콜라보레이터 초대 수락 (유탁이 초대) → clone → F1 스캐폴딩
+- [ ] **F1 머지 직후 (유탁 수동):** Vercel Import + 첫 Deploy — 레포 Import(Root Directory=`frontend/`) → Deploy. `NEXT_PUBLIC_API_BASE` 미설정이므로 mock 모드 배포 = 12 §5 폴백 동작 그대로 (15 §7). 이후 PR마다 Preview URL 자동 생성 → F9 스모크에 사용
 - [ ] 순서: F1(스캐폴딩+api.ts+mock 저장소) → F2(공통 컴포넌트·금칙어 grep) → F3(허브) → F5(대시보드)
       → F4(카드 상세+지도) → F6(인센티브) → F8(트래킹) → F7(위젯) → F9(전환·메타·모바일)
 - [ ] 유탁 지원 포인트: T4 완료 시 실데이터 mock 전달, T9 완료 시 `NEXT_PUBLIC_API_BASE=http://localhost:8000`
@@ -290,20 +291,16 @@ _table = boto3.resource("dynamodb", **_kw).Table(os.environ.get("CARDS_TABLE", "
 
 ### T17. AWS 최종 배포 (전체 개발 완료 후에만 — 09 §4)
 
-- [ ] **Step 1 (전날까지, 유탁 수동):** IAM 인라인 정책 부착 — 터미널에서 직접:
-
-```bash
-aws iam put-user-policy --user-name Yutak_trading --policy-name sangseng-camp-sam-deploy \
-  --policy-document '{"Version":"2012-10-17","Statement":[{"Effect":"Allow","Action":["cloudformation:*","apigateway:*","dynamodb:*"],"Resource":"*"}]}'
-# 캠프 종료 후 삭제: aws iam delete-user-policy --user-name Yutak_trading --policy-name sangseng-camp-sam-deploy
-```
+- [ ] **Step 1 (전날까지, 유탁 수동):** AWS 콘솔(관리자 권한)에서 IAM → 사용자 `Yutak_trading` →
+      [권한 추가] → **`AdministratorAccess` 정책 한시 부착** (04 §5 후주 — 개인 계정·캠프 기간 한정).
+      인라인 정책 나열 방식은 SAM 배포 필수 권한(iam:CreateRole·PassRole, lambda:*, s3:*, logs:*)
+      누락 리스크로 폐기 (15 §3-2). **캠프 종료 후 콘솔에서 정책 분리(회수) 필수.**
 
 - [ ] Step 2: `cd infra && ./deploy-backend.sh` → Outputs의 `ApiUrl`·`CardsTable` 기록
 - [ ] Step 3: `.env`의 `CARDS_TABLE=`에 Outputs 값 → **실 DDB로** `python backend/seed_demo.py --reset`
       (DYNAMO_ENDPOINT 미설정 = 실 AWS)
 - [ ] Step 4: `curl $ApiUrl/api/health` → `{"ok":true,"data_loaded":true}` + dashboard·cards 스모크
-- [ ] Step 5: Vercel — 레포 Import(Root Directory=`frontend/`) → env `NEXT_PUBLIC_API_BASE=$ApiUrl`
-      (Production+Preview) → Deploy → 배포 URL 기록 (04 §6)
+- [ ] Step 5: Vercel — 프로젝트 [Settings] > [Environment Variables]에 `NEXT_PUBLIC_API_BASE=$ApiUrl` (Production+Preview) → **Production 재배포** → 배포 URL 기록 (04 §6; Import·첫 Deploy는 F1 머지 직후 완료됨 — 15 §7)
 - [ ] Step 6: 배포 URL에서 11 §1 리허설 ×10 (Safari·휴대폰 실기기 포함), 09 §5 CORS 조이기·§5.5 워밍 룰(선택)
 - **Gate:** 01 성공 기준 전항 + 12 §6 체크리스트 전항
 
