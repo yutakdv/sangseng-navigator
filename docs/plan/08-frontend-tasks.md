@@ -92,7 +92,11 @@ export const api = {
 
 - [ ] AI 조정 근거 전문: 후보비교 / 근거 리스트 / 리스크 / 원 Score 순위 표(항상 병기)
 - [ ] 지도(`MapView` 컴포넌트, MapLibre GL): 가맹점 핀(merchants) + 후보 마커(candidates, 강조색)
-      + 500m 반경 원 + 거점(하이원 정문) 마커
+      + 500m 반경 원 + 거점(강원랜드 카지노) 마커 — 라벨은 `ANCHOR.name` 그대로 쓴다
+      ("정문"은 근거 없는 좌표라 폐기됨, 06 공통 상수)
+- [ ] 후보 상세에 `road_distance_km`·`road_minutes` 병기 — "직선 X km / 도로 Y km·Z분"으로
+      **두 값을 함께** 적고, "거점에서 가장 가깝다"는 단정은 쓰지 않는다.
+      값이 `null`이면 도로 항목만 `—` 처리. 이 값으로 후보를 재정렬하지 않는다 (05 §1)
 
 ```tsx
 // src/components/MapView.tsx — "use client", next/dynamic(ssr:false)으로 로드
@@ -114,7 +118,8 @@ function circlePolygon(lng: number, lat: number, radiusM = 500, points = 64) {
 ```
 
 - [ ] 1단계 근거: 읍 랭킹 바 차트 (eup_ranking)
-- [ ] "이 후보를 확보하면?" 버튼 → `POST /simulate` → delta·narrative 표시 + `가정 기반 전망` 배지
+- [ ] "이 후보가 가맹 전환하면?" 버튼 → `POST /simulate` → delta·narrative 표시 + `가정 기반 전망` 배지
+      (가맹점은 사업자가 신청하고 강원랜드가 심사하는 구조라 "확보" 표현을 쓰지 않는다 — 05 §2)
 - [ ] **검증:** 지도 핀·반경이 사북/고한 일대에 정상 표시, 시뮬레이션 응답 렌더.
       **Safari(맥·아이폰)에서 지도 렌더 확인 — 문제 시 02 문서 폴백(거리 표+정적 캡처)으로 즉시 전환**
 
