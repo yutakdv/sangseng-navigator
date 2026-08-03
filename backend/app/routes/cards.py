@@ -1,11 +1,11 @@
 """B2·B4·B5: Action Card CRUD·생성·상태 전이·시뮬레이션 (generate는 B4에서 추가)."""
 import json
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Response
 from pydantic import BaseModel
 
 from app import dataload, db, llm, prompts
-from app.services import simulate
+from app.services import cardgen, simulate
 
 router = APIRouter()
 
@@ -31,6 +31,10 @@ class ProgressBody(BaseModel):
     progress: str
 
 
+class GenerateBody(BaseModel):
+    type: str
+
+
 def _get_or_404(cid: str) -> dict:
     card = db.get_card(cid)
     if card is None:
@@ -52,6 +56,20 @@ def get_cards(type: str | None = None, status: str | None = None):
         cards = [c for c in cards if c.get("status") == status]
     cards.sort(key=lambda c: c.get("created_at") or "", reverse=True)
     return {"cards": cards}
+
+
+@router.post("/cards/generate", status_code=201)
+def generate(body: GenerateBody, response: Response):
+    """스코어링+AI로 카드 생성 (B4) — 신규 201, 동일 타깃 pending 중복 시 기존 카드 200 (05 문서 §2·§8)."""
+    if body.type not in ("EXPANSION", "INCENTIVE"):
+        raise HTTPException(status_code=400, detail="type은 EXPANSION|INCENTIVE 중 하나여야 합니다")
+    try:
+        card, created = cardgen.generate_card(body.type)
+    except FileNotFoundError as exc:
+        raise HTTPException(status_code=503, detail=f"{exc}.json이 아직 생성되지 않았습니다")
+    if not created:
+        response.status_code = 200
+    return {"card": card}
 
 
 @router.get("/cards/{cid}")
