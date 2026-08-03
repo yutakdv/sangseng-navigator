@@ -13,7 +13,7 @@ STEPS = [
     ("P1 사용현황 집계", "p1_usage.py"),
     ("P2 카지노 입장객", "p2_visitors.py"),      # 미구현 — data.go.kr 승인 후
     ("P3 가맹점 지오코딩", "p3_merchants.py"),   # 미구현 — data.go.kr 승인 후
-    ("P4 소진공 상가정보", "p4_stores.py"),      # 미구현 — data.go.kr 승인 후
+    ("P4 소진공 상가정보", "p4_stores.py"),      # 인자 없이 실행 = api_cache 재사용 (갱신은 --refresh)
     ("P5 진단 지표", "p5_metrics.py"),           # 미구현 — P2 산출물 필요
     ("P6 2단계 스코어링", "p6_scoring.py"),      # 미구현 — P3·P4 산출물 필요
     ("P7 국세청 파생지표", "p7_risk.py"),
