@@ -80,7 +80,8 @@ Base URL: 로컬 `http://localhost:8000` / 배포 후 API Gateway URL. 경로 �
     }
   ],
   "merchants": [
-    {"name": "OO식당", "category": "한식", "eup": "사북읍", "lat": 37.2205, "lng": 128.8101}
+    {"name": "OO식당", "category": "음식점", "eup": "사북읍", "address": "강원도 정선군 사북읍 ...",
+     "lat": 37.2205, "lng": 128.8101}
   ]
 }
 ```
@@ -258,7 +259,7 @@ Base URL: 로컬 `http://localhost:8000` / 배포 후 API Gateway URL. 경로 �
 | `dashboard.json` | §1의 `GET /api/dashboard` 응답 그대로 | BE 서빙, FE mock |
 | `eup_scores.json` | §1 `eup_ranking` + `selected_eups` | BE(candidates, 카드 생성) |
 | `candidates.json` | §1 `candidates` 배열 | BE(candidates, 카드 생성) |
-| `merchants.json` | §1 `merchants` 배열 (지오코딩 완료분) | BE(candidates, 위젯) |
+| `merchants.json` | §1 `merchants` 배열 (지오코딩·주소 포함) | BE(candidates, 위젯) |
 | `risk_signal.json` | `[{"sigungu": "정선군", "under2y_ratio": 0.31}]` | BE(카드 생성 AI 입력 ⑥) |
 | `sensitivity.json` | `{"combos": 25, "top3_stable_ratio": 0.88, "detail": [...]}` | 발표 슬라이드 |
 | `usage_monthly.json` | 월×지역×업종 원자료 집계 (재계산·검증용) | pipeline, simulate |
