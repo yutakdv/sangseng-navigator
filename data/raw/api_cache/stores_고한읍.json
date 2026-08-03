@@ -6,12 +6,13 @@
   "key": "51770253"
  },
  "stdr_ym": "202606",
- "collected_at": "2026-08-03",
+ "collected_at": "2026-08-04",
  "total_count": 533,
  "excluded_adong": [],
  "excluded_count": 0,
  "duplicate_count": 0,
  "dropped_invalid_coord": 0,
+ "scope": "고한읍",
  "note": "",
  "stores": [
   {

@@ -6,7 +6,7 @@
   "key": "51770"
  },
  "stdr_ym": "202606",
- "collected_at": "2026-08-03",
+ "collected_at": "2026-08-04",
  "total_count": 3009,
  "excluded_adong": [
   "51770253",
@@ -15,6 +15,7 @@
  "excluded_count": 1044,
  "duplicate_count": 0,
  "dropped_invalid_coord": 0,
+ "scope": "정선군",
  "note": "정선군은 시군구 전체 조회에서 고한읍·사북읍 행정동을 제외한 잔여 지역 (P1 지역 컬럼 의미와 동일)",
  "stores": [
   {
