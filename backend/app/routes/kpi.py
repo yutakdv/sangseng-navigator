@@ -20,16 +20,18 @@ def _elapsed_hours(card: dict) -> float | None:
         return None
     try:
         return (datetime.fromisoformat(decided) - datetime.fromisoformat(created)).total_seconds() / 3600
-    except ValueError:
+    except (ValueError, TypeError):
+        # 형식 불량·naive/aware 혼합(TypeError) 카드는 평균에서만 제외 — KPI 전체를 500으로 만들지 않는다
         return None
 
 
 def _balance_index(approved: list) -> int | None:
-    """지역 균형지수 = (1 − 승인 카드 지역 분포의 불균형도) × 100 (05 문서 §3).
+    """지역 균형지수 = 100 − 집중도(승인 EXPANSION 카드의 6지역 분포) (05 문서 §3).
 
+    - 완전 균등 = 100, 한 지역 몰림 = 0. 승인 1장이면 0, 서로 다른 2개 지역이면 20.
+    - 집중도는 services/simulate.concentration_index(0~100 정규화 지수) 재사용 —
+      대시보드 `concentration.index`(파이프라인 진단 지표)와 같은 자다.
     - 분모는 `REGIONS` 6개 지역 고정 — 승인 카드가 없는 지역도 0건으로 포함한다.
-    - 불균형도는 services/simulate.concentration_index(0~100 정규화값)를 그대로 재사용하므로
-      균형지수 = 100 − 집중도. 파이프라인·시뮬레이션과 동일 산식이다.
     - 대상은 `target`이 있는 EXPANSION 승인 카드뿐 (INCENTIVE는 지역이 없어 분포에 넣을 수 없음).
       해당 카드가 0장이면 분모 0이므로 null (05 문서 §8).
     """
