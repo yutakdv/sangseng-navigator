@@ -124,3 +124,56 @@ merchants.json 부재(로더 대체)        → 503 {"detail":"merchants.json이
 4. **B7 스모크 테스트(T?)에서 KPI/위젯을 마지막 링크로 넣을 것** — 이번 검증은 전부 수동 curl이라
    회귀 방지 장치가 없다. `test_smoke.py`의 순서(health→…→kpi→widget)에 위 4번 표의
    수동 계산 대조를 그대로 assert로 옮기면 계산 정의가 박제된다.
+
+## 픽스 라운드 1 (리뷰 Critical 1 + Important 1)
+
+### 1. (Critical) 균형지수 — 계약 개정으로 해소, 코드 산식 유지 (컨트롤러 결정)
+
+`regional_balance_index`가 05 §3 원문 "(1−Gini)×100"(원시 지니)이 아니라 정규화 지니
+(`concentration_index` 기반)를 쓴다는 지적 — [1,1,0,0,0,0]에서 구현 20 vs 계약 33.
+컨트롤러 결정에 따라 **코드를 두고 계약을 개정**했다 (정규화판이 파이프라인 지역 소비 집중도와
+같은 자를 쓰고, 완전 편중=0이라 "카드가 쌓일수록 오르는 지표" 데모 멘트(15 §5)에 맞기 때문).
+
+- `docs/plan/05-api-contract.md` §3: 균형지수 정의를 "승인 EXPANSION 카드의 6지역 분포에
+  **지역 소비 집중도와 동일한 정규화 지수**를 적용해 `100 − 집중도` (완전 균등=100, 완전 편중=0)"로
+  개정. "여러 지역에 쌓일수록 상승" 문구는 유지하고, 승인 1장=`0` / 2개 지역=`20` 예시와
+  "예시의 80은 여러 지역에 고루 쌓인 상태 가정" 단서를 추가 (커밋 `cdb59fc`)
+- `backend/app/routes/kpi.py` `_balance_index` docstring을 개정된 계약 문구로 교체 —
+  옛 "(1 − …) × 100" 표현이 불일치를 가리던 문제 해소 (커밋 `e36c1ea`)
+- PR #14 본문에 FE 공유 경고 추가 (아래 3번)
+
+### 2. (Important) 고장 타임스탬프 카드가 KPI 전체를 500으로 만들던 경로 차단
+
+`_elapsed_hours`의 `except ValueError` → `except (ValueError, TypeError)`.
+컨테이너에서 실제 예외형 확인 결과 **두 고장 케이스 모두 TypeError**라 기존 코드로는 잡히지 않았다:
+
+```
+naive/aware 혼합  → TypeError: can't subtract offset-naive and offset-aware datetimes
+비문자열 created_at → TypeError: fromisoformat: argument must be str
+```
+
+### 3. 검증 (Docker 재기동 → KPI 재실행 → down·git 클린)
+
+균형지수 손계산 대조 (승인 EXPANSION 지역 수를 1→2→3으로 늘리며, 6지역 고정 분모):
+
+| 승인 EXPANSION 분포 | 손계산 (지니 → 정규화 → 100−집중도) | 응답 |
+|---|---|---|
+| 사북 1 | 0.8333 → 1.0 → 100−100 | **0** ✅ |
+| 사북 1, 고한 1 | 0.6667 → 0.8 → 100−80 | **20** ✅ |
+| 사북 1, 고한 1, 정선 1 | 0.5 → 0.6 → 100−60 | **40** ✅ |
+
+3지역 시점 전체 응답: `{"adoption_rate":0.8,"execution_rate":0.5,"avg_approval_hours":3.0,
+"regional_balance_index":40,"counts":{"total":5,...,"approved":4,"rejected":1,"done":2}}`
+— 채택 4/5=0.8, 실행 2/4=0.5, 평균 (3+1+5+2+4)/5=3.0h 전부 손계산 일치.
+
+고장 카드 2장(`AC-910` naive/aware 혼합·approved 영월군, `AC-911` 비문자열+"어제"·rejected) 추가 후:
+
+```
+GET /api/kpi → HTTP 200
+{"adoption_rate":0.71,"execution_rate":0.4,"avg_approval_hours":3.0,"regional_balance_index":60,
+ "counts":{"total":7,"pending":0,"approved":5,"rejected":2,"held":0,"done":2}}
+```
+
+500 없이 200이고, `avg_approval_hours`는 3.0 그대로(고장 2장만 평균에서 제외됨) — 나머지 지표에는
+정상 반영(채택 5/7=0.71, 승인 EXPANSION 4개 지역 → 균형지수 60, 손계산 일치).
+`docker compose down` + `.env` 사본 삭제 후 `git status` 클린 확인.
