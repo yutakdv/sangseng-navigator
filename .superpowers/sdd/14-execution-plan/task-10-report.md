@@ -79,6 +79,48 @@ raised after 2 attempts: boom
 ```
 정확히 2회(최초+재시도 1회) 시도 후 예외 전파 확인.
 
+## 픽스 라운드 1 (리뷰 발견사항 대응)
+
+**발견:** `timeout=None` 기본값을 OpenAI `with_options(timeout=timeout)` / Anthropic
+`messages.create(..., timeout=timeout)`에 그대로 넘기면, 두 SDK 모두 "타임아웃 없음(무한 대기)"으로
+해석한다. 인자를 아예 생략(NotGiven)했을 때의 "클라이언트 기본 타임아웃(약 10분)"과 다르므로,
+`timeout`을 지정하지 않고 호출하는 B4/B5 등이 의도치 않게 무제한 대기로 회귀하는 문제였다.
+
+**수정:** `timeout is not None`일 때만 값을 실어 보내고, `None`이면 파라미터 자체를 생략해 SDK
+기본 동작을 유지하도록 변경.
+- OpenAI: `if timeout is not None: client = client.with_options(timeout=timeout)` — 미지정 시
+  `with_options` 자체를 호출하지 않음
+- Anthropic: `extra = {"timeout": timeout} if timeout is not None else {}` 후 `**extra`로 전달 —
+  미지정 시 `timeout` 키워드 인자 자체가 `create()` 호출에 포함되지 않음(NotGiven 기본값 유지)
+
+### 재검증 (순서대로 실행, 출력 기록)
+
+**1. `timeout=0.001` — 여전히 재시도 포함 2회 후 타임아웃 예외 전파 (실호출)**
+```
+$ python -c "... generate_json(..., timeout=0.001) ..."
+Timeout exception after 3.122 s: APITimeoutError Request timed out.
+```
+
+**2. `timeout` 미지정 — `with_options`를 아예 거치지 않는지 (spy로 확인, 실호출)**
+```
+$ python -c "
+... openai.OpenAI.with_options를 spy로 감싸 호출 여부 추적 ...
+result: {'r': 'pong'}
+with_options called (should be False): False
+"
+```
+`with_options`가 호출되지 않아 SDK 기본 타임아웃(NotGiven)이 그대로 유지됨을 확인. (Anthropic
+쪽도 동일 패턴 — `extra` dict가 비어 있으면 `**extra`로 `timeout` 키워드 자체가 전달되지 않음을
+코드로 확인)
+
+**3. OpenAI 실호출 1회 (`timeout` 미지정) — 정상 동작**
+```
+$ python -c "from app.llm import generate_json; print(generate_json('한 단어로 답하라','ping',{...}))"
+{'r': 'pong'}
+```
+
+세 검증 모두 통과. 커밋: `fix: timeout 미지정 시 SDK 기본 타임아웃 유지`.
+
 ## 우려사항
 
 - 검증 1·3의 실행 커맨드는 브리프 원문과 달리 `python -c` 내부에서 `load_dotenv('../.env')`를
