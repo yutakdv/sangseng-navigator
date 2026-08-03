@@ -163,7 +163,7 @@ Tailwind 설정(`tailwind.config.ts` theme.extend.colors)에 아래 이름으로
   contributors, OpenFreeMap | 데이터 기준: {period_note}"
 - 금칙어 grep 체크(F2 검증 항목): `지니`, `Gini`, `HHI`, `실행하겠습니다` — UI 문자열에 존재 금지
 
-## 10. 05 계약 변경 후보 (FE 시안 확정 시 — 절차: 05 수정 → mock 수정 → 팀 공유 → 코드)
+## 10. 05 계약 변경 후보 (FE 시안 확정 시 — 절차: 05 수정 → `scripts/sync-mocks.sh` 재실행 → 팀 공유 → 코드)
 
 목업을 충실히 구현하려면 아래 필드가 있으면 좋다. **아직 계약에 넣지 않았다** — FE 담당이 목업 방향을
 확정하면 05 문서부터 고친다:

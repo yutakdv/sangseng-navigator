@@ -1,8 +1,10 @@
 # 05. API 계약 — FE↔BE 단일 진실
 
 > **예시 JSON은 스키마·필드 형태의 기준이다.** mock 데이터의 실제 값 원천은 `data/processed/`의
-> 실산출이며, `scripts/sync-mocks.sh`로 `frontend/src/mocks/`에 복사한다. 예시의 지역·업종·수치는
-> 스키마 설명용이며 실데이터와 다를 수 있다 — 값을 보고 mock을 손으로 만들지 말 것.
+> 실산출이며, `./scripts/sync-mocks.sh`로 생성한 뒤 `frontend/src/mocks/`에 **커밋한다**
+> (정적 import·Vercel 빌드·`NEXT_PUBLIC_API_BASE` 미설정 시 mock 모드 폴백에 필요 — 12 문서 §5).
+> 예시의 지역·업종·수치는 스키마 설명용이며 실데이터와 다를 수 있다 — 값을 보고 mock을 손으로 만들지 말 것.
+> 데이터가 갱신되면 스크립트를 다시 실행해 커밋한다.
 > 계약 변경 절차: ① 이 문서 수정 → ② `scripts/sync-mocks.sh` 재실행 → ③ 팀원 공유 → ④ 코드 수정.
 > 모든 응답은 `application/json`, 에러는 `{"detail": "메시지"}` + 4xx/5xx.
 
@@ -279,6 +281,7 @@ Base URL: 로컬 `http://localhost:8000` / 배포 후 API Gateway URL. 경로 �
 
 FE mock 동기화: 레포 루트에서 `./scripts/sync-mocks.sh` — 위 산출 JSON을 `frontend/src/mocks/`로
 복사하고, `candidates.json`은 `GET /api/candidates`와 같은 병합 응답 형태로 생성한다.
+생성 결과는 커밋한다(FE가 커밋 — 정적 import·mock 모드 폴백에 필요).
 
 ## 7. DynamoDB 스키마
 

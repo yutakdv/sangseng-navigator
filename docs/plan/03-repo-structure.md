@@ -23,7 +23,8 @@ sangseng-navigator/
 │       │   └── tracking/page.tsx      # ⑥ 실행 상태 트래킹
 │       ├── components/                # KpiCard, Badge(근사지표/가정기반), CardItem, MapView ...
 │       ├── lib/api.ts                 # 단일 데이터 접근 계층 (mock ↔ 실 API 전환)
-│       └── mocks/                     # 05 문서의 예시 JSON 그대로 (dashboard.json, cards.json ...)
+│       └── mocks/                     # data/processed 실산출 → ./scripts/sync-mocks.sh 로 생성한 뒤 커밋 (FE가 커밋)
+│                                       #   (cards/kpi/widget/simulate 등 스크립트 대상 외는 05 예시 구조 참조)
 │
 ├── backend/                   # ← 유탁 전담 영역
 │   ├── requirements.txt       # fastapi, mangum, boto3, python-dotenv, openai, anthropic (pandas 금지 — 07 문서)
@@ -71,7 +72,7 @@ sangseng-navigator/
 1. **영역 분리**: FE 팀원은 `frontend/`만, 유탁은 나머지를 수정한다. 서로의 영역을 고쳐야 하면
    PR로. (유탁이 FE를 지원할 때도 브랜치+PR)
 2. **경계는 계약 문서**: `05-api-contract.md`가 FE↔BE의 유일한 인터페이스. 응답 형태를 바꾸고
-   싶으면 ①문서 수정 → ②mock JSON 수정 → ③상대에게 공유 → ④코드 수정 순서.
+   싶으면 ①문서 수정 → ②`scripts/sync-mocks.sh` 재실행 → ③상대에게 공유 → ④코드 수정 순서.
 3. **브랜치**: `main`(항상 데모 가능 상태 유지) ← `feat/<이름>-<주제>` PR.
    캠프 중 리뷰는 간단히(스모크 확인 후 셀프 머지 허용), 단 `main`이 깨지면 최우선 복구.
 4. **mock 우선**: BE 미완성 기능은 FE가 mock으로 먼저 완성한다. mock 파일은
