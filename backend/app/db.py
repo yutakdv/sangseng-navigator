@@ -7,7 +7,8 @@ KST = timezone(timedelta(hours=9))
 _kw = {"region_name": os.environ.get("AWS_REGION", "ap-northeast-2")}
 if os.environ.get("DYNAMO_ENDPOINT"):          # Docker/로컬 테스트 (T7)
     _kw["endpoint_url"] = os.environ["DYNAMO_ENDPOINT"]
-_table = boto3.resource("dynamodb", **_kw).Table(os.environ.get("CARDS_TABLE", "sangseng-cards"))
+# `or` 로 받는다 — .env 의 `CARDS_TABLE=` (빈 문자열)이면 테이블명이 ""가 되어 카드 API 전부가 500
+_table = boto3.resource("dynamodb", **_kw).Table(os.environ.get("CARDS_TABLE") or "sangseng-cards")
 
 
 def _clean(v):

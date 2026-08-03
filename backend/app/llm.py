@@ -3,10 +3,13 @@ import os, json
 
 
 def generate_json(system: str, user: str, schema: dict, schema_name: str = "result",
-                   timeout: float | None = None) -> dict:
+                   timeout: float | None = None, attempts: int = 2) -> dict:
+    """attempts 는 총 시도 횟수 — 기본 2(최초+재시도 1회)로 기존 호출부 동작은 그대로다.
+    지연 상한이 중요한 호출부(위젯 blurb)만 attempts=1 로 재시도를 끄고 fallback 으로 넘긴다.
+    """
     provider = os.environ.get("LLM_PROVIDER", "openai")
     last_exc: Exception | None = None
-    for attempt in range(2):  # 최초 시도 + 실패 시 1회 재시도
+    for _ in range(attempts):
         try:
             if provider == "anthropic":
                 import anthropic
