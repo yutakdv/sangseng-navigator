@@ -11,49 +11,57 @@
     "proximity": 1.0,
     "saturation": 0.0,
     "nearby_stores": 1,
-    "nearby_merchants": 0
+    "nearby_merchants": 0,
+    "road_distance_km": 11.0,
+    "road_minutes": 50.8
   },
   {
     "id": "CAND-002",
-    "eup": "영월군",
-    "category": "소매점",
-    "name": "강원선바위협동조합",
-    "lat": 37.155258,
-    "lng": 128.803142,
-    "score": 0.65,
-    "gap": 1.0,
-    "proximity": 0.96,
-    "saturation": 0.0,
-    "nearby_stores": 2,
-    "nearby_merchants": 0
-  },
-  {
-    "id": "CAND-003",
     "eup": "영월군",
     "category": "음식점",
     "name": "동원각",
     "lat": 37.145829,
     "lng": 128.843322,
-    "score": 0.63,
+    "score": 0.57,
     "gap": 1.0,
-    "proximity": 0.9,
+    "proximity": 0.71,
     "saturation": 0.0,
     "nearby_stores": 3,
-    "nearby_merchants": 0
+    "nearby_merchants": 0,
+    "road_distance_km": 25.8,
+    "road_minutes": 33.9
   },
   {
-    "id": "CAND-004",
+    "id": "CAND-003",
     "eup": "영월군",
     "category": "편의점",
     "name": "메이플",
     "lat": 37.14395,
     "lng": 128.840148,
-    "score": 0.62,
+    "score": 0.56,
     "gap": 1.0,
-    "proximity": 0.87,
+    "proximity": 0.69,
     "saturation": 0.0,
     "nearby_stores": 4,
-    "nearby_merchants": 0
+    "nearby_merchants": 0,
+    "road_distance_km": 26.2,
+    "road_minutes": 34.5
+  },
+  {
+    "id": "CAND-004",
+    "eup": "영월군",
+    "category": "소매점",
+    "name": "한결퇴비",
+    "lat": 37.148504,
+    "lng": 128.864107,
+    "score": 0.56,
+    "gap": 1.0,
+    "proximity": 0.67,
+    "saturation": 0.0,
+    "nearby_stores": 1,
+    "nearby_merchants": 0,
+    "road_distance_km": 23.7,
+    "road_minutes": 30.8
   },
   {
     "id": "CAND-005",
@@ -64,9 +72,11 @@
     "lng": 128.709522,
     "score": 0.47,
     "gap": 1.0,
-    "proximity": 0.41,
+    "proximity": 0.4,
     "saturation": 0.0,
     "nearby_stores": 3,
-    "nearby_merchants": 0
+    "nearby_merchants": 0,
+    "road_distance_km": 42.6,
+    "road_minutes": 39.9
   }
 ]
