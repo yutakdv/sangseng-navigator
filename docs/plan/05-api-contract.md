@@ -47,6 +47,8 @@ Base URL: 로컬 `http://localhost:8000` / 배포 후 API Gateway URL. 경로 �
 
 규칙: `conversion.is_proxy=true`이면 FE는 반드시 `근사 지표` 배지 렌더.
 `concentration.index`는 0~100 정규화값(내부 Gini 비노출), `grade`는 높음/보통/낮음.
+업종 표시 롤업: 대시보드·위젯의 업종 표시는 13 문서 §5의 6분류(카페·음식점·편의점·숙박업·소매점·기타)로
+롤업하며, 하이원 18종·소진공 대분류(`indsLclsNm`)와의 매핑 정본은 `pipeline/category_map.py` 하나다.
 
 ### `GET /api/candidates`
 지도·카드 상세용 스코어링 결과 (`eup_scores.json` + `candidates.json` 병합).
