@@ -87,12 +87,14 @@ class FakeLLM:
 
     def __init__(self):
         self.calls = []
+        self.attempts = []                                          # 호출부별 재시도 설정 (지연 상한 검증용)
         self.ai_rank_target = FAKE_AI["ai_rank_target"]
         self.narrative = FAKE_NARRATIVE
         self.blurbs = None                                          # None이면 가맹점 수만큼 자동 생성
 
-    def __call__(self, system, user, schema, schema_name="result", timeout=None):
+    def __call__(self, system, user, schema, schema_name="result", timeout=None, attempts=2):
         self.calls.append(schema_name)
+        self.attempts.append(attempts)
         props = schema.get("properties", {})
         if "narrative" in props:                                    # cards.simulate
             return {"narrative": self.narrative}
@@ -222,6 +224,7 @@ def test_generate_expansion_creates_pending_card(fake_llm):
     assert res.status_code == 201
     card = res.json()["card"]
     assert fake_llm.calls == ["action_card"]
+    assert fake_llm.attempts == [2]                                   # 재시도 기본값 유지 (위젯만 1회)
 
     assert card["id"] == "AC-003" and card["type"] == "EXPANSION"
     assert card["status"] == "pending" and card["progress"] is None   # 절대 규칙 4 — AI는 제안만
@@ -340,6 +343,7 @@ def test_simulate_expansion_card(fake_llm):
     assert res.status_code == 200
     sim = res.json()["simulation"]
     assert fake_llm.calls == ["narrative"]
+    assert fake_llm.attempts == [2]                                # 재시도 기본값 유지 (위젯만 1회)
 
     assert 0 <= sim["current_index"] <= 100 and 0 <= sim["projected_index"] <= 100
     lo, hi = sim["delta_pp"]
@@ -446,6 +450,7 @@ def test_widget_promotes_completed_targets_and_payback(fake_llm):
     assert all(r["payback"] == {"rate": 5, "label": "지금 여기서 쓰면 5% 페이백"} for r in recs)
     assert all({"name", "category", "address", "lat", "lng"} <= set(r) for r in recs)
     assert fake_llm.calls == ["blurbs", "blurbs"]
+    assert fake_llm.attempts == [1, 1]      # 위젯만 재시도 끔 — 최악 지연 5초 (timeout 5s × 1회)
 
 
 def test_widget_blurb_falls_back_when_llm_fails(monkeypatch):
