@@ -148,8 +148,11 @@ def _fallback_ai(cands: list, cards: list) -> dict:
 
 
 def _ensure_assumption(text: str) -> str:
-    """expected_effect에 가정 기반 고정 문구 보장 (절대 규칙 3)."""
-    return text if "가정" in text else f"{text} ({ASSUMPTION_NOTE})"
+    """expected_effect에 가정 기반 **고정 문구** 보장 (절대 규칙 3).
+
+    '가정' 키워드 포함만으로는 고정 문구 없는 카드가 통과할 수 있어 문구 전체로 판정한다.
+    """
+    return text if ASSUMPTION_NOTE in text else f"{text} ({ASSUMPTION_NOTE})"
 
 
 def _find_pending(cards: list, card_type: str, eup: str | None = None,
@@ -181,7 +184,10 @@ def _generate_expansion(cards: list) -> tuple[dict, bool]:
     except Exception:
         out = _fallback_ai(cands, cards)
     target = _match_candidate(cands, str(out.get("ai_rank_target", "")))
-    if target is None or _target_state(target, cards) in BLOCKED:   # 금지 타깃·미매칭 보정
+    if target is None or _target_state(target, cards) in BLOCKED:
+        # 금지 타깃·미매칭 보정 — 타깃만 바꾸면 LLM 원문 사유가 다른 후보를 가리키는
+        # "타깃-사유 불일치" 카드가 저장된다(감사 가능성 위반). 텍스트까지 통째 교체.
+        out = _fallback_ai(cands, cards)
         target = _first_available(cands, cards)
 
     existing = _find_pending(cards, "EXPANSION", target["eup"], target["category"])
