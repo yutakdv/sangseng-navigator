@@ -1,7 +1,10 @@
 # 08. 프론트엔드 태스크 (FE 팀원 · Phase 1부터 병렬 진행)
 
-> 원칙: **BE를 기다리지 않는다.** `05-api-contract.md`의 예시 JSON을 `src/mocks/`에 넣고
-> 화면부터 완성 → `NEXT_PUBLIC_API_BASE` 설정 한 줄로 실 API 전환.
+> 원칙: **BE를 기다리지 않는다.** `src/mocks/`를 채우고 화면부터 완성 →
+> `NEXT_PUBLIC_API_BASE` 설정 한 줄로 실 API 전환.
+> ⚠ **mock 값은 05 예시를 베끼지 말고 `./scripts/sync-mocks.sh`로 만든다** — 05의 예시 JSON은
+> 스키마 설명용이라 지역·업종·수치가 실산출(영월군 서사)과 다르다. 베끼면 mock과 실서버가
+> 서로 다른 이야기를 하게 된다. 05 예시는 **필드 형태를 볼 때만** 참조한다.
 > 서비스 정체성은 "시각화"가 아니라 "의사결정 지원" — 첫 화면은 차트가 아니라 **Action Card 허브**다.
 >
 > **디자인 기준: `13-design-guide.md` 필독.** 시안 미확정 상태의 기준은 목업(레포 루트
@@ -50,7 +53,10 @@ export const api = {
 };
 ```
 
-- [ ] `src/mocks/`에 05 문서의 예시 JSON 전부 생성 (dashboard, candidates, cards, kpi, widget, simulate)
+- [ ] `src/mocks/` 채우기 — **정적 데이터는 레포 루트에서 `./scripts/sync-mocks.sh` 실행**
+      (dashboard·candidates·eup_scores·merchants·usage_monthly·risk_signal·sensitivity가 실산출 값으로 생성된다).
+      DynamoDB에서 오는 `cards`와 파생값 `kpi`·`widget`·`simulate` mock만 05 예시 **구조**를 보고 직접 만든다
+      (`cards.json`은 데모 초기 상태 3장 = `backend/seed_demo.py`의 카드와 같은 서사로 맞출 것)
 - [ ] **mock 상태 저장소** `src/mocks/store.ts`: mock 모드에서 POST(승인·상태 변경·카드 생성)가
       페이지를 오가도 유지되도록 카드 목록을 모듈 스코프 인메모리 배열로 관리
       (`cards.json`을 초기값으로 로드, `decide()`/`setProgress()`가 이 배열을 변경).

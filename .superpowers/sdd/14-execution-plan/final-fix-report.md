@@ -10,6 +10,7 @@
 | `data/raw/api_cache/merchants_raw.json` | I1 | 두 필드 제거 후 재저장 (API 재호출 없음) |
 | `docs/plan/05-api-contract.md` | I2·M5 | 머리말 원천 명시, §6 에 sync-mocks 사용법 1줄, §2 고정 문구 교정 |
 | `scripts/sync-mocks.sh` | I2 | 신규 (실행 권한 포함) |
+| `docs/plan/08-frontend-tasks.md` | I2 | FE 가 실제로 읽는 문서 — "05 예시를 mock 에 넣어라" 지시 2곳을 sync-mocks 로 교체 |
 | `backend/app/db.py`·`backend/seed_demo.py`·`backend/local_init.py` | I3 | `CARDS_TABLE` 빈 문자열 방어 |
 | `backend/app/llm.py`·`backend/app/routes/widget.py` | M4 | `attempts` 파라미터(기본 2), 위젯 blurb 만 1 |
 | `backend/tests/test_smoke.py` | M4 | `FakeLLM` 이 `attempts` 를 받도록 + 호출부별 대조 3곳 |
@@ -55,6 +56,11 @@ $ git status --short          # 산출물 변경 0
 
 **검증:** `frontend/` 가 없는 상태에서 실행 → 디렉터리 생성 후 7개 파일 산출.
 병합본을 실제 BE 응답과 대조해 **payload 완전 일치**(`get_candidates() == mock` → `True`, 키 순서까지 동일).
+
+**지적 범위 밖이지만 함께 고침 —** `docs/plan/08-frontend-tasks.md` 가 머리말(:3)과 F1 체크리스트(:53)에서
+"05 문서의 예시 JSON을 `src/mocks/`에 넣어라" 라고 **두 번** 지시하고 있었다. FE 가 내일 읽는 문서는 08 이라
+여기를 안 고치면 05만 고쳐도 이 픽스가 실제로는 안 먹는다. 둘 다 `sync-mocks.sh` 로 바꾸고, 스크립트가
+못 만드는 mock(`cards`·`kpi`·`widget`·`simulate` — DDB/파생값)은 05 예시의 **구조**만 보라고 구분해 적었다.
 
 > **판단 1개:** 생성된 mock 자체는 **커밋하지 않았다.** 커밋하면 `data/processed/` 와 사본이 두 벌이
 > 되어 이번에 없애려던 드리프트가 그대로 재발한다(브리프의 커밋 예시에도 mock data 커밋이 없다).
