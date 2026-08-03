@@ -106,7 +106,7 @@ CLI로 불가하므로 **콘솔(관리자 권한) 경로**로 수행한다.
 - [x] **T10** `generate_json()`에 timeout 인자 추가 — 05 §4 blurb의 5초 타임아웃을 현재 시그니처(`system, user, schema`)로는 지킬 수 없음
 - [x] **T11** 시드의 "Score 2위→AI 1위" 카드는 LLM 호출 없이 **고정 JSON**으로 생성 (리허설·심사 리셋 시 서사 재현성 보장) — `seed_demo.py` 카드 B(영월군 소매점)로 반영 완료
 - [x] **T12** B5 반사실 가정치의 분모 0 처리 — 공백 업종은 정의상 해당 지역 가맹점 0곳이라 "해당 업종 지역 건수÷가맹점 수"가 기본 케이스에서 0나눗셈. "전 지역 동일 업종 평균 건수" 등 대체 가정을 명시
-- [ ] **T7·T14** pytest·httpx는 `backend/requirements-dev.txt`로 분리 (Lambda 번들 오염 방지 — 07 의존성 원칙)
+- [x] **T7·T14** pytest·httpx는 `backend/requirements-dev.txt`로 분리 (Lambda 번들 오염 방지 — 07 의존성 원칙) — T14에서 확인 완료: requirements.txt만 설치한 venv에서 `import app.main` 성공(pytest·httpx2 미설치). TestClient의 HTTP 클라이언트는 starlette 1.3의 권장에 따라 `httpx` → `httpx2`
 - [ ] **T18 전** 12 §1 상태 칸 갱신 — "현재 Private + 커밋 0개"는 stale (현재 상태의 정본은 14 문서)
 
 ## 6. 문서 참조 정정 (off-by-one) — 착수 첫 커밋에서 일괄
