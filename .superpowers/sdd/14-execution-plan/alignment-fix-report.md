@@ -134,3 +134,30 @@
 5. **FE mock 미동기화.** 이 레포에 `frontend/`가 아직 없어 `scripts/sync-mocks.sh`를 돌리지
    않았다. FE 담당이 `road_distance_km`·`road_minutes`·`proxy_note`를 반영해야 한다(05 계약 변경).
 6. **1단계 소비저조도 분모 보정은 하지 않았다**(브리프 지시). §3 보조표가 그 근거 자료다.
+
+---
+
+## 6. 픽스 라운드 1 (리뷰 Important 3건 + Minor)
+
+리뷰 판정 수용: OSRM 프로파일은 driving이 맞지만 **CAND-001만 평균 13.0km/h**(11.0km·50.8분)이고
+나머지는 45~64km/h라 임도(track) 경유로 추정된다. 결론("직선 1위가 시간상 최하위")은 감사 실측
+(55km·66분)과 OSRM 양쪽에서 동일하게 성립하므로 **결론은 유지하고 개별 수치의 단정만 제거**했다.
+
+| # | 조치 | 파일 |
+|---|---|---|
+| 1 | 05 §1에 캐비엇 추가 — "공개 라우팅 API 추정치이며 비포장·임도 구간 포함 가능, 절대 수치가 아니라 후보 간 상대 비교용". 속도 실측(13km/h vs 45~64km/h) 근거 병기 | `docs/plan/05-api-contract.md` |
+| 2 | 대본·시드를 **소요시간 중심**으로 교체 — "도로 11.0km" 등 거리 단정 삭제, "직선 5.6km인데 차로 50분대 / 직선상 더 먼 후보가 30분대". 범위 표기도 "도로 11.0~42.6km" → "차로 30분대~50분대" | `backend/seed_demo.py`, `docs/plan/11-demo-and-qa.md` §1-2·§3 |
+| 3 | 시드 가드에 `ORIGINAL_CANDIDATE_ROAD_MINUTES` 대조 추가 — 값이 달라지거나 `null`이면 중단 | `backend/seed_demo.py` |
+| 4 | (a) 채택 — 07 B4 입력 ① 표에 road 필드를 넣고 `cardgen._build_inputs`가 실제로 싣게 했다. 근접도와 어긋나면 거리 단정 대신 소요시간 비교로 쓰라는 작성 지침도 추가. Score 기준선·정렬은 그대로 | `docs/plan/07-backend-ai-tasks.md`, `backend/app/services/cardgen.py` |
+| Minor | `CORPORATE_MARKERS`에 `농협`·`새마을금고` 추가 (제외 19 → **22건**: 영월농협하나로마트사업소 ×2, 북면점 1). **상위 5곳·`data/processed/` 전 산출물 불변** | `pipeline/p6_scoring.py` |
+| Minor | `growth.qoq_pp` 설명(05 §1)·01 문서 ①-2의 "입장객" → **"입장 연인원(교대 합산)"** | `docs/plan/05·01` |
+
+### 검증
+
+| 항목 | 결과 |
+|---|---|
+| `run_all.py` 재실행 | 8단계 성공. `road_minutes` 5건 캐시 재사용으로 동일(50.8/33.9/34.5/30.8/39.9), `data/processed/` **diff 0** |
+| 스모크 | **24 passed** |
+| 시드 가드 변조 테스트 (파일 미변경, 인메모리) | 정상 통과 / `road_minutes` 33.9→41.2 **중단** / 전건 `null` **중단** — 3케이스 모두 기대대로 |
+| 실LLM generate 1회 (gpt-4o-mini, 실호출) | 입력 ①에 `거점에서_도로_소요시간_분: 50.8` 등이 실제로 실린 것을 확인. **다만 생성된 카드의 comparison·reasons에는 접근성 언급이 나오지 않았다** — 모델은 Score 1위 숙박업을 그대로 택하고 "음식점은 승인 대기 상태"라는 추진 상태 논거만 썼다(규칙 기반 fallback 아님, `adjusted=false`). 입력 제공은 완료됐고 모델이 그 신호를 쓸지는 호출마다 다르다는 사실을 그대로 기재한다. 데모 카드 B는 LLM 호출 없는 고정 JSON이라 접근성 근거가 항상 표시된다 |
+| 정리 | compose down, 작업용 `.env` 삭제, `git status` 클린 |
