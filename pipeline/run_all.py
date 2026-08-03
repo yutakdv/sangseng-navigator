@@ -9,15 +9,17 @@ from pathlib import Path
 HERE = Path(__file__).parent
 PROCESSED = HERE.parents[0] / "data" / "processed"
 
+# 번호순이 아니라 의존순 — P5는 P8의 sensitivity.json(ai_stability)을 읽으므로 P6→P8→P5 로 미뤘다
+# (P5는 P1·P2·(선택)P8 산출만, P6는 P1~P4 산출만, P7은 raw CSV만 사용 — 클린 체크아웃 1회 실행 재현용)
 STEPS = [
     ("P1 사용현황 집계", "p1_usage.py"),
     ("P2 카지노 입장객", "p2_visitors.py"),      # 인자 없이 실행 = api_cache 재사용 (갱신은 --refresh)
     ("P3 가맹점 지오코딩", "p3_merchants.py"),   # 인자 없이 실행 = api_cache 재사용 (갱신은 --refresh)
     ("P4 소진공 상가정보", "p4_stores.py"),      # 인자 없이 실행 = api_cache 재사용 (갱신은 --refresh)
-    ("P5 진단 지표", "p5_metrics.py"),
     ("P6 2단계 스코어링", "p6_scoring.py"),
+    ("P8 가중치 민감도", "p8_sensitivity.py"),
+    ("P5 진단 지표", "p5_metrics.py"),           # ai_stability = P8 top3_stable_ratio×100
     ("P7 국세청 파생지표", "p7_risk.py"),
-    ("P8 가중치 민감도", "p8_sensitivity.py"),   # 미구현 — P6 이후
 ]
 
 

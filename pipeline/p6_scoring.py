@@ -34,13 +34,15 @@ def minmax01(values: list[float]) -> list[float]:
 
 
 # ---------------------------------------------------------------- 1단계 (읍 단위 집계 데이터만)
-def stage1_eup_ranking(usage: dict) -> list[dict]:
+def stage1_eup_ranking(usage: dict, weights: dict = EUP_WEIGHTS) -> list[dict]:
     """1단계 — 읍 우선순위. **읍 단위 집계 데이터만** 사용한다 (좌표 인자 없음).
 
     소비저조도 = 1 − (해당 읍 최근 3개월 건수 / 6개 읍 평균 건수), 0~1 클리핑
     소비증감  = 전분기 대비 감소율 (전분기−최근분기)/전분기 를 0~1 min-max (감소가 클수록 1)
     읍Score  = 0.5×소비저조도 + 0.5×소비증감 (EUP_WEIGHTS)
     "최근 3개월"/"전분기" = base_month 기준 최근 3개월 vs 직전 3개월 (P5 growth.qoq_pp 와 동일 정의)
+
+    weights 는 P8 민감도 분석(p8_sensitivity.py)이 격자 값을 주입하는 용도 — 기본값은 정본 상수다.
     """
     months = usage["months"]
     if len(months) < 6:
@@ -63,7 +65,7 @@ def stage1_eup_ranking(usage: dict) -> list[dict]:
     low = {r: min(1.0, max(0.0, 1 - recent[r] / mean_recent)) for r in REGIONS}
     decline = dict(zip(REGIONS, minmax01([(prev[r] - recent[r]) / prev[r] for r in REGIONS])))
     rows = [
-        {"eup": r, "score": EUP_WEIGHTS["v1"] * low[r] + EUP_WEIGHTS["v2"] * decline[r],
+        {"eup": r, "score": weights["v1"] * low[r] + weights["v2"] * decline[r],
          "low_usage": low[r], "decline": decline[r], "recent_3m": recent[r], "prev_3m": prev[r]}
         for r in REGIONS
     ]
@@ -89,7 +91,8 @@ def _radius_counter(points: list[dict]):
     return count
 
 
-def stage2_candidates(eups_by_rank: list[str], select_n: int = SELECT_EUPS) -> tuple[list[dict], list[str]]:
+def stage2_candidates(eups_by_rank: list[str], select_n: int = SELECT_EUPS,
+                      weights: dict = CAND_WEIGHTS) -> tuple[list[dict], list[str]]:
     """2단계 — 후보 지점. **좌표 데이터만** 사용한다 (usage_monthly 인자 없음).
 
     업종공백도    = 1 − (반경 500m 내 동일 표시 업종 하이원 가맹점 수 / 반경 내 소진공 전체 상가 수)
@@ -98,6 +101,8 @@ def stage2_candidates(eups_by_rank: list[str], select_n: int = SELECT_EUPS) -> t
     후보Score    = (1/3)×업종공백도 + (1/3)×관광동선근접도 − (1/3)×기존가맹포화도 (CAND_WEIGHTS)
     업종별 최고점 상가 = 그 업종의 대표 후보 → 전 업종 대표 후보 Score 내림차순 상위 5개.
     반환: (candidates 배열, 실제 사용한 읍 목록 — 후보 0개면 차순위 읍 자동 재시도로 늘어날 수 있음)
+
+    weights 는 P8 민감도 분석(p8_sensitivity.py)이 격자 값을 주입하는 용도 — 기본값은 정본 상수다.
     """
     # 반경 분모·가맹점 수는 수집분 전체에서 센다 — 읍 경계에 걸친 반경이 이웃 지역 상가를 놓치지 않게
     count_stores = _radius_counter([s for region in REGIONS for s in load_stores(region)])
@@ -141,8 +146,7 @@ def stage2_candidates(eups_by_rank: list[str], select_n: int = SELECT_EUPS) -> t
     for c, prox, sat in zip(kept, minmax01([c["inv_dist"] for c in kept]),
                             minmax01([c["nearby_merchants"] for c in kept])):
         c["proximity"], c["saturation"] = prox, sat
-        c["score"] = (CAND_WEIGHTS["w1"] * c["gap"] + CAND_WEIGHTS["w2"] * prox
-                      - CAND_WEIGHTS["w3"] * sat)
+        c["score"] = weights["w1"] * c["gap"] + weights["w2"] * prox - weights["w3"] * sat
 
     best: dict[str, dict] = {}  # 업종별 최고점 상가 = 그 업종의 대표 후보
     for c in kept:
