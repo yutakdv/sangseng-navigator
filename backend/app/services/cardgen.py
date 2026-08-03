@@ -94,7 +94,11 @@ def _build_inputs(cands: list, cards: list) -> dict:
              "Score": c["score"], "업종공백도": c["gap"], "관광동선근접도": c["proximity"],
              "기존가맹포화도": c["saturation"],
              "반경500m_동일업종_하이원_가맹점": c["nearby_merchants"],
-             "반경500m_전체_상가": c["nearby_stores"]} for c in cands],
+             "반경500m_전체_상가": c["nearby_stores"],
+             # 근접도는 직선거리 기반이라 산악 지형에서 실제 접근성과 역전된다 — AI가 그 역전을
+             # 근거로 지적할 수 있게 병기한다(05 §1). 순위 재정렬 용도가 아니다.
+             "거점에서_도로_소요시간_분": c.get("road_minutes"),
+             "거점에서_도로_거리_km": c.get("road_distance_km")} for c in cands],
         "2_후보별_현재_추진_상태": [
             {"후보": f"{c['eup']} {c['category']}", "추진 상태": _target_state(c, cards)}
             for c in cands],
@@ -105,7 +109,10 @@ def _build_inputs(cands: list, cards: list) -> dict:
         "작성_지침": ("ai_rank_target에는 조정 후 1순위 타깃을 '지역 업종'(예: 영월군 소매점) "
                    "형식으로 적을 것. 추진 상태가 추진중/완료인 후보는 1순위로 제안하지 말고, "
                    "그런 후보 때문에 제외·조정이 있었다면 해당 추진 상태('추진중' 등)를 reasons에 "
-                   "명시할 것. 입력 1의 수치에 없는 사실은 지어내지 말 것"),
+                   "명시할 것. 입력 1의 수치에 없는 사실은 지어내지 말 것. "
+                   "관광동선근접도는 직선거리 기반이고 도로 소요시간은 공개 라우팅 API 추정치이므로, "
+                   "둘이 어긋나면 거리 수치를 단정하지 말고 '직선으로는 가깝지만 차로는 더 걸린다' "
+                   "처럼 소요시간 비교로 서술할 것. Score 순위 자체는 변경 불가 기준선이다"),
     }
 
 
