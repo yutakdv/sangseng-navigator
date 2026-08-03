@@ -74,7 +74,7 @@ Base URL: 로컬 `http://localhost:8000` / 배포 후 API Gateway URL. 경로 �
   "candidates": [
     {
       "id": "CAND-001", "eup": "사북읍", "category": "카페",
-      "lat": 37.2211, "lng": 128.8123, "name_hint": "사북시장 인근",
+      "lat": 37.2211, "lng": 128.8123, "name": "OO카페",
       "score": 0.57, "gap": 1.0, "proximity": 0.7, "saturation": 0.0,
       "nearby_merchants": 0, "nearby_stores": 34
     }
@@ -85,6 +85,12 @@ Base URL: 로컬 `http://localhost:8000` / 배포 후 API Gateway URL. 경로 �
   ]
 }
 ```
+
+- `candidates[]`는 업종별 대표 후보(그 업종 최고점 상가)를 Score 내림차순 상위 5개까지 담으며,
+  **계산 근거 필드를 항상 포함**한다(감사 가능성 원칙·F4 지도 팝업 근거): `name`=소진공 상가 상호명,
+  `gap`=업종공백도, `proximity`=관광동선근접도, `saturation`=기존가맹포화도,
+  `nearby_stores`=반경 500m 내 소진공 전체 상가 수, `nearby_merchants`=반경 내 동일 표시 업종
+  하이원 가맹점 수. 산식·산출 정본은 `pipeline/p6_scoring.py`(06 P6).
 
 ## 2. Action Card
 
