@@ -71,7 +71,7 @@ CLI로 불가하므로 **콘솔(관리자 권한) 경로**로 수행한다.
 
 ### 4-1. `merchants.json`에 `address` 필드 없음 — T2 진입 전
 
-- [ ] 05 §1 `merchants` 스키마와 §6 표에 `address` 추가 → T2(P3) 산출물이 채움
+- [x] 05 §1 `merchants` 스키마와 §6 표에 `address` 추가 → T2(P3) 산출물이 채움
 
 위젯 응답(05 §4)은 `address`를 내려주는데, 원천인 merchants 스키마(05 §1)는
 `{name, category, eup, lat, lng}`뿐이라 B6이 채울 데이터가 없다. P3가 지오코딩 입력으로
@@ -79,7 +79,8 @@ CLI로 불가하므로 **콘솔(관리자 권한) 경로**로 수행한다.
 
 ### 4-2. 업종 분류 3계층 매핑 정본 부재 — T3에서 확정
 
-- [ ] `pipeline/category_map.py`를 단일 정본으로 매핑 3종 확정 + 05에 표시명 롤업 규칙 1줄 명시
+- [x] `pipeline/category_map.py`를 단일 정본으로 매핑 3종 확정 + 05에 표시명 롤업 규칙 1줄 명시
+      (매핑 ③은 가맹점 API에 업종 필드가 없어 **상호명 키워드 규칙** `MERCHANT_NAME_RULES`로 확정 — T2)
 
 실데이터 업종 18종(P1 산출 `usage_monthly.json`의 categories: 커피전문점·일반음식점업·슈퍼마켓·숙박업·소매업 등)
 ↔ 13 §5 표시 6분류(카페·음식점·편의점·숙박업·소매점·기타) ↔ 소진공 대분류(`indsLclsNm`)
