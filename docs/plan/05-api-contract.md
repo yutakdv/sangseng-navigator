@@ -215,11 +215,16 @@ Base URL: 로컬 `http://localhost:8000` / 배포 후 API Gateway URL. 경로 �
 ```
 
 - 채택률 = approved / 전체, 실행 전환율 = (추진중+완료) / approved
-- 평균 승인 소요 = avg(decided_at − created_at), 지역 균형지수 = (1 − 채택 카드의 지역 분포 Gini) × 100
+- 평균 승인 소요 = avg(decided_at − created_at)
+- 지역 균형지수 = 승인 EXPANSION 카드의 6지역 분포에 **지역 소비 집중도와 동일한 정규화 지수**(0~100)를
+  적용해 `100 − 집중도`. **완전 균등 = 100, 한 지역 몰림(완전 편중) = 0**.
+  §1 `concentration.index`와 같은 자를 쓰므로 진단 지표와 나란히 읽을 수 있다
+  (내부 산식은 정규화 지니 — 화면·발표 용어 비노출 원칙은 그대로)
 - 지역 균형지수는 **EXPANSION 카드만** 집계 (INCENTIVE는 `target`이 없어 지역 분포에 넣을 수 없음)
 - `regional_balance_index`의 분모는 **`REGIONS` 6개 지역 고정** — 승인(approved) 카드가 한 건도 없는
   지역도 0건으로 포함해 위 산식으로 계산하고, 결과는 반올림한 정수. 지표 특성상 승인 카드가
-  여러 지역에 쌓일수록 상승한다 (데모 초반의 낮은 값은 정상 동작)
+  여러 지역에 쌓일수록 상승한다 (승인 1장 = `0`, 서로 다른 2개 지역 = `20` — 데모 초반의 낮은 값은
+  정상 동작이며, 위 예시의 `80`은 여러 지역에 고루 쌓인 상태를 가정한 값이다)
 - `avg_approval_hours`의 집계 대상은 **`decided_at`이 있는 모든 카드**(approved+rejected+held) —
   "의사결정 소요 시간"이라는 지표 의미에 맞춘 정의. `decided_at − created_at`의 평균을 소수 1자리로 반올림
 
