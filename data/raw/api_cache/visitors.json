@@ -1,0 +1,6601 @@
+{
+  "endpoint": "https://apis.data.go.kr/B552525/DailCustCntService/getDailCustCnt",
+  "fetched_at": "2026-08-03T08:07:32+00:00",
+  "params_note": "dateFrom/dateTo = 월초~월말(YYYY-MM-DD), numOfRows=200, totalCount 기준 페이징 완주",
+  "months": {
+    "2025-01": [
+      {
+        "BSN_DT": "2025-01-01",
+        "BSN_HR_CN": "1부",
+        "NATIVE_CNT": 6638,
+        "FRGNR_CNT": 52
+      },
+      {
+        "BSN_DT": "2025-01-01",
+        "BSN_HR_CN": "2부",
+        "NATIVE_CNT": 1612,
+        "FRGNR_CNT": 24
+      },
+      {
+        "BSN_DT": "2025-01-01",
+        "BSN_HR_CN": "3부",
+        "NATIVE_CNT": 267,
+        "FRGNR_CNT": 3
+      },
+      {
+        "BSN_DT": "2025-01-02",
+        "BSN_HR_CN": "1부",
+        "NATIVE_CNT": 5017,
+        "FRGNR_CNT": 55
+      },
+      {
+        "BSN_DT": "2025-01-02",
+        "BSN_HR_CN": "2부",
+        "NATIVE_CNT": 1661,
+        "FRGNR_CNT": 31
+      },
+      {
+        "BSN_DT": "2025-01-02",
+        "BSN_HR_CN": "3부",
+        "NATIVE_CNT": 287,
+        "FRGNR_CNT": 2
+      },
+      {
+        "BSN_DT": "2025-01-03",
+        "BSN_HR_CN": "1부",
+        "NATIVE_CNT": 4707,
+        "FRGNR_CNT": 44
+      },
+      {
+        "BSN_DT": "2025-01-03",
+        "BSN_HR_CN": "2부",
+        "NATIVE_CNT": 2474,
+        "FRGNR_CNT": 55
+      },
+      {
+        "BSN_DT": "2025-01-03",
+        "BSN_HR_CN": "3부",
+        "NATIVE_CNT": 489,
+        "FRGNR_CNT": 7
+      },
+      {
+        "BSN_DT": "2025-01-04",
+        "BSN_HR_CN": "1부",
+        "NATIVE_CNT": 6391,
+        "FRGNR_CNT": 64
+      },
+      {
+        "BSN_DT": "2025-01-04",
+        "BSN_HR_CN": "2부",
+        "NATIVE_CNT": 2736,
+        "FRGNR_CNT": 36
+      },
+      {
+        "BSN_DT": "2025-01-04",
+        "BSN_HR_CN": "3부",
+        "NATIVE_CNT": 428,
+        "FRGNR_CNT": 6
+      },
+      {
+        "BSN_DT": "2025-01-05",
+        "BSN_HR_CN": "1부",
+        "NATIVE_CNT": 4800,
+        "FRGNR_CNT": 54
+      },
+      {
+        "BSN_DT": "2025-01-05",
+        "BSN_HR_CN": "2부",
+        "NATIVE_CNT": 1327,
+        "FRGNR_CNT": 24
+      },
+      {
+        "BSN_DT": "2025-01-05",
+        "BSN_HR_CN": "3부",
+        "NATIVE_CNT": 222,
+        "FRGNR_CNT": 10
+      },
+      {
+        "BSN_DT": "2025-01-06",
+        "BSN_HR_CN": "1부",
+        "NATIVE_CNT": 3832,
+        "FRGNR_CNT": 64
+      },
+      {
+        "BSN_DT": "2025-01-06",
+        "BSN_HR_CN": "2부",
+        "NATIVE_CNT": 1503,
+        "FRGNR_CNT": 36
+      },
+      {
+        "BSN_DT": "2025-01-06",
+        "BSN_HR_CN": "3부",
+        "NATIVE_CNT": 261,
+        "FRGNR_CNT": 3
+      },
+      {
+        "BSN_DT": "2025-01-07",
+        "BSN_HR_CN": "1부",
+        "NATIVE_CNT": 4358,
+        "FRGNR_CNT": 42
+      },
+      {
+        "BSN_DT": "2025-01-07",
+        "BSN_HR_CN": "2부",
+        "NATIVE_CNT": 1586,
+        "FRGNR_CNT": 16
+      },
+      {
+        "BSN_DT": "2025-01-07",
+        "BSN_HR_CN": "3부",
+        "NATIVE_CNT": 201,
+        "FRGNR_CNT": 0
+      },
+      {
+        "BSN_DT": "2025-01-08",
+        "BSN_HR_CN": "1부",
+        "NATIVE_CNT": 4304,
+        "FRGNR_CNT": 40
+      },
+      {
+        "BSN_DT": "2025-01-08",
+        "BSN_HR_CN": "2부",
+        "NATIVE_CNT": 1370,
+        "FRGNR_CNT": 31
+      },
+      {
+        "BSN_DT": "2025-01-08",
+        "BSN_HR_CN": "3부",
+        "NATIVE_CNT": 174,
+        "FRGNR_CNT": 5
+      },
+      {
+        "BSN_DT": "2025-01-09",
+        "BSN_HR_CN": "1부",
+        "NATIVE_CNT": 4183,
+        "FRGNR_CNT": 51
+      },
+      {
+        "BSN_DT": "2025-01-09",
+        "BSN_HR_CN": "2부",
+        "NATIVE_CNT": 1416,
+        "FRGNR_CNT": 20
+      },
+      {
+        "BSN_DT": "2025-01-09",
+        "BSN_HR_CN": "3부",
+        "NATIVE_CNT": 209,
+        "FRGNR_CNT": 4
+      },
+      {
+        "BSN_DT": "2025-01-10",
+        "BSN_HR_CN": "1부",
+        "NATIVE_CNT": 4334,
+        "FRGNR_CNT": 42
+      },
+      {
+        "BSN_DT": "2025-01-10",
+        "BSN_HR_CN": "2부",
+        "NATIVE_CNT": 2737,
+        "FRGNR_CNT": 19
+      },
+      {
+        "BSN_DT": "2025-01-10",
+        "BSN_HR_CN": "3부",
+        "NATIVE_CNT": 469,
+        "FRGNR_CNT": 7
+      },
+      {
+        "BSN_DT": "2025-01-11",
+        "BSN_HR_CN": "1부",
+        "NATIVE_CNT": 6301,
+        "FRGNR_CNT": 46
+      },
+      {
+        "BSN_DT": "2025-01-11",
+        "BSN_HR_CN": "2부",
+        "NATIVE_CNT": 2868,
+        "FRGNR_CNT": 37
+      },
+      {
+        "BSN_DT": "2025-01-11",
+        "BSN_HR_CN": "3부",
+        "NATIVE_CNT": 527,
+        "FRGNR_CNT": 8
+      },
+      {
+        "BSN_DT": "2025-01-12",
+        "BSN_HR_CN": "1부",
+        "NATIVE_CNT": 5579,
+        "FRGNR_CNT": 49
+      },
+      {
+        "BSN_DT": "2025-01-12",
+        "BSN_HR_CN": "2부",
+        "NATIVE_CNT": 1670,
+        "FRGNR_CNT": 60
+      },
+      {
+        "BSN_DT": "2025-01-12",
+        "BSN_HR_CN": "3부",
+        "NATIVE_CNT": 261,
+        "FRGNR_CNT": 6
+      },
+      {
+        "BSN_DT": "2025-01-13",
+        "BSN_HR_CN": "1부",
+        "NATIVE_CNT": 4106,
+        "FRGNR_CNT": 65
+      },
+      {
+        "BSN_DT": "2025-01-13",
+        "BSN_HR_CN": "2부",
+        "NATIVE_CNT": 1403,
+        "FRGNR_CNT": 69
+      },
+      {
+        "BSN_DT": "2025-01-13",
+        "BSN_HR_CN": "3부",
+        "NATIVE_CNT": 264,
+        "FRGNR_CNT": 1
+      },
+      {
+        "BSN_DT": "2025-01-14",
+        "BSN_HR_CN": "1부",
+        "NATIVE_CNT": 4032,
+        "FRGNR_CNT": 67
+      },
+      {
+        "BSN_DT": "2025-01-14",
+        "BSN_HR_CN": "2부",
+        "NATIVE_CNT": 1447,
+        "FRGNR_CNT": 27
+      },
+      {
+        "BSN_DT": "2025-01-14",
+        "BSN_HR_CN": "3부",
+        "NATIVE_CNT": 225,
+        "FRGNR_CNT": 5
+      },
+      {
+        "BSN_DT": "2025-01-15",
+        "BSN_HR_CN": "1부",
+        "NATIVE_CNT": 4089,
+        "FRGNR_CNT": 46
+      },
+      {
+        "BSN_DT": "2025-01-15",
+        "BSN_HR_CN": "2부",
+        "NATIVE_CNT": 1572,
+        "FRGNR_CNT": 23
+      },
+      {
+        "BSN_DT": "2025-01-15",
+        "BSN_HR_CN": "3부",
+        "NATIVE_CNT": 243,
+        "FRGNR_CNT": 2
+      },
+      {
+        "BSN_DT": "2025-01-16",
+        "BSN_HR_CN": "1부",
+        "NATIVE_CNT": 4176,
+        "FRGNR_CNT": 37
+      },
+      {
+        "BSN_DT": "2025-01-16",
+        "BSN_HR_CN": "2부",
+        "NATIVE_CNT": 1551,
+        "FRGNR_CNT": 34
+      },
+      {
+        "BSN_DT": "2025-01-16",
+        "BSN_HR_CN": "3부",
+        "NATIVE_CNT": 224,
+        "FRGNR_CNT": 7
+      },
+      {
+        "BSN_DT": "2025-01-17",
+        "BSN_HR_CN": "1부",
+        "NATIVE_CNT": 4512,
+        "FRGNR_CNT": 39
+      },
+      {
+        "BSN_DT": "2025-01-17",
+        "BSN_HR_CN": "2부",
+        "NATIVE_CNT": 2467,
+        "FRGNR_CNT": 39
+      },
+      {
+        "BSN_DT": "2025-01-17",
+        "BSN_HR_CN": "3부",
+        "NATIVE_CNT": 470,
+        "FRGNR_CNT": 4
+      },
+      {
+        "BSN_DT": "2025-01-18",
+        "BSN_HR_CN": "1부",
+        "NATIVE_CNT": 6107,
+        "FRGNR_CNT": 39
+      },
+      {
+        "BSN_DT": "2025-01-18",
+        "BSN_HR_CN": "2부",
+        "NATIVE_CNT": 2917,
+        "FRGNR_CNT": 35
+      },
+      {
+        "BSN_DT": "2025-01-18",
+        "BSN_HR_CN": "3부",
+        "NATIVE_CNT": 483,
+        "FRGNR_CNT": 3
+      },
+      {
+        "BSN_DT": "2025-01-19",
+        "BSN_HR_CN": "1부",
+        "NATIVE_CNT": 5117,
+        "FRGNR_CNT": 53
+      },
+      {
+        "BSN_DT": "2025-01-19",
+        "BSN_HR_CN": "2부",
+        "NATIVE_CNT": 1656,
+        "FRGNR_CNT": 26
+      },
+      {
+        "BSN_DT": "2025-01-19",
+        "BSN_HR_CN": "3부",
+        "NATIVE_CNT": 261,
+        "FRGNR_CNT": 2
+      },
+      {
+        "BSN_DT": "2025-01-20",
+        "BSN_HR_CN": "1부",
+        "NATIVE_CNT": 3845,
+        "FRGNR_CNT": 36
+      },
+      {
+        "BSN_DT": "2025-01-20",
+        "BSN_HR_CN": "2부",
+        "NATIVE_CNT": 1505,
+        "FRGNR_CNT": 16
+      },
+      {
+        "BSN_DT": "2025-01-20",
+        "BSN_HR_CN": "3부",
+        "NATIVE_CNT": 225,
+        "FRGNR_CNT": 2
+      },
+      {
+        "BSN_DT": "2025-01-21",
+        "BSN_HR_CN": "1부",
+        "NATIVE_CNT": 4127,
+        "FRGNR_CNT": 41
+      },
+      {
+        "BSN_DT": "2025-01-21",
+        "BSN_HR_CN": "2부",
+        "NATIVE_CNT": 1431,
+        "FRGNR_CNT": 30
+      },
+      {
+        "BSN_DT": "2025-01-21",
+        "BSN_HR_CN": "3부",
+        "NATIVE_CNT": 240,
+        "FRGNR_CNT": 2
+      },
+      {
+        "BSN_DT": "2025-01-22",
+        "BSN_HR_CN": "1부",
+        "NATIVE_CNT": 3862,
+        "FRGNR_CNT": 46
+      },
+      {
+        "BSN_DT": "2025-01-22",
+        "BSN_HR_CN": "2부",
+        "NATIVE_CNT": 1588,
+        "FRGNR_CNT": 22
+      },
+      {
+        "BSN_DT": "2025-01-22",
+        "BSN_HR_CN": "3부",
+        "NATIVE_CNT": 255,
+        "FRGNR_CNT": 0
+      },
+      {
+        "BSN_DT": "2025-01-23",
+        "BSN_HR_CN": "1부",
+        "NATIVE_CNT": 3690,
+        "FRGNR_CNT": 33
+      },
+      {
+        "BSN_DT": "2025-01-23",
+        "BSN_HR_CN": "2부",
+        "NATIVE_CNT": 1478,
+        "FRGNR_CNT": 17
+      },
+      {
+        "BSN_DT": "2025-01-23",
+        "BSN_HR_CN": "3부",
+        "NATIVE_CNT": 251,
+        "FRGNR_CNT": 2
+      },
+      {
+        "BSN_DT": "2025-01-24",
+        "BSN_HR_CN": "1부",
+        "NATIVE_CNT": 4283,
+        "FRGNR_CNT": 49
+      },
+      {
+        "BSN_DT": "2025-01-24",
+        "BSN_HR_CN": "2부",
+        "NATIVE_CNT": 2590,
+        "FRGNR_CNT": 28
+      },
+      {
+        "BSN_DT": "2025-01-24",
+        "BSN_HR_CN": "3부",
+        "NATIVE_CNT": 486,
+        "FRGNR_CNT": 5
+      },
+      {
+        "BSN_DT": "2025-01-25",
+        "BSN_HR_CN": "1부",
+        "NATIVE_CNT": 6836,
+        "FRGNR_CNT": 73
+      },
+      {
+        "BSN_DT": "2025-01-25",
+        "BSN_HR_CN": "2부",
+        "NATIVE_CNT": 3160,
+        "FRGNR_CNT": 33
+      },
+      {
+        "BSN_DT": "2025-01-25",
+        "BSN_HR_CN": "3부",
+        "NATIVE_CNT": 600,
+        "FRGNR_CNT": 3
+      },
+      {
+        "BSN_DT": "2025-01-26",
+        "BSN_HR_CN": "1부",
+        "NATIVE_CNT": 7452,
+        "FRGNR_CNT": 51
+      },
+      {
+        "BSN_DT": "2025-01-26",
+        "BSN_HR_CN": "2부",
+        "NATIVE_CNT": 2858,
+        "FRGNR_CNT": 24
+      },
+      {
+        "BSN_DT": "2025-01-26",
+        "BSN_HR_CN": "3부",
+        "NATIVE_CNT": 448,
+        "FRGNR_CNT": 1
+      },
+      {
+        "BSN_DT": "2025-01-27",
+        "BSN_HR_CN": "1부",
+        "NATIVE_CNT": 5523,
+        "FRGNR_CNT": 38
+      },
+      {
+        "BSN_DT": "2025-01-27",
+        "BSN_HR_CN": "2부",
+        "NATIVE_CNT": 1913,
+        "FRGNR_CNT": 19
+      },
+      {
+        "BSN_DT": "2025-01-27",
+        "BSN_HR_CN": "3부",
+        "NATIVE_CNT": 335,
+        "FRGNR_CNT": 2
+      },
+      {
+        "BSN_DT": "2025-01-28",
+        "BSN_HR_CN": "1부",
+        "NATIVE_CNT": 4198,
+        "FRGNR_CNT": 50
+      },
+      {
+        "BSN_DT": "2025-01-28",
+        "BSN_HR_CN": "2부",
+        "NATIVE_CNT": 1610,
+        "FRGNR_CNT": 33
+      },
+      {
+        "BSN_DT": "2025-01-28",
+        "BSN_HR_CN": "3부",
+        "NATIVE_CNT": 235,
+        "FRGNR_CNT": 3
+      },
+      {
+        "BSN_DT": "2025-01-29",
+        "BSN_HR_CN": "1부",
+        "NATIVE_CNT": 4870,
+        "FRGNR_CNT": 55
+      },
+      {
+        "BSN_DT": "2025-01-29",
+        "BSN_HR_CN": "2부",
+        "NATIVE_CNT": 2453,
+        "FRGNR_CNT": 32
+      },
+      {
+        "BSN_DT": "2025-01-29",
+        "BSN_HR_CN": "3부",
+        "NATIVE_CNT": 401,
+        "FRGNR_CNT": 4
+      },
+      {
+        "BSN_DT": "2025-01-30",
+        "BSN_HR_CN": "1부",
+        "NATIVE_CNT": 6189,
+        "FRGNR_CNT": 72
+      },
+      {
+        "BSN_DT": "2025-01-30",
+        "BSN_HR_CN": "2부",
+        "NATIVE_CNT": 2267,
+        "FRGNR_CNT": 34
+      },
+      {
+        "BSN_DT": "2025-01-30",
+        "BSN_HR_CN": "3부",
+        "NATIVE_CNT": 326,
+        "FRGNR_CNT": 1
+      },
+      {
+        "BSN_DT": "2025-01-31",
+        "BSN_HR_CN": "1부",
+        "NATIVE_CNT": 6241,
+        "FRGNR_CNT": 53
+      },
+      {
+        "BSN_DT": "2025-01-31",
+        "BSN_HR_CN": "2부",
+        "NATIVE_CNT": 2737,
+        "FRGNR_CNT": 38
+      },
+      {
+        "BSN_DT": "2025-01-31",
+        "BSN_HR_CN": "3부",
+        "NATIVE_CNT": 461,
+        "FRGNR_CNT": 8
+      }
+    ],
+    "2025-02": [
+      {
+        "BSN_DT": "2025-02-01",
+        "BSN_HR_CN": "1부",
+        "NATIVE_CNT": 8217,
+        "FRGNR_CNT": 47
+      },
+      {
+        "BSN_DT": "2025-02-01",
+        "BSN_HR_CN": "2부",
+        "NATIVE_CNT": 2910,
+        "FRGNR_CNT": 22
+      },
+      {
+        "BSN_DT": "2025-02-01",
+        "BSN_HR_CN": "3부",
+        "NATIVE_CNT": 511,
+        "FRGNR_CNT": 9
+      },
+      {
+        "BSN_DT": "2025-02-02",
+        "BSN_HR_CN": "1부",
+        "NATIVE_CNT": 6451,
+        "FRGNR_CNT": 53
+      },
+      {
+        "BSN_DT": "2025-02-02",
+        "BSN_HR_CN": "2부",
+        "NATIVE_CNT": 1822,
+        "FRGNR_CNT": 46
+      },
+      {
+        "BSN_DT": "2025-02-02",
+        "BSN_HR_CN": "3부",
+        "NATIVE_CNT": 342,
+        "FRGNR_CNT": 12
+      },
+      {
+        "BSN_DT": "2025-02-03",
+        "BSN_HR_CN": "1부",
+        "NATIVE_CNT": 5108,
+        "FRGNR_CNT": 44
+      },
+      {
+        "BSN_DT": "2025-02-03",
+        "BSN_HR_CN": "2부",
+        "NATIVE_CNT": 1752,
+        "FRGNR_CNT": 41
+      },
+      {
+        "BSN_DT": "2025-02-03",
+        "BSN_HR_CN": "3부",
+        "NATIVE_CNT": 242,
+        "FRGNR_CNT": 8
+      },
+      {
+        "BSN_DT": "2025-02-04",
+        "BSN_HR_CN": "1부",
+        "NATIVE_CNT": 5011,
+        "FRGNR_CNT": 39
+      },
+      {
+        "BSN_DT": "2025-02-04",
+        "BSN_HR_CN": "2부",
+        "NATIVE_CNT": 1478,
+        "FRGNR_CNT": 28
+      },
+      {
+        "BSN_DT": "2025-02-04",
+        "BSN_HR_CN": "3부",
+        "NATIVE_CNT": 239,
+        "FRGNR_CNT": 11
+      },
+      {
+        "BSN_DT": "2025-02-05",
+        "BSN_HR_CN": "1부",
+        "NATIVE_CNT": 4598,
+        "FRGNR_CNT": 40
+      },
+      {
+        "BSN_DT": "2025-02-05",
+        "BSN_HR_CN": "2부",
+        "NATIVE_CNT": 1652,
+        "FRGNR_CNT": 39
+      },
+      {
+        "BSN_DT": "2025-02-05",
+        "BSN_HR_CN": "3부",
+        "NATIVE_CNT": 252,
+        "FRGNR_CNT": 7
+      },
+      {
+        "BSN_DT": "2025-02-06",
+        "BSN_HR_CN": "1부",
+        "NATIVE_CNT": 4388,
+        "FRGNR_CNT": 43
+      },
+      {
+        "BSN_DT": "2025-02-06",
+        "BSN_HR_CN": "2부",
+        "NATIVE_CNT": 1247,
+        "FRGNR_CNT": 23
+      },
+      {
+        "BSN_DT": "2025-02-06",
+        "BSN_HR_CN": "3부",
+        "NATIVE_CNT": 200,
+        "FRGNR_CNT": 6
+      },
+      {
+        "BSN_DT": "2025-02-07",
+        "BSN_HR_CN": "1부",
+        "NATIVE_CNT": 4295,
+        "FRGNR_CNT": 48
+      },
+      {
+        "BSN_DT": "2025-02-07",
+        "BSN_HR_CN": "2부",
+        "NATIVE_CNT": 2223,
+        "FRGNR_CNT": 34
+      },
+      {
+        "BSN_DT": "2025-02-07",
+        "BSN_HR_CN": "3부",
+        "NATIVE_CNT": 383,
+        "FRGNR_CNT": 13
+      },
+      {
+        "BSN_DT": "2025-02-08",
+        "BSN_HR_CN": "1부",
+        "NATIVE_CNT": 6161,
+        "FRGNR_CNT": 73
+      },
+      {
+        "BSN_DT": "2025-02-08",
+        "BSN_HR_CN": "2부",
+        "NATIVE_CNT": 2685,
+        "FRGNR_CNT": 68
+      },
+      {
+        "BSN_DT": "2025-02-08",
+        "BSN_HR_CN": "3부",
+        "NATIVE_CNT": 466,
+        "FRGNR_CNT": 5
+      },
+      {
+        "BSN_DT": "2025-02-09",
+        "BSN_HR_CN": "1부",
+        "NATIVE_CNT": 5646,
+        "FRGNR_CNT": 60
+      },
+      {
+        "BSN_DT": "2025-02-09",
+        "BSN_HR_CN": "2부",
+        "NATIVE_CNT": 1689,
+        "FRGNR_CNT": 62
+      },
+      {
+        "BSN_DT": "2025-02-09",
+        "BSN_HR_CN": "3부",
+        "NATIVE_CNT": 238,
+        "FRGNR_CNT": 10
+      },
+      {
+        "BSN_DT": "2025-02-10",
+        "BSN_HR_CN": "1부",
+        "NATIVE_CNT": 4373,
+        "FRGNR_CNT": 65
+      },
+      {
+        "BSN_DT": "2025-02-10",
+        "BSN_HR_CN": "2부",
+        "NATIVE_CNT": 1601,
+        "FRGNR_CNT": 48
+      },
+      {
+        "BSN_DT": "2025-02-10",
+        "BSN_HR_CN": "3부",
+        "NATIVE_CNT": 273,
+        "FRGNR_CNT": 3
+      },
+      {
+        "BSN_DT": "2025-02-11",
+        "BSN_HR_CN": "1부",
+        "NATIVE_CNT": 4514,
+        "FRGNR_CNT": 61
+      },
+      {
+        "BSN_DT": "2025-02-11",
+        "BSN_HR_CN": "2부",
+        "NATIVE_CNT": 1775,
+        "FRGNR_CNT": 23
+      },
+      {
+        "BSN_DT": "2025-02-11",
+        "BSN_HR_CN": "3부",
+        "NATIVE_CNT": 231,
+        "FRGNR_CNT": 5
+      },
+      {
+        "BSN_DT": "2025-02-12",
+        "BSN_HR_CN": "1부",
+        "NATIVE_CNT": 4235,
+        "FRGNR_CNT": 34
+      },
+      {
+        "BSN_DT": "2025-02-12",
+        "BSN_HR_CN": "2부",
+        "NATIVE_CNT": 1511,
+        "FRGNR_CNT": 16
+      },
+      {
+        "BSN_DT": "2025-02-12",
+        "BSN_HR_CN": "3부",
+        "NATIVE_CNT": 243,
+        "FRGNR_CNT": 3
+      },
+      {
+        "BSN_DT": "2025-02-13",
+        "BSN_HR_CN": "1부",
+        "NATIVE_CNT": 4575,
+        "FRGNR_CNT": 30
+      },
+      {
+        "BSN_DT": "2025-02-13",
+        "BSN_HR_CN": "2부",
+        "NATIVE_CNT": 1828,
+        "FRGNR_CNT": 20
+      },
+      {
+        "BSN_DT": "2025-02-13",
+        "BSN_HR_CN": "3부",
+        "NATIVE_CNT": 220,
+        "FRGNR_CNT": 2
+      },
+      {
+        "BSN_DT": "2025-02-14",
+        "BSN_HR_CN": "1부",
+        "NATIVE_CNT": 4730,
+        "FRGNR_CNT": 33
+      },
+      {
+        "BSN_DT": "2025-02-14",
+        "BSN_HR_CN": "2부",
+        "NATIVE_CNT": 2522,
+        "FRGNR_CNT": 28
+      },
+      {
+        "BSN_DT": "2025-02-14",
+        "BSN_HR_CN": "3부",
+        "NATIVE_CNT": 499,
+        "FRGNR_CNT": 8
+      },
+      {
+        "BSN_DT": "2025-02-15",
+        "BSN_HR_CN": "1부",
+        "NATIVE_CNT": 6293,
+        "FRGNR_CNT": 58
+      },
+      {
+        "BSN_DT": "2025-02-15",
+        "BSN_HR_CN": "2부",
+        "NATIVE_CNT": 2912,
+        "FRGNR_CNT": 68
+      },
+      {
+        "BSN_DT": "2025-02-15",
+        "BSN_HR_CN": "3부",
+        "NATIVE_CNT": 566,
+        "FRGNR_CNT": 7
+      },
+      {
+        "BSN_DT": "2025-02-16",
+        "BSN_HR_CN": "1부",
+        "NATIVE_CNT": 5594,
+        "FRGNR_CNT": 51
+      },
+      {
+        "BSN_DT": "2025-02-16",
+        "BSN_HR_CN": "2부",
+        "NATIVE_CNT": 1876,
+        "FRGNR_CNT": 46
+      },
+      {
+        "BSN_DT": "2025-02-16",
+        "BSN_HR_CN": "3부",
+        "NATIVE_CNT": 314,
+        "FRGNR_CNT": 6
+      },
+      {
+        "BSN_DT": "2025-02-17",
+        "BSN_HR_CN": "1부",
+        "NATIVE_CNT": 4479,
+        "FRGNR_CNT": 49
+      },
+      {
+        "BSN_DT": "2025-02-17",
+        "BSN_HR_CN": "2부",
+        "NATIVE_CNT": 1628,
+        "FRGNR_CNT": 26
+      },
+      {
+        "BSN_DT": "2025-02-17",
+        "BSN_HR_CN": "3부",
+        "NATIVE_CNT": 270,
+        "FRGNR_CNT": 1
+      },
+      {
+        "BSN_DT": "2025-02-18",
+        "BSN_HR_CN": "1부",
+        "NATIVE_CNT": 4489,
+        "FRGNR_CNT": 52
+      },
+      {
+        "BSN_DT": "2025-02-18",
+        "BSN_HR_CN": "2부",
+        "NATIVE_CNT": 1496,
+        "FRGNR_CNT": 57
+      },
+      {
+        "BSN_DT": "2025-02-18",
+        "BSN_HR_CN": "3부",
+        "NATIVE_CNT": 230,
+        "FRGNR_CNT": 2
+      },
+      {
+        "BSN_DT": "2025-02-19",
+        "BSN_HR_CN": "1부",
+        "NATIVE_CNT": 4330,
+        "FRGNR_CNT": 29
+      },
+      {
+        "BSN_DT": "2025-02-19",
+        "BSN_HR_CN": "2부",
+        "NATIVE_CNT": 1403,
+        "FRGNR_CNT": 33
+      },
+      {
+        "BSN_DT": "2025-02-19",
+        "BSN_HR_CN": "3부",
+        "NATIVE_CNT": 195,
+        "FRGNR_CNT": 4
+      },
+      {
+        "BSN_DT": "2025-02-20",
+        "BSN_HR_CN": "1부",
+        "NATIVE_CNT": 4357,
+        "FRGNR_CNT": 35
+      },
+      {
+        "BSN_DT": "2025-02-20",
+        "BSN_HR_CN": "2부",
+        "NATIVE_CNT": 1737,
+        "FRGNR_CNT": 28
+      },
+      {
+        "BSN_DT": "2025-02-20",
+        "BSN_HR_CN": "3부",
+        "NATIVE_CNT": 253,
+        "FRGNR_CNT": 4
+      },
+      {
+        "BSN_DT": "2025-02-21",
+        "BSN_HR_CN": "1부",
+        "NATIVE_CNT": 4635,
+        "FRGNR_CNT": 46
+      },
+      {
+        "BSN_DT": "2025-02-21",
+        "BSN_HR_CN": "2부",
+        "NATIVE_CNT": 2520,
+        "FRGNR_CNT": 16
+      },
+      {
+        "BSN_DT": "2025-02-21",
+        "BSN_HR_CN": "3부",
+        "NATIVE_CNT": 446,
+        "FRGNR_CNT": 3
+      },
+      {
+        "BSN_DT": "2025-02-22",
+        "BSN_HR_CN": "1부",
+        "NATIVE_CNT": 6100,
+        "FRGNR_CNT": 33
+      },
+      {
+        "BSN_DT": "2025-02-22",
+        "BSN_HR_CN": "2부",
+        "NATIVE_CNT": 2500,
+        "FRGNR_CNT": 41
+      },
+      {
+        "BSN_DT": "2025-02-22",
+        "BSN_HR_CN": "3부",
+        "NATIVE_CNT": 390,
+        "FRGNR_CNT": 3
+      },
+      {
+        "BSN_DT": "2025-02-23",
+        "BSN_HR_CN": "1부",
+        "NATIVE_CNT": 5382,
+        "FRGNR_CNT": 45
+      },
+      {
+        "BSN_DT": "2025-02-23",
+        "BSN_HR_CN": "2부",
+        "NATIVE_CNT": 1554,
+        "FRGNR_CNT": 29
+      },
+      {
+        "BSN_DT": "2025-02-23",
+        "BSN_HR_CN": "3부",
+        "NATIVE_CNT": 268,
+        "FRGNR_CNT": 5
+      },
+      {
+        "BSN_DT": "2025-02-24",
+        "BSN_HR_CN": "1부",
+        "NATIVE_CNT": 3966,
+        "FRGNR_CNT": 34
+      },
+      {
+        "BSN_DT": "2025-02-24",
+        "BSN_HR_CN": "2부",
+        "NATIVE_CNT": 1565,
+        "FRGNR_CNT": 25
+      },
+      {
+        "BSN_DT": "2025-02-24",
+        "BSN_HR_CN": "3부",
+        "NATIVE_CNT": 276,
+        "FRGNR_CNT": 4
+      },
+      {
+        "BSN_DT": "2025-02-25",
+        "BSN_HR_CN": "1부",
+        "NATIVE_CNT": 4238,
+        "FRGNR_CNT": 39
+      },
+      {
+        "BSN_DT": "2025-02-25",
+        "BSN_HR_CN": "2부",
+        "NATIVE_CNT": 1702,
+        "FRGNR_CNT": 19
+      },
+      {
+        "BSN_DT": "2025-02-25",
+        "BSN_HR_CN": "3부",
+        "NATIVE_CNT": 241,
+        "FRGNR_CNT": 1
+      },
+      {
+        "BSN_DT": "2025-02-26",
+        "BSN_HR_CN": "1부",
+        "NATIVE_CNT": 4142,
+        "FRGNR_CNT": 42
+      },
+      {
+        "BSN_DT": "2025-02-26",
+        "BSN_HR_CN": "2부",
+        "NATIVE_CNT": 1476,
+        "FRGNR_CNT": 18
+      },
+      {
+        "BSN_DT": "2025-02-26",
+        "BSN_HR_CN": "3부",
+        "NATIVE_CNT": 190,
+        "FRGNR_CNT": 5
+      },
+      {
+        "BSN_DT": "2025-02-27",
+        "BSN_HR_CN": "1부",
+        "NATIVE_CNT": 3975,
+        "FRGNR_CNT": 55
+      },
+      {
+        "BSN_DT": "2025-02-27",
+        "BSN_HR_CN": "2부",
+        "NATIVE_CNT": 1719,
+        "FRGNR_CNT": 13
+      },
+      {
+        "BSN_DT": "2025-02-27",
+        "BSN_HR_CN": "3부",
+        "NATIVE_CNT": 238,
+        "FRGNR_CNT": 1
+      },
+      {
+        "BSN_DT": "2025-02-28",
+        "BSN_HR_CN": "1부",
+        "NATIVE_CNT": 4305,
+        "FRGNR_CNT": 35
+      },
+      {
+        "BSN_DT": "2025-02-28",
+        "BSN_HR_CN": "2부",
+        "NATIVE_CNT": 2993,
+        "FRGNR_CNT": 22
+      },
+      {
+        "BSN_DT": "2025-02-28",
+        "BSN_HR_CN": "3부",
+        "NATIVE_CNT": 667,
+        "FRGNR_CNT": 2
+      }
+    ],
+    "2025-03": [
+      {
+        "BSN_DT": "2025-03-01",
+        "BSN_HR_CN": "1부",
+        "NATIVE_CNT": 7995,
+        "FRGNR_CNT": 57
+      },
+      {
+        "BSN_DT": "2025-03-01",
+        "BSN_HR_CN": "2부",
+        "NATIVE_CNT": 3406,
+        "FRGNR_CNT": 18
+      },
+      {
+        "BSN_DT": "2025-03-01",
+        "BSN_HR_CN": "3부",
+        "NATIVE_CNT": 565,
+        "FRGNR_CNT": 5
+      },
+      {
+        "BSN_DT": "2025-03-02",
+        "BSN_HR_CN": "1부",
+        "NATIVE_CNT": 7763,
+        "FRGNR_CNT": 54
+      },
+      {
+        "BSN_DT": "2025-03-02",
+        "BSN_HR_CN": "2부",
+        "NATIVE_CNT": 2068,
+        "FRGNR_CNT": 17
+      },
+      {
+        "BSN_DT": "2025-03-02",
+        "BSN_HR_CN": "3부",
+        "NATIVE_CNT": 324,
+        "FRGNR_CNT": 7
+      },
+      {
+        "BSN_DT": "2025-03-03",
+        "BSN_HR_CN": "1부",
+        "NATIVE_CNT": 5164,
+        "FRGNR_CNT": 63
+      },
+      {
+        "BSN_DT": "2025-03-03",
+        "BSN_HR_CN": "2부",
+        "NATIVE_CNT": 1274,
+        "FRGNR_CNT": 24
+      },
+      {
+        "BSN_DT": "2025-03-03",
+        "BSN_HR_CN": "3부",
+        "NATIVE_CNT": 190,
+        "FRGNR_CNT": 0
+      },
+      {
+        "BSN_DT": "2025-03-04",
+        "BSN_HR_CN": "1부",
+        "NATIVE_CNT": 3739,
+        "FRGNR_CNT": 43
+      },
+      {
+        "BSN_DT": "2025-03-04",
+        "BSN_HR_CN": "2부",
+        "NATIVE_CNT": 1096,
+        "FRGNR_CNT": 21
+      },
+      {
+        "BSN_DT": "2025-03-04",
+        "BSN_HR_CN": "3부",
+        "NATIVE_CNT": 165,
+        "FRGNR_CNT": 11
+      },
+      {
+        "BSN_DT": "2025-03-05",
+        "BSN_HR_CN": "1부",
+        "NATIVE_CNT": 4094,
+        "FRGNR_CNT": 47
+      },
+      {
+        "BSN_DT": "2025-03-05",
+        "BSN_HR_CN": "2부",
+        "NATIVE_CNT": 1398,
+        "FRGNR_CNT": 10
+      },
+      {
+        "BSN_DT": "2025-03-05",
+        "BSN_HR_CN": "3부",
+        "NATIVE_CNT": 220,
+        "FRGNR_CNT": 0
+      },
+      {
+        "BSN_DT": "2025-03-06",
+        "BSN_HR_CN": "1부",
+        "NATIVE_CNT": 4167,
+        "FRGNR_CNT": 38
+      },
+      {
+        "BSN_DT": "2025-03-06",
+        "BSN_HR_CN": "2부",
+        "NATIVE_CNT": 1339,
+        "FRGNR_CNT": 12
+      },
+      {
+        "BSN_DT": "2025-03-06",
+        "BSN_HR_CN": "3부",
+        "NATIVE_CNT": 184,
+        "FRGNR_CNT": 0
+      },
+      {
+        "BSN_DT": "2025-03-07",
+        "BSN_HR_CN": "1부",
+        "NATIVE_CNT": 4135,
+        "FRGNR_CNT": 38
+      },
+      {
+        "BSN_DT": "2025-03-07",
+        "BSN_HR_CN": "2부",
+        "NATIVE_CNT": 2065,
+        "FRGNR_CNT": 19
+      },
+      {
+        "BSN_DT": "2025-03-07",
+        "BSN_HR_CN": "3부",
+        "NATIVE_CNT": 371,
+        "FRGNR_CNT": 5
+      },
+      {
+        "BSN_DT": "2025-03-08",
+        "BSN_HR_CN": "1부",
+        "NATIVE_CNT": 5373,
+        "FRGNR_CNT": 42
+      },
+      {
+        "BSN_DT": "2025-03-08",
+        "BSN_HR_CN": "2부",
+        "NATIVE_CNT": 2133,
+        "FRGNR_CNT": 19
+      },
+      {
+        "BSN_DT": "2025-03-08",
+        "BSN_HR_CN": "3부",
+        "NATIVE_CNT": 367,
+        "FRGNR_CNT": 0
+      },
+      {
+        "BSN_DT": "2025-03-09",
+        "BSN_HR_CN": "1부",
+        "NATIVE_CNT": 4663,
+        "FRGNR_CNT": 48
+      },
+      {
+        "BSN_DT": "2025-03-09",
+        "BSN_HR_CN": "2부",
+        "NATIVE_CNT": 1375,
+        "FRGNR_CNT": 18
+      },
+      {
+        "BSN_DT": "2025-03-09",
+        "BSN_HR_CN": "3부",
+        "NATIVE_CNT": 235,
+        "FRGNR_CNT": 3
+      },
+      {
+        "BSN_DT": "2025-03-10",
+        "BSN_HR_CN": "1부",
+        "NATIVE_CNT": 4051,
+        "FRGNR_CNT": 36
+      },
+      {
+        "BSN_DT": "2025-03-10",
+        "BSN_HR_CN": "2부",
+        "NATIVE_CNT": 1421,
+        "FRGNR_CNT": 31
+      },
+      {
+        "BSN_DT": "2025-03-10",
+        "BSN_HR_CN": "3부",
+        "NATIVE_CNT": 191,
+        "FRGNR_CNT": 5
+      },
+      {
+        "BSN_DT": "2025-03-11",
+        "BSN_HR_CN": "1부",
+        "NATIVE_CNT": 4274,
+        "FRGNR_CNT": 39
+      },
+      {
+        "BSN_DT": "2025-03-11",
+        "BSN_HR_CN": "2부",
+        "NATIVE_CNT": 1313,
+        "FRGNR_CNT": 13
+      },
+      {
+        "BSN_DT": "2025-03-11",
+        "BSN_HR_CN": "3부",
+        "NATIVE_CNT": 204,
+        "FRGNR_CNT": 2
+      },
+      {
+        "BSN_DT": "2025-03-12",
+        "BSN_HR_CN": "1부",
+        "NATIVE_CNT": 3903,
+        "FRGNR_CNT": 28
+      },
+      {
+        "BSN_DT": "2025-03-12",
+        "BSN_HR_CN": "2부",
+        "NATIVE_CNT": 1307,
+        "FRGNR_CNT": 21
+      },
+      {
+        "BSN_DT": "2025-03-12",
+        "BSN_HR_CN": "3부",
+        "NATIVE_CNT": 184,
+        "FRGNR_CNT": 0
+      },
+      {
+        "BSN_DT": "2025-03-13",
+        "BSN_HR_CN": "1부",
+        "NATIVE_CNT": 3827,
+        "FRGNR_CNT": 36
+      },
+      {
+        "BSN_DT": "2025-03-13",
+        "BSN_HR_CN": "2부",
+        "NATIVE_CNT": 1275,
+        "FRGNR_CNT": 10
+      },
+      {
+        "BSN_DT": "2025-03-13",
+        "BSN_HR_CN": "3부",
+        "NATIVE_CNT": 200,
+        "FRGNR_CNT": 1
+      },
+      {
+        "BSN_DT": "2025-03-14",
+        "BSN_HR_CN": "1부",
+        "NATIVE_CNT": 3995,
+        "FRGNR_CNT": 32
+      },
+      {
+        "BSN_DT": "2025-03-14",
+        "BSN_HR_CN": "2부",
+        "NATIVE_CNT": 2156,
+        "FRGNR_CNT": 18
+      },
+      {
+        "BSN_DT": "2025-03-14",
+        "BSN_HR_CN": "3부",
+        "NATIVE_CNT": 388,
+        "FRGNR_CNT": 6
+      },
+      {
+        "BSN_DT": "2025-03-15",
+        "BSN_HR_CN": "1부",
+        "NATIVE_CNT": 5357,
+        "FRGNR_CNT": 38
+      },
+      {
+        "BSN_DT": "2025-03-15",
+        "BSN_HR_CN": "2부",
+        "NATIVE_CNT": 2170,
+        "FRGNR_CNT": 11
+      },
+      {
+        "BSN_DT": "2025-03-15",
+        "BSN_HR_CN": "3부",
+        "NATIVE_CNT": 388,
+        "FRGNR_CNT": 2
+      },
+      {
+        "BSN_DT": "2025-03-16",
+        "BSN_HR_CN": "1부",
+        "NATIVE_CNT": 4753,
+        "FRGNR_CNT": 53
+      },
+      {
+        "BSN_DT": "2025-03-16",
+        "BSN_HR_CN": "2부",
+        "NATIVE_CNT": 1020,
+        "FRGNR_CNT": 11
+      },
+      {
+        "BSN_DT": "2025-03-16",
+        "BSN_HR_CN": "3부",
+        "NATIVE_CNT": 198,
+        "FRGNR_CNT": 1
+      },
+      {
+        "BSN_DT": "2025-03-17",
+        "BSN_HR_CN": "1부",
+        "NATIVE_CNT": 3432,
+        "FRGNR_CNT": 32
+      },
+      {
+        "BSN_DT": "2025-03-17",
+        "BSN_HR_CN": "2부",
+        "NATIVE_CNT": 1111,
+        "FRGNR_CNT": 12
+      },
+      {
+        "BSN_DT": "2025-03-17",
+        "BSN_HR_CN": "3부",
+        "NATIVE_CNT": 172,
+        "FRGNR_CNT": 2
+      },
+      {
+        "BSN_DT": "2025-03-18",
+        "BSN_HR_CN": "1부",
+        "NATIVE_CNT": 3154,
+        "FRGNR_CNT": 37
+      },
+      {
+        "BSN_DT": "2025-03-18",
+        "BSN_HR_CN": "2부",
+        "NATIVE_CNT": 936,
+        "FRGNR_CNT": 15
+      },
+      {
+        "BSN_DT": "2025-03-18",
+        "BSN_HR_CN": "3부",
+        "NATIVE_CNT": 181,
+        "FRGNR_CNT": 1
+      },
+      {
+        "BSN_DT": "2025-03-19",
+        "BSN_HR_CN": "1부",
+        "NATIVE_CNT": 3484,
+        "FRGNR_CNT": 33
+      },
+      {
+        "BSN_DT": "2025-03-19",
+        "BSN_HR_CN": "2부",
+        "NATIVE_CNT": 1155,
+        "FRGNR_CNT": 12
+      },
+      {
+        "BSN_DT": "2025-03-19",
+        "BSN_HR_CN": "3부",
+        "NATIVE_CNT": 171,
+        "FRGNR_CNT": 5
+      },
+      {
+        "BSN_DT": "2025-03-20",
+        "BSN_HR_CN": "1부",
+        "NATIVE_CNT": 3564,
+        "FRGNR_CNT": 28
+      },
+      {
+        "BSN_DT": "2025-03-20",
+        "BSN_HR_CN": "2부",
+        "NATIVE_CNT": 1225,
+        "FRGNR_CNT": 7
+      },
+      {
+        "BSN_DT": "2025-03-20",
+        "BSN_HR_CN": "3부",
+        "NATIVE_CNT": 193,
+        "FRGNR_CNT": 4
+      },
+      {
+        "BSN_DT": "2025-03-21",
+        "BSN_HR_CN": "1부",
+        "NATIVE_CNT": 3826,
+        "FRGNR_CNT": 28
+      },
+      {
+        "BSN_DT": "2025-03-21",
+        "BSN_HR_CN": "2부",
+        "NATIVE_CNT": 2003,
+        "FRGNR_CNT": 10
+      },
+      {
+        "BSN_DT": "2025-03-21",
+        "BSN_HR_CN": "3부",
+        "NATIVE_CNT": 378,
+        "FRGNR_CNT": 6
+      },
+      {
+        "BSN_DT": "2025-03-22",
+        "BSN_HR_CN": "1부",
+        "NATIVE_CNT": 5020,
+        "FRGNR_CNT": 33
+      },
+      {
+        "BSN_DT": "2025-03-22",
+        "BSN_HR_CN": "2부",
+        "NATIVE_CNT": 2009,
+        "FRGNR_CNT": 19
+      },
+      {
+        "BSN_DT": "2025-03-22",
+        "BSN_HR_CN": "3부",
+        "NATIVE_CNT": 367,
+        "FRGNR_CNT": 2
+      },
+      {
+        "BSN_DT": "2025-03-23",
+        "BSN_HR_CN": "1부",
+        "NATIVE_CNT": 4410,
+        "FRGNR_CNT": 42
+      },
+      {
+        "BSN_DT": "2025-03-23",
+        "BSN_HR_CN": "2부",
+        "NATIVE_CNT": 1128,
+        "FRGNR_CNT": 13
+      },
+      {
+        "BSN_DT": "2025-03-23",
+        "BSN_HR_CN": "3부",
+        "NATIVE_CNT": 211,
+        "FRGNR_CNT": 3
+      },
+      {
+        "BSN_DT": "2025-03-24",
+        "BSN_HR_CN": "1부",
+        "NATIVE_CNT": 3153,
+        "FRGNR_CNT": 38
+      },
+      {
+        "BSN_DT": "2025-03-24",
+        "BSN_HR_CN": "2부",
+        "NATIVE_CNT": 1080,
+        "FRGNR_CNT": 18
+      },
+      {
+        "BSN_DT": "2025-03-24",
+        "BSN_HR_CN": "3부",
+        "NATIVE_CNT": 175,
+        "FRGNR_CNT": 0
+      },
+      {
+        "BSN_DT": "2025-03-25",
+        "BSN_HR_CN": "1부",
+        "NATIVE_CNT": 3494,
+        "FRGNR_CNT": 33
+      },
+      {
+        "BSN_DT": "2025-03-25",
+        "BSN_HR_CN": "2부",
+        "NATIVE_CNT": 1216,
+        "FRGNR_CNT": 10
+      },
+      {
+        "BSN_DT": "2025-03-25",
+        "BSN_HR_CN": "3부",
+        "NATIVE_CNT": 157,
+        "FRGNR_CNT": 2
+      },
+      {
+        "BSN_DT": "2025-03-26",
+        "BSN_HR_CN": "1부",
+        "NATIVE_CNT": 3351,
+        "FRGNR_CNT": 28
+      },
+      {
+        "BSN_DT": "2025-03-26",
+        "BSN_HR_CN": "2부",
+        "NATIVE_CNT": 1077,
+        "FRGNR_CNT": 18
+      },
+      {
+        "BSN_DT": "2025-03-26",
+        "BSN_HR_CN": "3부",
+        "NATIVE_CNT": 168,
+        "FRGNR_CNT": 0
+      },
+      {
+        "BSN_DT": "2025-03-27",
+        "BSN_HR_CN": "1부",
+        "NATIVE_CNT": 3341,
+        "FRGNR_CNT": 20
+      },
+      {
+        "BSN_DT": "2025-03-27",
+        "BSN_HR_CN": "2부",
+        "NATIVE_CNT": 1155,
+        "FRGNR_CNT": 11
+      },
+      {
+        "BSN_DT": "2025-03-27",
+        "BSN_HR_CN": "3부",
+        "NATIVE_CNT": 172,
+        "FRGNR_CNT": 1
+      },
+      {
+        "BSN_DT": "2025-03-28",
+        "BSN_HR_CN": "1부",
+        "NATIVE_CNT": 3546,
+        "FRGNR_CNT": 26
+      },
+      {
+        "BSN_DT": "2025-03-28",
+        "BSN_HR_CN": "2부",
+        "NATIVE_CNT": 1971,
+        "FRGNR_CNT": 7
+      },
+      {
+        "BSN_DT": "2025-03-28",
+        "BSN_HR_CN": "3부",
+        "NATIVE_CNT": 302,
+        "FRGNR_CNT": 4
+      },
+      {
+        "BSN_DT": "2025-03-29",
+        "BSN_HR_CN": "1부",
+        "NATIVE_CNT": 4633,
+        "FRGNR_CNT": 34
+      },
+      {
+        "BSN_DT": "2025-03-29",
+        "BSN_HR_CN": "2부",
+        "NATIVE_CNT": 1774,
+        "FRGNR_CNT": 17
+      },
+      {
+        "BSN_DT": "2025-03-29",
+        "BSN_HR_CN": "3부",
+        "NATIVE_CNT": 274,
+        "FRGNR_CNT": 6
+      },
+      {
+        "BSN_DT": "2025-03-30",
+        "BSN_HR_CN": "1부",
+        "NATIVE_CNT": 4088,
+        "FRGNR_CNT": 41
+      },
+      {
+        "BSN_DT": "2025-03-30",
+        "BSN_HR_CN": "2부",
+        "NATIVE_CNT": 1126,
+        "FRGNR_CNT": 7
+      },
+      {
+        "BSN_DT": "2025-03-30",
+        "BSN_HR_CN": "3부",
+        "NATIVE_CNT": 210,
+        "FRGNR_CNT": 5
+      },
+      {
+        "BSN_DT": "2025-03-31",
+        "BSN_HR_CN": "1부",
+        "NATIVE_CNT": 3215,
+        "FRGNR_CNT": 34
+      },
+      {
+        "BSN_DT": "2025-03-31",
+        "BSN_HR_CN": "2부",
+        "NATIVE_CNT": 1140,
+        "FRGNR_CNT": 9
+      },
+      {
+        "BSN_DT": "2025-03-31",
+        "BSN_HR_CN": "3부",
+        "NATIVE_CNT": 182,
+        "FRGNR_CNT": 5
+      }
+    ],
+    "2025-04": [
+      {
+        "BSN_DT": "2025-04-01",
+        "BSN_HR_CN": "1부",
+        "NATIVE_CNT": 4344,
+        "FRGNR_CNT": 37
+      },
+      {
+        "BSN_DT": "2025-04-01",
+        "BSN_HR_CN": "2부",
+        "NATIVE_CNT": 1364,
+        "FRGNR_CNT": 17
+      },
+      {
+        "BSN_DT": "2025-04-01",
+        "BSN_HR_CN": "3부",
+        "NATIVE_CNT": 164,
+        "FRGNR_CNT": 2
+      },
+      {
+        "BSN_DT": "2025-04-02",
+        "BSN_HR_CN": "1부",
+        "NATIVE_CNT": 4000,
+        "FRGNR_CNT": 36
+      },
+      {
+        "BSN_DT": "2025-04-02",
+        "BSN_HR_CN": "2부",
+        "NATIVE_CNT": 1223,
+        "FRGNR_CNT": 13
+      },
+      {
+        "BSN_DT": "2025-04-02",
+        "BSN_HR_CN": "3부",
+        "NATIVE_CNT": 147,
+        "FRGNR_CNT": 4
+      },
+      {
+        "BSN_DT": "2025-04-03",
+        "BSN_HR_CN": "1부",
+        "NATIVE_CNT": 3869,
+        "FRGNR_CNT": 34
+      },
+      {
+        "BSN_DT": "2025-04-03",
+        "BSN_HR_CN": "2부",
+        "NATIVE_CNT": 1312,
+        "FRGNR_CNT": 17
+      },
+      {
+        "BSN_DT": "2025-04-03",
+        "BSN_HR_CN": "3부",
+        "NATIVE_CNT": 194,
+        "FRGNR_CNT": 3
+      },
+      {
+        "BSN_DT": "2025-04-04",
+        "BSN_HR_CN": "1부",
+        "NATIVE_CNT": 3873,
+        "FRGNR_CNT": 29
+      },
+      {
+        "BSN_DT": "2025-04-04",
+        "BSN_HR_CN": "2부",
+        "NATIVE_CNT": 2278,
+        "FRGNR_CNT": 18
+      },
+      {
+        "BSN_DT": "2025-04-04",
+        "BSN_HR_CN": "3부",
+        "NATIVE_CNT": 418,
+        "FRGNR_CNT": 9
+      },
+      {
+        "BSN_DT": "2025-04-05",
+        "BSN_HR_CN": "1부",
+        "NATIVE_CNT": 5770,
+        "FRGNR_CNT": 44
+      },
+      {
+        "BSN_DT": "2025-04-05",
+        "BSN_HR_CN": "2부",
+        "NATIVE_CNT": 1878,
+        "FRGNR_CNT": 16
+      },
+      {
+        "BSN_DT": "2025-04-05",
+        "BSN_HR_CN": "3부",
+        "NATIVE_CNT": 283,
+        "FRGNR_CNT": 4
+      },
+      {
+        "BSN_DT": "2025-04-06",
+        "BSN_HR_CN": "1부",
+        "NATIVE_CNT": 4748,
+        "FRGNR_CNT": 48
+      },
+      {
+        "BSN_DT": "2025-04-06",
+        "BSN_HR_CN": "2부",
+        "NATIVE_CNT": 1270,
+        "FRGNR_CNT": 16
+      },
+      {
+        "BSN_DT": "2025-04-06",
+        "BSN_HR_CN": "3부",
+        "NATIVE_CNT": 224,
+        "FRGNR_CNT": 5
+      },
+      {
+        "BSN_DT": "2025-04-07",
+        "BSN_HR_CN": "1부",
+        "NATIVE_CNT": 3747,
+        "FRGNR_CNT": 42
+      },
+      {
+        "BSN_DT": "2025-04-07",
+        "BSN_HR_CN": "2부",
+        "NATIVE_CNT": 1347,
+        "FRGNR_CNT": 17
+      },
+      {
+        "BSN_DT": "2025-04-07",
+        "BSN_HR_CN": "3부",
+        "NATIVE_CNT": 183,
+        "FRGNR_CNT": 1
+      },
+      {
+        "BSN_DT": "2025-04-08",
+        "BSN_HR_CN": "1부",
+        "NATIVE_CNT": 3769,
+        "FRGNR_CNT": 51
+      },
+      {
+        "BSN_DT": "2025-04-08",
+        "BSN_HR_CN": "2부",
+        "NATIVE_CNT": 1206,
+        "FRGNR_CNT": 9
+      },
+      {
+        "BSN_DT": "2025-04-08",
+        "BSN_HR_CN": "3부",
+        "NATIVE_CNT": 195,
+        "FRGNR_CNT": 2
+      },
+      {
+        "BSN_DT": "2025-04-09",
+        "BSN_HR_CN": "1부",
+        "NATIVE_CNT": 3671,
+        "FRGNR_CNT": 32
+      },
+      {
+        "BSN_DT": "2025-04-09",
+        "BSN_HR_CN": "2부",
+        "NATIVE_CNT": 1253,
+        "FRGNR_CNT": 17
+      },
+      {
+        "BSN_DT": "2025-04-09",
+        "BSN_HR_CN": "3부",
+        "NATIVE_CNT": 165,
+        "FRGNR_CNT": 2
+      },
+      {
+        "BSN_DT": "2025-04-10",
+        "BSN_HR_CN": "1부",
+        "NATIVE_CNT": 3840,
+        "FRGNR_CNT": 36
+      },
+      {
+        "BSN_DT": "2025-04-10",
+        "BSN_HR_CN": "2부",
+        "NATIVE_CNT": 1437,
+        "FRGNR_CNT": 22
+      },
+      {
+        "BSN_DT": "2025-04-10",
+        "BSN_HR_CN": "3부",
+        "NATIVE_CNT": 228,
+        "FRGNR_CNT": 1
+      },
+      {
+        "BSN_DT": "2025-04-11",
+        "BSN_HR_CN": "1부",
+        "NATIVE_CNT": 4125,
+        "FRGNR_CNT": 38
+      },
+      {
+        "BSN_DT": "2025-04-11",
+        "BSN_HR_CN": "2부",
+        "NATIVE_CNT": 2178,
+        "FRGNR_CNT": 16
+      },
+      {
+        "BSN_DT": "2025-04-11",
+        "BSN_HR_CN": "3부",
+        "NATIVE_CNT": 444,
+        "FRGNR_CNT": 1
+      },
+      {
+        "BSN_DT": "2025-04-12",
+        "BSN_HR_CN": "1부",
+        "NATIVE_CNT": 5589,
+        "FRGNR_CNT": 39
+      },
+      {
+        "BSN_DT": "2025-04-12",
+        "BSN_HR_CN": "2부",
+        "NATIVE_CNT": 2016,
+        "FRGNR_CNT": 24
+      },
+      {
+        "BSN_DT": "2025-04-12",
+        "BSN_HR_CN": "3부",
+        "NATIVE_CNT": 309,
+        "FRGNR_CNT": 1
+      },
+      {
+        "BSN_DT": "2025-04-13",
+        "BSN_HR_CN": "1부",
+        "NATIVE_CNT": 5051,
+        "FRGNR_CNT": 44
+      },
+      {
+        "BSN_DT": "2025-04-13",
+        "BSN_HR_CN": "2부",
+        "NATIVE_CNT": 1285,
+        "FRGNR_CNT": 12
+      },
+      {
+        "BSN_DT": "2025-04-13",
+        "BSN_HR_CN": "3부",
+        "NATIVE_CNT": 226,
+        "FRGNR_CNT": 4
+      },
+      {
+        "BSN_DT": "2025-04-14",
+        "BSN_HR_CN": "1부",
+        "NATIVE_CNT": 3746,
+        "FRGNR_CNT": 44
+      },
+      {
+        "BSN_DT": "2025-04-14",
+        "BSN_HR_CN": "2부",
+        "NATIVE_CNT": 1206,
+        "FRGNR_CNT": 8
+      },
+      {
+        "BSN_DT": "2025-04-14",
+        "BSN_HR_CN": "3부",
+        "NATIVE_CNT": 171,
+        "FRGNR_CNT": 3
+      },
+      {
+        "BSN_DT": "2025-04-15",
+        "BSN_HR_CN": "1부",
+        "NATIVE_CNT": 3599,
+        "FRGNR_CNT": 33
+      },
+      {
+        "BSN_DT": "2025-04-15",
+        "BSN_HR_CN": "2부",
+        "NATIVE_CNT": 1270,
+        "FRGNR_CNT": 22
+      },
+      {
+        "BSN_DT": "2025-04-15",
+        "BSN_HR_CN": "3부",
+        "NATIVE_CNT": 210,
+        "FRGNR_CNT": 2
+      },
+      {
+        "BSN_DT": "2025-04-16",
+        "BSN_HR_CN": "1부",
+        "NATIVE_CNT": 3529,
+        "FRGNR_CNT": 27
+      },
+      {
+        "BSN_DT": "2025-04-16",
+        "BSN_HR_CN": "2부",
+        "NATIVE_CNT": 1136,
+        "FRGNR_CNT": 13
+      },
+      {
+        "BSN_DT": "2025-04-16",
+        "BSN_HR_CN": "3부",
+        "NATIVE_CNT": 186,
+        "FRGNR_CNT": 3
+      },
+      {
+        "BSN_DT": "2025-04-17",
+        "BSN_HR_CN": "1부",
+        "NATIVE_CNT": 3377,
+        "FRGNR_CNT": 32
+      },
+      {
+        "BSN_DT": "2025-04-17",
+        "BSN_HR_CN": "2부",
+        "NATIVE_CNT": 1290,
+        "FRGNR_CNT": 17
+      },
+      {
+        "BSN_DT": "2025-04-17",
+        "BSN_HR_CN": "3부",
+        "NATIVE_CNT": 160,
+        "FRGNR_CNT": 2
+      },
+      {
+        "BSN_DT": "2025-04-18",
+        "BSN_HR_CN": "1부",
+        "NATIVE_CNT": 3824,
+        "FRGNR_CNT": 30
+      },
+      {
+        "BSN_DT": "2025-04-18",
+        "BSN_HR_CN": "2부",
+        "NATIVE_CNT": 2177,
+        "FRGNR_CNT": 17
+      },
+      {
+        "BSN_DT": "2025-04-18",
+        "BSN_HR_CN": "3부",
+        "NATIVE_CNT": 397,
+        "FRGNR_CNT": 4
+      },
+      {
+        "BSN_DT": "2025-04-19",
+        "BSN_HR_CN": "1부",
+        "NATIVE_CNT": 5441,
+        "FRGNR_CNT": 33
+      },
+      {
+        "BSN_DT": "2025-04-19",
+        "BSN_HR_CN": "2부",
+        "NATIVE_CNT": 1965,
+        "FRGNR_CNT": 22
+      },
+      {
+        "BSN_DT": "2025-04-19",
+        "BSN_HR_CN": "3부",
+        "NATIVE_CNT": 359,
+        "FRGNR_CNT": 3
+      },
+      {
+        "BSN_DT": "2025-04-20",
+        "BSN_HR_CN": "1부",
+        "NATIVE_CNT": 4415,
+        "FRGNR_CNT": 50
+      },
+      {
+        "BSN_DT": "2025-04-20",
+        "BSN_HR_CN": "2부",
+        "NATIVE_CNT": 1349,
+        "FRGNR_CNT": 23
+      },
+      {
+        "BSN_DT": "2025-04-20",
+        "BSN_HR_CN": "3부",
+        "NATIVE_CNT": 199,
+        "FRGNR_CNT": 3
+      },
+      {
+        "BSN_DT": "2025-04-21",
+        "BSN_HR_CN": "1부",
+        "NATIVE_CNT": 3438,
+        "FRGNR_CNT": 31
+      },
+      {
+        "BSN_DT": "2025-04-21",
+        "BSN_HR_CN": "2부",
+        "NATIVE_CNT": 1455,
+        "FRGNR_CNT": 16
+      },
+      {
+        "BSN_DT": "2025-04-21",
+        "BSN_HR_CN": "3부",
+        "NATIVE_CNT": 191,
+        "FRGNR_CNT": 4
+      },
+      {
+        "BSN_DT": "2025-04-22",
+        "BSN_HR_CN": "1부",
+        "NATIVE_CNT": 4174,
+        "FRGNR_CNT": 28
+      },
+      {
+        "BSN_DT": "2025-04-22",
+        "BSN_HR_CN": "2부",
+        "NATIVE_CNT": 1148,
+        "FRGNR_CNT": 14
+      },
+      {
+        "BSN_DT": "2025-04-22",
+        "BSN_HR_CN": "3부",
+        "NATIVE_CNT": 178,
+        "FRGNR_CNT": 1
+      },
+      {
+        "BSN_DT": "2025-04-23",
+        "BSN_HR_CN": "1부",
+        "NATIVE_CNT": 3442,
+        "FRGNR_CNT": 27
+      },
+      {
+        "BSN_DT": "2025-04-23",
+        "BSN_HR_CN": "2부",
+        "NATIVE_CNT": 1183,
+        "FRGNR_CNT": 11
+      },
+      {
+        "BSN_DT": "2025-04-23",
+        "BSN_HR_CN": "3부",
+        "NATIVE_CNT": 198,
+        "FRGNR_CNT": 0
+      },
+      {
+        "BSN_DT": "2025-04-24",
+        "BSN_HR_CN": "1부",
+        "NATIVE_CNT": 3171,
+        "FRGNR_CNT": 32
+      },
+      {
+        "BSN_DT": "2025-04-24",
+        "BSN_HR_CN": "2부",
+        "NATIVE_CNT": 1302,
+        "FRGNR_CNT": 10
+      },
+      {
+        "BSN_DT": "2025-04-24",
+        "BSN_HR_CN": "3부",
+        "NATIVE_CNT": 196,
+        "FRGNR_CNT": 0
+      },
+      {
+        "BSN_DT": "2025-04-25",
+        "BSN_HR_CN": "1부",
+        "NATIVE_CNT": 3785,
+        "FRGNR_CNT": 33
+      },
+      {
+        "BSN_DT": "2025-04-25",
+        "BSN_HR_CN": "2부",
+        "NATIVE_CNT": 2055,
+        "FRGNR_CNT": 16
+      },
+      {
+        "BSN_DT": "2025-04-25",
+        "BSN_HR_CN": "3부",
+        "NATIVE_CNT": 374,
+        "FRGNR_CNT": 2
+      },
+      {
+        "BSN_DT": "2025-04-26",
+        "BSN_HR_CN": "1부",
+        "NATIVE_CNT": 4932,
+        "FRGNR_CNT": 30
+      },
+      {
+        "BSN_DT": "2025-04-26",
+        "BSN_HR_CN": "2부",
+        "NATIVE_CNT": 2084,
+        "FRGNR_CNT": 29
+      },
+      {
+        "BSN_DT": "2025-04-26",
+        "BSN_HR_CN": "3부",
+        "NATIVE_CNT": 271,
+        "FRGNR_CNT": 1
+      },
+      {
+        "BSN_DT": "2025-04-27",
+        "BSN_HR_CN": "1부",
+        "NATIVE_CNT": 4168,
+        "FRGNR_CNT": 40
+      },
+      {
+        "BSN_DT": "2025-04-27",
+        "BSN_HR_CN": "2부",
+        "NATIVE_CNT": 1238,
+        "FRGNR_CNT": 19
+      },
+      {
+        "BSN_DT": "2025-04-27",
+        "BSN_HR_CN": "3부",
+        "NATIVE_CNT": 212,
+        "FRGNR_CNT": 2
+      },
+      {
+        "BSN_DT": "2025-04-28",
+        "BSN_HR_CN": "1부",
+        "NATIVE_CNT": 3356,
+        "FRGNR_CNT": 43
+      },
+      {
+        "BSN_DT": "2025-04-28",
+        "BSN_HR_CN": "2부",
+        "NATIVE_CNT": 1285,
+        "FRGNR_CNT": 7
+      },
+      {
+        "BSN_DT": "2025-04-28",
+        "BSN_HR_CN": "3부",
+        "NATIVE_CNT": 181,
+        "FRGNR_CNT": 0
+      },
+      {
+        "BSN_DT": "2025-04-29",
+        "BSN_HR_CN": "1부",
+        "NATIVE_CNT": 3382,
+        "FRGNR_CNT": 34
+      },
+      {
+        "BSN_DT": "2025-04-29",
+        "BSN_HR_CN": "2부",
+        "NATIVE_CNT": 1212,
+        "FRGNR_CNT": 16
+      },
+      {
+        "BSN_DT": "2025-04-29",
+        "BSN_HR_CN": "3부",
+        "NATIVE_CNT": 170,
+        "FRGNR_CNT": 1
+      },
+      {
+        "BSN_DT": "2025-04-30",
+        "BSN_HR_CN": "1부",
+        "NATIVE_CNT": 3590,
+        "FRGNR_CNT": 36
+      },
+      {
+        "BSN_DT": "2025-04-30",
+        "BSN_HR_CN": "2부",
+        "NATIVE_CNT": 2414,
+        "FRGNR_CNT": 26
+      },
+      {
+        "BSN_DT": "2025-04-30",
+        "BSN_HR_CN": "3부",
+        "NATIVE_CNT": 440,
+        "FRGNR_CNT": 6
+      }
+    ],
+    "2025-05": [
+      {
+        "BSN_DT": "2025-05-01",
+        "BSN_HR_CN": "1부",
+        "NATIVE_CNT": 7041,
+        "FRGNR_CNT": 55
+      },
+      {
+        "BSN_DT": "2025-05-01",
+        "BSN_HR_CN": "2부",
+        "NATIVE_CNT": 1700,
+        "FRGNR_CNT": 6
+      },
+      {
+        "BSN_DT": "2025-05-01",
+        "BSN_HR_CN": "3부",
+        "NATIVE_CNT": 217,
+        "FRGNR_CNT": 3
+      },
+      {
+        "BSN_DT": "2025-05-02",
+        "BSN_HR_CN": "1부",
+        "NATIVE_CNT": 5403,
+        "FRGNR_CNT": 46
+      },
+      {
+        "BSN_DT": "2025-05-02",
+        "BSN_HR_CN": "2부",
+        "NATIVE_CNT": 2568,
+        "FRGNR_CNT": 13
+      },
+      {
+        "BSN_DT": "2025-05-02",
+        "BSN_HR_CN": "3부",
+        "NATIVE_CNT": 507,
+        "FRGNR_CNT": 1
+      },
+      {
+        "BSN_DT": "2025-05-03",
+        "BSN_HR_CN": "1부",
+        "NATIVE_CNT": 6392,
+        "FRGNR_CNT": 42
+      },
+      {
+        "BSN_DT": "2025-05-03",
+        "BSN_HR_CN": "2부",
+        "NATIVE_CNT": 3237,
+        "FRGNR_CNT": 23
+      },
+      {
+        "BSN_DT": "2025-05-03",
+        "BSN_HR_CN": "3부",
+        "NATIVE_CNT": 510,
+        "FRGNR_CNT": 3
+      },
+      {
+        "BSN_DT": "2025-05-04",
+        "BSN_HR_CN": "1부",
+        "NATIVE_CNT": 7061,
+        "FRGNR_CNT": 54
+      },
+      {
+        "BSN_DT": "2025-05-04",
+        "BSN_HR_CN": "2부",
+        "NATIVE_CNT": 3249,
+        "FRGNR_CNT": 35
+      },
+      {
+        "BSN_DT": "2025-05-04",
+        "BSN_HR_CN": "3부",
+        "NATIVE_CNT": 456,
+        "FRGNR_CNT": 8
+      },
+      {
+        "BSN_DT": "2025-05-05",
+        "BSN_HR_CN": "1부",
+        "NATIVE_CNT": 6757,
+        "FRGNR_CNT": 70
+      },
+      {
+        "BSN_DT": "2025-05-05",
+        "BSN_HR_CN": "2부",
+        "NATIVE_CNT": 2282,
+        "FRGNR_CNT": 13
+      },
+      {
+        "BSN_DT": "2025-05-05",
+        "BSN_HR_CN": "3부",
+        "NATIVE_CNT": 360,
+        "FRGNR_CNT": 0
+      },
+      {
+        "BSN_DT": "2025-05-06",
+        "BSN_HR_CN": "1부",
+        "NATIVE_CNT": 4878,
+        "FRGNR_CNT": 49
+      },
+      {
+        "BSN_DT": "2025-05-06",
+        "BSN_HR_CN": "2부",
+        "NATIVE_CNT": 1420,
+        "FRGNR_CNT": 15
+      },
+      {
+        "BSN_DT": "2025-05-06",
+        "BSN_HR_CN": "3부",
+        "NATIVE_CNT": 247,
+        "FRGNR_CNT": 1
+      },
+      {
+        "BSN_DT": "2025-05-07",
+        "BSN_HR_CN": "1부",
+        "NATIVE_CNT": 3635,
+        "FRGNR_CNT": 35
+      },
+      {
+        "BSN_DT": "2025-05-07",
+        "BSN_HR_CN": "2부",
+        "NATIVE_CNT": 1288,
+        "FRGNR_CNT": 22
+      },
+      {
+        "BSN_DT": "2025-05-07",
+        "BSN_HR_CN": "3부",
+        "NATIVE_CNT": 172,
+        "FRGNR_CNT": 3
+      },
+      {
+        "BSN_DT": "2025-05-08",
+        "BSN_HR_CN": "1부",
+        "NATIVE_CNT": 3445,
+        "FRGNR_CNT": 32
+      },
+      {
+        "BSN_DT": "2025-05-08",
+        "BSN_HR_CN": "2부",
+        "NATIVE_CNT": 1450,
+        "FRGNR_CNT": 12
+      },
+      {
+        "BSN_DT": "2025-05-08",
+        "BSN_HR_CN": "3부",
+        "NATIVE_CNT": 218,
+        "FRGNR_CNT": 3
+      },
+      {
+        "BSN_DT": "2025-05-09",
+        "BSN_HR_CN": "1부",
+        "NATIVE_CNT": 4513,
+        "FRGNR_CNT": 29
+      },
+      {
+        "BSN_DT": "2025-05-09",
+        "BSN_HR_CN": "2부",
+        "NATIVE_CNT": 2128,
+        "FRGNR_CNT": 21
+      },
+      {
+        "BSN_DT": "2025-05-09",
+        "BSN_HR_CN": "3부",
+        "NATIVE_CNT": 357,
+        "FRGNR_CNT": 0
+      },
+      {
+        "BSN_DT": "2025-05-10",
+        "BSN_HR_CN": "1부",
+        "NATIVE_CNT": 5378,
+        "FRGNR_CNT": 36
+      },
+      {
+        "BSN_DT": "2025-05-10",
+        "BSN_HR_CN": "2부",
+        "NATIVE_CNT": 2011,
+        "FRGNR_CNT": 29
+      },
+      {
+        "BSN_DT": "2025-05-10",
+        "BSN_HR_CN": "3부",
+        "NATIVE_CNT": 356,
+        "FRGNR_CNT": 0
+      },
+      {
+        "BSN_DT": "2025-05-11",
+        "BSN_HR_CN": "1부",
+        "NATIVE_CNT": 4587,
+        "FRGNR_CNT": 37
+      },
+      {
+        "BSN_DT": "2025-05-11",
+        "BSN_HR_CN": "2부",
+        "NATIVE_CNT": 1308,
+        "FRGNR_CNT": 8
+      },
+      {
+        "BSN_DT": "2025-05-11",
+        "BSN_HR_CN": "3부",
+        "NATIVE_CNT": 292,
+        "FRGNR_CNT": 2
+      },
+      {
+        "BSN_DT": "2025-05-12",
+        "BSN_HR_CN": "1부",
+        "NATIVE_CNT": 3741,
+        "FRGNR_CNT": 29
+      },
+      {
+        "BSN_DT": "2025-05-12",
+        "BSN_HR_CN": "2부",
+        "NATIVE_CNT": 1363,
+        "FRGNR_CNT": 23
+      },
+      {
+        "BSN_DT": "2025-05-12",
+        "BSN_HR_CN": "3부",
+        "NATIVE_CNT": 223,
+        "FRGNR_CNT": 4
+      },
+      {
+        "BSN_DT": "2025-05-13",
+        "BSN_HR_CN": "1부",
+        "NATIVE_CNT": 3738,
+        "FRGNR_CNT": 33
+      },
+      {
+        "BSN_DT": "2025-05-13",
+        "BSN_HR_CN": "2부",
+        "NATIVE_CNT": 1300,
+        "FRGNR_CNT": 18
+      },
+      {
+        "BSN_DT": "2025-05-13",
+        "BSN_HR_CN": "3부",
+        "NATIVE_CNT": 185,
+        "FRGNR_CNT": 2
+      },
+      {
+        "BSN_DT": "2025-05-14",
+        "BSN_HR_CN": "1부",
+        "NATIVE_CNT": 3647,
+        "FRGNR_CNT": 30
+      },
+      {
+        "BSN_DT": "2025-05-14",
+        "BSN_HR_CN": "2부",
+        "NATIVE_CNT": 1329,
+        "FRGNR_CNT": 10
+      },
+      {
+        "BSN_DT": "2025-05-14",
+        "BSN_HR_CN": "3부",
+        "NATIVE_CNT": 192,
+        "FRGNR_CNT": 2
+      },
+      {
+        "BSN_DT": "2025-05-15",
+        "BSN_HR_CN": "1부",
+        "NATIVE_CNT": 3789,
+        "FRGNR_CNT": 31
+      },
+      {
+        "BSN_DT": "2025-05-15",
+        "BSN_HR_CN": "2부",
+        "NATIVE_CNT": 1426,
+        "FRGNR_CNT": 15
+      },
+      {
+        "BSN_DT": "2025-05-15",
+        "BSN_HR_CN": "3부",
+        "NATIVE_CNT": 196,
+        "FRGNR_CNT": 2
+      },
+      {
+        "BSN_DT": "2025-05-16",
+        "BSN_HR_CN": "1부",
+        "NATIVE_CNT": 4079,
+        "FRGNR_CNT": 39
+      },
+      {
+        "BSN_DT": "2025-05-16",
+        "BSN_HR_CN": "2부",
+        "NATIVE_CNT": 2055,
+        "FRGNR_CNT": 7
+      },
+      {
+        "BSN_DT": "2025-05-16",
+        "BSN_HR_CN": "3부",
+        "NATIVE_CNT": 449,
+        "FRGNR_CNT": 2
+      },
+      {
+        "BSN_DT": "2025-05-17",
+        "BSN_HR_CN": "1부",
+        "NATIVE_CNT": 5171,
+        "FRGNR_CNT": 28
+      },
+      {
+        "BSN_DT": "2025-05-17",
+        "BSN_HR_CN": "2부",
+        "NATIVE_CNT": 2166,
+        "FRGNR_CNT": 20
+      },
+      {
+        "BSN_DT": "2025-05-17",
+        "BSN_HR_CN": "3부",
+        "NATIVE_CNT": 341,
+        "FRGNR_CNT": 2
+      },
+      {
+        "BSN_DT": "2025-05-18",
+        "BSN_HR_CN": "1부",
+        "NATIVE_CNT": 4489,
+        "FRGNR_CNT": 38
+      },
+      {
+        "BSN_DT": "2025-05-18",
+        "BSN_HR_CN": "2부",
+        "NATIVE_CNT": 1256,
+        "FRGNR_CNT": 23
+      },
+      {
+        "BSN_DT": "2025-05-18",
+        "BSN_HR_CN": "3부",
+        "NATIVE_CNT": 252,
+        "FRGNR_CNT": 2
+      },
+      {
+        "BSN_DT": "2025-05-19",
+        "BSN_HR_CN": "1부",
+        "NATIVE_CNT": 3434,
+        "FRGNR_CNT": 43
+      },
+      {
+        "BSN_DT": "2025-05-19",
+        "BSN_HR_CN": "2부",
+        "NATIVE_CNT": 1221,
+        "FRGNR_CNT": 13
+      },
+      {
+        "BSN_DT": "2025-05-19",
+        "BSN_HR_CN": "3부",
+        "NATIVE_CNT": 183,
+        "FRGNR_CNT": 2
+      },
+      {
+        "BSN_DT": "2025-05-20",
+        "BSN_HR_CN": "1부",
+        "NATIVE_CNT": 3537,
+        "FRGNR_CNT": 37
+      },
+      {
+        "BSN_DT": "2025-05-20",
+        "BSN_HR_CN": "2부",
+        "NATIVE_CNT": 1285,
+        "FRGNR_CNT": 9
+      },
+      {
+        "BSN_DT": "2025-05-20",
+        "BSN_HR_CN": "3부",
+        "NATIVE_CNT": 211,
+        "FRGNR_CNT": 2
+      },
+      {
+        "BSN_DT": "2025-05-21",
+        "BSN_HR_CN": "1부",
+        "NATIVE_CNT": 3469,
+        "FRGNR_CNT": 36
+      },
+      {
+        "BSN_DT": "2025-05-21",
+        "BSN_HR_CN": "2부",
+        "NATIVE_CNT": 1225,
+        "FRGNR_CNT": 8
+      },
+      {
+        "BSN_DT": "2025-05-21",
+        "BSN_HR_CN": "3부",
+        "NATIVE_CNT": 184,
+        "FRGNR_CNT": 1
+      },
+      {
+        "BSN_DT": "2025-05-22",
+        "BSN_HR_CN": "1부",
+        "NATIVE_CNT": 3625,
+        "FRGNR_CNT": 26
+      },
+      {
+        "BSN_DT": "2025-05-22",
+        "BSN_HR_CN": "2부",
+        "NATIVE_CNT": 1387,
+        "FRGNR_CNT": 8
+      },
+      {
+        "BSN_DT": "2025-05-22",
+        "BSN_HR_CN": "3부",
+        "NATIVE_CNT": 191,
+        "FRGNR_CNT": 3
+      },
+      {
+        "BSN_DT": "2025-05-23",
+        "BSN_HR_CN": "1부",
+        "NATIVE_CNT": 3930,
+        "FRGNR_CNT": 22
+      },
+      {
+        "BSN_DT": "2025-05-23",
+        "BSN_HR_CN": "2부",
+        "NATIVE_CNT": 2315,
+        "FRGNR_CNT": 19
+      },
+      {
+        "BSN_DT": "2025-05-23",
+        "BSN_HR_CN": "3부",
+        "NATIVE_CNT": 414,
+        "FRGNR_CNT": 7
+      },
+      {
+        "BSN_DT": "2025-05-24",
+        "BSN_HR_CN": "1부",
+        "NATIVE_CNT": 5569,
+        "FRGNR_CNT": 55
+      },
+      {
+        "BSN_DT": "2025-05-24",
+        "BSN_HR_CN": "2부",
+        "NATIVE_CNT": 2112,
+        "FRGNR_CNT": 21
+      },
+      {
+        "BSN_DT": "2025-05-24",
+        "BSN_HR_CN": "3부",
+        "NATIVE_CNT": 386,
+        "FRGNR_CNT": 1
+      },
+      {
+        "BSN_DT": "2025-05-25",
+        "BSN_HR_CN": "1부",
+        "NATIVE_CNT": 4480,
+        "FRGNR_CNT": 50
+      },
+      {
+        "BSN_DT": "2025-05-25",
+        "BSN_HR_CN": "2부",
+        "NATIVE_CNT": 1309,
+        "FRGNR_CNT": 13
+      },
+      {
+        "BSN_DT": "2025-05-25",
+        "BSN_HR_CN": "3부",
+        "NATIVE_CNT": 264,
+        "FRGNR_CNT": 5
+      },
+      {
+        "BSN_DT": "2025-05-26",
+        "BSN_HR_CN": "1부",
+        "NATIVE_CNT": 3458,
+        "FRGNR_CNT": 37
+      },
+      {
+        "BSN_DT": "2025-05-26",
+        "BSN_HR_CN": "2부",
+        "NATIVE_CNT": 1331,
+        "FRGNR_CNT": 10
+      },
+      {
+        "BSN_DT": "2025-05-26",
+        "BSN_HR_CN": "3부",
+        "NATIVE_CNT": 194,
+        "FRGNR_CNT": 1
+      },
+      {
+        "BSN_DT": "2025-05-27",
+        "BSN_HR_CN": "1부",
+        "NATIVE_CNT": 3495,
+        "FRGNR_CNT": 23
+      },
+      {
+        "BSN_DT": "2025-05-27",
+        "BSN_HR_CN": "2부",
+        "NATIVE_CNT": 1319,
+        "FRGNR_CNT": 13
+      },
+      {
+        "BSN_DT": "2025-05-27",
+        "BSN_HR_CN": "3부",
+        "NATIVE_CNT": 173,
+        "FRGNR_CNT": 1
+      },
+      {
+        "BSN_DT": "2025-05-28",
+        "BSN_HR_CN": "1부",
+        "NATIVE_CNT": 3496,
+        "FRGNR_CNT": 31
+      },
+      {
+        "BSN_DT": "2025-05-28",
+        "BSN_HR_CN": "2부",
+        "NATIVE_CNT": 1157,
+        "FRGNR_CNT": 12
+      },
+      {
+        "BSN_DT": "2025-05-28",
+        "BSN_HR_CN": "3부",
+        "NATIVE_CNT": 180,
+        "FRGNR_CNT": 0
+      },
+      {
+        "BSN_DT": "2025-05-29",
+        "BSN_HR_CN": "1부",
+        "NATIVE_CNT": 3307,
+        "FRGNR_CNT": 32
+      },
+      {
+        "BSN_DT": "2025-05-29",
+        "BSN_HR_CN": "2부",
+        "NATIVE_CNT": 1231,
+        "FRGNR_CNT": 4
+      },
+      {
+        "BSN_DT": "2025-05-29",
+        "BSN_HR_CN": "3부",
+        "NATIVE_CNT": 175,
+        "FRGNR_CNT": 1
+      },
+      {
+        "BSN_DT": "2025-05-30",
+        "BSN_HR_CN": "1부",
+        "NATIVE_CNT": 3550,
+        "FRGNR_CNT": 15
+      },
+      {
+        "BSN_DT": "2025-05-30",
+        "BSN_HR_CN": "2부",
+        "NATIVE_CNT": 2135,
+        "FRGNR_CNT": 19
+      },
+      {
+        "BSN_DT": "2025-05-30",
+        "BSN_HR_CN": "3부",
+        "NATIVE_CNT": 370,
+        "FRGNR_CNT": 2
+      },
+      {
+        "BSN_DT": "2025-05-31",
+        "BSN_HR_CN": "1부",
+        "NATIVE_CNT": 5114,
+        "FRGNR_CNT": 36
+      },
+      {
+        "BSN_DT": "2025-05-31",
+        "BSN_HR_CN": "2부",
+        "NATIVE_CNT": 2275,
+        "FRGNR_CNT": 15
+      },
+      {
+        "BSN_DT": "2025-05-31",
+        "BSN_HR_CN": "3부",
+        "NATIVE_CNT": 359,
+        "FRGNR_CNT": 0
+      }
+    ],
+    "2025-06": [
+      {
+        "BSN_DT": "2025-06-01",
+        "BSN_HR_CN": "1부",
+        "NATIVE_CNT": 5795,
+        "FRGNR_CNT": 37
+      },
+      {
+        "BSN_DT": "2025-06-01",
+        "BSN_HR_CN": "2부",
+        "NATIVE_CNT": 1722,
+        "FRGNR_CNT": 16
+      },
+      {
+        "BSN_DT": "2025-06-01",
+        "BSN_HR_CN": "3부",
+        "NATIVE_CNT": 259,
+        "FRGNR_CNT": 2
+      },
+      {
+        "BSN_DT": "2025-06-02",
+        "BSN_HR_CN": "1부",
+        "NATIVE_CNT": 4921,
+        "FRGNR_CNT": 43
+      },
+      {
+        "BSN_DT": "2025-06-02",
+        "BSN_HR_CN": "2부",
+        "NATIVE_CNT": 2380,
+        "FRGNR_CNT": 17
+      },
+      {
+        "BSN_DT": "2025-06-02",
+        "BSN_HR_CN": "3부",
+        "NATIVE_CNT": 357,
+        "FRGNR_CNT": 1
+      },
+      {
+        "BSN_DT": "2025-06-03",
+        "BSN_HR_CN": "1부",
+        "NATIVE_CNT": 5013,
+        "FRGNR_CNT": 33
+      },
+      {
+        "BSN_DT": "2025-06-03",
+        "BSN_HR_CN": "2부",
+        "NATIVE_CNT": 1181,
+        "FRGNR_CNT": 15
+      },
+      {
+        "BSN_DT": "2025-06-03",
+        "BSN_HR_CN": "3부",
+        "NATIVE_CNT": 200,
+        "FRGNR_CNT": 3
+      },
+      {
+        "BSN_DT": "2025-06-04",
+        "BSN_HR_CN": "1부",
+        "NATIVE_CNT": 3972,
+        "FRGNR_CNT": 31
+      },
+      {
+        "BSN_DT": "2025-06-04",
+        "BSN_HR_CN": "2부",
+        "NATIVE_CNT": 1407,
+        "FRGNR_CNT": 11
+      },
+      {
+        "BSN_DT": "2025-06-04",
+        "BSN_HR_CN": "3부",
+        "NATIVE_CNT": 227,
+        "FRGNR_CNT": 1
+      },
+      {
+        "BSN_DT": "2025-06-05",
+        "BSN_HR_CN": "1부",
+        "NATIVE_CNT": 4416,
+        "FRGNR_CNT": 44
+      },
+      {
+        "BSN_DT": "2025-06-05",
+        "BSN_HR_CN": "2부",
+        "NATIVE_CNT": 2610,
+        "FRGNR_CNT": 17
+      },
+      {
+        "BSN_DT": "2025-06-05",
+        "BSN_HR_CN": "3부",
+        "NATIVE_CNT": 588,
+        "FRGNR_CNT": 2
+      },
+      {
+        "BSN_DT": "2025-06-06",
+        "BSN_HR_CN": "1부",
+        "NATIVE_CNT": 6583,
+        "FRGNR_CNT": 35
+      },
+      {
+        "BSN_DT": "2025-06-06",
+        "BSN_HR_CN": "2부",
+        "NATIVE_CNT": 3013,
+        "FRGNR_CNT": 27
+      },
+      {
+        "BSN_DT": "2025-06-06",
+        "BSN_HR_CN": "3부",
+        "NATIVE_CNT": 478,
+        "FRGNR_CNT": 3
+      },
+      {
+        "BSN_DT": "2025-06-07",
+        "BSN_HR_CN": "1부",
+        "NATIVE_CNT": 6634,
+        "FRGNR_CNT": 35
+      },
+      {
+        "BSN_DT": "2025-06-07",
+        "BSN_HR_CN": "2부",
+        "NATIVE_CNT": 2595,
+        "FRGNR_CNT": 23
+      },
+      {
+        "BSN_DT": "2025-06-07",
+        "BSN_HR_CN": "3부",
+        "NATIVE_CNT": 391,
+        "FRGNR_CNT": 4
+      },
+      {
+        "BSN_DT": "2025-06-08",
+        "BSN_HR_CN": "1부",
+        "NATIVE_CNT": 5108,
+        "FRGNR_CNT": 37
+      },
+      {
+        "BSN_DT": "2025-06-08",
+        "BSN_HR_CN": "2부",
+        "NATIVE_CNT": 1492,
+        "FRGNR_CNT": 17
+      },
+      {
+        "BSN_DT": "2025-06-08",
+        "BSN_HR_CN": "3부",
+        "NATIVE_CNT": 263,
+        "FRGNR_CNT": 4
+      },
+      {
+        "BSN_DT": "2025-06-09",
+        "BSN_HR_CN": "1부",
+        "NATIVE_CNT": 3812,
+        "FRGNR_CNT": 34
+      },
+      {
+        "BSN_DT": "2025-06-09",
+        "BSN_HR_CN": "2부",
+        "NATIVE_CNT": 1379,
+        "FRGNR_CNT": 16
+      },
+      {
+        "BSN_DT": "2025-06-09",
+        "BSN_HR_CN": "3부",
+        "NATIVE_CNT": 209,
+        "FRGNR_CNT": 2
+      },
+      {
+        "BSN_DT": "2025-06-10",
+        "BSN_HR_CN": "1부",
+        "NATIVE_CNT": 3909,
+        "FRGNR_CNT": 20
+      },
+      {
+        "BSN_DT": "2025-06-10",
+        "BSN_HR_CN": "2부",
+        "NATIVE_CNT": 1433,
+        "FRGNR_CNT": 16
+      },
+      {
+        "BSN_DT": "2025-06-10",
+        "BSN_HR_CN": "3부",
+        "NATIVE_CNT": 227,
+        "FRGNR_CNT": 1
+      },
+      {
+        "BSN_DT": "2025-06-11",
+        "BSN_HR_CN": "1부",
+        "NATIVE_CNT": 3994,
+        "FRGNR_CNT": 31
+      },
+      {
+        "BSN_DT": "2025-06-11",
+        "BSN_HR_CN": "2부",
+        "NATIVE_CNT": 1448,
+        "FRGNR_CNT": 8
+      },
+      {
+        "BSN_DT": "2025-06-11",
+        "BSN_HR_CN": "3부",
+        "NATIVE_CNT": 192,
+        "FRGNR_CNT": 1
+      },
+      {
+        "BSN_DT": "2025-06-12",
+        "BSN_HR_CN": "1부",
+        "NATIVE_CNT": 3878,
+        "FRGNR_CNT": 30
+      },
+      {
+        "BSN_DT": "2025-06-12",
+        "BSN_HR_CN": "2부",
+        "NATIVE_CNT": 1484,
+        "FRGNR_CNT": 5
+      },
+      {
+        "BSN_DT": "2025-06-12",
+        "BSN_HR_CN": "3부",
+        "NATIVE_CNT": 241,
+        "FRGNR_CNT": 2
+      },
+      {
+        "BSN_DT": "2025-06-13",
+        "BSN_HR_CN": "1부",
+        "NATIVE_CNT": 4021,
+        "FRGNR_CNT": 24
+      },
+      {
+        "BSN_DT": "2025-06-13",
+        "BSN_HR_CN": "2부",
+        "NATIVE_CNT": 2437,
+        "FRGNR_CNT": 19
+      },
+      {
+        "BSN_DT": "2025-06-13",
+        "BSN_HR_CN": "3부",
+        "NATIVE_CNT": 438,
+        "FRGNR_CNT": 1
+      },
+      {
+        "BSN_DT": "2025-06-14",
+        "BSN_HR_CN": "1부",
+        "NATIVE_CNT": 5744,
+        "FRGNR_CNT": 37
+      },
+      {
+        "BSN_DT": "2025-06-14",
+        "BSN_HR_CN": "2부",
+        "NATIVE_CNT": 2362,
+        "FRGNR_CNT": 19
+      },
+      {
+        "BSN_DT": "2025-06-14",
+        "BSN_HR_CN": "3부",
+        "NATIVE_CNT": 402,
+        "FRGNR_CNT": 6
+      },
+      {
+        "BSN_DT": "2025-06-15",
+        "BSN_HR_CN": "1부",
+        "NATIVE_CNT": 4608,
+        "FRGNR_CNT": 42
+      },
+      {
+        "BSN_DT": "2025-06-15",
+        "BSN_HR_CN": "2부",
+        "NATIVE_CNT": 1435,
+        "FRGNR_CNT": 16
+      },
+      {
+        "BSN_DT": "2025-06-15",
+        "BSN_HR_CN": "3부",
+        "NATIVE_CNT": 242,
+        "FRGNR_CNT": 2
+      },
+      {
+        "BSN_DT": "2025-06-16",
+        "BSN_HR_CN": "1부",
+        "NATIVE_CNT": 3907,
+        "FRGNR_CNT": 38
+      },
+      {
+        "BSN_DT": "2025-06-16",
+        "BSN_HR_CN": "2부",
+        "NATIVE_CNT": 1531,
+        "FRGNR_CNT": 13
+      },
+      {
+        "BSN_DT": "2025-06-16",
+        "BSN_HR_CN": "3부",
+        "NATIVE_CNT": 217,
+        "FRGNR_CNT": 1
+      },
+      {
+        "BSN_DT": "2025-06-17",
+        "BSN_HR_CN": "1부",
+        "NATIVE_CNT": 3770,
+        "FRGNR_CNT": 42
+      },
+      {
+        "BSN_DT": "2025-06-17",
+        "BSN_HR_CN": "2부",
+        "NATIVE_CNT": 1441,
+        "FRGNR_CNT": 18
+      },
+      {
+        "BSN_DT": "2025-06-17",
+        "BSN_HR_CN": "3부",
+        "NATIVE_CNT": 215,
+        "FRGNR_CNT": 2
+      },
+      {
+        "BSN_DT": "2025-06-18",
+        "BSN_HR_CN": "1부",
+        "NATIVE_CNT": 3558,
+        "FRGNR_CNT": 33
+      },
+      {
+        "BSN_DT": "2025-06-18",
+        "BSN_HR_CN": "2부",
+        "NATIVE_CNT": 1357,
+        "FRGNR_CNT": 11
+      },
+      {
+        "BSN_DT": "2025-06-18",
+        "BSN_HR_CN": "3부",
+        "NATIVE_CNT": 193,
+        "FRGNR_CNT": 1
+      },
+      {
+        "BSN_DT": "2025-06-19",
+        "BSN_HR_CN": "1부",
+        "NATIVE_CNT": 3519,
+        "FRGNR_CNT": 30
+      },
+      {
+        "BSN_DT": "2025-06-19",
+        "BSN_HR_CN": "2부",
+        "NATIVE_CNT": 1499,
+        "FRGNR_CNT": 41
+      },
+      {
+        "BSN_DT": "2025-06-19",
+        "BSN_HR_CN": "3부",
+        "NATIVE_CNT": 250,
+        "FRGNR_CNT": 4
+      },
+      {
+        "BSN_DT": "2025-06-20",
+        "BSN_HR_CN": "1부",
+        "NATIVE_CNT": 4479,
+        "FRGNR_CNT": 31
+      },
+      {
+        "BSN_DT": "2025-06-20",
+        "BSN_HR_CN": "2부",
+        "NATIVE_CNT": 2264,
+        "FRGNR_CNT": 23
+      },
+      {
+        "BSN_DT": "2025-06-20",
+        "BSN_HR_CN": "3부",
+        "NATIVE_CNT": 424,
+        "FRGNR_CNT": 3
+      },
+      {
+        "BSN_DT": "2025-06-21",
+        "BSN_HR_CN": "1부",
+        "NATIVE_CNT": 5484,
+        "FRGNR_CNT": 51
+      },
+      {
+        "BSN_DT": "2025-06-21",
+        "BSN_HR_CN": "2부",
+        "NATIVE_CNT": 2300,
+        "FRGNR_CNT": 25
+      },
+      {
+        "BSN_DT": "2025-06-21",
+        "BSN_HR_CN": "3부",
+        "NATIVE_CNT": 417,
+        "FRGNR_CNT": 2
+      },
+      {
+        "BSN_DT": "2025-06-22",
+        "BSN_HR_CN": "1부",
+        "NATIVE_CNT": 4724,
+        "FRGNR_CNT": 49
+      },
+      {
+        "BSN_DT": "2025-06-22",
+        "BSN_HR_CN": "2부",
+        "NATIVE_CNT": 1441,
+        "FRGNR_CNT": 11
+      },
+      {
+        "BSN_DT": "2025-06-22",
+        "BSN_HR_CN": "3부",
+        "NATIVE_CNT": 235,
+        "FRGNR_CNT": 7
+      },
+      {
+        "BSN_DT": "2025-06-23",
+        "BSN_HR_CN": "1부",
+        "NATIVE_CNT": 3590,
+        "FRGNR_CNT": 34
+      },
+      {
+        "BSN_DT": "2025-06-23",
+        "BSN_HR_CN": "2부",
+        "NATIVE_CNT": 1420,
+        "FRGNR_CNT": 20
+      },
+      {
+        "BSN_DT": "2025-06-23",
+        "BSN_HR_CN": "3부",
+        "NATIVE_CNT": 192,
+        "FRGNR_CNT": 0
+      },
+      {
+        "BSN_DT": "2025-06-24",
+        "BSN_HR_CN": "1부",
+        "NATIVE_CNT": 3584,
+        "FRGNR_CNT": 32
+      },
+      {
+        "BSN_DT": "2025-06-24",
+        "BSN_HR_CN": "2부",
+        "NATIVE_CNT": 1412,
+        "FRGNR_CNT": 12
+      },
+      {
+        "BSN_DT": "2025-06-24",
+        "BSN_HR_CN": "3부",
+        "NATIVE_CNT": 209,
+        "FRGNR_CNT": 2
+      },
+      {
+        "BSN_DT": "2025-06-25",
+        "BSN_HR_CN": "1부",
+        "NATIVE_CNT": 4116,
+        "FRGNR_CNT": 36
+      },
+      {
+        "BSN_DT": "2025-06-25",
+        "BSN_HR_CN": "2부",
+        "NATIVE_CNT": 1380,
+        "FRGNR_CNT": 14
+      },
+      {
+        "BSN_DT": "2025-06-25",
+        "BSN_HR_CN": "3부",
+        "NATIVE_CNT": 199,
+        "FRGNR_CNT": 2
+      },
+      {
+        "BSN_DT": "2025-06-26",
+        "BSN_HR_CN": "1부",
+        "NATIVE_CNT": 3877,
+        "FRGNR_CNT": 41
+      },
+      {
+        "BSN_DT": "2025-06-26",
+        "BSN_HR_CN": "2부",
+        "NATIVE_CNT": 1554,
+        "FRGNR_CNT": 16
+      },
+      {
+        "BSN_DT": "2025-06-26",
+        "BSN_HR_CN": "3부",
+        "NATIVE_CNT": 207,
+        "FRGNR_CNT": 3
+      },
+      {
+        "BSN_DT": "2025-06-27",
+        "BSN_HR_CN": "1부",
+        "NATIVE_CNT": 3988,
+        "FRGNR_CNT": 35
+      },
+      {
+        "BSN_DT": "2025-06-27",
+        "BSN_HR_CN": "2부",
+        "NATIVE_CNT": 2482,
+        "FRGNR_CNT": 12
+      },
+      {
+        "BSN_DT": "2025-06-27",
+        "BSN_HR_CN": "3부",
+        "NATIVE_CNT": 486,
+        "FRGNR_CNT": 14
+      },
+      {
+        "BSN_DT": "2025-06-28",
+        "BSN_HR_CN": "1부",
+        "NATIVE_CNT": 5709,
+        "FRGNR_CNT": 53
+      },
+      {
+        "BSN_DT": "2025-06-28",
+        "BSN_HR_CN": "2부",
+        "NATIVE_CNT": 2397,
+        "FRGNR_CNT": 21
+      },
+      {
+        "BSN_DT": "2025-06-28",
+        "BSN_HR_CN": "3부",
+        "NATIVE_CNT": 427,
+        "FRGNR_CNT": 6
+      },
+      {
+        "BSN_DT": "2025-06-29",
+        "BSN_HR_CN": "1부",
+        "NATIVE_CNT": 4681,
+        "FRGNR_CNT": 44
+      },
+      {
+        "BSN_DT": "2025-06-29",
+        "BSN_HR_CN": "2부",
+        "NATIVE_CNT": 1420,
+        "FRGNR_CNT": 14
+      },
+      {
+        "BSN_DT": "2025-06-29",
+        "BSN_HR_CN": "3부",
+        "NATIVE_CNT": 288,
+        "FRGNR_CNT": 7
+      },
+      {
+        "BSN_DT": "2025-06-30",
+        "BSN_HR_CN": "1부",
+        "NATIVE_CNT": 3680,
+        "FRGNR_CNT": 31
+      },
+      {
+        "BSN_DT": "2025-06-30",
+        "BSN_HR_CN": "2부",
+        "NATIVE_CNT": 1496,
+        "FRGNR_CNT": 19
+      },
+      {
+        "BSN_DT": "2025-06-30",
+        "BSN_HR_CN": "3부",
+        "NATIVE_CNT": 222,
+        "FRGNR_CNT": 3
+      }
+    ],
+    "2025-07": [
+      {
+        "BSN_DT": "2025-07-01",
+        "BSN_HR_CN": "1부",
+        "NATIVE_CNT": 4685,
+        "FRGNR_CNT": 25
+      },
+      {
+        "BSN_DT": "2025-07-01",
+        "BSN_HR_CN": "2부",
+        "NATIVE_CNT": 1558,
+        "FRGNR_CNT": 16
+      },
+      {
+        "BSN_DT": "2025-07-01",
+        "BSN_HR_CN": "3부",
+        "NATIVE_CNT": 235,
+        "FRGNR_CNT": 3
+      },
+      {
+        "BSN_DT": "2025-07-02",
+        "BSN_HR_CN": "1부",
+        "NATIVE_CNT": 4406,
+        "FRGNR_CNT": 24
+      },
+      {
+        "BSN_DT": "2025-07-02",
+        "BSN_HR_CN": "2부",
+        "NATIVE_CNT": 1522,
+        "FRGNR_CNT": 20
+      },
+      {
+        "BSN_DT": "2025-07-02",
+        "BSN_HR_CN": "3부",
+        "NATIVE_CNT": 214,
+        "FRGNR_CNT": 2
+      },
+      {
+        "BSN_DT": "2025-07-03",
+        "BSN_HR_CN": "1부",
+        "NATIVE_CNT": 4284,
+        "FRGNR_CNT": 24
+      },
+      {
+        "BSN_DT": "2025-07-03",
+        "BSN_HR_CN": "2부",
+        "NATIVE_CNT": 1567,
+        "FRGNR_CNT": 18
+      },
+      {
+        "BSN_DT": "2025-07-03",
+        "BSN_HR_CN": "3부",
+        "NATIVE_CNT": 193,
+        "FRGNR_CNT": 6
+      },
+      {
+        "BSN_DT": "2025-07-04",
+        "BSN_HR_CN": "1부",
+        "NATIVE_CNT": 4663,
+        "FRGNR_CNT": 39
+      },
+      {
+        "BSN_DT": "2025-07-04",
+        "BSN_HR_CN": "2부",
+        "NATIVE_CNT": 2689,
+        "FRGNR_CNT": 14
+      },
+      {
+        "BSN_DT": "2025-07-04",
+        "BSN_HR_CN": "3부",
+        "NATIVE_CNT": 436,
+        "FRGNR_CNT": 5
+      },
+      {
+        "BSN_DT": "2025-07-05",
+        "BSN_HR_CN": "1부",
+        "NATIVE_CNT": 6159,
+        "FRGNR_CNT": 40
+      },
+      {
+        "BSN_DT": "2025-07-05",
+        "BSN_HR_CN": "2부",
+        "NATIVE_CNT": 2605,
+        "FRGNR_CNT": 20
+      },
+      {
+        "BSN_DT": "2025-07-05",
+        "BSN_HR_CN": "3부",
+        "NATIVE_CNT": 440,
+        "FRGNR_CNT": 8
+      },
+      {
+        "BSN_DT": "2025-07-06",
+        "BSN_HR_CN": "1부",
+        "NATIVE_CNT": 5593,
+        "FRGNR_CNT": 53
+      },
+      {
+        "BSN_DT": "2025-07-06",
+        "BSN_HR_CN": "2부",
+        "NATIVE_CNT": 1751,
+        "FRGNR_CNT": 20
+      },
+      {
+        "BSN_DT": "2025-07-06",
+        "BSN_HR_CN": "3부",
+        "NATIVE_CNT": 249,
+        "FRGNR_CNT": 9
+      },
+      {
+        "BSN_DT": "2025-07-07",
+        "BSN_HR_CN": "1부",
+        "NATIVE_CNT": 4326,
+        "FRGNR_CNT": 42
+      },
+      {
+        "BSN_DT": "2025-07-07",
+        "BSN_HR_CN": "2부",
+        "NATIVE_CNT": 1706,
+        "FRGNR_CNT": 16
+      },
+      {
+        "BSN_DT": "2025-07-07",
+        "BSN_HR_CN": "3부",
+        "NATIVE_CNT": 284,
+        "FRGNR_CNT": 1
+      },
+      {
+        "BSN_DT": "2025-07-08",
+        "BSN_HR_CN": "1부",
+        "NATIVE_CNT": 4480,
+        "FRGNR_CNT": 42
+      },
+      {
+        "BSN_DT": "2025-07-08",
+        "BSN_HR_CN": "2부",
+        "NATIVE_CNT": 1549,
+        "FRGNR_CNT": 24
+      },
+      {
+        "BSN_DT": "2025-07-08",
+        "BSN_HR_CN": "3부",
+        "NATIVE_CNT": 217,
+        "FRGNR_CNT": 2
+      },
+      {
+        "BSN_DT": "2025-07-09",
+        "BSN_HR_CN": "1부",
+        "NATIVE_CNT": 4410,
+        "FRGNR_CNT": 40
+      },
+      {
+        "BSN_DT": "2025-07-09",
+        "BSN_HR_CN": "2부",
+        "NATIVE_CNT": 1372,
+        "FRGNR_CNT": 13
+      },
+      {
+        "BSN_DT": "2025-07-09",
+        "BSN_HR_CN": "3부",
+        "NATIVE_CNT": 241,
+        "FRGNR_CNT": 1
+      },
+      {
+        "BSN_DT": "2025-07-10",
+        "BSN_HR_CN": "1부",
+        "NATIVE_CNT": 4309,
+        "FRGNR_CNT": 31
+      },
+      {
+        "BSN_DT": "2025-07-10",
+        "BSN_HR_CN": "2부",
+        "NATIVE_CNT": 1810,
+        "FRGNR_CNT": 31
+      },
+      {
+        "BSN_DT": "2025-07-10",
+        "BSN_HR_CN": "3부",
+        "NATIVE_CNT": 264,
+        "FRGNR_CNT": 6
+      },
+      {
+        "BSN_DT": "2025-07-11",
+        "BSN_HR_CN": "1부",
+        "NATIVE_CNT": 4714,
+        "FRGNR_CNT": 45
+      },
+      {
+        "BSN_DT": "2025-07-11",
+        "BSN_HR_CN": "2부",
+        "NATIVE_CNT": 2709,
+        "FRGNR_CNT": 20
+      },
+      {
+        "BSN_DT": "2025-07-11",
+        "BSN_HR_CN": "3부",
+        "NATIVE_CNT": 510,
+        "FRGNR_CNT": 7
+      },
+      {
+        "BSN_DT": "2025-07-12",
+        "BSN_HR_CN": "1부",
+        "NATIVE_CNT": 6275,
+        "FRGNR_CNT": 48
+      },
+      {
+        "BSN_DT": "2025-07-12",
+        "BSN_HR_CN": "2부",
+        "NATIVE_CNT": 2706,
+        "FRGNR_CNT": 36
+      },
+      {
+        "BSN_DT": "2025-07-12",
+        "BSN_HR_CN": "3부",
+        "NATIVE_CNT": 462,
+        "FRGNR_CNT": 6
+      },
+      {
+        "BSN_DT": "2025-07-13",
+        "BSN_HR_CN": "1부",
+        "NATIVE_CNT": 5357,
+        "FRGNR_CNT": 47
+      },
+      {
+        "BSN_DT": "2025-07-13",
+        "BSN_HR_CN": "2부",
+        "NATIVE_CNT": 1577,
+        "FRGNR_CNT": 15
+      },
+      {
+        "BSN_DT": "2025-07-13",
+        "BSN_HR_CN": "3부",
+        "NATIVE_CNT": 276,
+        "FRGNR_CNT": 4
+      },
+      {
+        "BSN_DT": "2025-07-14",
+        "BSN_HR_CN": "1부",
+        "NATIVE_CNT": 4320,
+        "FRGNR_CNT": 44
+      },
+      {
+        "BSN_DT": "2025-07-14",
+        "BSN_HR_CN": "2부",
+        "NATIVE_CNT": 1504,
+        "FRGNR_CNT": 19
+      },
+      {
+        "BSN_DT": "2025-07-14",
+        "BSN_HR_CN": "3부",
+        "NATIVE_CNT": 224,
+        "FRGNR_CNT": 2
+      },
+      {
+        "BSN_DT": "2025-07-15",
+        "BSN_HR_CN": "1부",
+        "NATIVE_CNT": 4275,
+        "FRGNR_CNT": 41
+      },
+      {
+        "BSN_DT": "2025-07-15",
+        "BSN_HR_CN": "2부",
+        "NATIVE_CNT": 1420,
+        "FRGNR_CNT": 18
+      },
+      {
+        "BSN_DT": "2025-07-15",
+        "BSN_HR_CN": "3부",
+        "NATIVE_CNT": 228,
+        "FRGNR_CNT": 1
+      },
+      {
+        "BSN_DT": "2025-07-16",
+        "BSN_HR_CN": "1부",
+        "NATIVE_CNT": 4480,
+        "FRGNR_CNT": 35
+      },
+      {
+        "BSN_DT": "2025-07-16",
+        "BSN_HR_CN": "2부",
+        "NATIVE_CNT": 1384,
+        "FRGNR_CNT": 22
+      },
+      {
+        "BSN_DT": "2025-07-16",
+        "BSN_HR_CN": "3부",
+        "NATIVE_CNT": 240,
+        "FRGNR_CNT": 4
+      },
+      {
+        "BSN_DT": "2025-07-17",
+        "BSN_HR_CN": "1부",
+        "NATIVE_CNT": 4392,
+        "FRGNR_CNT": 42
+      },
+      {
+        "BSN_DT": "2025-07-17",
+        "BSN_HR_CN": "2부",
+        "NATIVE_CNT": 1506,
+        "FRGNR_CNT": 30
+      },
+      {
+        "BSN_DT": "2025-07-17",
+        "BSN_HR_CN": "3부",
+        "NATIVE_CNT": 215,
+        "FRGNR_CNT": 1
+      },
+      {
+        "BSN_DT": "2025-07-18",
+        "BSN_HR_CN": "1부",
+        "NATIVE_CNT": 4646,
+        "FRGNR_CNT": 37
+      },
+      {
+        "BSN_DT": "2025-07-18",
+        "BSN_HR_CN": "2부",
+        "NATIVE_CNT": 2595,
+        "FRGNR_CNT": 30
+      },
+      {
+        "BSN_DT": "2025-07-18",
+        "BSN_HR_CN": "3부",
+        "NATIVE_CNT": 447,
+        "FRGNR_CNT": 2
+      },
+      {
+        "BSN_DT": "2025-07-19",
+        "BSN_HR_CN": "1부",
+        "NATIVE_CNT": 5846,
+        "FRGNR_CNT": 40
+      },
+      {
+        "BSN_DT": "2025-07-19",
+        "BSN_HR_CN": "2부",
+        "NATIVE_CNT": 2250,
+        "FRGNR_CNT": 26
+      },
+      {
+        "BSN_DT": "2025-07-19",
+        "BSN_HR_CN": "3부",
+        "NATIVE_CNT": 374,
+        "FRGNR_CNT": 7
+      },
+      {
+        "BSN_DT": "2025-07-20",
+        "BSN_HR_CN": "1부",
+        "NATIVE_CNT": 4584,
+        "FRGNR_CNT": 49
+      },
+      {
+        "BSN_DT": "2025-07-20",
+        "BSN_HR_CN": "2부",
+        "NATIVE_CNT": 1499,
+        "FRGNR_CNT": 24
+      },
+      {
+        "BSN_DT": "2025-07-20",
+        "BSN_HR_CN": "3부",
+        "NATIVE_CNT": 255,
+        "FRGNR_CNT": 8
+      },
+      {
+        "BSN_DT": "2025-07-21",
+        "BSN_HR_CN": "1부",
+        "NATIVE_CNT": 3682,
+        "FRGNR_CNT": 41
+      },
+      {
+        "BSN_DT": "2025-07-21",
+        "BSN_HR_CN": "2부",
+        "NATIVE_CNT": 1454,
+        "FRGNR_CNT": 19
+      },
+      {
+        "BSN_DT": "2025-07-21",
+        "BSN_HR_CN": "3부",
+        "NATIVE_CNT": 249,
+        "FRGNR_CNT": 2
+      },
+      {
+        "BSN_DT": "2025-07-22",
+        "BSN_HR_CN": "1부",
+        "NATIVE_CNT": 3818,
+        "FRGNR_CNT": 34
+      },
+      {
+        "BSN_DT": "2025-07-22",
+        "BSN_HR_CN": "2부",
+        "NATIVE_CNT": 1457,
+        "FRGNR_CNT": 14
+      },
+      {
+        "BSN_DT": "2025-07-22",
+        "BSN_HR_CN": "3부",
+        "NATIVE_CNT": 218,
+        "FRGNR_CNT": 3
+      },
+      {
+        "BSN_DT": "2025-07-23",
+        "BSN_HR_CN": "1부",
+        "NATIVE_CNT": 3716,
+        "FRGNR_CNT": 35
+      },
+      {
+        "BSN_DT": "2025-07-23",
+        "BSN_HR_CN": "2부",
+        "NATIVE_CNT": 1491,
+        "FRGNR_CNT": 17
+      },
+      {
+        "BSN_DT": "2025-07-23",
+        "BSN_HR_CN": "3부",
+        "NATIVE_CNT": 177,
+        "FRGNR_CNT": 3
+      },
+      {
+        "BSN_DT": "2025-07-24",
+        "BSN_HR_CN": "1부",
+        "NATIVE_CNT": 3598,
+        "FRGNR_CNT": 38
+      },
+      {
+        "BSN_DT": "2025-07-24",
+        "BSN_HR_CN": "2부",
+        "NATIVE_CNT": 1612,
+        "FRGNR_CNT": 23
+      },
+      {
+        "BSN_DT": "2025-07-24",
+        "BSN_HR_CN": "3부",
+        "NATIVE_CNT": 227,
+        "FRGNR_CNT": 1
+      },
+      {
+        "BSN_DT": "2025-07-25",
+        "BSN_HR_CN": "1부",
+        "NATIVE_CNT": 4345,
+        "FRGNR_CNT": 42
+      },
+      {
+        "BSN_DT": "2025-07-25",
+        "BSN_HR_CN": "2부",
+        "NATIVE_CNT": 2539,
+        "FRGNR_CNT": 25
+      },
+      {
+        "BSN_DT": "2025-07-25",
+        "BSN_HR_CN": "3부",
+        "NATIVE_CNT": 538,
+        "FRGNR_CNT": 6
+      },
+      {
+        "BSN_DT": "2025-07-26",
+        "BSN_HR_CN": "1부",
+        "NATIVE_CNT": 6121,
+        "FRGNR_CNT": 46
+      },
+      {
+        "BSN_DT": "2025-07-26",
+        "BSN_HR_CN": "2부",
+        "NATIVE_CNT": 2684,
+        "FRGNR_CNT": 46
+      },
+      {
+        "BSN_DT": "2025-07-26",
+        "BSN_HR_CN": "3부",
+        "NATIVE_CNT": 421,
+        "FRGNR_CNT": 5
+      },
+      {
+        "BSN_DT": "2025-07-27",
+        "BSN_HR_CN": "1부",
+        "NATIVE_CNT": 5600,
+        "FRGNR_CNT": 47
+      },
+      {
+        "BSN_DT": "2025-07-27",
+        "BSN_HR_CN": "2부",
+        "NATIVE_CNT": 1975,
+        "FRGNR_CNT": 18
+      },
+      {
+        "BSN_DT": "2025-07-27",
+        "BSN_HR_CN": "3부",
+        "NATIVE_CNT": 303,
+        "FRGNR_CNT": 10
+      },
+      {
+        "BSN_DT": "2025-07-28",
+        "BSN_HR_CN": "1부",
+        "NATIVE_CNT": 4803,
+        "FRGNR_CNT": 46
+      },
+      {
+        "BSN_DT": "2025-07-28",
+        "BSN_HR_CN": "2부",
+        "NATIVE_CNT": 2019,
+        "FRGNR_CNT": 20
+      },
+      {
+        "BSN_DT": "2025-07-28",
+        "BSN_HR_CN": "3부",
+        "NATIVE_CNT": 284,
+        "FRGNR_CNT": 4
+      },
+      {
+        "BSN_DT": "2025-07-29",
+        "BSN_HR_CN": "1부",
+        "NATIVE_CNT": 4796,
+        "FRGNR_CNT": 41
+      },
+      {
+        "BSN_DT": "2025-07-29",
+        "BSN_HR_CN": "2부",
+        "NATIVE_CNT": 1821,
+        "FRGNR_CNT": 31
+      },
+      {
+        "BSN_DT": "2025-07-29",
+        "BSN_HR_CN": "3부",
+        "NATIVE_CNT": 256,
+        "FRGNR_CNT": 2
+      },
+      {
+        "BSN_DT": "2025-07-30",
+        "BSN_HR_CN": "1부",
+        "NATIVE_CNT": 4748,
+        "FRGNR_CNT": 63
+      },
+      {
+        "BSN_DT": "2025-07-30",
+        "BSN_HR_CN": "2부",
+        "NATIVE_CNT": 2023,
+        "FRGNR_CNT": 28
+      },
+      {
+        "BSN_DT": "2025-07-30",
+        "BSN_HR_CN": "3부",
+        "NATIVE_CNT": 299,
+        "FRGNR_CNT": 6
+      },
+      {
+        "BSN_DT": "2025-07-31",
+        "BSN_HR_CN": "1부",
+        "NATIVE_CNT": 5352,
+        "FRGNR_CNT": 56
+      },
+      {
+        "BSN_DT": "2025-07-31",
+        "BSN_HR_CN": "2부",
+        "NATIVE_CNT": 2628,
+        "FRGNR_CNT": 35
+      },
+      {
+        "BSN_DT": "2025-07-31",
+        "BSN_HR_CN": "3부",
+        "NATIVE_CNT": 392,
+        "FRGNR_CNT": 7
+      }
+    ],
+    "2025-08": [
+      {
+        "BSN_DT": "2025-08-01",
+        "BSN_HR_CN": "1부",
+        "NATIVE_CNT": 6901,
+        "FRGNR_CNT": 64
+      },
+      {
+        "BSN_DT": "2025-08-01",
+        "BSN_HR_CN": "2부",
+        "NATIVE_CNT": 3484,
+        "FRGNR_CNT": 49
+      },
+      {
+        "BSN_DT": "2025-08-01",
+        "BSN_HR_CN": "3부",
+        "NATIVE_CNT": 536,
+        "FRGNR_CNT": 11
+      },
+      {
+        "BSN_DT": "2025-08-02",
+        "BSN_HR_CN": "1부",
+        "NATIVE_CNT": 7551,
+        "FRGNR_CNT": 80
+      },
+      {
+        "BSN_DT": "2025-08-02",
+        "BSN_HR_CN": "2부",
+        "NATIVE_CNT": 3211,
+        "FRGNR_CNT": 41
+      },
+      {
+        "BSN_DT": "2025-08-02",
+        "BSN_HR_CN": "3부",
+        "NATIVE_CNT": 556,
+        "FRGNR_CNT": 6
+      },
+      {
+        "BSN_DT": "2025-08-03",
+        "BSN_HR_CN": "1부",
+        "NATIVE_CNT": 6837,
+        "FRGNR_CNT": 59
+      },
+      {
+        "BSN_DT": "2025-08-03",
+        "BSN_HR_CN": "2부",
+        "NATIVE_CNT": 2452,
+        "FRGNR_CNT": 28
+      },
+      {
+        "BSN_DT": "2025-08-03",
+        "BSN_HR_CN": "3부",
+        "NATIVE_CNT": 390,
+        "FRGNR_CNT": 3
+      },
+      {
+        "BSN_DT": "2025-08-04",
+        "BSN_HR_CN": "1부",
+        "NATIVE_CNT": 6493,
+        "FRGNR_CNT": 46
+      },
+      {
+        "BSN_DT": "2025-08-04",
+        "BSN_HR_CN": "2부",
+        "NATIVE_CNT": 2391,
+        "FRGNR_CNT": 20
+      },
+      {
+        "BSN_DT": "2025-08-04",
+        "BSN_HR_CN": "3부",
+        "NATIVE_CNT": 332,
+        "FRGNR_CNT": 3
+      },
+      {
+        "BSN_DT": "2025-08-05",
+        "BSN_HR_CN": "1부",
+        "NATIVE_CNT": 5972,
+        "FRGNR_CNT": 33
+      },
+      {
+        "BSN_DT": "2025-08-05",
+        "BSN_HR_CN": "2부",
+        "NATIVE_CNT": 2183,
+        "FRGNR_CNT": 22
+      },
+      {
+        "BSN_DT": "2025-08-05",
+        "BSN_HR_CN": "3부",
+        "NATIVE_CNT": 279,
+        "FRGNR_CNT": 12
+      },
+      {
+        "BSN_DT": "2025-08-06",
+        "BSN_HR_CN": "1부",
+        "NATIVE_CNT": 5521,
+        "FRGNR_CNT": 40
+      },
+      {
+        "BSN_DT": "2025-08-06",
+        "BSN_HR_CN": "2부",
+        "NATIVE_CNT": 1763,
+        "FRGNR_CNT": 11
+      },
+      {
+        "BSN_DT": "2025-08-06",
+        "BSN_HR_CN": "3부",
+        "NATIVE_CNT": 263,
+        "FRGNR_CNT": 1
+      },
+      {
+        "BSN_DT": "2025-08-07",
+        "BSN_HR_CN": "1부",
+        "NATIVE_CNT": 5048,
+        "FRGNR_CNT": 34
+      },
+      {
+        "BSN_DT": "2025-08-07",
+        "BSN_HR_CN": "2부",
+        "NATIVE_CNT": 1890,
+        "FRGNR_CNT": 20
+      },
+      {
+        "BSN_DT": "2025-08-07",
+        "BSN_HR_CN": "3부",
+        "NATIVE_CNT": 259,
+        "FRGNR_CNT": 0
+      },
+      {
+        "BSN_DT": "2025-08-08",
+        "BSN_HR_CN": "1부",
+        "NATIVE_CNT": 5022,
+        "FRGNR_CNT": 39
+      },
+      {
+        "BSN_DT": "2025-08-08",
+        "BSN_HR_CN": "2부",
+        "NATIVE_CNT": 2685,
+        "FRGNR_CNT": 20
+      },
+      {
+        "BSN_DT": "2025-08-08",
+        "BSN_HR_CN": "3부",
+        "NATIVE_CNT": 472,
+        "FRGNR_CNT": 4
+      },
+      {
+        "BSN_DT": "2025-08-09",
+        "BSN_HR_CN": "1부",
+        "NATIVE_CNT": 6344,
+        "FRGNR_CNT": 41
+      },
+      {
+        "BSN_DT": "2025-08-09",
+        "BSN_HR_CN": "2부",
+        "NATIVE_CNT": 2907,
+        "FRGNR_CNT": 27
+      },
+      {
+        "BSN_DT": "2025-08-09",
+        "BSN_HR_CN": "3부",
+        "NATIVE_CNT": 485,
+        "FRGNR_CNT": 6
+      },
+      {
+        "BSN_DT": "2025-08-10",
+        "BSN_HR_CN": "1부",
+        "NATIVE_CNT": 5569,
+        "FRGNR_CNT": 51
+      },
+      {
+        "BSN_DT": "2025-08-10",
+        "BSN_HR_CN": "2부",
+        "NATIVE_CNT": 2040,
+        "FRGNR_CNT": 32
+      },
+      {
+        "BSN_DT": "2025-08-10",
+        "BSN_HR_CN": "3부",
+        "NATIVE_CNT": 393,
+        "FRGNR_CNT": 4
+      },
+      {
+        "BSN_DT": "2025-08-11",
+        "BSN_HR_CN": "1부",
+        "NATIVE_CNT": 4700,
+        "FRGNR_CNT": 56
+      },
+      {
+        "BSN_DT": "2025-08-11",
+        "BSN_HR_CN": "2부",
+        "NATIVE_CNT": 2110,
+        "FRGNR_CNT": 15
+      },
+      {
+        "BSN_DT": "2025-08-11",
+        "BSN_HR_CN": "3부",
+        "NATIVE_CNT": 261,
+        "FRGNR_CNT": 1
+      },
+      {
+        "BSN_DT": "2025-08-12",
+        "BSN_HR_CN": "1부",
+        "NATIVE_CNT": 4926,
+        "FRGNR_CNT": 45
+      },
+      {
+        "BSN_DT": "2025-08-12",
+        "BSN_HR_CN": "2부",
+        "NATIVE_CNT": 1858,
+        "FRGNR_CNT": 20
+      },
+      {
+        "BSN_DT": "2025-08-12",
+        "BSN_HR_CN": "3부",
+        "NATIVE_CNT": 336,
+        "FRGNR_CNT": 5
+      },
+      {
+        "BSN_DT": "2025-08-13",
+        "BSN_HR_CN": "1부",
+        "NATIVE_CNT": 4979,
+        "FRGNR_CNT": 51
+      },
+      {
+        "BSN_DT": "2025-08-13",
+        "BSN_HR_CN": "2부",
+        "NATIVE_CNT": 1880,
+        "FRGNR_CNT": 26
+      },
+      {
+        "BSN_DT": "2025-08-13",
+        "BSN_HR_CN": "3부",
+        "NATIVE_CNT": 249,
+        "FRGNR_CNT": 2
+      },
+      {
+        "BSN_DT": "2025-08-14",
+        "BSN_HR_CN": "1부",
+        "NATIVE_CNT": 5216,
+        "FRGNR_CNT": 82
+      },
+      {
+        "BSN_DT": "2025-08-14",
+        "BSN_HR_CN": "2부",
+        "NATIVE_CNT": 3072,
+        "FRGNR_CNT": 30
+      },
+      {
+        "BSN_DT": "2025-08-14",
+        "BSN_HR_CN": "3부",
+        "NATIVE_CNT": 665,
+        "FRGNR_CNT": 3
+      },
+      {
+        "BSN_DT": "2025-08-15",
+        "BSN_HR_CN": "1부",
+        "NATIVE_CNT": 7250,
+        "FRGNR_CNT": 39
+      },
+      {
+        "BSN_DT": "2025-08-15",
+        "BSN_HR_CN": "2부",
+        "NATIVE_CNT": 3544,
+        "FRGNR_CNT": 40
+      },
+      {
+        "BSN_DT": "2025-08-15",
+        "BSN_HR_CN": "3부",
+        "NATIVE_CNT": 463,
+        "FRGNR_CNT": 5
+      },
+      {
+        "BSN_DT": "2025-08-16",
+        "BSN_HR_CN": "1부",
+        "NATIVE_CNT": 7137,
+        "FRGNR_CNT": 52
+      },
+      {
+        "BSN_DT": "2025-08-16",
+        "BSN_HR_CN": "2부",
+        "NATIVE_CNT": 3145,
+        "FRGNR_CNT": 28
+      },
+      {
+        "BSN_DT": "2025-08-16",
+        "BSN_HR_CN": "3부",
+        "NATIVE_CNT": 433,
+        "FRGNR_CNT": 5
+      },
+      {
+        "BSN_DT": "2025-08-17",
+        "BSN_HR_CN": "1부",
+        "NATIVE_CNT": 5608,
+        "FRGNR_CNT": 56
+      },
+      {
+        "BSN_DT": "2025-08-17",
+        "BSN_HR_CN": "2부",
+        "NATIVE_CNT": 1994,
+        "FRGNR_CNT": 16
+      },
+      {
+        "BSN_DT": "2025-08-17",
+        "BSN_HR_CN": "3부",
+        "NATIVE_CNT": 327,
+        "FRGNR_CNT": 4
+      },
+      {
+        "BSN_DT": "2025-08-18",
+        "BSN_HR_CN": "1부",
+        "NATIVE_CNT": 4579,
+        "FRGNR_CNT": 44
+      },
+      {
+        "BSN_DT": "2025-08-18",
+        "BSN_HR_CN": "2부",
+        "NATIVE_CNT": 1877,
+        "FRGNR_CNT": 20
+      },
+      {
+        "BSN_DT": "2025-08-18",
+        "BSN_HR_CN": "3부",
+        "NATIVE_CNT": 252,
+        "FRGNR_CNT": 6
+      },
+      {
+        "BSN_DT": "2025-08-19",
+        "BSN_HR_CN": "1부",
+        "NATIVE_CNT": 4578,
+        "FRGNR_CNT": 34
+      },
+      {
+        "BSN_DT": "2025-08-19",
+        "BSN_HR_CN": "2부",
+        "NATIVE_CNT": 1747,
+        "FRGNR_CNT": 16
+      },
+      {
+        "BSN_DT": "2025-08-19",
+        "BSN_HR_CN": "3부",
+        "NATIVE_CNT": 254,
+        "FRGNR_CNT": 1
+      },
+      {
+        "BSN_DT": "2025-08-20",
+        "BSN_HR_CN": "1부",
+        "NATIVE_CNT": 4405,
+        "FRGNR_CNT": 45
+      },
+      {
+        "BSN_DT": "2025-08-20",
+        "BSN_HR_CN": "2부",
+        "NATIVE_CNT": 1685,
+        "FRGNR_CNT": 21
+      },
+      {
+        "BSN_DT": "2025-08-20",
+        "BSN_HR_CN": "3부",
+        "NATIVE_CNT": 264,
+        "FRGNR_CNT": 1
+      },
+      {
+        "BSN_DT": "2025-08-21",
+        "BSN_HR_CN": "1부",
+        "NATIVE_CNT": 4389,
+        "FRGNR_CNT": 39
+      },
+      {
+        "BSN_DT": "2025-08-21",
+        "BSN_HR_CN": "2부",
+        "NATIVE_CNT": 1748,
+        "FRGNR_CNT": 24
+      },
+      {
+        "BSN_DT": "2025-08-21",
+        "BSN_HR_CN": "3부",
+        "NATIVE_CNT": 274,
+        "FRGNR_CNT": 2
+      },
+      {
+        "BSN_DT": "2025-08-22",
+        "BSN_HR_CN": "1부",
+        "NATIVE_CNT": 4558,
+        "FRGNR_CNT": 54
+      },
+      {
+        "BSN_DT": "2025-08-22",
+        "BSN_HR_CN": "2부",
+        "NATIVE_CNT": 2610,
+        "FRGNR_CNT": 23
+      },
+      {
+        "BSN_DT": "2025-08-22",
+        "BSN_HR_CN": "3부",
+        "NATIVE_CNT": 500,
+        "FRGNR_CNT": 4
+      },
+      {
+        "BSN_DT": "2025-08-23",
+        "BSN_HR_CN": "1부",
+        "NATIVE_CNT": 5741,
+        "FRGNR_CNT": 47
+      },
+      {
+        "BSN_DT": "2025-08-23",
+        "BSN_HR_CN": "2부",
+        "NATIVE_CNT": 2772,
+        "FRGNR_CNT": 56
+      },
+      {
+        "BSN_DT": "2025-08-23",
+        "BSN_HR_CN": "3부",
+        "NATIVE_CNT": 409,
+        "FRGNR_CNT": 3
+      },
+      {
+        "BSN_DT": "2025-08-24",
+        "BSN_HR_CN": "1부",
+        "NATIVE_CNT": 5161,
+        "FRGNR_CNT": 60
+      },
+      {
+        "BSN_DT": "2025-08-24",
+        "BSN_HR_CN": "2부",
+        "NATIVE_CNT": 1689,
+        "FRGNR_CNT": 23
+      },
+      {
+        "BSN_DT": "2025-08-24",
+        "BSN_HR_CN": "3부",
+        "NATIVE_CNT": 285,
+        "FRGNR_CNT": 0
+      },
+      {
+        "BSN_DT": "2025-08-25",
+        "BSN_HR_CN": "1부",
+        "NATIVE_CNT": 4286,
+        "FRGNR_CNT": 36
+      },
+      {
+        "BSN_DT": "2025-08-25",
+        "BSN_HR_CN": "2부",
+        "NATIVE_CNT": 1912,
+        "FRGNR_CNT": 33
+      },
+      {
+        "BSN_DT": "2025-08-25",
+        "BSN_HR_CN": "3부",
+        "NATIVE_CNT": 225,
+        "FRGNR_CNT": 0
+      },
+      {
+        "BSN_DT": "2025-08-26",
+        "BSN_HR_CN": "1부",
+        "NATIVE_CNT": 4573,
+        "FRGNR_CNT": 43
+      },
+      {
+        "BSN_DT": "2025-08-26",
+        "BSN_HR_CN": "2부",
+        "NATIVE_CNT": 1549,
+        "FRGNR_CNT": 18
+      },
+      {
+        "BSN_DT": "2025-08-26",
+        "BSN_HR_CN": "3부",
+        "NATIVE_CNT": 194,
+        "FRGNR_CNT": 4
+      },
+      {
+        "BSN_DT": "2025-08-27",
+        "BSN_HR_CN": "1부",
+        "NATIVE_CNT": 4022,
+        "FRGNR_CNT": 39
+      },
+      {
+        "BSN_DT": "2025-08-27",
+        "BSN_HR_CN": "2부",
+        "NATIVE_CNT": 1551,
+        "FRGNR_CNT": 34
+      },
+      {
+        "BSN_DT": "2025-08-27",
+        "BSN_HR_CN": "3부",
+        "NATIVE_CNT": 253,
+        "FRGNR_CNT": 1
+      },
+      {
+        "BSN_DT": "2025-08-28",
+        "BSN_HR_CN": "1부",
+        "NATIVE_CNT": 4077,
+        "FRGNR_CNT": 36
+      },
+      {
+        "BSN_DT": "2025-08-28",
+        "BSN_HR_CN": "2부",
+        "NATIVE_CNT": 1695,
+        "FRGNR_CNT": 32
+      },
+      {
+        "BSN_DT": "2025-08-28",
+        "BSN_HR_CN": "3부",
+        "NATIVE_CNT": 253,
+        "FRGNR_CNT": 1
+      },
+      {
+        "BSN_DT": "2025-08-29",
+        "BSN_HR_CN": "1부",
+        "NATIVE_CNT": 4138,
+        "FRGNR_CNT": 37
+      },
+      {
+        "BSN_DT": "2025-08-29",
+        "BSN_HR_CN": "2부",
+        "NATIVE_CNT": 2523,
+        "FRGNR_CNT": 33
+      },
+      {
+        "BSN_DT": "2025-08-29",
+        "BSN_HR_CN": "3부",
+        "NATIVE_CNT": 512,
+        "FRGNR_CNT": 1
+      },
+      {
+        "BSN_DT": "2025-08-30",
+        "BSN_HR_CN": "1부",
+        "NATIVE_CNT": 5739,
+        "FRGNR_CNT": 86
+      },
+      {
+        "BSN_DT": "2025-08-30",
+        "BSN_HR_CN": "2부",
+        "NATIVE_CNT": 2930,
+        "FRGNR_CNT": 29
+      },
+      {
+        "BSN_DT": "2025-08-30",
+        "BSN_HR_CN": "3부",
+        "NATIVE_CNT": 431,
+        "FRGNR_CNT": 1
+      },
+      {
+        "BSN_DT": "2025-08-31",
+        "BSN_HR_CN": "1부",
+        "NATIVE_CNT": 5138,
+        "FRGNR_CNT": 63
+      },
+      {
+        "BSN_DT": "2025-08-31",
+        "BSN_HR_CN": "2부",
+        "NATIVE_CNT": 1584,
+        "FRGNR_CNT": 12
+      },
+      {
+        "BSN_DT": "2025-08-31",
+        "BSN_HR_CN": "3부",
+        "NATIVE_CNT": 329,
+        "FRGNR_CNT": 7
+      }
+    ],
+    "2025-09": [
+      {
+        "BSN_DT": "2025-09-01",
+        "BSN_HR_CN": "1부",
+        "NATIVE_CNT": 5157,
+        "FRGNR_CNT": 44
+      },
+      {
+        "BSN_DT": "2025-09-01",
+        "BSN_HR_CN": "2부",
+        "NATIVE_CNT": 1777,
+        "FRGNR_CNT": 26
+      },
+      {
+        "BSN_DT": "2025-09-01",
+        "BSN_HR_CN": "3부",
+        "NATIVE_CNT": 279,
+        "FRGNR_CNT": 2
+      },
+      {
+        "BSN_DT": "2025-09-02",
+        "BSN_HR_CN": "1부",
+        "NATIVE_CNT": 4774,
+        "FRGNR_CNT": 35
+      },
+      {
+        "BSN_DT": "2025-09-02",
+        "BSN_HR_CN": "2부",
+        "NATIVE_CNT": 1680,
+        "FRGNR_CNT": 17
+      },
+      {
+        "BSN_DT": "2025-09-02",
+        "BSN_HR_CN": "3부",
+        "NATIVE_CNT": 268,
+        "FRGNR_CNT": 0
+      },
+      {
+        "BSN_DT": "2025-09-03",
+        "BSN_HR_CN": "1부",
+        "NATIVE_CNT": 4597,
+        "FRGNR_CNT": 31
+      },
+      {
+        "BSN_DT": "2025-09-03",
+        "BSN_HR_CN": "2부",
+        "NATIVE_CNT": 1619,
+        "FRGNR_CNT": 20
+      },
+      {
+        "BSN_DT": "2025-09-03",
+        "BSN_HR_CN": "3부",
+        "NATIVE_CNT": 263,
+        "FRGNR_CNT": 3
+      },
+      {
+        "BSN_DT": "2025-09-04",
+        "BSN_HR_CN": "1부",
+        "NATIVE_CNT": 4576,
+        "FRGNR_CNT": 38
+      },
+      {
+        "BSN_DT": "2025-09-04",
+        "BSN_HR_CN": "2부",
+        "NATIVE_CNT": 1750,
+        "FRGNR_CNT": 24
+      },
+      {
+        "BSN_DT": "2025-09-04",
+        "BSN_HR_CN": "3부",
+        "NATIVE_CNT": 266,
+        "FRGNR_CNT": 2
+      },
+      {
+        "BSN_DT": "2025-09-05",
+        "BSN_HR_CN": "1부",
+        "NATIVE_CNT": 4620,
+        "FRGNR_CNT": 40
+      },
+      {
+        "BSN_DT": "2025-09-05",
+        "BSN_HR_CN": "2부",
+        "NATIVE_CNT": 2554,
+        "FRGNR_CNT": 33
+      },
+      {
+        "BSN_DT": "2025-09-05",
+        "BSN_HR_CN": "3부",
+        "NATIVE_CNT": 463,
+        "FRGNR_CNT": 3
+      },
+      {
+        "BSN_DT": "2025-09-06",
+        "BSN_HR_CN": "1부",
+        "NATIVE_CNT": 6113,
+        "FRGNR_CNT": 79
+      },
+      {
+        "BSN_DT": "2025-09-06",
+        "BSN_HR_CN": "2부",
+        "NATIVE_CNT": 2644,
+        "FRGNR_CNT": 38
+      },
+      {
+        "BSN_DT": "2025-09-06",
+        "BSN_HR_CN": "3부",
+        "NATIVE_CNT": 448,
+        "FRGNR_CNT": 4
+      },
+      {
+        "BSN_DT": "2025-09-07",
+        "BSN_HR_CN": "1부",
+        "NATIVE_CNT": 5484,
+        "FRGNR_CNT": 95
+      },
+      {
+        "BSN_DT": "2025-09-07",
+        "BSN_HR_CN": "2부",
+        "NATIVE_CNT": 1632,
+        "FRGNR_CNT": 18
+      },
+      {
+        "BSN_DT": "2025-09-07",
+        "BSN_HR_CN": "3부",
+        "NATIVE_CNT": 313,
+        "FRGNR_CNT": 1
+      },
+      {
+        "BSN_DT": "2025-09-08",
+        "BSN_HR_CN": "1부",
+        "NATIVE_CNT": 4116,
+        "FRGNR_CNT": 34
+      },
+      {
+        "BSN_DT": "2025-09-08",
+        "BSN_HR_CN": "2부",
+        "NATIVE_CNT": 1592,
+        "FRGNR_CNT": 19
+      },
+      {
+        "BSN_DT": "2025-09-08",
+        "BSN_HR_CN": "3부",
+        "NATIVE_CNT": 231,
+        "FRGNR_CNT": 2
+      },
+      {
+        "BSN_DT": "2025-09-09",
+        "BSN_HR_CN": "1부",
+        "NATIVE_CNT": 4277,
+        "FRGNR_CNT": 34
+      },
+      {
+        "BSN_DT": "2025-09-09",
+        "BSN_HR_CN": "2부",
+        "NATIVE_CNT": 1500,
+        "FRGNR_CNT": 21
+      },
+      {
+        "BSN_DT": "2025-09-09",
+        "BSN_HR_CN": "3부",
+        "NATIVE_CNT": 261,
+        "FRGNR_CNT": 1
+      },
+      {
+        "BSN_DT": "2025-09-10",
+        "BSN_HR_CN": "1부",
+        "NATIVE_CNT": 4077,
+        "FRGNR_CNT": 40
+      },
+      {
+        "BSN_DT": "2025-09-10",
+        "BSN_HR_CN": "2부",
+        "NATIVE_CNT": 1578,
+        "FRGNR_CNT": 30
+      },
+      {
+        "BSN_DT": "2025-09-10",
+        "BSN_HR_CN": "3부",
+        "NATIVE_CNT": 264,
+        "FRGNR_CNT": 5
+      },
+      {
+        "BSN_DT": "2025-09-11",
+        "BSN_HR_CN": "1부",
+        "NATIVE_CNT": 4061,
+        "FRGNR_CNT": 45
+      },
+      {
+        "BSN_DT": "2025-09-11",
+        "BSN_HR_CN": "2부",
+        "NATIVE_CNT": 1646,
+        "FRGNR_CNT": 17
+      },
+      {
+        "BSN_DT": "2025-09-11",
+        "BSN_HR_CN": "3부",
+        "NATIVE_CNT": 252,
+        "FRGNR_CNT": 1
+      },
+      {
+        "BSN_DT": "2025-09-12",
+        "BSN_HR_CN": "1부",
+        "NATIVE_CNT": 4266,
+        "FRGNR_CNT": 35
+      },
+      {
+        "BSN_DT": "2025-09-12",
+        "BSN_HR_CN": "2부",
+        "NATIVE_CNT": 2598,
+        "FRGNR_CNT": 37
+      },
+      {
+        "BSN_DT": "2025-09-12",
+        "BSN_HR_CN": "3부",
+        "NATIVE_CNT": 500,
+        "FRGNR_CNT": 10
+      },
+      {
+        "BSN_DT": "2025-09-13",
+        "BSN_HR_CN": "1부",
+        "NATIVE_CNT": 6309,
+        "FRGNR_CNT": 140
+      },
+      {
+        "BSN_DT": "2025-09-13",
+        "BSN_HR_CN": "2부",
+        "NATIVE_CNT": 2280,
+        "FRGNR_CNT": 25
+      },
+      {
+        "BSN_DT": "2025-09-13",
+        "BSN_HR_CN": "3부",
+        "NATIVE_CNT": 425,
+        "FRGNR_CNT": 4
+      },
+      {
+        "BSN_DT": "2025-09-14",
+        "BSN_HR_CN": "1부",
+        "NATIVE_CNT": 4974,
+        "FRGNR_CNT": 134
+      },
+      {
+        "BSN_DT": "2025-09-14",
+        "BSN_HR_CN": "2부",
+        "NATIVE_CNT": 1530,
+        "FRGNR_CNT": 23
+      },
+      {
+        "BSN_DT": "2025-09-14",
+        "BSN_HR_CN": "3부",
+        "NATIVE_CNT": 240,
+        "FRGNR_CNT": 6
+      },
+      {
+        "BSN_DT": "2025-09-15",
+        "BSN_HR_CN": "1부",
+        "NATIVE_CNT": 3732,
+        "FRGNR_CNT": 40
+      },
+      {
+        "BSN_DT": "2025-09-15",
+        "BSN_HR_CN": "2부",
+        "NATIVE_CNT": 1431,
+        "FRGNR_CNT": 22
+      },
+      {
+        "BSN_DT": "2025-09-15",
+        "BSN_HR_CN": "3부",
+        "NATIVE_CNT": 223,
+        "FRGNR_CNT": 3
+      },
+      {
+        "BSN_DT": "2025-09-16",
+        "BSN_HR_CN": "1부",
+        "NATIVE_CNT": 3958,
+        "FRGNR_CNT": 41
+      },
+      {
+        "BSN_DT": "2025-09-16",
+        "BSN_HR_CN": "2부",
+        "NATIVE_CNT": 1542,
+        "FRGNR_CNT": 14
+      },
+      {
+        "BSN_DT": "2025-09-16",
+        "BSN_HR_CN": "3부",
+        "NATIVE_CNT": 274,
+        "FRGNR_CNT": 11
+      },
+      {
+        "BSN_DT": "2025-09-17",
+        "BSN_HR_CN": "1부",
+        "NATIVE_CNT": 4166,
+        "FRGNR_CNT": 51
+      },
+      {
+        "BSN_DT": "2025-09-17",
+        "BSN_HR_CN": "2부",
+        "NATIVE_CNT": 1308,
+        "FRGNR_CNT": 20
+      },
+      {
+        "BSN_DT": "2025-09-17",
+        "BSN_HR_CN": "3부",
+        "NATIVE_CNT": 227,
+        "FRGNR_CNT": 2
+      },
+      {
+        "BSN_DT": "2025-09-18",
+        "BSN_HR_CN": "1부",
+        "NATIVE_CNT": 3709,
+        "FRGNR_CNT": 44
+      },
+      {
+        "BSN_DT": "2025-09-18",
+        "BSN_HR_CN": "2부",
+        "NATIVE_CNT": 1457,
+        "FRGNR_CNT": 10
+      },
+      {
+        "BSN_DT": "2025-09-18",
+        "BSN_HR_CN": "3부",
+        "NATIVE_CNT": 207,
+        "FRGNR_CNT": 3
+      },
+      {
+        "BSN_DT": "2025-09-19",
+        "BSN_HR_CN": "1부",
+        "NATIVE_CNT": 4203,
+        "FRGNR_CNT": 39
+      },
+      {
+        "BSN_DT": "2025-09-19",
+        "BSN_HR_CN": "2부",
+        "NATIVE_CNT": 2354,
+        "FRGNR_CNT": 28
+      },
+      {
+        "BSN_DT": "2025-09-19",
+        "BSN_HR_CN": "3부",
+        "NATIVE_CNT": 489,
+        "FRGNR_CNT": 2
+      },
+      {
+        "BSN_DT": "2025-09-20",
+        "BSN_HR_CN": "1부",
+        "NATIVE_CNT": 5540,
+        "FRGNR_CNT": 150
+      },
+      {
+        "BSN_DT": "2025-09-20",
+        "BSN_HR_CN": "2부",
+        "NATIVE_CNT": 2401,
+        "FRGNR_CNT": 33
+      },
+      {
+        "BSN_DT": "2025-09-20",
+        "BSN_HR_CN": "3부",
+        "NATIVE_CNT": 376,
+        "FRGNR_CNT": 1
+      },
+      {
+        "BSN_DT": "2025-09-21",
+        "BSN_HR_CN": "1부",
+        "NATIVE_CNT": 4560,
+        "FRGNR_CNT": 159
+      },
+      {
+        "BSN_DT": "2025-09-21",
+        "BSN_HR_CN": "2부",
+        "NATIVE_CNT": 1479,
+        "FRGNR_CNT": 20
+      },
+      {
+        "BSN_DT": "2025-09-21",
+        "BSN_HR_CN": "3부",
+        "NATIVE_CNT": 271,
+        "FRGNR_CNT": 4
+      },
+      {
+        "BSN_DT": "2025-09-22",
+        "BSN_HR_CN": "1부",
+        "NATIVE_CNT": 3441,
+        "FRGNR_CNT": 29
+      },
+      {
+        "BSN_DT": "2025-09-22",
+        "BSN_HR_CN": "2부",
+        "NATIVE_CNT": 1283,
+        "FRGNR_CNT": 8
+      },
+      {
+        "BSN_DT": "2025-09-22",
+        "BSN_HR_CN": "3부",
+        "NATIVE_CNT": 183,
+        "FRGNR_CNT": 0
+      },
+      {
+        "BSN_DT": "2025-09-23",
+        "BSN_HR_CN": "1부",
+        "NATIVE_CNT": 3611,
+        "FRGNR_CNT": 33
+      },
+      {
+        "BSN_DT": "2025-09-23",
+        "BSN_HR_CN": "2부",
+        "NATIVE_CNT": 1377,
+        "FRGNR_CNT": 10
+      },
+      {
+        "BSN_DT": "2025-09-23",
+        "BSN_HR_CN": "3부",
+        "NATIVE_CNT": 209,
+        "FRGNR_CNT": 1
+      },
+      {
+        "BSN_DT": "2025-09-24",
+        "BSN_HR_CN": "1부",
+        "NATIVE_CNT": 3673,
+        "FRGNR_CNT": 29
+      },
+      {
+        "BSN_DT": "2025-09-24",
+        "BSN_HR_CN": "2부",
+        "NATIVE_CNT": 1327,
+        "FRGNR_CNT": 33
+      },
+      {
+        "BSN_DT": "2025-09-24",
+        "BSN_HR_CN": "3부",
+        "NATIVE_CNT": 187,
+        "FRGNR_CNT": 3
+      },
+      {
+        "BSN_DT": "2025-09-25",
+        "BSN_HR_CN": "1부",
+        "NATIVE_CNT": 3698,
+        "FRGNR_CNT": 47
+      },
+      {
+        "BSN_DT": "2025-09-25",
+        "BSN_HR_CN": "2부",
+        "NATIVE_CNT": 1388,
+        "FRGNR_CNT": 16
+      },
+      {
+        "BSN_DT": "2025-09-25",
+        "BSN_HR_CN": "3부",
+        "NATIVE_CNT": 208,
+        "FRGNR_CNT": 2
+      },
+      {
+        "BSN_DT": "2025-09-26",
+        "BSN_HR_CN": "1부",
+        "NATIVE_CNT": 3458,
+        "FRGNR_CNT": 45
+      },
+      {
+        "BSN_DT": "2025-09-26",
+        "BSN_HR_CN": "2부",
+        "NATIVE_CNT": 2064,
+        "FRGNR_CNT": 39
+      },
+      {
+        "BSN_DT": "2025-09-26",
+        "BSN_HR_CN": "3부",
+        "NATIVE_CNT": 416,
+        "FRGNR_CNT": 3
+      },
+      {
+        "BSN_DT": "2025-09-27",
+        "BSN_HR_CN": "1부",
+        "NATIVE_CNT": 4550,
+        "FRGNR_CNT": 65
+      },
+      {
+        "BSN_DT": "2025-09-27",
+        "BSN_HR_CN": "2부",
+        "NATIVE_CNT": 2097,
+        "FRGNR_CNT": 28
+      },
+      {
+        "BSN_DT": "2025-09-27",
+        "BSN_HR_CN": "3부",
+        "NATIVE_CNT": 350,
+        "FRGNR_CNT": 8
+      },
+      {
+        "BSN_DT": "2025-09-28",
+        "BSN_HR_CN": "1부",
+        "NATIVE_CNT": 4375,
+        "FRGNR_CNT": 106
+      },
+      {
+        "BSN_DT": "2025-09-28",
+        "BSN_HR_CN": "2부",
+        "NATIVE_CNT": 1291,
+        "FRGNR_CNT": 17
+      },
+      {
+        "BSN_DT": "2025-09-28",
+        "BSN_HR_CN": "3부",
+        "NATIVE_CNT": 214,
+        "FRGNR_CNT": 4
+      },
+      {
+        "BSN_DT": "2025-09-29",
+        "BSN_HR_CN": "1부",
+        "NATIVE_CNT": 3072,
+        "FRGNR_CNT": 30
+      },
+      {
+        "BSN_DT": "2025-09-29",
+        "BSN_HR_CN": "2부",
+        "NATIVE_CNT": 1224,
+        "FRGNR_CNT": 14
+      },
+      {
+        "BSN_DT": "2025-09-29",
+        "BSN_HR_CN": "3부",
+        "NATIVE_CNT": 175,
+        "FRGNR_CNT": 0
+      },
+      {
+        "BSN_DT": "2025-09-30",
+        "BSN_HR_CN": "1부",
+        "NATIVE_CNT": 3281,
+        "FRGNR_CNT": 24
+      },
+      {
+        "BSN_DT": "2025-09-30",
+        "BSN_HR_CN": "2부",
+        "NATIVE_CNT": 1349,
+        "FRGNR_CNT": 17
+      },
+      {
+        "BSN_DT": "2025-09-30",
+        "BSN_HR_CN": "3부",
+        "NATIVE_CNT": 225,
+        "FRGNR_CNT": 3
+      }
+    ],
+    "2025-10": [
+      {
+        "BSN_DT": "2025-10-01",
+        "BSN_HR_CN": "1부",
+        "NATIVE_CNT": 4451,
+        "FRGNR_CNT": 146
+      },
+      {
+        "BSN_DT": "2025-10-01",
+        "BSN_HR_CN": "2부",
+        "NATIVE_CNT": 1635,
+        "FRGNR_CNT": 18
+      },
+      {
+        "BSN_DT": "2025-10-01",
+        "BSN_HR_CN": "3부",
+        "NATIVE_CNT": 191,
+        "FRGNR_CNT": 3
+      },
+      {
+        "BSN_DT": "2025-10-02",
+        "BSN_HR_CN": "1부",
+        "NATIVE_CNT": 4421,
+        "FRGNR_CNT": 42
+      },
+      {
+        "BSN_DT": "2025-10-02",
+        "BSN_HR_CN": "2부",
+        "NATIVE_CNT": 2607,
+        "FRGNR_CNT": 41
+      },
+      {
+        "BSN_DT": "2025-10-02",
+        "BSN_HR_CN": "3부",
+        "NATIVE_CNT": 566,
+        "FRGNR_CNT": 9
+      },
+      {
+        "BSN_DT": "2025-10-03",
+        "BSN_HR_CN": "1부",
+        "NATIVE_CNT": 6691,
+        "FRGNR_CNT": 59
+      },
+      {
+        "BSN_DT": "2025-10-03",
+        "BSN_HR_CN": "2부",
+        "NATIVE_CNT": 2704,
+        "FRGNR_CNT": 32
+      },
+      {
+        "BSN_DT": "2025-10-03",
+        "BSN_HR_CN": "3부",
+        "NATIVE_CNT": 477,
+        "FRGNR_CNT": 3
+      },
+      {
+        "BSN_DT": "2025-10-04",
+        "BSN_HR_CN": "1부",
+        "NATIVE_CNT": 6202,
+        "FRGNR_CNT": 199
+      },
+      {
+        "BSN_DT": "2025-10-04",
+        "BSN_HR_CN": "2부",
+        "NATIVE_CNT": 2641,
+        "FRGNR_CNT": 42
+      },
+      {
+        "BSN_DT": "2025-10-04",
+        "BSN_HR_CN": "3부",
+        "NATIVE_CNT": 489,
+        "FRGNR_CNT": 8
+      },
+      {
+        "BSN_DT": "2025-10-05",
+        "BSN_HR_CN": "1부",
+        "NATIVE_CNT": 5774,
+        "FRGNR_CNT": 125
+      },
+      {
+        "BSN_DT": "2025-10-05",
+        "BSN_HR_CN": "2부",
+        "NATIVE_CNT": 2563,
+        "FRGNR_CNT": 36
+      },
+      {
+        "BSN_DT": "2025-10-05",
+        "BSN_HR_CN": "3부",
+        "NATIVE_CNT": 403,
+        "FRGNR_CNT": 5
+      },
+      {
+        "BSN_DT": "2025-10-06",
+        "BSN_HR_CN": "1부",
+        "NATIVE_CNT": 6586,
+        "FRGNR_CNT": 100
+      },
+      {
+        "BSN_DT": "2025-10-06",
+        "BSN_HR_CN": "2부",
+        "NATIVE_CNT": 3444,
+        "FRGNR_CNT": 47
+      },
+      {
+        "BSN_DT": "2025-10-06",
+        "BSN_HR_CN": "3부",
+        "NATIVE_CNT": 549,
+        "FRGNR_CNT": 4
+      },
+      {
+        "BSN_DT": "2025-10-07",
+        "BSN_HR_CN": "1부",
+        "NATIVE_CNT": 8634,
+        "FRGNR_CNT": 85
+      },
+      {
+        "BSN_DT": "2025-10-07",
+        "BSN_HR_CN": "2부",
+        "NATIVE_CNT": 3649,
+        "FRGNR_CNT": 28
+      },
+      {
+        "BSN_DT": "2025-10-07",
+        "BSN_HR_CN": "3부",
+        "NATIVE_CNT": 617,
+        "FRGNR_CNT": 0
+      },
+      {
+        "BSN_DT": "2025-10-08",
+        "BSN_HR_CN": "1부",
+        "NATIVE_CNT": 8546,
+        "FRGNR_CNT": 74
+      },
+      {
+        "BSN_DT": "2025-10-08",
+        "BSN_HR_CN": "2부",
+        "NATIVE_CNT": 2888,
+        "FRGNR_CNT": 22
+      },
+      {
+        "BSN_DT": "2025-10-08",
+        "BSN_HR_CN": "3부",
+        "NATIVE_CNT": 436,
+        "FRGNR_CNT": 2
+      },
+      {
+        "BSN_DT": "2025-10-09",
+        "BSN_HR_CN": "1부",
+        "NATIVE_CNT": 6737,
+        "FRGNR_CNT": 89
+      },
+      {
+        "BSN_DT": "2025-10-09",
+        "BSN_HR_CN": "2부",
+        "NATIVE_CNT": 2032,
+        "FRGNR_CNT": 28
+      },
+      {
+        "BSN_DT": "2025-10-09",
+        "BSN_HR_CN": "3부",
+        "NATIVE_CNT": 289,
+        "FRGNR_CNT": 5
+      },
+      {
+        "BSN_DT": "2025-10-10",
+        "BSN_HR_CN": "1부",
+        "NATIVE_CNT": 5975,
+        "FRGNR_CNT": 64
+      },
+      {
+        "BSN_DT": "2025-10-10",
+        "BSN_HR_CN": "2부",
+        "NATIVE_CNT": 2362,
+        "FRGNR_CNT": 18
+      },
+      {
+        "BSN_DT": "2025-10-10",
+        "BSN_HR_CN": "3부",
+        "NATIVE_CNT": 380,
+        "FRGNR_CNT": 1
+      },
+      {
+        "BSN_DT": "2025-10-11",
+        "BSN_HR_CN": "1부",
+        "NATIVE_CNT": 5957,
+        "FRGNR_CNT": 51
+      },
+      {
+        "BSN_DT": "2025-10-11",
+        "BSN_HR_CN": "2부",
+        "NATIVE_CNT": 2168,
+        "FRGNR_CNT": 15
+      },
+      {
+        "BSN_DT": "2025-10-11",
+        "BSN_HR_CN": "3부",
+        "NATIVE_CNT": 416,
+        "FRGNR_CNT": 5
+      },
+      {
+        "BSN_DT": "2025-10-12",
+        "BSN_HR_CN": "1부",
+        "NATIVE_CNT": 5259,
+        "FRGNR_CNT": 126
+      },
+      {
+        "BSN_DT": "2025-10-12",
+        "BSN_HR_CN": "2부",
+        "NATIVE_CNT": 1587,
+        "FRGNR_CNT": 20
+      },
+      {
+        "BSN_DT": "2025-10-12",
+        "BSN_HR_CN": "3부",
+        "NATIVE_CNT": 267,
+        "FRGNR_CNT": 4
+      },
+      {
+        "BSN_DT": "2025-10-13",
+        "BSN_HR_CN": "1부",
+        "NATIVE_CNT": 4561,
+        "FRGNR_CNT": 57
+      },
+      {
+        "BSN_DT": "2025-10-13",
+        "BSN_HR_CN": "2부",
+        "NATIVE_CNT": 1330,
+        "FRGNR_CNT": 21
+      },
+      {
+        "BSN_DT": "2025-10-13",
+        "BSN_HR_CN": "3부",
+        "NATIVE_CNT": 241,
+        "FRGNR_CNT": 4
+      },
+      {
+        "BSN_DT": "2025-10-14",
+        "BSN_HR_CN": "1부",
+        "NATIVE_CNT": 4348,
+        "FRGNR_CNT": 57
+      },
+      {
+        "BSN_DT": "2025-10-14",
+        "BSN_HR_CN": "2부",
+        "NATIVE_CNT": 1335,
+        "FRGNR_CNT": 8
+      },
+      {
+        "BSN_DT": "2025-10-14",
+        "BSN_HR_CN": "3부",
+        "NATIVE_CNT": 235,
+        "FRGNR_CNT": 5
+      },
+      {
+        "BSN_DT": "2025-10-15",
+        "BSN_HR_CN": "1부",
+        "NATIVE_CNT": 3932,
+        "FRGNR_CNT": 47
+      },
+      {
+        "BSN_DT": "2025-10-15",
+        "BSN_HR_CN": "2부",
+        "NATIVE_CNT": 1410,
+        "FRGNR_CNT": 23
+      },
+      {
+        "BSN_DT": "2025-10-15",
+        "BSN_HR_CN": "3부",
+        "NATIVE_CNT": 218,
+        "FRGNR_CNT": 1
+      },
+      {
+        "BSN_DT": "2025-10-16",
+        "BSN_HR_CN": "1부",
+        "NATIVE_CNT": 3960,
+        "FRGNR_CNT": 45
+      },
+      {
+        "BSN_DT": "2025-10-16",
+        "BSN_HR_CN": "2부",
+        "NATIVE_CNT": 1456,
+        "FRGNR_CNT": 28
+      },
+      {
+        "BSN_DT": "2025-10-16",
+        "BSN_HR_CN": "3부",
+        "NATIVE_CNT": 222,
+        "FRGNR_CNT": 1
+      },
+      {
+        "BSN_DT": "2025-10-17",
+        "BSN_HR_CN": "1부",
+        "NATIVE_CNT": 3839,
+        "FRGNR_CNT": 44
+      },
+      {
+        "BSN_DT": "2025-10-17",
+        "BSN_HR_CN": "2부",
+        "NATIVE_CNT": 1999,
+        "FRGNR_CNT": 25
+      },
+      {
+        "BSN_DT": "2025-10-17",
+        "BSN_HR_CN": "3부",
+        "NATIVE_CNT": 385,
+        "FRGNR_CNT": 3
+      },
+      {
+        "BSN_DT": "2025-10-18",
+        "BSN_HR_CN": "1부",
+        "NATIVE_CNT": 5067,
+        "FRGNR_CNT": 107
+      },
+      {
+        "BSN_DT": "2025-10-18",
+        "BSN_HR_CN": "2부",
+        "NATIVE_CNT": 2079,
+        "FRGNR_CNT": 23
+      },
+      {
+        "BSN_DT": "2025-10-18",
+        "BSN_HR_CN": "3부",
+        "NATIVE_CNT": 364,
+        "FRGNR_CNT": 4
+      },
+      {
+        "BSN_DT": "2025-10-19",
+        "BSN_HR_CN": "1부",
+        "NATIVE_CNT": 4296,
+        "FRGNR_CNT": 46
+      },
+      {
+        "BSN_DT": "2025-10-19",
+        "BSN_HR_CN": "2부",
+        "NATIVE_CNT": 1216,
+        "FRGNR_CNT": 17
+      },
+      {
+        "BSN_DT": "2025-10-19",
+        "BSN_HR_CN": "3부",
+        "NATIVE_CNT": 229,
+        "FRGNR_CNT": 5
+      },
+      {
+        "BSN_DT": "2025-10-20",
+        "BSN_HR_CN": "1부",
+        "NATIVE_CNT": 3628,
+        "FRGNR_CNT": 44
+      },
+      {
+        "BSN_DT": "2025-10-20",
+        "BSN_HR_CN": "2부",
+        "NATIVE_CNT": 1387,
+        "FRGNR_CNT": 16
+      },
+      {
+        "BSN_DT": "2025-10-20",
+        "BSN_HR_CN": "3부",
+        "NATIVE_CNT": 208,
+        "FRGNR_CNT": 3
+      },
+      {
+        "BSN_DT": "2025-10-21",
+        "BSN_HR_CN": "1부",
+        "NATIVE_CNT": 3737,
+        "FRGNR_CNT": 45
+      },
+      {
+        "BSN_DT": "2025-10-21",
+        "BSN_HR_CN": "2부",
+        "NATIVE_CNT": 1321,
+        "FRGNR_CNT": 16
+      },
+      {
+        "BSN_DT": "2025-10-21",
+        "BSN_HR_CN": "3부",
+        "NATIVE_CNT": 170,
+        "FRGNR_CNT": 4
+      },
+      {
+        "BSN_DT": "2025-10-22",
+        "BSN_HR_CN": "1부",
+        "NATIVE_CNT": 3627,
+        "FRGNR_CNT": 51
+      },
+      {
+        "BSN_DT": "2025-10-22",
+        "BSN_HR_CN": "2부",
+        "NATIVE_CNT": 1268,
+        "FRGNR_CNT": 30
+      },
+      {
+        "BSN_DT": "2025-10-22",
+        "BSN_HR_CN": "3부",
+        "NATIVE_CNT": 184,
+        "FRGNR_CNT": 5
+      },
+      {
+        "BSN_DT": "2025-10-23",
+        "BSN_HR_CN": "1부",
+        "NATIVE_CNT": 3546,
+        "FRGNR_CNT": 59
+      },
+      {
+        "BSN_DT": "2025-10-23",
+        "BSN_HR_CN": "2부",
+        "NATIVE_CNT": 1366,
+        "FRGNR_CNT": 21
+      },
+      {
+        "BSN_DT": "2025-10-23",
+        "BSN_HR_CN": "3부",
+        "NATIVE_CNT": 183,
+        "FRGNR_CNT": 3
+      },
+      {
+        "BSN_DT": "2025-10-24",
+        "BSN_HR_CN": "1부",
+        "NATIVE_CNT": 4078,
+        "FRGNR_CNT": 49
+      },
+      {
+        "BSN_DT": "2025-10-24",
+        "BSN_HR_CN": "2부",
+        "NATIVE_CNT": 2226,
+        "FRGNR_CNT": 24
+      },
+      {
+        "BSN_DT": "2025-10-24",
+        "BSN_HR_CN": "3부",
+        "NATIVE_CNT": 392,
+        "FRGNR_CNT": 5
+      },
+      {
+        "BSN_DT": "2025-10-25",
+        "BSN_HR_CN": "1부",
+        "NATIVE_CNT": 5094,
+        "FRGNR_CNT": 56
+      },
+      {
+        "BSN_DT": "2025-10-25",
+        "BSN_HR_CN": "2부",
+        "NATIVE_CNT": 2359,
+        "FRGNR_CNT": 33
+      },
+      {
+        "BSN_DT": "2025-10-25",
+        "BSN_HR_CN": "3부",
+        "NATIVE_CNT": 402,
+        "FRGNR_CNT": 4
+      },
+      {
+        "BSN_DT": "2025-10-26",
+        "BSN_HR_CN": "1부",
+        "NATIVE_CNT": 4316,
+        "FRGNR_CNT": 143
+      },
+      {
+        "BSN_DT": "2025-10-26",
+        "BSN_HR_CN": "2부",
+        "NATIVE_CNT": 1444,
+        "FRGNR_CNT": 11
+      },
+      {
+        "BSN_DT": "2025-10-26",
+        "BSN_HR_CN": "3부",
+        "NATIVE_CNT": 211,
+        "FRGNR_CNT": 10
+      },
+      {
+        "BSN_DT": "2025-10-27",
+        "BSN_HR_CN": "1부",
+        "NATIVE_CNT": 3532,
+        "FRGNR_CNT": 48
+      },
+      {
+        "BSN_DT": "2025-10-27",
+        "BSN_HR_CN": "2부",
+        "NATIVE_CNT": 1336,
+        "FRGNR_CNT": 22
+      },
+      {
+        "BSN_DT": "2025-10-27",
+        "BSN_HR_CN": "3부",
+        "NATIVE_CNT": 203,
+        "FRGNR_CNT": 15
+      },
+      {
+        "BSN_DT": "2025-10-28",
+        "BSN_HR_CN": "1부",
+        "NATIVE_CNT": 3542,
+        "FRGNR_CNT": 33
+      },
+      {
+        "BSN_DT": "2025-10-28",
+        "BSN_HR_CN": "2부",
+        "NATIVE_CNT": 1388,
+        "FRGNR_CNT": 15
+      },
+      {
+        "BSN_DT": "2025-10-28",
+        "BSN_HR_CN": "3부",
+        "NATIVE_CNT": 166,
+        "FRGNR_CNT": 6
+      },
+      {
+        "BSN_DT": "2025-10-29",
+        "BSN_HR_CN": "1부",
+        "NATIVE_CNT": 3435,
+        "FRGNR_CNT": 54
+      },
+      {
+        "BSN_DT": "2025-10-29",
+        "BSN_HR_CN": "2부",
+        "NATIVE_CNT": 1246,
+        "FRGNR_CNT": 44
+      },
+      {
+        "BSN_DT": "2025-10-29",
+        "BSN_HR_CN": "3부",
+        "NATIVE_CNT": 173,
+        "FRGNR_CNT": 12
+      },
+      {
+        "BSN_DT": "2025-10-30",
+        "BSN_HR_CN": "1부",
+        "NATIVE_CNT": 3426,
+        "FRGNR_CNT": 68
+      },
+      {
+        "BSN_DT": "2025-10-30",
+        "BSN_HR_CN": "2부",
+        "NATIVE_CNT": 1393,
+        "FRGNR_CNT": 27
+      },
+      {
+        "BSN_DT": "2025-10-30",
+        "BSN_HR_CN": "3부",
+        "NATIVE_CNT": 166,
+        "FRGNR_CNT": 10
+      },
+      {
+        "BSN_DT": "2025-10-31",
+        "BSN_HR_CN": "1부",
+        "NATIVE_CNT": 3671,
+        "FRGNR_CNT": 38
+      },
+      {
+        "BSN_DT": "2025-10-31",
+        "BSN_HR_CN": "2부",
+        "NATIVE_CNT": 2247,
+        "FRGNR_CNT": 14
+      },
+      {
+        "BSN_DT": "2025-10-31",
+        "BSN_HR_CN": "3부",
+        "NATIVE_CNT": 413,
+        "FRGNR_CNT": 0
+      }
+    ],
+    "2025-11": [
+      {
+        "BSN_DT": "2025-11-01",
+        "BSN_HR_CN": "1부",
+        "NATIVE_CNT": 5974,
+        "FRGNR_CNT": 91
+      },
+      {
+        "BSN_DT": "2025-11-01",
+        "BSN_HR_CN": "2부",
+        "NATIVE_CNT": 2484,
+        "FRGNR_CNT": 49
+      },
+      {
+        "BSN_DT": "2025-11-01",
+        "BSN_HR_CN": "3부",
+        "NATIVE_CNT": 403,
+        "FRGNR_CNT": 6
+      },
+      {
+        "BSN_DT": "2025-11-02",
+        "BSN_HR_CN": "1부",
+        "NATIVE_CNT": 5502,
+        "FRGNR_CNT": 53
+      },
+      {
+        "BSN_DT": "2025-11-02",
+        "BSN_HR_CN": "2부",
+        "NATIVE_CNT": 1523,
+        "FRGNR_CNT": 26
+      },
+      {
+        "BSN_DT": "2025-11-02",
+        "BSN_HR_CN": "3부",
+        "NATIVE_CNT": 290,
+        "FRGNR_CNT": 4
+      },
+      {
+        "BSN_DT": "2025-11-03",
+        "BSN_HR_CN": "1부",
+        "NATIVE_CNT": 4165,
+        "FRGNR_CNT": 46
+      },
+      {
+        "BSN_DT": "2025-11-03",
+        "BSN_HR_CN": "2부",
+        "NATIVE_CNT": 1594,
+        "FRGNR_CNT": 20
+      },
+      {
+        "BSN_DT": "2025-11-03",
+        "BSN_HR_CN": "3부",
+        "NATIVE_CNT": 207,
+        "FRGNR_CNT": 5
+      },
+      {
+        "BSN_DT": "2025-11-04",
+        "BSN_HR_CN": "1부",
+        "NATIVE_CNT": 4157,
+        "FRGNR_CNT": 48
+      },
+      {
+        "BSN_DT": "2025-11-04",
+        "BSN_HR_CN": "2부",
+        "NATIVE_CNT": 1488,
+        "FRGNR_CNT": 27
+      },
+      {
+        "BSN_DT": "2025-11-04",
+        "BSN_HR_CN": "3부",
+        "NATIVE_CNT": 206,
+        "FRGNR_CNT": 4
+      },
+      {
+        "BSN_DT": "2025-11-05",
+        "BSN_HR_CN": "1부",
+        "NATIVE_CNT": 4054,
+        "FRGNR_CNT": 41
+      },
+      {
+        "BSN_DT": "2025-11-05",
+        "BSN_HR_CN": "2부",
+        "NATIVE_CNT": 1482,
+        "FRGNR_CNT": 23
+      },
+      {
+        "BSN_DT": "2025-11-05",
+        "BSN_HR_CN": "3부",
+        "NATIVE_CNT": 209,
+        "FRGNR_CNT": 4
+      },
+      {
+        "BSN_DT": "2025-11-06",
+        "BSN_HR_CN": "1부",
+        "NATIVE_CNT": 3931,
+        "FRGNR_CNT": 54
+      },
+      {
+        "BSN_DT": "2025-11-06",
+        "BSN_HR_CN": "2부",
+        "NATIVE_CNT": 1634,
+        "FRGNR_CNT": 22
+      },
+      {
+        "BSN_DT": "2025-11-06",
+        "BSN_HR_CN": "3부",
+        "NATIVE_CNT": 213,
+        "FRGNR_CNT": 1
+      },
+      {
+        "BSN_DT": "2025-11-07",
+        "BSN_HR_CN": "1부",
+        "NATIVE_CNT": 4109,
+        "FRGNR_CNT": 52
+      },
+      {
+        "BSN_DT": "2025-11-07",
+        "BSN_HR_CN": "2부",
+        "NATIVE_CNT": 2401,
+        "FRGNR_CNT": 32
+      },
+      {
+        "BSN_DT": "2025-11-07",
+        "BSN_HR_CN": "3부",
+        "NATIVE_CNT": 412,
+        "FRGNR_CNT": 5
+      },
+      {
+        "BSN_DT": "2025-11-08",
+        "BSN_HR_CN": "1부",
+        "NATIVE_CNT": 5471,
+        "FRGNR_CNT": 140
+      },
+      {
+        "BSN_DT": "2025-11-08",
+        "BSN_HR_CN": "2부",
+        "NATIVE_CNT": 2297,
+        "FRGNR_CNT": 42
+      },
+      {
+        "BSN_DT": "2025-11-08",
+        "BSN_HR_CN": "3부",
+        "NATIVE_CNT": 372,
+        "FRGNR_CNT": 2
+      },
+      {
+        "BSN_DT": "2025-11-09",
+        "BSN_HR_CN": "1부",
+        "NATIVE_CNT": 4936,
+        "FRGNR_CNT": 79
+      },
+      {
+        "BSN_DT": "2025-11-09",
+        "BSN_HR_CN": "2부",
+        "NATIVE_CNT": 1429,
+        "FRGNR_CNT": 14
+      },
+      {
+        "BSN_DT": "2025-11-09",
+        "BSN_HR_CN": "3부",
+        "NATIVE_CNT": 233,
+        "FRGNR_CNT": 3
+      },
+      {
+        "BSN_DT": "2025-11-10",
+        "BSN_HR_CN": "1부",
+        "NATIVE_CNT": 3846,
+        "FRGNR_CNT": 32
+      },
+      {
+        "BSN_DT": "2025-11-10",
+        "BSN_HR_CN": "2부",
+        "NATIVE_CNT": 1471,
+        "FRGNR_CNT": 21
+      },
+      {
+        "BSN_DT": "2025-11-10",
+        "BSN_HR_CN": "3부",
+        "NATIVE_CNT": 218,
+        "FRGNR_CNT": 2
+      },
+      {
+        "BSN_DT": "2025-11-11",
+        "BSN_HR_CN": "1부",
+        "NATIVE_CNT": 3947,
+        "FRGNR_CNT": 38
+      },
+      {
+        "BSN_DT": "2025-11-11",
+        "BSN_HR_CN": "2부",
+        "NATIVE_CNT": 1409,
+        "FRGNR_CNT": 17
+      },
+      {
+        "BSN_DT": "2025-11-11",
+        "BSN_HR_CN": "3부",
+        "NATIVE_CNT": 219,
+        "FRGNR_CNT": 2
+      },
+      {
+        "BSN_DT": "2025-11-12",
+        "BSN_HR_CN": "1부",
+        "NATIVE_CNT": 3843,
+        "FRGNR_CNT": 39
+      },
+      {
+        "BSN_DT": "2025-11-12",
+        "BSN_HR_CN": "2부",
+        "NATIVE_CNT": 1388,
+        "FRGNR_CNT": 16
+      },
+      {
+        "BSN_DT": "2025-11-12",
+        "BSN_HR_CN": "3부",
+        "NATIVE_CNT": 188,
+        "FRGNR_CNT": 3
+      },
+      {
+        "BSN_DT": "2025-11-13",
+        "BSN_HR_CN": "1부",
+        "NATIVE_CNT": 3796,
+        "FRGNR_CNT": 46
+      },
+      {
+        "BSN_DT": "2025-11-13",
+        "BSN_HR_CN": "2부",
+        "NATIVE_CNT": 1377,
+        "FRGNR_CNT": 16
+      },
+      {
+        "BSN_DT": "2025-11-13",
+        "BSN_HR_CN": "3부",
+        "NATIVE_CNT": 204,
+        "FRGNR_CNT": 2
+      },
+      {
+        "BSN_DT": "2025-11-14",
+        "BSN_HR_CN": "1부",
+        "NATIVE_CNT": 4042,
+        "FRGNR_CNT": 70
+      },
+      {
+        "BSN_DT": "2025-11-14",
+        "BSN_HR_CN": "2부",
+        "NATIVE_CNT": 2261,
+        "FRGNR_CNT": 16
+      },
+      {
+        "BSN_DT": "2025-11-14",
+        "BSN_HR_CN": "3부",
+        "NATIVE_CNT": 383,
+        "FRGNR_CNT": 3
+      },
+      {
+        "BSN_DT": "2025-11-15",
+        "BSN_HR_CN": "1부",
+        "NATIVE_CNT": 5451,
+        "FRGNR_CNT": 60
+      },
+      {
+        "BSN_DT": "2025-11-15",
+        "BSN_HR_CN": "2부",
+        "NATIVE_CNT": 2351,
+        "FRGNR_CNT": 29
+      },
+      {
+        "BSN_DT": "2025-11-15",
+        "BSN_HR_CN": "3부",
+        "NATIVE_CNT": 336,
+        "FRGNR_CNT": 1
+      },
+      {
+        "BSN_DT": "2025-11-16",
+        "BSN_HR_CN": "1부",
+        "NATIVE_CNT": 4744,
+        "FRGNR_CNT": 53
+      },
+      {
+        "BSN_DT": "2025-11-16",
+        "BSN_HR_CN": "2부",
+        "NATIVE_CNT": 1381,
+        "FRGNR_CNT": 20
+      },
+      {
+        "BSN_DT": "2025-11-16",
+        "BSN_HR_CN": "3부",
+        "NATIVE_CNT": 249,
+        "FRGNR_CNT": 3
+      },
+      {
+        "BSN_DT": "2025-11-17",
+        "BSN_HR_CN": "1부",
+        "NATIVE_CNT": 3780,
+        "FRGNR_CNT": 39
+      },
+      {
+        "BSN_DT": "2025-11-17",
+        "BSN_HR_CN": "2부",
+        "NATIVE_CNT": 1292,
+        "FRGNR_CNT": 15
+      },
+      {
+        "BSN_DT": "2025-11-17",
+        "BSN_HR_CN": "3부",
+        "NATIVE_CNT": 200,
+        "FRGNR_CNT": 3
+      },
+      {
+        "BSN_DT": "2025-11-18",
+        "BSN_HR_CN": "1부",
+        "NATIVE_CNT": 3818,
+        "FRGNR_CNT": 32
+      },
+      {
+        "BSN_DT": "2025-11-18",
+        "BSN_HR_CN": "2부",
+        "NATIVE_CNT": 1189,
+        "FRGNR_CNT": 17
+      },
+      {
+        "BSN_DT": "2025-11-18",
+        "BSN_HR_CN": "3부",
+        "NATIVE_CNT": 163,
+        "FRGNR_CNT": 3
+      },
+      {
+        "BSN_DT": "2025-11-19",
+        "BSN_HR_CN": "1부",
+        "NATIVE_CNT": 3491,
+        "FRGNR_CNT": 36
+      },
+      {
+        "BSN_DT": "2025-11-19",
+        "BSN_HR_CN": "2부",
+        "NATIVE_CNT": 1200,
+        "FRGNR_CNT": 8
+      },
+      {
+        "BSN_DT": "2025-11-19",
+        "BSN_HR_CN": "3부",
+        "NATIVE_CNT": 190,
+        "FRGNR_CNT": 2
+      },
+      {
+        "BSN_DT": "2025-11-20",
+        "BSN_HR_CN": "1부",
+        "NATIVE_CNT": 3837,
+        "FRGNR_CNT": 43
+      },
+      {
+        "BSN_DT": "2025-11-20",
+        "BSN_HR_CN": "2부",
+        "NATIVE_CNT": 1390,
+        "FRGNR_CNT": 21
+      },
+      {
+        "BSN_DT": "2025-11-20",
+        "BSN_HR_CN": "3부",
+        "NATIVE_CNT": 226,
+        "FRGNR_CNT": 4
+      },
+      {
+        "BSN_DT": "2025-11-21",
+        "BSN_HR_CN": "1부",
+        "NATIVE_CNT": 3982,
+        "FRGNR_CNT": 27
+      },
+      {
+        "BSN_DT": "2025-11-21",
+        "BSN_HR_CN": "2부",
+        "NATIVE_CNT": 2050,
+        "FRGNR_CNT": 21
+      },
+      {
+        "BSN_DT": "2025-11-21",
+        "BSN_HR_CN": "3부",
+        "NATIVE_CNT": 403,
+        "FRGNR_CNT": 4
+      },
+      {
+        "BSN_DT": "2025-11-22",
+        "BSN_HR_CN": "1부",
+        "NATIVE_CNT": 5109,
+        "FRGNR_CNT": 45
+      },
+      {
+        "BSN_DT": "2025-11-22",
+        "BSN_HR_CN": "2부",
+        "NATIVE_CNT": 2084,
+        "FRGNR_CNT": 44
+      },
+      {
+        "BSN_DT": "2025-11-22",
+        "BSN_HR_CN": "3부",
+        "NATIVE_CNT": 324,
+        "FRGNR_CNT": 1
+      },
+      {
+        "BSN_DT": "2025-11-23",
+        "BSN_HR_CN": "1부",
+        "NATIVE_CNT": 4475,
+        "FRGNR_CNT": 93
+      },
+      {
+        "BSN_DT": "2025-11-23",
+        "BSN_HR_CN": "2부",
+        "NATIVE_CNT": 1319,
+        "FRGNR_CNT": 16
+      },
+      {
+        "BSN_DT": "2025-11-23",
+        "BSN_HR_CN": "3부",
+        "NATIVE_CNT": 188,
+        "FRGNR_CNT": 0
+      },
+      {
+        "BSN_DT": "2025-11-24",
+        "BSN_HR_CN": "1부",
+        "NATIVE_CNT": 3381,
+        "FRGNR_CNT": 39
+      },
+      {
+        "BSN_DT": "2025-11-24",
+        "BSN_HR_CN": "2부",
+        "NATIVE_CNT": 1314,
+        "FRGNR_CNT": 22
+      },
+      {
+        "BSN_DT": "2025-11-24",
+        "BSN_HR_CN": "3부",
+        "NATIVE_CNT": 233,
+        "FRGNR_CNT": 5
+      },
+      {
+        "BSN_DT": "2025-11-25",
+        "BSN_HR_CN": "1부",
+        "NATIVE_CNT": 4137,
+        "FRGNR_CNT": 40
+      },
+      {
+        "BSN_DT": "2025-11-25",
+        "BSN_HR_CN": "2부",
+        "NATIVE_CNT": 1321,
+        "FRGNR_CNT": 16
+      },
+      {
+        "BSN_DT": "2025-11-25",
+        "BSN_HR_CN": "3부",
+        "NATIVE_CNT": 167,
+        "FRGNR_CNT": 1
+      },
+      {
+        "BSN_DT": "2025-11-26",
+        "BSN_HR_CN": "1부",
+        "NATIVE_CNT": 3794,
+        "FRGNR_CNT": 43
+      },
+      {
+        "BSN_DT": "2025-11-26",
+        "BSN_HR_CN": "2부",
+        "NATIVE_CNT": 1255,
+        "FRGNR_CNT": 18
+      },
+      {
+        "BSN_DT": "2025-11-26",
+        "BSN_HR_CN": "3부",
+        "NATIVE_CNT": 187,
+        "FRGNR_CNT": 2
+      },
+      {
+        "BSN_DT": "2025-11-27",
+        "BSN_HR_CN": "1부",
+        "NATIVE_CNT": 3774,
+        "FRGNR_CNT": 35
+      },
+      {
+        "BSN_DT": "2025-11-27",
+        "BSN_HR_CN": "2부",
+        "NATIVE_CNT": 1302,
+        "FRGNR_CNT": 19
+      },
+      {
+        "BSN_DT": "2025-11-27",
+        "BSN_HR_CN": "3부",
+        "NATIVE_CNT": 175,
+        "FRGNR_CNT": 6
+      },
+      {
+        "BSN_DT": "2025-11-28",
+        "BSN_HR_CN": "1부",
+        "NATIVE_CNT": 3836,
+        "FRGNR_CNT": 32
+      },
+      {
+        "BSN_DT": "2025-11-28",
+        "BSN_HR_CN": "2부",
+        "NATIVE_CNT": 2242,
+        "FRGNR_CNT": 22
+      },
+      {
+        "BSN_DT": "2025-11-28",
+        "BSN_HR_CN": "3부",
+        "NATIVE_CNT": 431,
+        "FRGNR_CNT": 6
+      },
+      {
+        "BSN_DT": "2025-11-29",
+        "BSN_HR_CN": "1부",
+        "NATIVE_CNT": 5159,
+        "FRGNR_CNT": 43
+      },
+      {
+        "BSN_DT": "2025-11-29",
+        "BSN_HR_CN": "2부",
+        "NATIVE_CNT": 2225,
+        "FRGNR_CNT": 40
+      },
+      {
+        "BSN_DT": "2025-11-29",
+        "BSN_HR_CN": "3부",
+        "NATIVE_CNT": 379,
+        "FRGNR_CNT": 3
+      },
+      {
+        "BSN_DT": "2025-11-30",
+        "BSN_HR_CN": "1부",
+        "NATIVE_CNT": 4402,
+        "FRGNR_CNT": 44
+      },
+      {
+        "BSN_DT": "2025-11-30",
+        "BSN_HR_CN": "2부",
+        "NATIVE_CNT": 1479,
+        "FRGNR_CNT": 14
+      },
+      {
+        "BSN_DT": "2025-11-30",
+        "BSN_HR_CN": "3부",
+        "NATIVE_CNT": 224,
+        "FRGNR_CNT": 2
+      }
+    ],
+    "2025-12": [
+      {
+        "BSN_DT": "2025-12-01",
+        "BSN_HR_CN": "1부",
+        "NATIVE_CNT": 4338,
+        "FRGNR_CNT": 38
+      },
+      {
+        "BSN_DT": "2025-12-01",
+        "BSN_HR_CN": "2부",
+        "NATIVE_CNT": 1628,
+        "FRGNR_CNT": 13
+      },
+      {
+        "BSN_DT": "2025-12-01",
+        "BSN_HR_CN": "3부",
+        "NATIVE_CNT": 231,
+        "FRGNR_CNT": 2
+      },
+      {
+        "BSN_DT": "2025-12-02",
+        "BSN_HR_CN": "1부",
+        "NATIVE_CNT": 4289,
+        "FRGNR_CNT": 31
+      },
+      {
+        "BSN_DT": "2025-12-02",
+        "BSN_HR_CN": "2부",
+        "NATIVE_CNT": 1383,
+        "FRGNR_CNT": 17
+      },
+      {
+        "BSN_DT": "2025-12-02",
+        "BSN_HR_CN": "3부",
+        "NATIVE_CNT": 202,
+        "FRGNR_CNT": 3
+      },
+      {
+        "BSN_DT": "2025-12-03",
+        "BSN_HR_CN": "1부",
+        "NATIVE_CNT": 4239,
+        "FRGNR_CNT": 38
+      },
+      {
+        "BSN_DT": "2025-12-03",
+        "BSN_HR_CN": "2부",
+        "NATIVE_CNT": 1277,
+        "FRGNR_CNT": 17
+      },
+      {
+        "BSN_DT": "2025-12-03",
+        "BSN_HR_CN": "3부",
+        "NATIVE_CNT": 174,
+        "FRGNR_CNT": 4
+      },
+      {
+        "BSN_DT": "2025-12-04",
+        "BSN_HR_CN": "1부",
+        "NATIVE_CNT": 4037,
+        "FRGNR_CNT": 46
+      },
+      {
+        "BSN_DT": "2025-12-04",
+        "BSN_HR_CN": "2부",
+        "NATIVE_CNT": 1086,
+        "FRGNR_CNT": 18
+      },
+      {
+        "BSN_DT": "2025-12-04",
+        "BSN_HR_CN": "3부",
+        "NATIVE_CNT": 191,
+        "FRGNR_CNT": 5
+      },
+      {
+        "BSN_DT": "2025-12-05",
+        "BSN_HR_CN": "1부",
+        "NATIVE_CNT": 4158,
+        "FRGNR_CNT": 44
+      },
+      {
+        "BSN_DT": "2025-12-05",
+        "BSN_HR_CN": "2부",
+        "NATIVE_CNT": 2077,
+        "FRGNR_CNT": 17
+      },
+      {
+        "BSN_DT": "2025-12-05",
+        "BSN_HR_CN": "3부",
+        "NATIVE_CNT": 426,
+        "FRGNR_CNT": 7
+      },
+      {
+        "BSN_DT": "2025-12-06",
+        "BSN_HR_CN": "1부",
+        "NATIVE_CNT": 5666,
+        "FRGNR_CNT": 42
+      },
+      {
+        "BSN_DT": "2025-12-06",
+        "BSN_HR_CN": "2부",
+        "NATIVE_CNT": 2084,
+        "FRGNR_CNT": 15
+      },
+      {
+        "BSN_DT": "2025-12-06",
+        "BSN_HR_CN": "3부",
+        "NATIVE_CNT": 401,
+        "FRGNR_CNT": 12
+      },
+      {
+        "BSN_DT": "2025-12-07",
+        "BSN_HR_CN": "1부",
+        "NATIVE_CNT": 4871,
+        "FRGNR_CNT": 42
+      },
+      {
+        "BSN_DT": "2025-12-07",
+        "BSN_HR_CN": "2부",
+        "NATIVE_CNT": 1429,
+        "FRGNR_CNT": 16
+      },
+      {
+        "BSN_DT": "2025-12-07",
+        "BSN_HR_CN": "3부",
+        "NATIVE_CNT": 212,
+        "FRGNR_CNT": 2
+      },
+      {
+        "BSN_DT": "2025-12-08",
+        "BSN_HR_CN": "1부",
+        "NATIVE_CNT": 3865,
+        "FRGNR_CNT": 36
+      },
+      {
+        "BSN_DT": "2025-12-08",
+        "BSN_HR_CN": "2부",
+        "NATIVE_CNT": 1403,
+        "FRGNR_CNT": 20
+      },
+      {
+        "BSN_DT": "2025-12-08",
+        "BSN_HR_CN": "3부",
+        "NATIVE_CNT": 237,
+        "FRGNR_CNT": 5
+      },
+      {
+        "BSN_DT": "2025-12-09",
+        "BSN_HR_CN": "1부",
+        "NATIVE_CNT": 4124,
+        "FRGNR_CNT": 30
+      },
+      {
+        "BSN_DT": "2025-12-09",
+        "BSN_HR_CN": "2부",
+        "NATIVE_CNT": 1381,
+        "FRGNR_CNT": 15
+      },
+      {
+        "BSN_DT": "2025-12-09",
+        "BSN_HR_CN": "3부",
+        "NATIVE_CNT": 220,
+        "FRGNR_CNT": 5
+      },
+      {
+        "BSN_DT": "2025-12-10",
+        "BSN_HR_CN": "1부",
+        "NATIVE_CNT": 4099,
+        "FRGNR_CNT": 44
+      },
+      {
+        "BSN_DT": "2025-12-10",
+        "BSN_HR_CN": "2부",
+        "NATIVE_CNT": 1604,
+        "FRGNR_CNT": 32
+      },
+      {
+        "BSN_DT": "2025-12-10",
+        "BSN_HR_CN": "3부",
+        "NATIVE_CNT": 222,
+        "FRGNR_CNT": 3
+      },
+      {
+        "BSN_DT": "2025-12-11",
+        "BSN_HR_CN": "1부",
+        "NATIVE_CNT": 4106,
+        "FRGNR_CNT": 61
+      },
+      {
+        "BSN_DT": "2025-12-11",
+        "BSN_HR_CN": "2부",
+        "NATIVE_CNT": 1681,
+        "FRGNR_CNT": 24
+      },
+      {
+        "BSN_DT": "2025-12-11",
+        "BSN_HR_CN": "3부",
+        "NATIVE_CNT": 215,
+        "FRGNR_CNT": 5
+      },
+      {
+        "BSN_DT": "2025-12-12",
+        "BSN_HR_CN": "1부",
+        "NATIVE_CNT": 4376,
+        "FRGNR_CNT": 55
+      },
+      {
+        "BSN_DT": "2025-12-12",
+        "BSN_HR_CN": "2부",
+        "NATIVE_CNT": 2257,
+        "FRGNR_CNT": 20
+      },
+      {
+        "BSN_DT": "2025-12-12",
+        "BSN_HR_CN": "3부",
+        "NATIVE_CNT": 481,
+        "FRGNR_CNT": 6
+      },
+      {
+        "BSN_DT": "2025-12-13",
+        "BSN_HR_CN": "1부",
+        "NATIVE_CNT": 5170,
+        "FRGNR_CNT": 41
+      },
+      {
+        "BSN_DT": "2025-12-13",
+        "BSN_HR_CN": "2부",
+        "NATIVE_CNT": 2018,
+        "FRGNR_CNT": 34
+      },
+      {
+        "BSN_DT": "2025-12-13",
+        "BSN_HR_CN": "3부",
+        "NATIVE_CNT": 354,
+        "FRGNR_CNT": 6
+      },
+      {
+        "BSN_DT": "2025-12-14",
+        "BSN_HR_CN": "1부",
+        "NATIVE_CNT": 4775,
+        "FRGNR_CNT": 36
+      },
+      {
+        "BSN_DT": "2025-12-14",
+        "BSN_HR_CN": "2부",
+        "NATIVE_CNT": 1338,
+        "FRGNR_CNT": 33
+      },
+      {
+        "BSN_DT": "2025-12-14",
+        "BSN_HR_CN": "3부",
+        "NATIVE_CNT": 302,
+        "FRGNR_CNT": 6
+      },
+      {
+        "BSN_DT": "2025-12-15",
+        "BSN_HR_CN": "1부",
+        "NATIVE_CNT": 3965,
+        "FRGNR_CNT": 57
+      },
+      {
+        "BSN_DT": "2025-12-15",
+        "BSN_HR_CN": "2부",
+        "NATIVE_CNT": 1496,
+        "FRGNR_CNT": 23
+      },
+      {
+        "BSN_DT": "2025-12-15",
+        "BSN_HR_CN": "3부",
+        "NATIVE_CNT": 223,
+        "FRGNR_CNT": 3
+      },
+      {
+        "BSN_DT": "2025-12-16",
+        "BSN_HR_CN": "1부",
+        "NATIVE_CNT": 3985,
+        "FRGNR_CNT": 63
+      },
+      {
+        "BSN_DT": "2025-12-16",
+        "BSN_HR_CN": "2부",
+        "NATIVE_CNT": 1335,
+        "FRGNR_CNT": 32
+      },
+      {
+        "BSN_DT": "2025-12-16",
+        "BSN_HR_CN": "3부",
+        "NATIVE_CNT": 276,
+        "FRGNR_CNT": 9
+      },
+      {
+        "BSN_DT": "2025-12-17",
+        "BSN_HR_CN": "1부",
+        "NATIVE_CNT": 4078,
+        "FRGNR_CNT": 46
+      },
+      {
+        "BSN_DT": "2025-12-17",
+        "BSN_HR_CN": "2부",
+        "NATIVE_CNT": 1276,
+        "FRGNR_CNT": 28
+      },
+      {
+        "BSN_DT": "2025-12-17",
+        "BSN_HR_CN": "3부",
+        "NATIVE_CNT": 193,
+        "FRGNR_CNT": 7
+      },
+      {
+        "BSN_DT": "2025-12-18",
+        "BSN_HR_CN": "1부",
+        "NATIVE_CNT": 3948,
+        "FRGNR_CNT": 38
+      },
+      {
+        "BSN_DT": "2025-12-18",
+        "BSN_HR_CN": "2부",
+        "NATIVE_CNT": 1455,
+        "FRGNR_CNT": 41
+      },
+      {
+        "BSN_DT": "2025-12-18",
+        "BSN_HR_CN": "3부",
+        "NATIVE_CNT": 218,
+        "FRGNR_CNT": 2
+      },
+      {
+        "BSN_DT": "2025-12-19",
+        "BSN_HR_CN": "1부",
+        "NATIVE_CNT": 4372,
+        "FRGNR_CNT": 45
+      },
+      {
+        "BSN_DT": "2025-12-19",
+        "BSN_HR_CN": "2부",
+        "NATIVE_CNT": 2385,
+        "FRGNR_CNT": 40
+      },
+      {
+        "BSN_DT": "2025-12-19",
+        "BSN_HR_CN": "3부",
+        "NATIVE_CNT": 478,
+        "FRGNR_CNT": 5
+      },
+      {
+        "BSN_DT": "2025-12-20",
+        "BSN_HR_CN": "1부",
+        "NATIVE_CNT": 5751,
+        "FRGNR_CNT": 45
+      },
+      {
+        "BSN_DT": "2025-12-20",
+        "BSN_HR_CN": "2부",
+        "NATIVE_CNT": 2244,
+        "FRGNR_CNT": 38
+      },
+      {
+        "BSN_DT": "2025-12-20",
+        "BSN_HR_CN": "3부",
+        "NATIVE_CNT": 405,
+        "FRGNR_CNT": 7
+      },
+      {
+        "BSN_DT": "2025-12-21",
+        "BSN_HR_CN": "1부",
+        "NATIVE_CNT": 4797,
+        "FRGNR_CNT": 46
+      },
+      {
+        "BSN_DT": "2025-12-21",
+        "BSN_HR_CN": "2부",
+        "NATIVE_CNT": 1477,
+        "FRGNR_CNT": 23
+      },
+      {
+        "BSN_DT": "2025-12-21",
+        "BSN_HR_CN": "3부",
+        "NATIVE_CNT": 235,
+        "FRGNR_CNT": 4
+      },
+      {
+        "BSN_DT": "2025-12-22",
+        "BSN_HR_CN": "1부",
+        "NATIVE_CNT": 3918,
+        "FRGNR_CNT": 50
+      },
+      {
+        "BSN_DT": "2025-12-22",
+        "BSN_HR_CN": "2부",
+        "NATIVE_CNT": 1432,
+        "FRGNR_CNT": 40
+      },
+      {
+        "BSN_DT": "2025-12-22",
+        "BSN_HR_CN": "3부",
+        "NATIVE_CNT": 231,
+        "FRGNR_CNT": 7
+      },
+      {
+        "BSN_DT": "2025-12-23",
+        "BSN_HR_CN": "1부",
+        "NATIVE_CNT": 3871,
+        "FRGNR_CNT": 52
+      },
+      {
+        "BSN_DT": "2025-12-23",
+        "BSN_HR_CN": "2부",
+        "NATIVE_CNT": 1205,
+        "FRGNR_CNT": 32
+      },
+      {
+        "BSN_DT": "2025-12-23",
+        "BSN_HR_CN": "3부",
+        "NATIVE_CNT": 222,
+        "FRGNR_CNT": 11
+      },
+      {
+        "BSN_DT": "2025-12-24",
+        "BSN_HR_CN": "1부",
+        "NATIVE_CNT": 3891,
+        "FRGNR_CNT": 51
+      },
+      {
+        "BSN_DT": "2025-12-24",
+        "BSN_HR_CN": "2부",
+        "NATIVE_CNT": 2372,
+        "FRGNR_CNT": 24
+      },
+      {
+        "BSN_DT": "2025-12-24",
+        "BSN_HR_CN": "3부",
+        "NATIVE_CNT": 475,
+        "FRGNR_CNT": 13
+      },
+      {
+        "BSN_DT": "2025-12-25",
+        "BSN_HR_CN": "1부",
+        "NATIVE_CNT": 5363,
+        "FRGNR_CNT": 55
+      },
+      {
+        "BSN_DT": "2025-12-25",
+        "BSN_HR_CN": "2부",
+        "NATIVE_CNT": 1690,
+        "FRGNR_CNT": 51
+      },
+      {
+        "BSN_DT": "2025-12-25",
+        "BSN_HR_CN": "3부",
+        "NATIVE_CNT": 214,
+        "FRGNR_CNT": 5
+      },
+      {
+        "BSN_DT": "2025-12-26",
+        "BSN_HR_CN": "1부",
+        "NATIVE_CNT": 5128,
+        "FRGNR_CNT": 55
+      },
+      {
+        "BSN_DT": "2025-12-26",
+        "BSN_HR_CN": "2부",
+        "NATIVE_CNT": 2391,
+        "FRGNR_CNT": 62
+      },
+      {
+        "BSN_DT": "2025-12-26",
+        "BSN_HR_CN": "3부",
+        "NATIVE_CNT": 398,
+        "FRGNR_CNT": 6
+      },
+      {
+        "BSN_DT": "2025-12-27",
+        "BSN_HR_CN": "1부",
+        "NATIVE_CNT": 5894,
+        "FRGNR_CNT": 74
+      },
+      {
+        "BSN_DT": "2025-12-27",
+        "BSN_HR_CN": "2부",
+        "NATIVE_CNT": 2458,
+        "FRGNR_CNT": 45
+      },
+      {
+        "BSN_DT": "2025-12-27",
+        "BSN_HR_CN": "3부",
+        "NATIVE_CNT": 505,
+        "FRGNR_CNT": 6
+      },
+      {
+        "BSN_DT": "2025-12-28",
+        "BSN_HR_CN": "1부",
+        "NATIVE_CNT": 5087,
+        "FRGNR_CNT": 73
+      },
+      {
+        "BSN_DT": "2025-12-28",
+        "BSN_HR_CN": "2부",
+        "NATIVE_CNT": 1558,
+        "FRGNR_CNT": 38
+      },
+      {
+        "BSN_DT": "2025-12-28",
+        "BSN_HR_CN": "3부",
+        "NATIVE_CNT": 245,
+        "FRGNR_CNT": 6
+      },
+      {
+        "BSN_DT": "2025-12-29",
+        "BSN_HR_CN": "1부",
+        "NATIVE_CNT": 4396,
+        "FRGNR_CNT": 62
+      },
+      {
+        "BSN_DT": "2025-12-29",
+        "BSN_HR_CN": "2부",
+        "NATIVE_CNT": 1499,
+        "FRGNR_CNT": 27
+      },
+      {
+        "BSN_DT": "2025-12-29",
+        "BSN_HR_CN": "3부",
+        "NATIVE_CNT": 288,
+        "FRGNR_CNT": 1
+      },
+      {
+        "BSN_DT": "2025-12-30",
+        "BSN_HR_CN": "1부",
+        "NATIVE_CNT": 4289,
+        "FRGNR_CNT": 56
+      },
+      {
+        "BSN_DT": "2025-12-30",
+        "BSN_HR_CN": "2부",
+        "NATIVE_CNT": 1745,
+        "FRGNR_CNT": 36
+      },
+      {
+        "BSN_DT": "2025-12-30",
+        "BSN_HR_CN": "3부",
+        "NATIVE_CNT": 293,
+        "FRGNR_CNT": 4
+      },
+      {
+        "BSN_DT": "2025-12-31",
+        "BSN_HR_CN": "1부",
+        "NATIVE_CNT": 4499,
+        "FRGNR_CNT": 36
+      },
+      {
+        "BSN_DT": "2025-12-31",
+        "BSN_HR_CN": "2부",
+        "NATIVE_CNT": 3033,
+        "FRGNR_CNT": 42
+      },
+      {
+        "BSN_DT": "2025-12-31",
+        "BSN_HR_CN": "3부",
+        "NATIVE_CNT": 836,
+        "FRGNR_CNT": 14
+      }
+    ]
+  }
+}
