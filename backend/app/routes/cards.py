@@ -81,10 +81,18 @@ def decide(cid: str, body: DecisionBody):
 
 
 def _fallback_narrative(r: dict) -> str:
-    """LLM 실패 시 규칙 기반 문구 — 수치 포함, '예상'·'가정' 포함, 3문장 이내 존댓말."""
+    """LLM 실패 시 규칙 기반 문구 — 수치 포함, '예상'·'가정' 포함, 3문장 이내 존댓말.
+
+    delta_pp 부호로 동사 분기: 양수=집중도 하락(개선), 음수=집중도 상승(집중 심화).
+    반올림 동률(current==projected)이면 "X에서 Y로" 구절은 생략한다.
+    """
     lo, hi = r["delta_pp"]
+    move = ("" if r["current_index"] == r["projected_index"]
+            else f"{r['current_index']}에서 {r['projected_index']}로, ")
+    change = (f"약 {lo}~{hi}%p 개선될" if lo + hi >= 0
+              else f"약 {abs(hi)}~{abs(lo)}%p 상승(집중 심화)할")
     return (f"{r['eup']} {r['category']} 업종에 신규 가맹점이 1곳 추가되면 지역 소비 집중도가 "
-            f"{r['current_index']}에서 {r['projected_index']}로, 약 {lo}~{hi}%p 개선될 것으로 예상됩니다. "
+            f"{move}{change} 것으로 예상됩니다. "
             "이는 유사 가맹점의 평균 초기 실적을 가정한 전망이며, 실제 결과는 입지·홍보 여부에 따라 "
             "달라질 수 있습니다.")
 
@@ -105,14 +113,20 @@ def simulate_card(cid: str):
     target = card.get("target") or {}
     result = simulate.simulate_expansion(usage, merchants, target.get("eup"), target.get("category"))
 
-    # narrative에 '예상'·'가정'이 항상 포함되도록 입력에 지침을 싣고, 누락 시 fallback으로 대체
+    # narrative에 '예상'·'가정'이 항상 포함되도록 입력에 지침을 싣고, 누락 시 fallback으로 대체.
+    # 음수 delta는 부호를 미리 말로 풀어 전달한다 — 원시 음수 범위를 주면 LLM이 "-0.7%p 개선"처럼
+    # 방향을 잘못 서술하는 것을 실호출로 확인(픽스 라운드 1).
+    lo, hi = result["delta_pp"]
+    negative = lo + hi < 0
+    direction = (f"지역 소비 집중도가 약 {abs(hi)}~{abs(lo)}%p 상승(집중 심화)" if negative
+                 else f"지역 소비 집중도가 약 {lo}~{hi}%p 개선(집중 완화)")
     user_payload = {
         "대상": f"{result['eup']} {result['category']} 업종 신규 가맹점 1곳",
         "현재 지역 소비 집중도": result["current_index"],
         "확보 시 예상 집중도": result["projected_index"],
-        "예상 개선폭 범위(%p)": result["delta_pp"],
+        "예상 변화(부호 해석 완료)": direction,
         "신규 가맹점 예상 월 이용 건수(가정치)": result["expected_monthly_count"],
-        "작성 지침": "설명문에 '예상'과 '가정' 두 단어를 반드시 포함할 것",
+        "작성 지침": "'예상 변화'의 방향(개선/상승)을 그대로 서술하고, '예상'과 '가정' 두 단어를 반드시 포함할 것",
     }
     narrative = None
     try:
@@ -121,7 +135,8 @@ def simulate_card(cid: str):
         narrative = out.get("narrative")
     except Exception:
         pass
-    if not narrative or "예상" not in narrative or "가정" not in narrative:
+    wrong_direction = bool(narrative) and negative and "개선" in narrative   # 집중 심화를 개선으로 서술 방지
+    if not narrative or wrong_direction or "예상" not in narrative or "가정" not in narrative:
         narrative = _fallback_narrative(result)
     return {"simulation": {
         "current_index": result["current_index"],
