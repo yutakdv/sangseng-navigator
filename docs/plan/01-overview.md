@@ -35,8 +35,9 @@
 | **유탁** | 데이터 파이프라인(수집·정제·스코어링·지오코딩), FastAPI+DynamoDB, LLM 연동(카드 생성·시뮬레이션·위젯 문구), AWS 배포 전체, FE 지원(연동 이슈·버그) | `pipeline/`, `backend/`, `infra/`, `data/processed/` |
 | **FE 팀원** | Next.js 화면 6종(허브·카드상세·대시보드·인센티브카드·위젯·상태트래킹), mock 연동 → 실 API 전환, 차트·지도 | `frontend/` |
 
-병렬화의 핵심: **FE는 BE를 기다리지 않는다.** `05-api-contract.md`의 예시 JSON을 그대로
-`frontend/src/mocks/`에 넣고 처음부터 화면을 만든다. 유탁이 실 데이터 파이프라인과 BE를 완성하면
+병렬화의 핵심: **FE는 BE를 기다리지 않는다.** `./scripts/sync-mocks.sh`로 `data/processed/` 실산출을
+`frontend/src/mocks/`에 채우고 처음부터 화면을 만든다(`05-api-contract.md`의 예시 JSON은 스키마
+기준일 뿐 값 원천이 아니다). 유탁이 실 데이터 파이프라인과 BE를 완성하면
 `NEXT_PUBLIC_API_BASE` 환경변수 하나로 전환한다. 작업 순서와 게이트는 `10-timeline.md`(Phase 0~6).
 
 ## 컷 리스트 (시간 부족 시 이 순서로 제외)
