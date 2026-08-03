@@ -8,6 +8,15 @@ import pandas as pd
 
 from common import PROCESSED_DIR, RAW_DIR, REGIONS
 
+# 산출물 메타 — 표시명("삼척시")과 실제 범위가 다른 지역을 산출물만 봐도 알 수 있게 남긴다.
+# 하이원포인트 지역가맹 대상지역은 "정선군·태백시·영월군·삼척 도계읍"이라
+# (https://www.high1.com/www/contents.do?key=1979) 삼척은 애초에 도계읍만 가맹 자격이 있고,
+# merchants.json 의 삼척 가맹점 129곳도 전부 도계읍 주소다(실측). P4 상가 수집도 도계읍만 한다.
+PROGRAM_AREA_NOTE = (
+    "'삼척시' 컬럼은 하이원포인트 지역가맹 대상지역인 **삼척시 도계읍** 분이다 "
+    "(가맹점 129곳 전부 도계읍 주소 — 실측). 시 전역이 아니다"
+)
+
 # 실측 확정 컬럼 매핑 (발표 "실제 CSV 열어봤나" 증거 — docs/plan/06 P1)
 COLMAP = {
     "가맹점 영업일자": "date",
@@ -53,7 +62,7 @@ def check_region_overlap(df: pd.DataFrame) -> str:
 
 def main():
     df = load_usage()
-    region_note = check_region_overlap(df)
+    region_note = f"{check_region_overlap(df)}. {PROGRAM_AREA_NOTE}"
 
     monthly = df.groupby(["month", "category"], as_index=False)[REGIONS].sum()
     months = sorted(df["month"].unique())
