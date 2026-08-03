@@ -88,7 +88,8 @@ def _get(params: dict) -> dict:
             res.raise_for_status()
             body = res.json()
         except Exception as exc:  # 통신·JSON 파싱 실패
-            last = f"{type(exc).__name__}: {exc}"
+            # requests 의 HTTPError 메시지에는 serviceKey 가 박힌 전체 URL 이 들어간다 → 마스킹
+            last = f"{type(exc).__name__}: {exc}".replace(params["serviceKey"], "***")
         else:
             header = body.get("header", {})
             if header.get("resultCode") == "00":
