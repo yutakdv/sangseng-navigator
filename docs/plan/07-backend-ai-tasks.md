@@ -161,7 +161,7 @@ AI 입력 스키마 (기획안 §2-2 그대로):
 
 | 입력 | 출처 |
 |---|---|
-| ① 후보 Score·순위 | `candidates.json` (변경 불가 기준선) |
+| ① 후보 Score·순위 **+ 도로 접근성** | `candidates.json` (변경 불가 기준선). 근거 필드(`gap`·`proximity`·`saturation`·반경 수치)와 함께 `road_distance_km`·`road_minutes`도 싣는다 — `proximity`가 **직선거리** 기반이라 산악 지형에서 실제 접근성과 역전되는 것을 AI가 근거로 지적할 수 있게 하려는 것이다. **Score·순위 자체는 그대로가 기준선이며 도로시간으로 재정렬하지 않는다**(05 §1). 값은 공개 라우팅 API 추정치라 프롬프트에서도 소요시간 중심 비교로만 쓰게 한다 |
 | ② 각 후보의 추진 상태 | DDB — 같은 (읍×업종) 타깃의 기존 카드 progress |
 | ③ 계절성 신호 | 아래 캘린더 규칙 표 (`services/season.py`) |
 | ④ 최근 지역별 채택 이력 | DDB — approved 카드의 target.eup 분포 |
