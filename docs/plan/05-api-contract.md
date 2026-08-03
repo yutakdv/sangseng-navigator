@@ -41,7 +41,11 @@ Base URL: 로컬 `http://localhost:8000` / 배포 후 API Gateway URL. 경로 �
   "monthly_by_region": [
     {"month": "2025-01", "고한읍": 480, "사북읍": 391, "정선군": 300, "태백시": 250, "영월군": 160, "삼척시": 120}
   ],
-  "growth": {"mom_pct": -2.1}
+  "category_share": [
+    {"category": "음식점", "count": 6800, "share": 0.37}
+  ],
+  "growth": {"mom_pct": -2.1, "qoq_pp": -0.4},
+  "ai_stability": null
 }
 ```
 
@@ -49,6 +53,13 @@ Base URL: 로컬 `http://localhost:8000` / 배포 후 API Gateway URL. 경로 �
 `concentration.index`는 0~100 정규화값(내부 Gini 비노출), `grade`는 높음/보통/낮음.
 업종 표시 롤업: 대시보드·위젯의 업종 표시는 13 문서 §5의 6분류(카페·음식점·편의점·숙박업·소매점·기타)로
 롤업하며, 하이원 18종·소진공 대분류(`indsLclsNm`)와의 매핑 정본은 `pipeline/category_map.py` 하나다.
+
+- `category_share`: 전 기간 누적 건수를 위 표시 6분류로 롤업한 업종 도넛용 배열
+  (`category`는 13 §5 고정 순서, 롤업 정본은 `category_map.py`의 매핑 ① `HIGHONE_TO_DISPLAY`, `share` 합=1.0)
+- `growth.qoq_pp`: **지역 전환율의 전분기 대비 변화(%p)** — 분기는 데이터 최신 월(2025-12) 기준
+  최근 3개월(2025-10~12) vs 직전 3개월(2025-07~09)이며, 분기 전환율은 3개월 건수 합 ÷ 3개월 입장객 합 × 100
+- `ai_stability`: P8 민감도 분석 `sensitivity.json`의 `top3_stable_ratio × 100` (정수, "AI 제안 안정도" 타일).
+  P8 실행 전에는 `null` — FE는 `null`이면 타일을 숨기거나 `—` 표시
 
 ### `GET /api/candidates`
 지도·카드 상세용 스코어링 결과 (`eup_scores.json` + `candidates.json` 병합).
@@ -126,6 +137,43 @@ Base URL: 로컬 `http://localhost:8000` / 배포 후 API Gateway URL. 경로 �
   기획안 원칙 "담당자가 승인한 페이백률만 확정"의 구현 — AI는 시나리오 비교만 제시하고,
   확정 rate는 승인 요청에서만 들어온다. 위젯 `payback.rate`의 유일한 출처.
 
+### INCENTIVE 카드 완성 예시
+
+```json
+{
+  "id": "INC-001",
+  "type": "INCENTIVE",
+  "status": "pending",
+  "progress": null,
+  "title": "하이원포인트 페이백 인센티브 (전 지역 공통)",
+  "target": null,
+  "score_rank": null,
+  "ai_rank": null,
+  "confidence": "중",
+  "ai": {
+    "adjusted": false,
+    "comparison": "3%는 재원 부담이 가장 낮지만 개선폭이 0.5~1.0%p로 제한적이고, 7%는 2.0~3.0%p로 가장 크지만 재원 부담도 함께 커집니다. 5%는 개선폭 1.0~2.0%p·재원 부담 중간으로, 분기 내 효과 확인과 재원 방어를 동시에 노리는 절충안입니다.",
+    "reasons": ["지역 전환율이 월별 17~23%대에서 오르내려 저점 월을 방어할 수요 측 유인이 필요", "사용 건수가 사북읍·태백시에 절반 이상 몰려 있어 특정 지역 한정이 아닌 전 지역 공통 적용이 지역 균형에 유리", "페이백률이 높을수록 효과와 재원 부담이 함께 커지는 트레이드오프가 뚜렷"],
+    "risks": ["재원 확보는 예산 부서의 별도 승인 사항", "기존 포인트 적립·할인 약관과의 중복 적용 여부 확인 필요", "실제 자동 지급 시스템 연동은 미구현(로드맵)"],
+    "expected_effect": "5% 적용 시 지역 전환율 약 1.0~2.0%p 개선 예상 (가정 기반 전망이며 실제와 다를 수 있음)",
+    "original_ranking": null
+  },
+  "scenarios": [
+    {"rate": 3, "delta_pp": [0.5, 1.0], "budget_note": "재원 부담 낮음"},
+    {"rate": 5, "delta_pp": [1.0, 2.0], "budget_note": "재원 부담 중간"},
+    {"rate": 7, "delta_pp": [2.0, 3.0], "budget_note": "재원 부담 높음"}
+  ],
+  "selected_rate": null,
+  "assumption_note": "페이백률-전환율 관계는 실측 데이터가 없어 팀 설정 가정(탄력성)에 기반한 전망",
+  "sources": ["하이원포인트 사용현황"],
+  "created_at": "2026-08-01T11:00:00+09:00",
+  "decided_at": null
+}
+```
+
+- INCENTIVE의 `ai`는 EXPANSION과 **동일 스키마를 재사용**하며 순위 필드(`original_ranking`)만 `null`이다
+  (`comparison`=시나리오 비교문, `reasons`=권고 근거, `risks`=A-3 프롬프트의 필수 리스크 3종).
+
 ### 엔드포인트
 
 | 메서드 | 경로 | 설명 | 요청 body | 응답 |
@@ -168,6 +216,11 @@ Base URL: 로컬 `http://localhost:8000` / 배포 후 API Gateway URL. 경로 �
 - 채택률 = approved / 전체, 실행 전환율 = (추진중+완료) / approved
 - 평균 승인 소요 = avg(decided_at − created_at), 지역 균형지수 = (1 − 채택 카드의 지역 분포 Gini) × 100
 - 지역 균형지수는 **EXPANSION 카드만** 집계 (INCENTIVE는 `target`이 없어 지역 분포에 넣을 수 없음)
+- `regional_balance_index`의 분모는 **`REGIONS` 6개 지역 고정** — 승인(approved) 카드가 한 건도 없는
+  지역도 0건으로 포함해 위 산식으로 계산하고, 결과는 반올림한 정수. 지표 특성상 승인 카드가
+  여러 지역에 쌓일수록 상승한다 (데모 초반의 낮은 값은 정상 동작)
+- `avg_approval_hours`의 집계 대상은 **`decided_at`이 있는 모든 카드**(approved+rejected+held) —
+  "의사결정 소요 시간"이라는 지표 의미에 맞춘 정의. `decided_at − created_at`의 평균을 소수 1자리로 반올림
 
 ## 4. 방문객 위젯
 
