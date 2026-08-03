@@ -58,6 +58,7 @@ DynamoDB(온디맨드) / OpenAI 또는 Claude(어댑터) / 배포: Vercel(FE) + 
 | 12 | [12-submission-compliance.md](12-submission-compliance.md) | **경진대회 제출 요건 대응** — Phase 0(레포 준비)·Phase 6(제출) 전 필수 |
 | 13 | [13-design-guide.md](13-design-guide.md) | 목업(image-1/2) 기반 디자인 가이드 — FE 화면 작업 전 필수 |
 | 14 | [14-execution-plan.md](14-execution-plan.md) | **잔여 개발 실행 런북 (T0~T18)** — 매 태스크 시작 전 여기서 절차 확인. Docker 테스트·AWS 최종 배포 전환 반영 |
+| 15 | [15-plan-review.md](15-plan-review.md) | **개발 착수 전 최종 검토 결과 (2026-08-03)** — 착수 첫 커밋 수정분(배포 블로커 2건)·태스크별 계약 선수정 추적 (§8 시점표) |
 
 ## Phase 게이트 요약 (상세: 10 문서)
 
