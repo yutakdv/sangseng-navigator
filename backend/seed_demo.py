@@ -131,7 +131,8 @@ def demo_cards() -> list:
             {"at": _iso(24), "action": "progress:추진중"},
         ],
     }
-    # 카드 B: pending, AI 조정 사례 (Score 2위→AI 1위) — 데모 핵심, 고정 JSON
+    # 카드 B: pending, "Score 2위 → 1순위 제안" 조정 사례 예시 — 데모 핵심.
+    # LLM 결과가 아니라 재현성을 위해 사람이 고정한 JSON이다 (모듈 docstring B 참조).
     # 조정 근거는 candidates.json 실측: 동빈네민박 직선 5.55km / 차로 50.8분,
     # 동원각 직선 7.56km / 차로 33.9분 (직선 근접도와 실제 접근성이 역전된 구간 — 05 §1).
     # 도로 거리(km)는 공개 라우팅 API 추정치라 비포장·임도가 섞일 수 있어 문구에 쓰지 않는다 —
