@@ -12,7 +12,7 @@ PARAMS=("LlmProvider=${LLM_PROVIDER:-openai}")
 [ -n "${ANTHROPIC_API_KEY:-}" ] && PARAMS+=("AnthropicApiKey=${ANTHROPIC_API_KEY}")
 
 sam build -t template.yaml
-sam deploy -t template.yaml \
+sam deploy \
   --stack-name sangseng-backend \
   --resolve-s3 --capabilities CAPABILITY_IAM \
   --region ap-northeast-2 \
