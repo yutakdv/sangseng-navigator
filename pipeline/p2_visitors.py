@@ -161,9 +161,10 @@ def main():
     usage_months = list(usage.get("months") or [])
     merged = {m: visitors[m] for m in usage_months if m in visitors}
     if not merged:
+        usage_span = f"{usage_months[0]}~{usage_months[-1]}" if usage_months else "(없음)"
         raise SystemExit(
-            f"P2 실패: 겹치는 월 0개 — 사용현황 {usage_months[:1]}~{usage_months[-1:]} vs "
-            f"입장객 {COLLECT_MONTHS[0]}~{COLLECT_MONTHS[-1]}"
+            f"P2 실패: 사용현황({usage_span})과 입장객({min(visitors)}~{max(visitors)})의 "
+            "겹치는 월이 0개 — COLLECT_MONTHS 수집 구간을 확인"
         )
 
     usage["visitors_monthly"] = merged  # 기존 키·데이터는 보존, 이 키만 교체
