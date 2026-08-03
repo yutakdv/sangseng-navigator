@@ -20,7 +20,7 @@ Phase 0 (준비·블로커 해소)
 - [x] [유] ★ 파일데이터 확보 → `data/raw/` 복사 + **헤더 실컬럼 대조 완료** (06 문서 COLMAP 반영됨 — 04 문서 §2)
 - [ ] [유] ★ GitHub 초기 커밋 (현재 커밋 0개 — 커밋이 있어야 Vercel Import 가능) + **FE 팀원 콜라보레이터 초대·수락 확인**, 첫 커밋부터 키·개인정보 금지 (12 문서 §4)
 - [ ] [유] ★ `.env` 작성 (공공데이터·지오코딩·LLM 키), AWS 프로파일·SAM CLI 확인
-- [ ] [유] ★ Vercel 계정 + GitHub 레포 연결 (Root Directory=`frontend/`) — **Import까지만**; 첫 Deploy는 frontend/가 커밋되는 Phase 1 F1 직후 (04 문서 §0·§6)
+- [ ] [유] ★ Vercel 계정 + GitHub 레포 연결 (Root Directory=`frontend/`) — F1 머지 직후 Import+첫 Deploy(15 §7 채택) (04 문서 §0·§6)
 - [ ] [공통] `docs/plan/` 정독, 데모 시나리오(01 문서) 숙지 + 제출 요건(12 문서)·디자인 기준(13 문서) 확인
 
 **Gate:** API 3건 승인 완료(또는 목업 CSV 대체 결정), `.env` 채워짐, 초기 커밋 + 콜라보레이터
@@ -33,7 +33,7 @@ Phase 0 (준비·블로커 해소)
 - [ ] [F] F1 (Next.js 스캐폴딩 + `lib/api.ts` + mock 렌더 확인)
 - [x] [유] ~~배포 리허설~~ → **결정 변경 (2026-08-03): 개발 중 AWS 배포 없음.** `sam validate`·`sam build`
       성공까지 확인 완료. 대신 **Docker 테스트 환경**(14 문서 T7)이 Phase 1 검증을 담당하고,
-      실배포는 개발 완료 후 최종 1회 (09 §4, 14 문서 T16)
+      실배포는 개발 완료 후 최종 1회 (09 §4, 14 문서 T17)
 
 **Gate:** `npm run dev`로 mock 첫 화면 렌더 + `docker compose up` 후 `curl localhost:8000/api/health` 200.
 
