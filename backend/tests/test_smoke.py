@@ -67,7 +67,7 @@ MANDATORY_INCENTIVE_RISKS = ["예산", "약관", "미구현"]
 FAKE_COMPARISON = "목업 비교문 — 1순위와 2순위를 비교한 문장입니다."
 FAKE_AI = {
     "adjusted": True,
-    "ai_rank_target": "영월군 음식점",
+    "ai_rank_target": "영월군 소매점",       # 시드 카드(카페=추진중, 음식점=pending)와 겹치지 않는 타깃
     "comparison": FAKE_COMPARISON,
     "reasons": ["목업 근거 1", "목업 근거 2"],
     "risks": ["목업 리스크 1"],
@@ -166,6 +166,8 @@ def test_dashboard_returns_real_data():
     conv = body["conversion"]
     assert isinstance(conv["headline_rate"], (int, float)) and conv["headline_rate"] > 0
     assert conv["is_proxy"] is True                     # 절대 규칙 2 — 근사 지표 배지의 근거
+    assert "입장 연인원" in conv["proxy_note"]           # 05 §1 — 배지만으로 못 막는 오인 차단 문구
+    assert "28.5%" in conv["proxy_note"]                # 금액 기준 공식 비율과 다른 지표임을 고지
     assert conv["monthly"] and all(
         {"month", "local_uses", "visitors", "rate"} <= set(m) for m in conv["monthly"])
 
@@ -191,7 +193,8 @@ def test_candidates_merges_scores_and_merchants():
     cands = body["candidates"]
     assert 1 <= len(cands) <= 5
     required = {"id", "eup", "category", "lat", "lng", "name", "score",
-                "gap", "proximity", "saturation", "nearby_merchants", "nearby_stores"}
+                "gap", "proximity", "saturation", "nearby_merchants", "nearby_stores",
+                "road_distance_km", "road_minutes"}    # 도로 접근성 병기 (05 §1, 값은 null 가능)
     assert all(required <= set(c) for c in cands)
     scores = [c["score"] for c in cands]
     assert scores == sorted(scores, reverse=True)
@@ -228,7 +231,7 @@ def test_generate_expansion_creates_pending_card(fake_llm):
 
     assert card["id"] == "AC-003" and card["type"] == "EXPANSION"
     assert card["status"] == "pending" and card["progress"] is None   # 절대 규칙 4 — AI는 제안만
-    assert card["target"] == {"eup": "영월군", "category": "음식점"}
+    assert card["target"] == {"eup": "영월군", "category": "소매점"}
     assert card["ai_rank"] == 1 and card["score_rank"] != 1 and card["ai"]["adjusted"] is True
     assert card["ai"]["comparison"] == FAKE_COMPARISON                # LLM 출력이 그대로 실렸는지
     assert card["ai"]["risks"]                                        # A-1 규칙 — 리스크 ≥1
@@ -372,7 +375,7 @@ def test_simulate_rejects_narrative_missing_required_words(fake_llm):
     assert fake_llm.calls == ["narrative"]                     # 예외가 아니라 내용 가드가 걸린 경로
     assert sim["narrative"] != fake_llm.narrative
     assert "예상" in sim["narrative"] and "가정" in sim["narrative"]
-    assert "영월군 소매점" in sim["narrative"]                  # 규칙 기반 문구 형태
+    assert "영월군 음식점" in sim["narrative"]                  # 규칙 기반 문구 형태 (AC-002 타깃)
 
 
 def test_simulate_rejects_narrative_with_wrong_direction(fake_llm):

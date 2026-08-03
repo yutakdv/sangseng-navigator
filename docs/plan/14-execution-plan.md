@@ -243,7 +243,7 @@ _table = boto3.resource("dynamodb", **_kw).Table(os.environ.get("CARDS_TABLE") o
 - [ ] 07 B4 그대로: AI 입력 ①~⑥ 조립(JSON 직렬화 → user 메시지) → `CARD_AI_SCHEMA` 강제 → Card 생성
       → 중복 가드(05 §8) → `original_ranking` 항상 포함 → INCENTIVE 3/5/7% 골격
 - [ ] `seed_demo.py`: `--init`(T7 local_init 겸용) / `--reset`(테이블 비우고 데모 초기 상태 —
-      "영월군 카페 approved+추진중" + "영월군 소매점 pending(Score2위→AI1위)" + INCENTIVE pending, 11 §1 사전 상태)
+      "영월군 카페 approved+추진중" + "영월군 음식점 pending(Score 2위 → 1순위 제안, 고정 JSON)" + INCENTIVE pending, 11 §1 사전 상태)
 - **검증:** Docker에서 generate 2회 → 카드 2장, 조정 사유에 "추진중" 언급 재현 (데모 핵심 사례)
 - **커밋:** `feat: B4 카드 생성(AI 입력 6종)+seed_demo`
 

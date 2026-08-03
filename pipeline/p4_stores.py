@@ -12,7 +12,7 @@ Base   : https://apis.data.go.kr/B553077/api/open/sdsc2
   storeListInRectangle?minx&miny&maxx&maxy 사각형 상가 목록 (행정동 코드 확보 실패 시 대안 — 미사용)
 공통 파라미터: serviceKey, pageNo, numOfRows, type=json
   numOfRows 최대 1000 (2000 요청 시 응답 numOfRows 가 1000 으로 잘림 — 실측)
-divId 실측: adongCd=행정동 **8자리**(51770253 고한읍 / 51770256 사북읍)
+divId 실측: adongCd=행정동 **8자리**(51770253 고한읍 / 51770256 사북읍 / 51230250 삼척시 도계읍)
            signguCd=시군구 5자리(51770 정선군 / 51190 태백시 / 51750 영월군 / 51230 삼척시)
            ctprvnCd=시도 2자리(51 강원특별자치도, 110,206건)
            ※ 행정동 코드를 10자리(5177025300)로 주면 resultCode 03 NODATA_ERROR
@@ -66,14 +66,29 @@ LAT_RANGE = (36.5, 38.5)   # 06 공통 원칙 5
 LNG_RANGE = (127.5, 129.5)
 KEY_PATTERN = re.compile(r"serviceKey=[^&\s]*")  # 에러 메시지의 URL 에서 키를 가린다
 
-# REGIONS 6종의 조회 키 — 전부 실호출로 확정 (2026-08-03, totalCount 병기)
+# REGIONS 6종의 조회 키 — 전부 실호출로 확정 (2026-08-03/2026-08-04, totalCount 병기)
 REGION_QUERY = {
     "고한읍": ("adongCd", "51770253"),    # 533
     "사북읍": ("adongCd", "51770256"),    # 511
     "정선군": ("signguCd", "51770"),      # 3009 (고한·사북 포함 → 아래에서 제외)
     "태백시": ("signguCd", "51190"),      # 2700
     "영월군": ("signguCd", "51750"),      # 2811
-    "삼척시": ("signguCd", "51230"),      # 4260
+    # 삼척시는 **시 전역이 아니라 도계읍만** 조회한다. 하이원포인트 지역가맹 대상지역이
+    # "정선군·태백시·영월군·삼척 도계읍"이라(https://www.high1.com/www/contents.do?key=1979 ,
+    # 강원랜드 상시모집 공고 key=141&bbsNo=16&nttNo=156943) 도계읍 밖 사업장은 애초에 가맹 자격이
+    # 없다 — 시 전역(signguCd=51230, totalCount 4,260)으로 받으면 자격 없는 지점이 2단계 후보 풀에
+    # 들어간다. merchants.json의 삼척 가맹점 129곳이 전부 도계읍 주소인 것도 같은 사실을 가리킨다.
+    "삼척시": ("adongCd", "51230250"),    # 480 (도계읍)
+}
+
+# 조회 결과에서 기대하는 지역명(응답 검증용) — 키 범위와 REGIONS 표시명이 다른 경우만 등재한다.
+# "삼척시" 표시명은 P1 원본 CSV 컬럼("삼척시 건수")과 맞추려고 유지하되, 실제 범위는 도계읍이다.
+REGION_RESPONSE_NAME = {"삼척시": "도계읍"}
+
+# 수집 범위가 표시명과 다른 지역의 산출물 메타 — 캐시 파일 note 에 남겨 산출물만 봐도 알 수 있게 한다
+REGION_SCOPE_NOTE = {
+    "삼척시": ("하이원포인트 지역가맹 대상지역인 삼척시 **도계읍**만 수집 (adongCd=51230250, 480곳). "
+             "시 전역 조회(signguCd=51230)는 4,260곳이며 도계읍 밖 3,780곳은 가맹 자격이 없어 제외"),
 }
 
 # 정선군 조회는 고한읍·사북읍을 포함한다. P1 실측 판정(정선군 컬럼 = 고한·사북 제외 잔여,
@@ -140,9 +155,11 @@ def build_cache(region: str, items: list[dict], total: int, stdr_ym: str) -> dic
     """조회 키 검증 → 지역 제외 → 좌표 유효성 가드 → 필요한 필드만 저장."""
     div_id, key = REGION_QUERY[region]
     name_field = "adongNm" if div_id == "adongCd" else "signguNm"
-    wrong = sorted({i.get(name_field) for i in items} - {region})
+    expect = REGION_RESPONSE_NAME.get(region, region)     # 삼척시 → 응답 adongNm 은 "도계읍"
+    wrong = sorted({i.get(name_field) for i in items} - {expect})
     if wrong:
-        raise SystemExit(f"P4 실패: {region} 조회 키({div_id}={key})가 다른 지역을 반환 — {wrong}")
+        raise SystemExit(f"P4 실패: {region} 조회 키({div_id}={key})가 다른 지역을 반환 "
+                         f"(기대 {name_field}={expect}) — {wrong}")
 
     # 중분류·소분류는 카페/편의점 분리에 필수다 (대분류만으로는 음식→음식점, 소매→소매점뿐).
     # 첫 응답에서 필드 존재를 확인하고, 없으면 조용히 빈 값으로 흘리지 말고 중단한다.
@@ -194,8 +211,10 @@ def build_cache(region: str, items: list[dict], total: int, stdr_ym: str) -> dic
         "excluded_count": excluded,
         "duplicate_count": dup,
         "dropped_invalid_coord": len(dropped),
-        "note": ("정선군은 시군구 전체 조회에서 고한읍·사북읍 행정동을 제외한 잔여 지역 "
-                 "(P1 지역 컬럼 의미와 동일)" if exclude else ""),
+        "scope": REGION_RESPONSE_NAME.get(region, region),
+        "note": REGION_SCOPE_NOTE.get(region) or (
+            "정선군은 시군구 전체 조회에서 고한읍·사북읍 행정동을 제외한 잔여 지역 "
+            "(P1 지역 컬럼 의미와 동일)" if exclude else ""),
         "stores": stores,
     }
 
@@ -283,6 +302,8 @@ def main() -> None:
                   f"(지역제외 {cache['excluded_count']:,} / 중복 {cache['duplicate_count']} / "
                   f"좌표버림 {cache['dropped_invalid_coord']}) 기준월 {cache['stdr_ym']}")
             time.sleep(SLEEP_S)
+        if region in REGION_SCOPE_NOTE:   # 수집 범위가 표시명보다 좁은 지역은 사유를 항상 출력
+            print(f"    [scope] {region} → {cache.get('scope', region)}: {REGION_SCOPE_NOTE[region]}")
         caches.append(cache)
 
     print(f"\nP4 완료: {CACHE_DIR} — {len(caches)}개 지역 총 {sum(len(c['stores']) for c in caches):,}건")

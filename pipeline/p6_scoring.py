@@ -14,8 +14,11 @@ min-max 정규화는 min==max면 전원 0.5 (15 §5 확정 가드 — 분모 0 �
 import json
 from bisect import bisect_left, bisect_right
 
+import requests
+
 from category_map import DISPLAY_CATEGORIES, store_display_category
-from common import ANCHOR, CAND_WEIGHTS, EUP_WEIGHTS, PROCESSED_DIR, RADIUS_M, REGIONS, haversine_m
+from common import (ANCHOR, CAND_WEIGHTS, EUP_WEIGHTS, PROCESSED_DIR, RADIUS_M, RAW_DIR, REGIONS,
+                    haversine_m)
 from p4_stores import load_stores
 
 # 06 P6 "상위 1~2개 읍" — 상한 2 채택: B4 AI 비교(05 §2 카드 예시)가 두 읍의 후보를 전제한다
@@ -23,6 +26,28 @@ SELECT_EUPS = 2
 # 후보 대상 표시 분류 5종 — store_display_category 가 None(후보 제외 대분류)·"기타"면 후보 아님
 CANDIDATE_CATEGORIES = [c for c in DISPLAY_CATEGORIES if c != "기타"]
 LAT_M_PER_DEG = 111_320  # 위도 1도 ≈ 111.32km — 반경 검색 위도 창(1차 컷)용
+
+# 하이원포인트 가맹점 상시모집 신청 자격은 "대상지역 내 주소지·사업장을 둔 **개인사업자**(법인 제외)"다
+# (강원랜드 상시모집 공고 https://www.kangwonland.com/kangwonland/selectBbsNttView.do
+#  ?key=141&bbsNo=16&nttNo=156943). 자격이 없는 법인을 추천하면 카드가 그대로 무효라 후보에서 뺀다.
+# ⚠ 이건 **상호명만 보고 하는 추정**이다 — 상호에 법인격 표기가 없는 법인은 걸러지지 않고,
+#   반대로 표기를 우연히 포함한 개인사업자가 빠질 수 있다. 실제 자격은 신청·심사에서 확정된다.
+CORPORATE_MARKERS = ("협동조합", "㈜", "(주)", "주식회사", "유한회사", "유한책임회사", "합자회사",
+                     "농업회사법인", "영농조합", "어업회사법인", "사단법인", "재단법인",
+                     "의료법인", "사회복지법인", "법인",
+                     # 조합·금고 브랜드 표기 — "…협동조합"으로 안 끝나는 지점명이 실제로 있다
+                     # (예: "농협하나로마트○○점", "○○새마을금고")
+                     "농협", "새마을금고")
+
+# 도로 접근성 병기 (05 §1 road_distance_km·road_minutes) — OSRM 공개 라우팅 API
+OSRM_ROUTE_URL = "https://router.project-osrm.org/route/v1/driving"
+ROAD_CACHE_PATH = RAW_DIR / "api_cache" / "road_routes.json"
+ROAD_TIMEOUT_S = 20
+
+
+def is_corporate(name: str) -> bool:
+    """상호명에 법인격 표기가 있는가 (개인사업자 자격 필터 — 추정, CORPORATE_MARKERS 주석 참조)."""
+    return any(marker in name for marker in CORPORATE_MARKERS)
 
 
 def minmax01(values: list[float]) -> list[float]:
@@ -91,6 +116,51 @@ def _radius_counter(points: list[dict]):
     return count
 
 
+def _fetch_route(lat: float, lng: float) -> dict:
+    """ANCHOR→(lat,lng) 자동차 경로 1건 (OSRM). 실패는 예외로 올린다 — 조용한 누락 금지."""
+    url = f"{OSRM_ROUTE_URL}/{ANCHOR['lng']},{ANCHOR['lat']};{lng},{lat}"
+    res = requests.get(url, params={"overview": "false"}, timeout=ROAD_TIMEOUT_S)
+    res.raise_for_status()
+    body = res.json()
+    if body.get("code") != "Ok" or not body.get("routes"):
+        raise RuntimeError(f"OSRM code={body.get('code')} {body.get('message', '')}".strip())
+    route = body["routes"][0]
+    return {"road_distance_km": round(route["distance"] / 1000, 1),
+            "road_minutes": round(route["duration"] / 60, 1)}
+
+
+def annotate_road_access(candidates: list[dict]) -> None:
+    """후보에 거점→후보 **도로** 거리·소요시간을 병기한다 (05 §1 road_distance_km·road_minutes).
+
+    관광동선근접도(proximity)는 직선거리 기반이라 산악 지형에서 실제 접근성과 역전될 수 있다
+    (고한↔상동은 만항재 해발 1,330m를 넘는다). 그 한계를 우리가 먼저 드러내려는 참고 필드이므로
+    **순위 산식에는 넣지 않는다** — 가중치·정렬 불변이고, 도로시간 기반 재정렬은 별도 검증 과제다.
+    결과는 road_routes.json 에 캐시해 재실행 재현성을 지키고, 실패하면 두 필드를 None 으로 두고
+    사유를 로그로 남긴다(값을 지어내지 않는다).
+
+    호출은 main() 의 최종 후보 5건에 대해서만 한다 — stage2_candidates 안에서 호출하면 P8 민감도
+    분석이 가중치 격자마다 재호출해 공개 API 호출이 폭증한다.
+    """
+    cache = (json.loads(ROAD_CACHE_PATH.read_text(encoding="utf-8"))
+             if ROAD_CACHE_PATH.exists() else {})
+    hits = len(cache)
+    for c in candidates:
+        key = f"{ANCHOR['lat']},{ANCHOR['lng']}>{c['lat']},{c['lng']}"
+        if key not in cache:
+            try:
+                cache[key] = _fetch_route(c["lat"], c["lng"])
+            except Exception as exc:    # 통신·응답 실패 — 필드를 null 로 두고 계속 진행
+                print(f"  [warn] 도로 경로 조회 실패 {c['id']} {c['name']}: {type(exc).__name__}: {exc}")
+        route = cache.get(key) or {}
+        c["road_distance_km"] = route.get("road_distance_km")
+        c["road_minutes"] = route.get("road_minutes")
+    if len(cache) > hits:
+        ROAD_CACHE_PATH.parent.mkdir(parents=True, exist_ok=True)
+        ROAD_CACHE_PATH.write_text(json.dumps(cache, ensure_ascii=False, indent=1), encoding="utf-8")
+    print(f"  도로 접근성 병기: 신규 조회 {len(cache) - hits}건 / 캐시 {hits}건 "
+          f"(OSRM, 순위 산식 미반영)")
+
+
 def stage2_candidates(eups_by_rank: list[str], select_n: int = SELECT_EUPS,
                       weights: dict = CAND_WEIGHTS) -> tuple[list[dict], list[str]]:
     """2단계 — 후보 지점. **좌표 데이터만** 사용한다 (usage_monthly 인자 없음).
@@ -100,6 +170,8 @@ def stage2_candidates(eups_by_rank: list[str], select_n: int = SELECT_EUPS,
     기존가맹포화도 = 반경 내 동일 표시 업종 하이원 가맹점 수를 후보군 내 0~1 min-max
     후보Score    = (1/3)×업종공백도 + (1/3)×관광동선근접도 − (1/3)×기존가맹포화도 (CAND_WEIGHTS)
     업종별 최고점 상가 = 그 업종의 대표 후보 → 전 업종 대표 후보 Score 내림차순 상위 5개.
+    후보 풀에서 **법인 추정 상호는 제외**한다 (상시모집 자격=개인사업자, CORPORATE_MARKERS 주석).
+    반경 분모(nearby_stores)는 그대로 전체 상가를 세므로 산식 자체는 바뀌지 않는다.
     반환: (candidates 배열, 실제 사용한 읍 목록 — 후보 0개면 차순위 읍 자동 재시도로 늘어날 수 있음)
 
     weights 는 P8 민감도 분석(p8_sensitivity.py)이 격자 값을 주입하는 용도 — 기본값은 정본 상수다.
@@ -114,11 +186,17 @@ def stage2_candidates(eups_by_rank: list[str], select_n: int = SELECT_EUPS,
 
     used, queue = list(eups_by_rank[:select_n]), list(eups_by_rank[select_n:])
     while True:
-        pool = [
-            {"eup": eup, "category": cat, "name": s["name"], "lat": s["lat"], "lng": s["lng"]}
-            for eup in used for s in load_stores(eup)
-            if (cat := store_display_category(s)) in CANDIDATE_CATEGORIES
-        ]
+        pool, corporate = [], []
+        for eup in used:
+            for s in load_stores(eup):
+                cat = store_display_category(s)
+                if cat not in CANDIDATE_CATEGORIES:
+                    continue
+                if is_corporate(s["name"]):     # 개인사업자만 신청 가능 (CORPORATE_MARKERS 주석)
+                    corporate.append(f"{eup} {s['name']}")
+                    continue
+                pool.append({"eup": eup, "category": cat, "name": s["name"],
+                             "lat": s["lat"], "lng": s["lng"]})
         if pool or not queue:
             break
         nxt = queue.pop(0)
@@ -126,6 +204,8 @@ def stage2_candidates(eups_by_rank: list[str], select_n: int = SELECT_EUPS,
         used.append(nxt)
     if not pool:
         raise SystemExit("P6 실패: 전 지역에서 후보 상가 0개 — p4 캐시·category_map 확인")
+    print(f"  법인 추정 상호 제외 {len(corporate)}건 (상시모집 자격=개인사업자)"
+          + (f": {', '.join(corporate[:8])}{' …' if len(corporate) > 8 else ''}" if corporate else ""))
 
     kept = []
     for c in pool:
@@ -181,6 +261,8 @@ def verify(eup_scores: dict, candidates: list[dict]) -> None:
     assert len(set(cats)) == len(cats) and set(cats) <= set(CANDIDATE_CATEGORIES), "업종 대표 중복/이탈"
     for c in candidates:
         assert c["eup"] in eup_scores["selected_eups"], f"{c['id']} 읍이 선정 읍 밖"
+        assert {"road_distance_km", "road_minutes"} <= set(c), f"{c['id']} 도로 접근성 필드 누락"
+        assert not is_corporate(c["name"]), f"{c['id']} {c['name']} — 법인 추정 상호가 후보에 남음"
         stores = load_stores(c["eup"])
         lats, lngs = [s["lat"] for s in stores], [s["lng"] for s in stores]
         assert min(lats) <= c["lat"] <= max(lats) and min(lngs) <= c["lng"] <= max(lngs), \
@@ -192,6 +274,7 @@ def main() -> None:
     usage = json.loads((PROCESSED_DIR / "usage_monthly.json").read_text(encoding="utf-8"))
     ranking = stage1_eup_ranking(usage)                                   # 읍 단위 데이터만
     candidates, selected = stage2_candidates([r["eup"] for r in ranking])  # 좌표 데이터만
+    annotate_road_access(candidates)          # 05 §1 병기 필드 — 순위·점수에는 영향 없음
 
     eup_scores = {
         "base_month": usage["base_month"],
@@ -214,9 +297,12 @@ def main() -> None:
               f"(저조도 {r['low_usage']:.2f} · 증감 {r['decline']:.2f} · "
               f"최근3개월 {r['recent_3m']:,} / 전분기 {r['prev_3m']:,}){mark}")
     for c in candidates:
+        road = ("도로 미상" if c["road_distance_km"] is None
+                else f"도로 {c['road_distance_km']}km·{c['road_minutes']}분")
         print(f"  {c['id']} {c['eup']} {c['category']:<3} {c['name']} score {c['score']:.2f} "
               f"(공백 {c['gap']:.2f} · 근접 {c['proximity']:.2f} · 포화 {c['saturation']:.2f} · "
-              f"반경상가 {c['nearby_stores']} · 동일업종가맹 {c['nearby_merchants']})")
+              f"반경상가 {c['nearby_stores']} · 동일업종가맹 {c['nearby_merchants']} · "
+              f"직선 {haversine_m(ANCHOR['lat'], ANCHOR['lng'], c['lat'], c['lng']) / 1000:.2f}km · {road})")
     verify(eup_scores, candidates)
 
 

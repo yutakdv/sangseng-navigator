@@ -66,6 +66,6 @@ DynamoDB(온디맨드) / OpenAI 또는 Claude(어댑터) / 배포: Vercel(FE) + 
 - **Phase 1:** 스캐폴딩 + mock 렌더 + Docker 스모크 (배포는 개발 완료 후 최종 1회로 변경 — 09 §4)
 - **Phase 2:** `python run_all.py` 한 번으로 `data/processed/` 전체 재현
 - **Phase 3:** 허브·대시보드가 로컬 실 BE 데이터로 동작
-- **Phase 4:** AI 카드 생성 + "Score 2위 → AI 1위" 조정 사례 재현
+- **Phase 4:** AI 카드 생성(실시간) + "Score 2위 → 1순위 제안" 조정 사례 시드 고정 재현
 - **Phase 5:** 로컬 풀루프 완주 (생성→승인→완료→위젯 반영→인센티브)
 - **Phase 6:** 배포 URL에서 데모 시나리오 30초 완주 ×10회

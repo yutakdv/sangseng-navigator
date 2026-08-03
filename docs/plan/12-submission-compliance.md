@@ -67,7 +67,7 @@
 | 리스크 | 내용 | 대응 (구현 시점) |
 |---|---|---|
 | Lambda 콜드스타트 | 첫 접속 API 응답 1~3초 지연 → "데이터 안 나옴"으로 오인 가능 | ① FE 로딩 스켈레톤 필수(F9) ② 여유 시 EventBridge `rate(5 minutes)` → `/api/health` 핑 워밍 룰을 SAM에 추가 (월 ~8.6천 호출, 프리티어 내 $0) (Phase 6) |
-| 데모 상태 오염 | 공개 URL이므로 심사위원이 승인/반려 클릭 → seed 서사("Score 2위→AI 1위" pending 카드)가 소실될 수 있음 | `seed_demo.py --reset`을 (a) 발표·심사 시작 직전 수동 실행, (b) 여유 시 EventBridge 스케줄(매시)로 자동 리셋 (B4 시드 스크립트 확장, Phase 6) |
+| 데모 상태 오염 | 공개 URL이므로 심사위원이 승인/반려 클릭 → seed 서사(고정해 둔 "Score 2위 → 1순위 제안" pending 카드)가 소실될 수 있음 | `seed_demo.py --reset`을 (a) 발표·심사 시작 직전 수동 실행, (b) 여유 시 EventBridge 스케줄(매시)로 자동 리셋 (B4 시드 스크립트 확장, Phase 6) |
 | LLM 호출 남용/비용 | 공개 URL에서 카드 생성·시뮬레이션 버튼 반복 클릭 가능 | ① generate는 pending 중복 가드가 이미 사실상 rate limit (05 §8) ② gpt-4o-mini 고정 + Billing $1 알림 ③ 여유 시 Lambda `ReservedConcurrentExecutions: 5` (Phase 6, 선택) |
 | FE만 살고 BE가 죽는 경우 | API 장애 시 화면 공백 → 심사 탈락급 리스크 | `lib/api.ts` 구조상 `NEXT_PUBLIC_API_BASE` 미설정 빌드는 mock(실데이터 사본)으로 동작 — **비상시 env 제거 후 Redeploy가 최후 폴백** (mock도 강원랜드 실데이터 산출물이므로 "데이터 정상 표시" 요건 충족) |
 | 마감 후 커밋 무효 | "제출 마감 이후 커밋은 심사에 반영되지 않을 수 있음" | 마감 전 최종 커밋에 `git tag submission-final` + 이후 main 동결 (핫픽스는 심사 영향 없음을 전제로만) |
