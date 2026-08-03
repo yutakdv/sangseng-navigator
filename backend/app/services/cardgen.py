@@ -1,0 +1,292 @@
+"""B4: Action Card 생성 — AI 입력 ①~⑥ 조립 → LLM 조정 제안 → Card 생성 (docs/plan/07 B4).
+
+절대 규칙 반영:
+- AI는 제안만 — 카드는 항상 `status=pending`으로 생성, 확정은 담당자 decision API
+- `original_ranking`(정량 Score 순위)은 조정 여부와 무관하게 항상 병기 (감사 가능성)
+- 시뮬레이션류 문구(expected_effect)에 가정 기반 고정 문구 보장
+LLM 최종 실패 시 규칙 기반 fallback (07 B3 — 데모 루프가 LLM 장애에도 완주되게).
+"""
+import json
+
+from app import dataload, db, llm, prompts
+from app.services import season
+
+ASSUMPTION_NOTE = "가정 기반 전망이며 실제와 다를 수 있음"          # 절대 규칙 3 — 고정 문구
+INCENTIVE_ASSUMPTION_NOTE = "페이백률-전환율 관계는 실측 데이터가 없어 팀 설정 가정(탄력성)에 기반한 전망"
+EXPANSION_SOURCES = ["하이원포인트 사용현황", "가맹점 상세정보", "소진공 상가정보"]
+INCENTIVE_SOURCES = ["하이원포인트 사용현황"]
+INCENTIVE_TITLE = "하이원포인트 페이백 인센티브 (전 지역 공통)"
+BLOCKED = ("추진중", "완료")            # A-1 프롬프트 규칙 — 중복 제안 금지 대상 progress
+LLM_TIMEOUT = 12                       # 1회 재시도 포함 최악 24s < Lambda 30s (07 의존성·09 타임아웃)
+
+# 3/5/7% 고정 골격 — delta_pp는 실측 없는 팀 설정 가정(탄력성) (05 문서 §2)
+SCENARIOS = [
+    {"rate": 3, "delta_pp": [0.5, 1.0], "budget_note": "재원 부담 낮음"},
+    {"rate": 5, "delta_pp": [1.0, 2.0], "budget_note": "재원 부담 중간"},
+    {"rate": 7, "delta_pp": [2.0, 3.0], "budget_note": "재원 부담 높음"},
+]
+
+# A-3 프롬프트의 필수 리스크 3종 — (키워드, 문구). LLM 출력에 키워드가 없으면 보충한다
+INCENTIVE_MANDATORY_RISKS = [
+    ("예산", "재원 확보는 예산 부서의 별도 승인 사항"),
+    ("약관", "기존 포인트 적립·할인 약관과의 중복 적용 여부 확인 필요"),
+    ("미구현", "실제 자동 지급 시스템 연동은 미구현(로드맵)"),
+]
+
+# 출력 JSON 스키마 = 05 문서 Card.ai 필드 (07 문서 B4 부록 원문)
+CARD_AI_SCHEMA = {
+    "type": "object", "additionalProperties": False,
+    "properties": {
+        "adjusted": {"type": "boolean"},
+        "ai_rank_target": {"type": "string"},
+        "comparison": {"type": "string"},
+        "reasons": {"type": "array", "items": {"type": "string"}},
+        "risks": {"type": "array", "items": {"type": "string"}},
+        "expected_effect": {"type": "string"},
+        "confidence": {"type": "string", "enum": ["상", "중", "하"]},
+    },
+    "required": ["adjusted", "ai_rank_target", "comparison", "reasons", "risks",
+                 "expected_effect", "confidence"],
+}
+
+
+def _ranked_candidates() -> list:
+    """candidates.json → Score 내림차순 순위 부여 (변경 불가 기준선 — AI 입력 ①)."""
+    cands = sorted(dataload.load("candidates"), key=lambda c: c["score"], reverse=True)
+    return [{**c, "rank": i + 1} for i, c in enumerate(cands)]
+
+
+def _target_state(cand: dict, cards: list) -> str:
+    """AI 입력 ② — 같은 (읍×업종) 타깃 기존 EXPANSION 카드의 추진 상태."""
+    matches = [c for c in cards if c.get("type") == "EXPANSION"
+               and (c.get("target") or {}).get("eup") == cand["eup"]
+               and (c.get("target") or {}).get("category") == cand["category"]]
+    approved = [c for c in matches if c.get("status") == "approved"]
+    if approved:        # 여러 장이면 가장 최근 결정 카드의 progress
+        latest = max(approved, key=lambda c: c.get("decided_at") or "")
+        return latest.get("progress") or "검토중"
+    if any(c.get("status") == "pending" for c in matches):
+        return "승인 대기"
+    return "없음"
+
+
+def _build_inputs(cands: list, cards: list) -> dict:
+    """AI 입력 ①~⑥ 조립 — user 메시지로 JSON 직렬화된다 (07 문서 B4 표)."""
+    adopted: dict[str, int] = {}
+    for c in cards:                                     # ④ approved 카드의 target.eup 분포
+        eup = (c.get("target") or {}).get("eup")
+        if c.get("status") == "approved" and c.get("type") == "EXPANSION" and eup:
+            adopted[eup] = adopted.get(eup, 0) + 1
+    rejected = [                                        # ⑤ 같은 타깃의 rejected 이력
+        {"타깃": f"{(c.get('target') or {}).get('eup')} {(c.get('target') or {}).get('category')}",
+         "결정": "반려", "결정 시각": c.get("decided_at")}
+        for c in cards if c.get("status") == "rejected" and c.get("target")]
+    try:
+        risk = dataload.load("risk_signal")             # ⑥ 참고용 — 없으면 컷 (07 문서 B4)
+    except FileNotFoundError:
+        risk = []
+    return {
+        "1_후보_Score와_순위(변경_불가_기준선)": [
+            {"순위": c["rank"], "지역": c["eup"], "업종": c["category"], "상호명": c["name"],
+             "Score": c["score"], "업종공백도": c["gap"], "관광동선근접도": c["proximity"],
+             "기존가맹포화도": c["saturation"],
+             "반경500m_동일업종_하이원_가맹점": c["nearby_merchants"],
+             "반경500m_전체_상가": c["nearby_stores"]} for c in cands],
+        "2_후보별_현재_추진_상태": [
+            {"후보": f"{c['eup']} {c['category']}", "추진 상태": _target_state(c, cards)}
+            for c in cands],
+        "3_계절성_신호": season.season_signal(),
+        "4_최근_지역별_채택_이력": adopted,
+        "5_최근_정책_이력(반려)": rejected,
+        "6_지역경제_위험_신호(참고용_진단_지표)": risk,
+        "작성_지침": ("ai_rank_target에는 조정 후 1순위 타깃을 '지역 업종'(예: 영월군 소매점) "
+                   "형식으로 적을 것. 추진 상태가 추진중/완료인 후보는 1순위로 제안하지 말고, "
+                   "그런 후보 때문에 제외·조정이 있었다면 해당 추진 상태('추진중' 등)를 reasons에 "
+                   "명시할 것. 입력 1의 수치에 없는 사실은 지어내지 말 것"),
+    }
+
+
+def _match_candidate(cands: list, text: str) -> dict | None:
+    """LLM의 ai_rank_target 문자열 → 후보 매칭 ('지역 업종' 우선, 상호명·id 보조)."""
+    for c in cands:
+        if c["eup"] in text and c["category"] in text:
+            return c
+    for c in cands:
+        if (c.get("name") and c["name"] in text) or c.get("id", "") in text:
+            return c
+    return None
+
+
+def _first_available(cands: list, cards: list) -> dict:
+    """추진중/완료가 아닌 최상위 후보 — LLM이 금지 타깃·미매칭 문자열을 내면 이걸로 보정."""
+    for c in cands:
+        if _target_state(c, cards) not in BLOCKED:
+            return c
+    return cands[0]     # 전 후보가 추진중/완료인 극단 케이스 — 데모 규모에선 도달하지 않음
+
+
+def _fallback_ai(cands: list, cards: list) -> dict:
+    """LLM 최종 실패 시 규칙 기반 fallback (07 B3) — 추진중/완료를 건너뛴 최상위 후보 제안."""
+    top = _first_available(cands, cards)
+    skipped = [c for c in cands if c["rank"] < top["rank"]]
+    reasons = [f"Score {c['rank']}위 {c['eup']} {c['category']}은(는) 추진 상태={_target_state(c, cards)}로 중복 제안 대상에서 제외"
+               for c in skipped]
+    reasons.append(f"{top['eup']} {top['category']} — 업종공백도 {top['gap']}, 반경 500m 내 동일 업종 하이원 가맹점 {top['nearby_merchants']}곳")
+    reasons.append("AI 설명 생성에 실패해 규칙 기반으로 제안된 카드입니다")
+    second = next((c for c in cands if c["rank"] != top["rank"]), top)
+    return {
+        "adjusted": top["rank"] != 1,
+        "ai_rank_target": f"{top['eup']} {top['category']}",
+        "comparison": (f"1순위 {top['eup']} {top['category']}(Score {top['score']}, {top['rank']}위)와 "
+                       f"차순위 {second['eup']} {second['category']}(Score {second['score']}, {second['rank']}위) 중 "
+                       "추진 상태와 Score를 함께 고려한 규칙 기반 제안입니다."),
+        "reasons": reasons,
+        "risks": ["신규 가맹점 초기 실적 저조 가능성", "가맹 협상이 분기 내 완료되지 않을 가능성"],
+        "expected_effect": f"{top['eup']} {top['category']} 공백 해소로 지역 소비 접점 확대 예상",
+        "confidence": "중",
+    }
+
+
+def _ensure_assumption(text: str) -> str:
+    """expected_effect에 가정 기반 **고정 문구** 보장 (절대 규칙 3).
+
+    '가정' 키워드 포함만으로는 고정 문구 없는 카드가 통과할 수 있어 문구 전체로 판정한다.
+    """
+    return text if ASSUMPTION_NOTE in text else f"{text} ({ASSUMPTION_NOTE})"
+
+
+def _find_pending(cards: list, card_type: str, eup: str | None = None,
+                  category: str | None = None) -> dict | None:
+    """중복 가드 — 동일 (type, target)의 pending 카드 (05 문서 §8, INCENTIVE는 target 무관)."""
+    for c in cards:
+        if c.get("type") != card_type or c.get("status") != "pending":
+            continue
+        target = c.get("target") or {}
+        if card_type == "INCENTIVE" or (target.get("eup") == eup and target.get("category") == category):
+            return c
+    return None
+
+
+def generate_card(card_type: str) -> tuple[dict, bool]:
+    """POST /api/cards/generate 본체 — (card, created) 반환. created=False면 기존 pending 카드."""
+    cards = db.list_cards()
+    if card_type == "INCENTIVE":
+        return _generate_incentive(cards)
+    return _generate_expansion(cards)
+
+
+def _generate_expansion(cards: list) -> tuple[dict, bool]:
+    cands = _ranked_candidates()
+    try:
+        out = llm.generate_json(prompts.CARD_SYSTEM_PROMPT,
+                                json.dumps(_build_inputs(cands, cards), ensure_ascii=False),
+                                CARD_AI_SCHEMA, schema_name="action_card", timeout=LLM_TIMEOUT)
+    except Exception:
+        out = _fallback_ai(cands, cards)
+    target = _match_candidate(cands, str(out.get("ai_rank_target", "")))
+    if target is None or _target_state(target, cards) in BLOCKED:
+        # 금지 타깃·미매칭 보정 — 타깃만 바꾸면 LLM 원문 사유가 다른 후보를 가리키는
+        # "타깃-사유 불일치" 카드가 저장된다(감사 가능성 위반). 텍스트까지 통째 교체.
+        out = _fallback_ai(cands, cards)
+        target = _first_available(cands, cards)
+
+    existing = _find_pending(cards, "EXPANSION", target["eup"], target["category"])
+    if existing:                                        # 05 §8 — 기존 카드 200 반환 (버튼 연타 대비)
+        return existing, False
+
+    risks = [r for r in out.get("risks", []) if isinstance(r, str) and r.strip()]
+    reasons = [r for r in out.get("reasons", []) if isinstance(r, str) and r.strip()]
+    now = db.now_iso()
+    card = {
+        "id": db.next_card_id("AC-"),
+        "type": "EXPANSION", "status": "pending", "progress": None,
+        "title": f"{target['eup']} {target['category']} 업종 가맹점 확충",
+        "target": {"eup": target["eup"], "category": target["category"]},
+        "score_rank": target["rank"],
+        "ai_rank": 1,                                   # 생성 카드 = AI 조정 후 1순위 제안
+        "confidence": out.get("confidence") if out.get("confidence") in ("상", "중", "하") else "중",
+        "ai": {
+            # 표시 일관성: 조정 여부 = (원 Score 순위 ≠ 1) — LLM 출력과 어긋나면 순위 쪽이 정본
+            "adjusted": target["rank"] != 1,
+            "comparison": out.get("comparison", ""),
+            "reasons": reasons or ["규칙 기반 제안 — 상세 사유 생성 실패"],
+            "risks": risks or ["신규 가맹점 초기 실적 저조 가능성"],    # A-1 규칙 — 리스크 ≥1
+            "expected_effect": _ensure_assumption(out.get("expected_effect", "")),
+            "original_ranking": [                        # 정량 순위 상시 병기 (절대 규칙 5)
+                {"rank": c["rank"], "candidate": f"{c['eup']} {c['category']}", "score": c["score"]}
+                for c in cands],
+        },
+        "scenarios": None,
+        "sources": EXPANSION_SOURCES,
+        "created_at": now, "decided_at": None,
+        "events": [{"at": now, "action": "generated"}],
+    }
+    db.put_card(card)
+    return card, True
+
+
+def _incentive_fallback_ai() -> dict:
+    """INCENTIVE LLM 최종 실패 시 — 05 문서 §2 INC-001 예시의 ai 원문 (실데이터와 정합 확인됨)."""
+    return {
+        "adjusted": False, "ai_rank_target": "전 지역 공통",
+        "comparison": ("3%는 재원 부담이 가장 낮지만 개선폭이 0.5~1.0%p로 제한적이고, 7%는 "
+                       "2.0~3.0%p로 가장 크지만 재원 부담도 함께 커집니다. 5%는 개선폭 1.0~2.0%p·"
+                       "재원 부담 중간으로, 분기 내 효과 확인과 재원 방어를 동시에 노리는 절충안입니다."),
+        "reasons": [
+            "지역 전환율이 월별 17~23%대에서 오르내려 저점 월을 방어할 수요 측 유인이 필요",
+            "사용 건수가 사북읍·태백시에 절반 이상 몰려 있어 특정 지역 한정이 아닌 전 지역 공통 적용이 지역 균형에 유리",
+            "페이백률이 높을수록 효과와 재원 부담이 함께 커지는 트레이드오프가 뚜렷",
+        ],
+        "risks": [text for _, text in INCENTIVE_MANDATORY_RISKS],
+        "expected_effect": "5% 적용 시 지역 전환율 약 1.0~2.0%p 개선 예상 (가정 기반 전망이며 실제와 다를 수 있음)",
+        "confidence": "중",
+    }
+
+
+def _generate_incentive(cards: list) -> tuple[dict, bool]:
+    existing = _find_pending(cards, "INCENTIVE")        # pending INCENTIVE는 동시에 1장만 (05 §8)
+    if existing:
+        return existing, False
+
+    try:
+        dash = dataload.load("dashboard")
+        rates = [m["rate"] for m in dash["conversion"]["monthly"]]
+        payload = {
+            "페이백_시나리오(팀_설정_가정)": SCENARIOS,
+            "지역_전환율_근사지표(%)": {"최근": dash["conversion"]["headline_rate"],
+                                 "월별_범위": [min(rates), max(rates)]},
+            "지역별_사용_비중": dash["region_share"],
+        }
+        out = llm.generate_json(prompts.INCENTIVE_PROMPT, json.dumps(payload, ensure_ascii=False),
+                                CARD_AI_SCHEMA, schema_name="incentive_card", timeout=LLM_TIMEOUT)
+    except Exception:
+        out = _incentive_fallback_ai()
+
+    risks = [r for r in out.get("risks", []) if isinstance(r, str) and r.strip()]
+    for keyword, text in INCENTIVE_MANDATORY_RISKS:     # A-3 필수 리스크 3종 보장
+        if not any(keyword in r for r in risks):
+            risks.append(text)
+    now = db.now_iso()
+    card = {
+        "id": db.next_card_id("INC-"),
+        "type": "INCENTIVE", "status": "pending", "progress": None,
+        "title": INCENTIVE_TITLE,
+        "target": None, "score_rank": None, "ai_rank": None,
+        "confidence": out.get("confidence") if out.get("confidence") in ("상", "중", "하") else "중",
+        "ai": {
+            "adjusted": False,                          # 순위 개념 없음 — 항상 false
+            "comparison": out.get("comparison", ""),
+            "reasons": [r for r in out.get("reasons", []) if isinstance(r, str) and r.strip()],
+            "risks": risks,
+            "expected_effect": _ensure_assumption(out.get("expected_effect", "")),
+            "original_ranking": None,                   # INCENTIVE만 null (05 문서 §2)
+        },
+        "scenarios": SCENARIOS,
+        "selected_rate": None,                          # 승인 시점에 담당자가 고른 값만 (B2)
+        "assumption_note": INCENTIVE_ASSUMPTION_NOTE,
+        "sources": INCENTIVE_SOURCES,
+        "created_at": now, "decided_at": None,
+        "events": [{"at": now, "action": "generated"}],
+    }
+    db.put_card(card)
+    return card, True
