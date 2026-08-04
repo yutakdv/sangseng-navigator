@@ -125,6 +125,28 @@ Base URL: 로컬 `http://localhost:8000` / 배포 후 API Gateway URL. 경로 �
   (`pipeline/p4_stores.py`). 표시명은 원본 CSV 컬럼명을 따라 "삼척시"로 두되,
   툴팁·범례에는 "삼척시 도계읍"으로 적는다
 
+### `GET /api/risk-signal`
+대시보드 **요인 카드**(13 §2-15)가 쓰는 배경 지표. `risk_signal.json`을 **가공 없이 그대로** 돌려준다.
+
+```json
+[
+  {"sigungu": "정선군", "under2y_ratio": 0.1507},
+  {"sigungu": "태백시", "under2y_ratio": 0.1497},
+  {"sigungu": "영월군", "under2y_ratio": 0.15},
+  {"sigungu": "삼척시", "under2y_ratio": 0.1459}
+]
+```
+
+- 응답은 **최상위 배열**이며 산출 JSON과 완전히 같다 — `scripts/sync-mocks.sh`가 같은 파일을
+  `frontend/src/mocks/risk_signal.json`으로 복사하므로, 감싸거나 필드를 더하면 mock 모드와
+  실 API 모드가 갈린다 (§6 mock 원천 단일화)
+- 요인 카드 4지표 중 `gap`·`proximity`·`saturation`은 `GET /api/candidates`에서, `under2y_ratio`만
+  이 엔드포인트에서 온다 (13 §2-15가 확정한 "산출 가능한 지표"). FE는 `api.riskSignal()`로 받는다
+- **표시 규칙(필수):** 진단 참고용이며 처방 근거가 아니다(절대 규칙 6). 4개 시군 편차가 0.5%p뿐이라
+  지역 비교·순위 정렬·'위험' 라벨·경고색을 쓰지 않고 **"운영 2년 미만 사업자 비중(배경 정보)"**
+  중립 표기만 쓴다 (§6·13 §7과 동일 규칙)
+- 산출 전이면 `503 {"detail": "risk_signal.json이 아직 생성되지 않았습니다"}`
+
 ## 2. Action Card
 
 ### Card 객체 (공통 스키마)
@@ -347,7 +369,7 @@ Base URL: 로컬 `http://localhost:8000` / 배포 후 API Gateway URL. 경로 �
 | `eup_scores.json` | §1 `eup_ranking` + `selected_eups` | BE(candidates, 카드 생성) |
 | `candidates.json` | §1 `candidates` 배열 | BE(candidates, 카드 생성) |
 | `merchants.json` | §1 `merchants` 배열 (지오코딩·주소 포함) | BE(candidates, 위젯) |
-| `risk_signal.json` | `[{"sigungu": "정선군", "under2y_ratio": 0.31}]` | BE(카드 생성 AI 입력 ⑥) |
+| `risk_signal.json` | `[{"sigungu": "정선군", "under2y_ratio": 0.1507}]` | BE(카드 생성 AI 입력 ⑥, `GET /api/risk-signal`), FE mock |
 | `sensitivity.json` | `{"combos": 25, "top3_stable_ratio": 0.88, "detail": [...]}` | 발표 슬라이드 |
 | `usage_monthly.json` | 월×지역×업종 원자료 집계 (재계산·검증용) | pipeline, simulate |
 

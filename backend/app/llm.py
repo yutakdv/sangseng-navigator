@@ -1,5 +1,5 @@
 """LLM 어댑터 — provider 분기(OpenAI/Anthropic)는 이 파일 안에만 존재 (CLAUDE.md 규칙, docs/plan/07 B3)."""
-import os, json, time, logging
+import os, json, re, time, logging
 
 log = logging.getLogger(__name__)
 # Lambda 런타임이 root 로거에 INFO 핸들러를 붙이므로 아래 log.info는 CloudWatch에 그대로 남는다.
@@ -8,6 +8,25 @@ log = logging.getLogger(__name__)
 RETRY_BACKOFF_SECONDS = 0.5
 # 재시도 사이 고정 대기. 최악 지연 = cardgen timeout 12s × 2회 + backoff 0.5s = 24.5s < Lambda 30s
 # (09 문서 Timeout: 30, cardgen.LLM_TIMEOUT=12). 마지막 시도 뒤에는 대기하지 않는다.
+
+# 인증 실패 응답에는 SDK가 부분 마스킹한 키가 그대로 들어 있다
+# (예: "Incorrect API key provided: sk-proj-****ABCD"). 로그·트레이스백에 남기지 않는다.
+_KEY_PATTERN = re.compile(r"\b(sk|sk-ant|sk-proj)-[A-Za-z0-9_\-*]{4,}")
+
+
+def redact(text: str) -> str:
+    """로그에 실을 문자열에서 API 키 형태를 지운다."""
+    return _KEY_PATTERN.sub("<redacted-key>", text)
+
+
+class LLMError(Exception):
+    """LLM 호출 최종 실패 — 원인 예외의 **마스킹된** 타입·메시지만 담는다.
+
+    SDK 예외를 그대로 올리면 호출부의 `log.warning(..., exc_info=True)`가 트레이스백과 함께
+    부분 마스킹된 키까지 CloudWatch에 남긴다. `raise ... from None`으로 원인 체인을 끊어
+    키가 실릴 수 있는 유일한 경로를 이 한 곳으로 모은다 (호출부는 계속 `except Exception`이라
+    잡는 방식은 그대로다). 실패 원인 구분(401·timeout·rate limit)은 메시지에 남는다.
+    """
 
 
 def generate_json(system: str, user: str, schema: dict, schema_name: str = "result",
@@ -62,7 +81,7 @@ def generate_json(system: str, user: str, schema: dict, schema_name: str = "resu
             last_exc = exc
             if attempt < attempts:
                 time.sleep(RETRY_BACKOFF_SECONDS)
-    log.info("llm fail provider=%s model=%s schema=%s attempts=%d elapsed=%.2fs error=%s: %s",
-             provider, model, schema_name, attempts, time.perf_counter() - started,
-             type(last_exc).__name__, last_exc)
-    raise last_exc
+    cause = redact(f"{type(last_exc).__name__}: {last_exc}")
+    log.info("llm fail provider=%s model=%s schema=%s attempts=%d elapsed=%.2fs error=%s",
+             provider, model, schema_name, attempts, time.perf_counter() - started, cause)
+    raise LLMError(cause) from None     # 원인 체인을 끊어 마스킹 안 된 SDK 메시지가 새지 않게 (위 docstring)

@@ -110,6 +110,8 @@ def load(name: str) -> dict | list:      # candidates·merchants·risk_signal �
 
 - [ ] `GET /api/dashboard` → `load("dashboard")` 그대로 반환
 - [ ] `GET /api/candidates` → `eup_scores` + `candidates` + `merchants` 병합 반환 (05 §1)
+- [ ] `GET /api/risk-signal` → `load("risk_signal")` **가공 없이 배열 그대로** (05 §1) —
+      13 §2-15 요인 카드의 `under2y_ratio` 출처. 감싸거나 필드를 더하면 FE mock(같은 파일)과 갈린다
 - [ ] **검증:** `uvicorn app.main:app --port 8000` 후 `curl localhost:8000/api/dashboard | jq .conversion.headline_rate`,
       `curl localhost:8000/api/health` → `datasets` 5종 전부 `true`
 
@@ -219,7 +221,7 @@ provider 분기는 이 파일 안에만 존재. 두 provider 모두 **JSON 스�
 
 ```python
 # app/llm.py
-import os, json, time, logging
+import os, json, re, time, logging
 
 log = logging.getLogger(__name__)
 # Lambda 런타임이 root 로거에 INFO 핸들러를 붙이므로 아래 log.info는 CloudWatch에 그대로 남는다.
@@ -228,6 +230,18 @@ log = logging.getLogger(__name__)
 RETRY_BACKOFF_SECONDS = 0.5
 # 재시도 사이 고정 대기. 최악 지연 = cardgen timeout 12s × 2회 + backoff 0.5s = 24.5s < Lambda 30s
 # (09 문서 Timeout: 30, cardgen.LLM_TIMEOUT=12). 마지막 시도 뒤에는 대기하지 않는다.
+
+# 인증 실패 응답에는 SDK가 부분 마스킹한 키가 그대로 들어 있다
+# (예: "Incorrect API key provided: sk-proj-****ABCD"). 로그·트레이스백에 남기지 않는다.
+_KEY_PATTERN = re.compile(r"\b(sk|sk-ant|sk-proj)-[A-Za-z0-9_\-*]{4,}")
+
+
+def redact(text: str) -> str:
+    return _KEY_PATTERN.sub("<redacted-key>", text)
+
+
+class LLMError(Exception):
+    """LLM 호출 최종 실패 — 원인 예외의 **마스킹된** 타입·메시지만 담는다 (아래 raise ... from None)."""
 
 
 def generate_json(system: str, user: str, schema: dict, schema_name: str = "result",
@@ -280,10 +294,10 @@ def generate_json(system: str, user: str, schema: dict, schema_name: str = "resu
             last_exc = exc
             if attempt < attempts:
                 time.sleep(RETRY_BACKOFF_SECONDS)
-    log.info("llm fail provider=%s model=%s schema=%s attempts=%d elapsed=%.2fs error=%s: %s",
-             provider, model, schema_name, attempts, time.perf_counter() - started,
-             type(last_exc).__name__, last_exc)
-    raise last_exc
+    cause = redact(f"{type(last_exc).__name__}: {last_exc}")
+    log.info("llm fail provider=%s model=%s schema=%s attempts=%d elapsed=%.2fs error=%s",
+             provider, model, schema_name, attempts, time.perf_counter() - started, cause)
+    raise LLMError(cause) from None     # 원인 체인을 끊어 마스킹 안 된 SDK 메시지가 새지 않게
 ```
 
 초판에서 바뀐 곳과 근거 — 백엔드 감사 반영분:
@@ -297,6 +311,11 @@ def generate_json(system: str, user: str, schema: dict, schema_name: str = "resu
   유지한다 — 두 SDK 모두 명시적 `None`을 "무한 대기"로 해석하므로 분기해서 넘긴다
 - 시그니처는 `generate_json(system, user, schema, schema_name=..., timeout=None, attempts=2)`로 고정 —
   호출부(cardgen·simulate·widget)가 이 형태에 의존한다
+- **최종 실패는 `LLMError`로 바꿔 올린다** — 호출부가 `log.warning(..., exc_info=True)`로 예외를
+  통째로 찍기 때문에, SDK 예외를 그대로 올리면 인증 실패 메시지에 든 **부분 마스킹된 키**가
+  트레이스백과 함께 CloudWatch에 남는다. `raise ... from None`으로 원인 체인을 끊고
+  `redact()`를 거친 타입·메시지만 남긴다(401·timeout·rate limit 구분은 유지).
+  호출부는 계속 `except Exception`이라 잡는 방식은 그대로다
 
 - [ ] 위 구현 + 최종 실패 시 호출부에서 규칙 기반 fallback 사용
 - [ ] **검증:** 로컬에서 두 provider 각각 1회 스모크 (`python -c ...`) — 스키마 준수 JSON 반환 확인

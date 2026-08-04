@@ -18,6 +18,8 @@ import json
 import math
 import os
 import sys
+import traceback
+import types
 from datetime import datetime
 from pathlib import Path
 from urllib.parse import urlparse
@@ -58,6 +60,10 @@ from app.main import app                         # noqa: E402  (.env 로드가 a
 from app import dataload                         # noqa: E402
 from app import db                               # noqa: E402
 from app import llm                              # noqa: E402
+
+# 아래 fake_llm 픽스처가 llm.generate_json 을 통째로 갈아끼우므로, 어댑터 자체를 검증하는
+# 테스트(§8)를 위해 원본을 미리 잡아 둔다.
+REAL_GENERATE_JSON = llm.generate_json
 from app.services import simulate                # noqa: E402
 
 import seed_demo                                 # noqa: E402
@@ -243,6 +249,22 @@ def test_candidates_merges_scores_and_merchants():
     assert body["merchants"]
     assert all({"name", "category", "eup", "address", "lat", "lng"} <= set(m)
                for m in body["merchants"][:20])
+
+
+def test_risk_signal_serves_artifact_verbatim():
+    """05 §1 — 대시보드 요인 카드(13 §2-15)가 쓰는 under2y_ratio의 서빙 경로.
+
+    `sync-mocks.sh`가 같은 파일을 FE mock으로 복사하므로 응답은 산출 JSON과 **완전히 같아야** 한다
+    (감싸거나 필드를 더하면 mock 모드와 실 API 모드가 갈린다 — 05 §6 mock 원천 단일화).
+    """
+    res = client.get("/api/risk-signal")
+    assert res.status_code == 200
+    assert res.json() == dataload.load("risk_signal")               # 가공 없이 그대로
+
+    rows = res.json()
+    assert isinstance(rows, list) and rows                           # 최상위가 배열 (05 §6)
+    assert all({"sigungu", "under2y_ratio"} == set(r) for r in rows)
+    assert all(0 <= r["under2y_ratio"] <= 1 for r in rows)
 
 
 # ── 2. 카드 목록 (seed --reset 상태) ─────────────────────────────────────
@@ -647,3 +669,72 @@ def test_widget_returns_empty_for_unknown_region(fake_llm):
     body = client.get("/api/widget/recommend", params={"region": "없는읍"}).json()
     assert body == {"recommendations": [], "policy_note": POLICY_NOTE}
     assert fake_llm.calls == []                                   # 결과 0건이면 LLM 호출도 없다
+
+
+# ── 8. LLM 어댑터 (실호출 없이 어댑터 자체를 검증) ───────────────────────
+
+def test_llm_failure_never_logs_an_api_key(monkeypatch):
+    """인증 실패 메시지에는 SDK가 부분 마스킹한 키가 들어 있다 — 로그·트레이스백에 남기지 않는다.
+
+    호출부는 `log.warning(..., exc_info=True)`로 예외를 통째로 찍으므로, 원인 체인을 끊고
+    마스킹된 메시지만 담은 LLMError로 바꾸는 것이 유일한 차단 지점이다 (llm.LLMError).
+    """
+    leaky = "Error code: 401 - Incorrect API key provided: sk-proj-abc123DEF456ghi. Check your key."
+
+    class _FakeOpenAI:
+        class chat:
+            class completions:
+                @staticmethod
+                def create(**kwargs):
+                    raise RuntimeError(leaky)
+
+        def __init__(self, *args, **kwargs):
+            pass
+
+        def with_options(self, **kwargs):
+            return self
+
+    fake_sdk = types.ModuleType("openai")
+    fake_sdk.OpenAI = _FakeOpenAI
+    monkeypatch.setitem(sys.modules, "openai", fake_sdk)
+    monkeypatch.setenv("LLM_PROVIDER", "openai")
+
+    with pytest.raises(llm.LLMError) as caught:
+        REAL_GENERATE_JSON("system", "user", {"type": "object"}, attempts=1)
+
+    rendered = "".join(traceback.format_exception(caught.value))    # 호출부가 남기는 것과 같은 형태
+    assert "sk-proj" not in rendered and "abc123DEF456ghi" not in rendered
+    assert "<redacted-key>" in rendered
+    assert "401" in rendered and "RuntimeError" in rendered         # 원인 구분은 살아 있다
+    assert caught.value.__cause__ is None and caught.value.__suppress_context__
+
+
+def test_llm_retries_with_backoff_then_wraps(monkeypatch):
+    """attempts=2면 두 번 시도하고 사이에 backoff 만큼 쉰다 (llm.RETRY_BACKOFF_SECONDS)."""
+    slept, calls = [], []
+
+    class _FakeOpenAI:
+        class chat:
+            class completions:
+                @staticmethod
+                def create(**kwargs):
+                    calls.append(kwargs["model"])
+                    raise RuntimeError("api down")
+
+        def __init__(self, *args, **kwargs):
+            pass
+
+        def with_options(self, **kwargs):
+            return self
+
+    fake_sdk = types.ModuleType("openai")
+    fake_sdk.OpenAI = _FakeOpenAI
+    monkeypatch.setitem(sys.modules, "openai", fake_sdk)
+    monkeypatch.setenv("LLM_PROVIDER", "openai")
+    monkeypatch.setattr(llm.time, "sleep", slept.append)
+
+    with pytest.raises(llm.LLMError):
+        REAL_GENERATE_JSON("system", "user", {"type": "object"}, attempts=2)
+
+    assert len(calls) == 2
+    assert slept == [llm.RETRY_BACKOFF_SECONDS]                     # 마지막 시도 뒤에는 쉬지 않는다
