@@ -19,9 +19,12 @@ def _clean(v):
     저장된 표기에 소수점이 있으면 float, 없으면 int — 값이 정수라는 이유로 float 를 int 로
     내리지 않는다. 정수 판정(v == v.to_integral_value())으로 내리면 read-modify-write 때마다
     05 §2 의 scenarios[].delta_pp 가 [1.0, 2.0] → [1, 2] 로 바뀐다 (감사 ②).
-    지수 표기('1E+2')는 소수점이 없으므로 int(100)로 떨어진다 — 실측 확인.
-    참고: 끝자리 0 절삭은 **최상위 속성에만** 적용된다(top-level 1.0 → 1). delta_pp 처럼
-    map/list 안에 들어간 숫자는 저장 표기가 그대로 돌아오므로 이 규칙으로 float 가 보존된다.
+    지수 표기('1E+2')는 소수점이 없으므로 int(100)로 떨어진다. 음의 지수('1E-8')는 int 로
+    절삭돼 0이 되지만, 카드에 실리는 최소 절대값이 0.47(score)이라 그 경로에는 닿지 않는다.
+    참고: 끝자리 0 절삭이 **최상위 속성에만** 적용되고 map/list 안의 숫자는 저장 표기가 그대로
+    돌아온다는 것은 **DynamoDB Local 실측**이다(delta_pp 가 scenarios 배열 안이라 보존된다).
+    실 DynamoDB 가 중첩까지 절삭하면 delta_pp 표기가 [1, 2]로 돌아갈 수 있어, T17 배포 직후
+    승인 왕복 1회로 확인한다(09 §4). 화면 표기는 FE 가 소수 1자리로 고정하므로(05 §2) 그래도 안전하다.
     """
     if isinstance(v, Decimal):
         return float(v) if "." in str(v) else int(v)

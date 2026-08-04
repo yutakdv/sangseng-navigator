@@ -1,3 +1,4 @@
+import json
 import logging
 import os
 from pathlib import Path
@@ -31,7 +32,7 @@ OPTIONAL_DATASETS = ("risk_signal",)
 app = FastAPI(title="상생 나침반 API")
 # 미들웨어 순서 주의: Starlette는 **나중에 add한 것이 바깥**이다. CORS가 바깥이어야
 # 에러 응답(예외 처리 결과)에도 CORS 헤더가 붙으므로 GZip을 먼저, CORS를 나중에 add한다.
-app.add_middleware(GZipMiddleware, minimum_size=1000)   # /api/candidates 299KB → gzip 44KB (실측)
+app.add_middleware(GZipMiddleware, minimum_size=1000)   # /api/candidates 285KB → gzip 44KB (실측)
 app.add_middleware(CORSMiddleware, allow_origins=ALLOWED_ORIGINS, allow_methods=["*"], allow_headers=["*"])
 for r in (dashboard.router, cards.router, widget.router, kpi.router):
     app.include_router(r, prefix="/api")
@@ -39,14 +40,19 @@ for r in (dashboard.router, cards.router, widget.router, kpi.router):
 
 @app.get("/api/health")
 def health():
-    """산출물별 로드 여부까지 보고 (05 문서 §5) — dashboard 하나만 보면 나머지 결손을 놓친다."""
+    """산출물별 로드 여부까지 보고 (05 문서 §5) — dashboard 하나만 보면 나머지 결손을 놓친다.
+
+    JSONDecodeError까지 잡는 이유: 이 엔드포인트의 목적이 배포 후 data 복사 실패 진단인데,
+    `cp`가 중간에 끊겨 "파일은 있고 내용이 잘린" 상태가 정확히 그 케이스다. 진단해야 할
+    상황에서 health 자체가 500으로 죽으면 안 된다.
+    """
     from app import dataload
     datasets = {}
     for name in REQUIRED_DATASETS + OPTIONAL_DATASETS:
         try:
             dataload.load(name)
             datasets[name] = True
-        except FileNotFoundError:
+        except (FileNotFoundError, json.JSONDecodeError):
             datasets[name] = False
     return {"ok": True,
             "data_loaded": all(datasets[n] for n in REQUIRED_DATASETS),
