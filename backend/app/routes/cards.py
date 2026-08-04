@@ -196,13 +196,15 @@ def simulate_card(cid: str):
         lo, hi = result["delta_pp"]
         direction = (f"지역 소비 집중도가 약 {abs(hi)}~{abs(lo)}%p 상승(집중 심화)" if kind == "심화"
                      else f"지역 소비 집중도가 약 {lo}~{hi}%p 개선(집중 완화)")
+        # 집중도 지수 두 값(현재·예상)은 일부러 싣지 않는다 — 변화폭이 0.05%p여도 지수 표기가
+        # 한 눈금 움직이는 구간이 있어, 두 값을 주면 LLM이 "43에서 42로 1포인트 개선"처럼
+        # delta_pp와 10배 어긋난 문장을 쓴다(실측). 판단에 필요한 건 방향과 폭뿐이다.
         user_payload = {
             "대상": f"{result['eup']} {result['category']} 업종 신규 가맹점 1곳",
-            "현재 지역 소비 집중도": result["current_index"],
-            "가맹 전환 시 예상 집중도": result["projected_index"],
             "예상 변화(부호 해석 완료)": direction,
             "신규 가맹점 예상 월 이용 건수(가정치)": result["expected_monthly_count"],
-            "작성 지침": "'예상 변화'의 방향(개선/상승)을 그대로 서술하고, '예상'과 '가정' 두 단어를 반드시 포함할 것",
+            "작성 지침": ("'예상 변화'의 방향(개선/상승)과 폭을 그대로 서술하고, 주어지지 않은 "
+                      "집중도 지수 값을 지어내지 말 것. '예상'과 '가정' 두 단어를 반드시 포함할 것"),
         }
         try:
             out = llm.generate_json(prompts.SIMULATE_PROMPT, json.dumps(user_payload, ensure_ascii=False),
@@ -210,7 +212,10 @@ def simulate_card(cid: str):
             narrative = out.get("narrative")
         except Exception:
             log.warning("simulate narrative LLM 실패 — 규칙 기반 문구로 대체 (card=%s)", cid, exc_info=True)
-    wrong_direction = bool(narrative) and kind == "심화" and "개선" in narrative  # 집중 심화를 개선으로 서술 방지
+    # 방향 오서술 차단은 **양방향** 대칭이어야 한다 — 심화를 "개선"으로 쓰는 것만 막으면,
+    # 개선 구간에서 LLM이 "상승(집중 심화)"라고 뒤집어 쓴 문장이 그대로 승인 화면에 실린다(실측).
+    wrong_direction = bool(narrative) and ((kind == "심화" and "개선" in narrative)
+                                           or (kind == "개선" and "심화" in narrative))
     if not narrative or wrong_direction or "예상" not in narrative or "가정" not in narrative:
         narrative = _fallback_narrative(result)
     return {"simulation": {

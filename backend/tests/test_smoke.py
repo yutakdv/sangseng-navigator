@@ -535,7 +535,11 @@ def test_simulate_rejects_narrative_missing_required_words(fake_llm):
 
 
 def test_simulate_rejects_narrative_with_wrong_direction(fake_llm):
-    """집중 심화(음수 delta)를 '개선'으로 서술한 narrative는 채택하지 않는다 (cards.py wrong_direction)."""
+    """계산 방향과 반대로 서술한 narrative는 **양방향 모두** 버린다 (cards.py wrong_direction).
+
+    한쪽(심화→"개선")만 막으면, 개선 구간에서 LLM이 "집중 심화"로 뒤집어 쓴 문장이 그대로
+    승인 화면에 실린다. 데모 카드 AC-002가 바로 개선 구간이라 실제로 노출될 수 있는 경로다.
+    """
     _put_expansion("AC-900", "사북읍", "카페")                  # 이미 소비가 몰린 지역 = 음수 delta
     fake_llm.narrative = "지역 소비 집중도가 개선될 것으로 예상됩니다. 가정에 기반한 수치입니다."
     sim = client.post("/api/cards/AC-900/simulate").json()["simulation"]
@@ -544,6 +548,51 @@ def test_simulate_rejects_narrative_with_wrong_direction(fake_llm):
     assert sim["narrative"] != fake_llm.narrative
     assert "상승(집중 심화)" in sim["narrative"]
     assert "예상" in sim["narrative"] and "가정" in sim["narrative"]
+
+    # 반대 방향 — AC-002(영월군 음식점)는 개선 구간이다
+    fake_llm.narrative = "지역 소비 집중도가 상승(집중 심화)할 것으로 예상됩니다. 가정에 기반한 수치입니다."
+    sim = client.post("/api/cards/AC-002/simulate").json()["simulation"]
+
+    assert sim["delta_pp"][1] > 0 and sim["delta_pp"][0] >= 0   # 전제: 개선 방향
+    assert sim["narrative"] != fake_llm.narrative
+    assert "개선될" in sim["narrative"] and "심화" not in sim["narrative"]
+
+
+def test_simulate_indices_share_the_unit_of_delta_pp(fake_llm):
+    """지수와 delta_pp의 단위가 어긋나면 한 문장 안에서 자기모순이 난다 (05 §2).
+
+    정수 반올림이면 원시 집중도 42.53이 0.05%p 변화에도 "43 → 42"(1포인트)로 보여, 같은 응답의
+    delta_pp(0.0~0.1%p)와 10배 어긋난다. 지수도 소수 1자리로 맞춘다.
+    """
+    sim = client.post("/api/cards/AC-002/simulate").json()["simulation"]
+    cur, proj = sim["current_index"], sim["projected_index"]
+
+    assert isinstance(cur, float) and isinstance(proj, float)
+    assert round(cur, 1) == cur and round(proj, 1) == proj      # 소수 1자리 고정
+    # 지수 변화폭이 delta_pp 범위 안에 있어야 한다 (반올림 오차 0.05 허용)
+    assert min(sim["delta_pp"]) - 0.05 <= cur - proj <= max(sim["delta_pp"]) + 0.05
+
+
+def test_simulate_does_not_hand_indices_to_the_llm(monkeypatch):
+    """LLM에 지수 두 값을 주면 "43에서 42로 1포인트 개선"처럼 delta_pp와 어긋난 문장을 쓴다.
+
+    방향과 폭만 주고 지수는 빼는 것이 그 문장을 구조적으로 막는 방법이다 (05 §2).
+    """
+    captured = {}
+
+    def spy(system, user, schema, schema_name="result", timeout=None, attempts=2):
+        captured["payload"] = json.loads(user)
+        return {"narrative": FAKE_NARRATIVE}
+
+    monkeypatch.setattr(llm, "generate_json", spy)
+    sim = client.post("/api/cards/AC-002/simulate").json()["simulation"]
+
+    payload = captured["payload"]
+    assert "예상 변화(부호 해석 완료)" in payload                  # 방향·폭은 준다
+    assert not any("집중도" in key for key in payload), payload.keys()   # 지수는 안 준다
+    serialized = json.dumps(payload, ensure_ascii=False)         # 다른 이름으로도 새지 않는다
+    assert str(sim["current_index"]) not in serialized
+    assert str(sim["projected_index"]) not in serialized
 
 
 def test_simulate_reports_no_change_without_claiming_a_direction(fake_llm):

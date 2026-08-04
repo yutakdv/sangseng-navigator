@@ -188,18 +188,25 @@ claude-sonnet-5 전환 시 $3/$15(인트로 $2/$10)로 수천 원 수준.
 
 ## 5. 마무리 조이기 (배포 URL 확정 후)
 
-**CORS는 2층이다** — ① API Gateway `CorsConfiguration.AllowOrigins`(게이트웨이) ② FastAPI
-`CORSMiddleware.allow_origins`(앱). 앱 쪽은 코드가 아니라 **`ALLOWED_ORIGINS` 환경변수**(콤마 구분)를
-읽으므로 SAM 파라미터 `AllowedOrigins`만 바꾸면 재배포로 좁혀진다 (07 B1 `app/main.py`).
-미설정·빈 값이면 지금까지와 같은 `*`다.
+**CORS는 2층이지만 배포에서 효력을 갖는 건 게이트웨이다.** ① API Gateway
+`CorsConfiguration.AllowOrigins` ② FastAPI `CORSMiddleware.allow_origins`(앱).
+⚠ **HTTP API에 `CorsConfiguration`이 설정돼 있으면 API Gateway는 통합(Lambda)이 돌려준 CORS 헤더를
+무시하고 자기 설정으로 덮는다**
+([AWS 문서](https://docs.aws.amazon.com/apigateway/latest/developerguide/http-api-cors.html)).
+따라서 앱 쪽만 좁히면 배포 환경에서는 **아무 효과가 없다** — 좁혔다고 착각하기 쉬운 함정이다.
+
+그래서 template이 두 층을 **같은 파라미터 하나**로 묶는다: 게이트웨이는
+`AllowOrigins: !Split [',', !Ref AllowedOrigins]`, Lambda 환경변수는 `ALLOWED_ORIGINS: !Ref AllowedOrigins`.
+`AllowedOrigins`(기본 `'*'`) 하나만 바꾸면 두 층이 함께 움직인다. 앱 레벨 설정은 로컬 uvicorn·Docker처럼
+게이트웨이를 거치지 않는 경로에서 의미가 있다.
 
 - [ ] `.env`에 `ALLOWED_ORIGINS=https://<project>.vercel.app,http://localhost:3000` 기입 →
-      `./deploy-backend.sh` 재실행 (스크립트가 `AllowedOrigins` 파라미터로 넘긴다)
-- [ ] 같은 값으로 template의 게이트웨이 `CorsConfiguration.AllowOrigins`도 좁혀 함께 재배포
-      (Vercel Preview URL도 쓸 거면 `https://*.vercel.app` 패턴은 HTTP API에서 안 되므로
-      Preview 도메인을 명시 추가하거나 데모 기간엔 `*` 유지 판단)
+      `./deploy-backend.sh` 재실행 (스크립트가 `AllowedOrigins` 파라미터로 넘겨 두 층을 함께 좁힌다)
+      - Vercel Preview URL도 쓸 거면 `https://*.vercel.app` 와일드카드는 HTTP API에서 안 되므로
+        Preview 도메인을 콤마로 명시 추가하거나 데모 기간엔 `*` 유지 판단
 - [ ] **검증:** 브라우저에서 Vercel 배포 URL로 정상 호출되는지 + 임의 오리진(로컬 파일 등)에서
-      차단되는지 확인. FE가 CORS 에러를 내면 두 층 중 어느 쪽인지부터 가른다 (트러블슈팅 표)
+      차단되는지 확인. 차단이 안 되면 **게이트웨이 쪽이 아직 `*`인지부터** 본다
+      (`aws apigatewayv2 get-api --api-id <id> --query CorsConfiguration`)
 - [ ] Billing 콘솔 $0 스크린샷 (발표 Q&A "운영 비용?" 대비)
 
 ## 5.5 심사 기간 운영 (제출 ~ 심사 종료, 상세: 12 문서 §5)
@@ -251,7 +258,7 @@ sam delete --stack-name sangseng-backend --region ap-northeast-2
 | Lambda 500 + Decimal 직렬화 오류 | DDB 응답의 Decimal 미변환 — `db.py`의 `_clean` 경유 확인 (07 문서 B2) |
 | BE만 고쳤는데 Vercel이 재빌드 | (선택) Vercel Settings → Git → Ignored Build Step에 `git diff --quiet HEAD^ HEAD -- .` 설정 — Root Directory(frontend) 변경 없으면 빌드 스킵 |
 | `data_loaded: false` | `deploy-backend.sh`의 data 복사 단계 누락 — 스크립트로만 배포. 응답의 `datasets`에서 어느 산출물이 `false`인지 바로 확인 (05 §5) |
-| FE에서 CORS 에러 | CORS는 2층(§5) — ① HTTP API `CorsConfiguration` ② Lambda 환경변수 `ALLOWED_ORIGINS`. 어느 쪽이 좁은지 확인하고 API URL 끝 `/` 중복도 확인 |
+| FE에서 CORS 에러 | 배포 경로에서 효력을 갖는 건 **게이트웨이 `CorsConfiguration`** 하나다(§5 — API Gateway가 Lambda의 CORS 헤더를 덮는다). `aws apigatewayv2 get-api --api-id <id> --query CorsConfiguration`으로 실제 값부터 확인하고, API URL 끝 `/` 중복도 확인 |
 | 배포 실패 — `ReservedConcurrentExecutions` 오류 | 계정의 미예약 동시성 여유 부족 → `.env`에 `RESERVED_CONCURRENCY=-1` 후 재배포 (속성 자체가 생략된다 — §5.5) |
 | Vercel 빌드 실패 | Root Directory가 `frontend/`인지, 환경변수 등록 후 **재배포**했는지 확인 (env는 빌드 시점 주입) |
 | Vercel에서 mock만 나옴 | `NEXT_PUBLIC_API_BASE` 미설정 상태로 빌드됨 — env 넣고 Redeploy |

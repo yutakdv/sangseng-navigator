@@ -85,8 +85,11 @@ def _blurbs(picked: list) -> list:
     payload = {
         "가맹점": [{"이름": m["name"], "지역": m["eup"], "업종": m["category"], "신규 가맹점": is_new}
                  for m, is_new in picked],
+        # 상호명에서 메뉴를 유추한 문구("BBQ하이캐슬점에서 맛있는 바베큐를 즐겨보세요")가 실호출로
+        # 확인돼 지침을 좁혔다 — A-4 프롬프트는 발표 공개용 원문이라 수정하지 않고 여기서 제한한다.
         "작성 지침": ("가맹점마다 한 문장씩, 입력 순서 그대로 blurbs 배열에 담을 것. "
-                   "이름·지역·업종 외의 사실(분위기·풍경·메뉴·인기도)은 지어내지 말 것"),
+                   "이름·지역·업종 외의 사실(분위기·풍경·메뉴·맛·인기도·거리)은 지어내지 말 것. "
+                   "상호명에서 취급 품목이나 맛을 유추해 쓰지 말 것"),
     }
     try:
         out = llm.generate_json(prompts.WIDGET_BLURB_PROMPT, json.dumps(payload, ensure_ascii=False),
