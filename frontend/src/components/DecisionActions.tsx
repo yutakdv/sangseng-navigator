@@ -13,16 +13,20 @@ import type { CardStatus, PaybackRate } from "@/types";
  * 여기서 카드 상태를 따로 들고 있지 않는다.
  */
 const DECISIONS: { value: CardStatus; label: string; tone: string }[] = [
-  { value: "approved", label: "승인", tone: "bg-admin-primary text-white hover:bg-admin-sidebar-active" },
+  {
+    value: "approved",
+    label: "승인",
+    tone: "bg-admin-primary text-white shadow-[0_4px_12px_-4px_rgb(79_70_229_/_0.8)] hover:bg-admin-primary-strong",
+  },
   {
     value: "rejected",
     label: "반려",
-    tone: "border border-state-bad/40 bg-admin-surface text-state-bad hover:bg-state-bad-bg",
+    tone: "border border-state-bad-line bg-admin-surface text-state-bad hover:bg-state-bad-bg",
   },
   {
     value: "held",
     label: "보류",
-    tone: "border border-black/10 bg-admin-surface text-admin-text hover:bg-admin-bg",
+    tone: "border border-admin-border bg-admin-surface text-admin-text hover:bg-admin-surface-sunken",
   },
 ];
 
@@ -78,7 +82,7 @@ export function DecisionActions({
               disabled={blocked}
               aria-busy={busy === d.value}
               aria-describedby={d.value === "approved" && rateMissing ? hintId : undefined}
-              className={`rounded-lg px-3 py-1.5 text-sm font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${d.tone}`}
+              className={`rounded-lg px-4 py-2 text-sm font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${d.tone}`}
             >
               {busy === d.value ? "처리 중…" : d.label}
             </button>
@@ -87,13 +91,16 @@ export function DecisionActions({
       </div>
 
       {rateMissing ? (
-        <p id={hintId} className="mt-1.5 text-xs text-admin-text-muted">
+        <p id={hintId} className="u-note mt-2">
           승인하려면 페이백률(3·5·7%)을 먼저 선택하세요 — 확정 rate는 담당자가 고른 값만 저장됩니다.
         </p>
       ) : null}
 
       {error ? (
-        <p role="alert" className="mt-1.5 break-keep text-xs leading-5 text-state-bad">
+        <p
+          role="alert"
+          className="mt-2 break-keep rounded-lg bg-state-bad-bg px-2.5 py-2 text-xs font-medium leading-5 text-state-bad ring-1 ring-inset ring-state-bad-line"
+        >
           {error}
         </p>
       ) : null}

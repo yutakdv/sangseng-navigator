@@ -3,6 +3,7 @@
 import { useState, useTransition } from "react";
 import { simulateAction } from "@/app/actions";
 import { AssumptionBadge, AssumptionNote } from "@/components/Badge";
+import { Icon } from "@/components/Icon";
 import { range } from "@/lib/format";
 import type { Simulation } from "@/types";
 
@@ -50,25 +51,29 @@ export function SimulateButton({ cardId }: { cardId: string }) {
         onClick={run}
         disabled={working}
         aria-busy={working}
-        className="rounded-lg bg-admin-primary px-3 py-1.5 text-sm font-medium text-white transition-colors hover:bg-admin-sidebar-active disabled:cursor-not-allowed disabled:opacity-50"
+        className="inline-flex items-center gap-2 rounded-xl bg-admin-primary px-4 py-2.5 text-sm font-bold text-white shadow-[0_6px_18px_-6px_rgb(79_70_229)] transition-colors hover:bg-admin-primary-strong disabled:cursor-not-allowed disabled:opacity-50"
       >
+        <Icon name="sparkle" size={16} strokeWidth={2} />
         {working ? "계산 중…" : result ? "다시 계산" : "이 후보가 가맹 전환하면?"}
       </button>
 
       {error ? (
-        <p role="alert" className="mt-2 break-keep text-xs leading-5 text-state-bad">
+        <p
+          role="alert"
+          className="mt-2 break-keep rounded-lg bg-state-bad-bg px-2.5 py-2 text-xs leading-5 text-state-bad ring-1 ring-inset ring-state-bad-line"
+        >
           {error}
         </p>
       ) : null}
 
       {result ? (
-        <div className="mt-3 rounded-lg bg-admin-primary-soft p-3">
+        <div className="mt-4 animate-fade-up rounded-xl bg-admin-primary-soft p-4 ring-1 ring-inset ring-admin-primary-line">
           <div className="flex flex-wrap items-center gap-2">
-            <h4 className="text-xs font-semibold text-admin-primary">가맹 전환 시 예상 효과</h4>
+            <h4 className="text-[13px] font-bold text-admin-primary">가맹 전환 시 예상 효과</h4>
             <AssumptionBadge />
           </div>
 
-          <div className="mt-2 grid grid-cols-1 gap-2 sm:grid-cols-3">
+          <div className="mt-3 grid grid-cols-1 gap-2.5 sm:grid-cols-3">
             {/* 지수는 소수 1자리 고정 — 정수로 반올림하면 같은 응답의 delta_pp와 어긋난다 (05 §2) */}
             <Metric
               label="현재 지역 소비 집중도"
@@ -87,7 +92,9 @@ export function SimulateButton({ cardId }: { cardId: string }) {
             />
           </div>
 
-          <p className="mt-2 break-keep text-sm leading-6 text-admin-text">{result.narrative}</p>
+          <p className="mt-3 break-keep text-[15px] leading-7 text-admin-text">
+            {result.narrative}
+          </p>
           <AssumptionNote className="mt-2" />
         </div>
       ) : null}
@@ -107,13 +114,13 @@ function Metric({
   sub?: string;
 }) {
   return (
-    <div className="rounded-lg bg-admin-surface px-3 py-2">
-      <p className="text-[11px] leading-4 text-admin-text-muted">{label}</p>
-      <p className="mt-0.5 flex items-baseline gap-1">
-        <span className="text-xl font-bold tabular-nums text-admin-text">{value}</span>
-        {unit ? <span className="text-[11px] text-admin-text-muted">{unit}</span> : null}
+    <div className="rounded-lg bg-admin-surface px-3.5 py-3 shadow-card">
+      <p className="break-keep text-xs font-medium leading-5 text-admin-text-muted">{label}</p>
+      <p className="mt-1 flex items-baseline gap-1">
+        <span className="text-2xl font-bold tabular-nums text-admin-text">{value}</span>
+        {unit ? <span className="text-xs text-admin-text-muted">{unit}</span> : null}
       </p>
-      {sub ? <p className="text-[10px] leading-4 text-admin-text-muted">{sub}</p> : null}
+      {sub ? <p className="mt-0.5 text-xs leading-5 text-admin-text-muted">{sub}</p> : null}
     </div>
   );
 }

@@ -4,8 +4,10 @@ import { notFound } from "next/navigation";
 import { AdminShell } from "@/components/AdminShell";
 import { AssumptionBadge, AssumptionNote, ProxyBadge } from "@/components/Badge";
 import { DecisionActions } from "@/components/DecisionActions";
+import { Icon } from "@/components/Icon";
 import { MapView } from "@/components/MapView";
 import { OriginalRankingTable } from "@/components/OriginalRankingTable";
+import { RankTrace } from "@/components/RankTrace";
 import { Section } from "@/components/Section";
 import { SimulateButton } from "@/components/SimulateButton";
 import { ProgressChip, StatusChip } from "@/components/StatusChip";
@@ -68,6 +70,7 @@ export default async function CardDetailPage({ params }: { params: Promise<{ id:
 
   const showRank = card.score_rank !== null && card.ai_rank !== null;
   const targetLabel = target ? `${target.eup} ${target.category}` : null;
+  const isExpansion = card.type === "EXPANSION";
 
   /**
    * `근사 지표` 배지 — "지역 전환율"이 보이는 **모든 위치**에 붙인다 (절대 규칙 2, 13 §9).
@@ -92,136 +95,155 @@ export default async function CardDetailPage({ params }: { params: Promise<{ id:
 
   return (
     <AdminShell dashboard={dashboard}>
-      <div className="mx-auto flex max-w-5xl flex-col gap-4">
+      <div className="mx-auto flex max-w-5xl flex-col gap-5">
+        <Link
+          href="/"
+          className="inline-flex w-fit items-center gap-1.5 text-[13px] font-semibold text-admin-text-muted underline-offset-4 hover:text-admin-primary hover:underline"
+        >
+          <Icon name="chevronRight" size={14} strokeWidth={2} className="rotate-180" />
+          제안 목록으로
+        </Link>
+
         {/* ── 카드 요약 + 결정 ─────────────────────────────────── */}
-        <div className="rounded-card bg-admin-surface p-4 shadow-card sm:p-5">
-          <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
-            <Link
-              href="/"
-              className="text-xs font-medium text-admin-primary underline-offset-2 hover:underline"
-            >
-              ← 제안 목록
-            </Link>
-            <span className="text-xs tabular-nums text-admin-text-muted">{card.id}</span>
-            <StatusChip status={card.status} />
-            {card.progress ? <ProgressChip progress={card.progress} /> : null}
-          </div>
-
-          <h2 className="mt-1.5 break-keep text-lg font-bold leading-7 text-admin-text">
-            {card.title}
-          </h2>
-
-          <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-admin-text-muted">
-            <span>
-              대상{" "}
-              <span className="font-medium text-admin-text">
-                {target ? `${target.eup} · ${target.category}` : "전 지역 공통"}
+        <div className="u-panel overflow-hidden">
+          <div className="border-b border-admin-border bg-gradient-to-br from-admin-primary-soft/70 to-admin-surface p-4 sm:p-6">
+            <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+              <span className="rounded-md bg-admin-surface px-1.5 py-0.5 text-[11px] font-semibold tabular-nums text-admin-text-muted ring-1 ring-inset ring-admin-border">
+                {card.id}
               </span>
-            </span>
-            <span>
-              신뢰도 <span className="font-medium text-admin-text">{card.confidence}</span>
-            </span>
-            <span>생성 {dateText(card.created_at)}</span>
-            {card.decided_at ? <span>결정 {dateText(card.decided_at)}</span> : null}
-            {card.selected_rate ? (
-              <span>
-                확정 페이백률{" "}
-                <span className="font-medium text-admin-text">{card.selected_rate}%</span>
+              <span className="text-[11px] font-semibold uppercase tracking-[0.1em] text-admin-text-muted">
+                {isExpansion ? "가맹점 확충" : "페이백 인센티브"}
               </span>
-            ) : null}
-          </div>
-
-          {/* 정량 순위 병기 — 조정 여부와 무관하게 항상 노출 (절대 규칙 5) */}
-          {showRank ? (
-            <div className="mt-3 flex flex-wrap items-center gap-2">
-              <span
-                className={`inline-flex items-center rounded-lg px-2.5 py-1.5 text-sm tabular-nums ${
-                  card.ai.adjusted
-                    ? "bg-admin-primary-soft font-semibold text-admin-primary"
-                    : "bg-admin-bg text-admin-text"
-                }`}
-              >
-                Score {card.score_rank}위 → AI 제안 {card.ai_rank}위
-              </span>
-              {card.ai.adjusted ? (
-                <span className="inline-flex items-center rounded-full bg-state-notice-bg px-2 py-0.5 text-[11px] font-medium text-state-notice">
-                  AI 조정 제안
-                </span>
-              ) : (
-                <span className="text-[11px] text-admin-text-muted">정량 1순위와 동일</span>
-              )}
+              <StatusChip status={card.status} />
+              {card.progress ? <ProgressChip progress={card.progress} /> : null}
             </div>
-          ) : null}
 
-          {card.status === "pending" ? (
-            <div className="mt-4 border-t border-black/5 pt-3">
-              <p className="mb-2 break-keep text-xs leading-5 text-admin-text-muted">
-                AI는 후보 비교와 근거까지만 제시합니다. 아래 버튼을 거쳐야 카드가 확정되며, 이
-                화면의 수치·문구는 담당자 의사결정 근거로 쓰입니다.
-              </p>
-              <DecisionActions
-                cardId={card.id}
-                requireRate={card.type === "INCENTIVE"}
-                selectedRate={card.selected_rate ?? null}
-              />
-              {card.type === "INCENTIVE" ? (
-                <p className="mt-1.5 text-xs text-admin-text-muted">
-                  페이백률(3·5·7%) 선택은{" "}
-                  <Link href="/incentive" className="text-admin-primary hover:underline">
-                    인센티브 정책 화면
-                  </Link>
-                  에서 합니다.
-                </p>
+            <h1 className="mt-2 break-keep text-[22px] font-bold leading-8 tracking-[-0.01em] text-admin-text sm:text-[26px] sm:leading-9">
+              {card.title}
+            </h1>
+
+            <div className="mt-3 flex flex-wrap items-center gap-x-5 gap-y-1.5 text-[13px] text-admin-text-muted">
+              <span className="flex items-center gap-1.5">
+                <Icon name="pin" size={14} />
+                대상{" "}
+                <b className="font-semibold text-admin-text">
+                  {target ? `${target.eup} · ${target.category}` : "전 지역 공통"}
+                </b>
+              </span>
+              <span className="flex items-center gap-1.5">
+                <Icon name="shield" size={14} />
+                신뢰도 <b className="font-semibold text-admin-text">{card.confidence}</b>
+              </span>
+              <span className="flex items-center gap-1.5 tabular-nums">
+                <Icon name="clock" size={14} />
+                생성 {dateText(card.created_at)}
+              </span>
+              {card.decided_at ? (
+                <span className="tabular-nums">결정 {dateText(card.decided_at)}</span>
+              ) : null}
+              {card.selected_rate ? (
+                <span className="flex items-center gap-1.5">
+                  <Icon name="gift" size={14} />
+                  확정 페이백률{" "}
+                  <b className="font-semibold text-admin-text">{card.selected_rate}%</b>
+                </span>
               ) : null}
             </div>
-          ) : null}
+          </div>
+
+          <div className="flex flex-col gap-4 p-4 sm:p-6">
+            {/* 정량 순위 병기 — 조정 여부와 무관하게 항상 노출 (절대 규칙 5) */}
+            {showRank ? <RankTrace card={card} size="md" /> : null}
+
+            {card.status === "pending" ? (
+              <div className="rounded-xl bg-admin-surface-sunken p-4">
+                <p className="u-note mb-2.5 flex items-start gap-1.5">
+                  <Icon name="info" size={13} strokeWidth={2} className="mt-[3px]" />
+                  <span>
+                    AI는 후보 비교와 근거까지만 제시합니다. 아래 버튼을 거쳐야 카드가 확정되며, 이
+                    화면의 수치·문구는 담당자 의사결정 근거로 쓰입니다.
+                  </span>
+                </p>
+                <DecisionActions
+                  cardId={card.id}
+                  requireRate={card.type === "INCENTIVE"}
+                  selectedRate={card.selected_rate ?? null}
+                />
+                {card.type === "INCENTIVE" ? (
+                  <p className="u-note mt-2">
+                    페이백률(3·5·7%) 선택은{" "}
+                    <Link
+                      href="/incentive"
+                      className="font-semibold text-admin-primary underline-offset-4 hover:underline"
+                    >
+                      인센티브 정책 화면
+                    </Link>
+                    에서 합니다.
+                  </p>
+                ) : null}
+              </div>
+            ) : null}
+          </div>
         </div>
 
         {/* ── AI 조정 근거 전문 ────────────────────────────────── */}
         <Section
+          icon="sparkle"
           title="AI 조정 근거"
           desc="AI가 후보를 비교한 내용을 요약하지 않고 그대로 싣는다. 담당자가 판단 근거를 직접 확인할 수 있어야 하기 때문이다."
         >
           <div className="flex flex-col gap-4">
             <Block title="후보 비교">
-              <p className="break-keep text-sm leading-6 text-admin-text">{card.ai.comparison}</p>
+              <p className="break-keep text-[15px] leading-7 text-admin-text">
+                {card.ai.comparison}
+              </p>
             </Block>
 
-            {card.ai.reasons?.length ? (
-              <Block title="근거">
-                <ul className="flex list-disc flex-col gap-1.5 pl-4">
-                  {card.ai.reasons.map((r, i) => (
-                    <li key={i} className="break-keep text-sm leading-6 text-admin-text">
-                      {r}
-                    </li>
-                  ))}
-                </ul>
-              </Block>
-            ) : null}
+            <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
+              {card.ai.reasons?.length ? (
+                <div className="rounded-xl bg-admin-surface-sunken p-4">
+                  <h3 className="flex items-center gap-1.5 text-[13px] font-bold text-admin-text">
+                    <Icon name="check" size={15} className="text-state-good" />
+                    근거
+                  </h3>
+                  <ul className="mt-2 flex list-disc flex-col gap-2 pl-4">
+                    {card.ai.reasons.map((r, i) => (
+                      <li key={i} className="break-keep text-[13px] leading-6 text-admin-text-soft">
+                        {r}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              ) : null}
 
-            {card.ai.risks?.length ? (
-              <Block title="리스크">
-                <ul className="flex list-disc flex-col gap-1.5 pl-4">
-                  {card.ai.risks.map((r, i) => (
-                    <li key={i} className="break-keep text-sm leading-6 text-admin-text">
-                      {r}
-                    </li>
-                  ))}
-                </ul>
-              </Block>
-            ) : null}
+              {card.ai.risks?.length ? (
+                <div className="rounded-xl bg-admin-surface-sunken p-4">
+                  <h3 className="flex items-center gap-1.5 text-[13px] font-bold text-admin-text">
+                    <Icon name="warn" size={15} className="text-state-warn" />
+                    리스크
+                  </h3>
+                  <ul className="mt-2 flex list-disc flex-col gap-2 pl-4">
+                    {card.ai.risks.map((r, i) => (
+                      <li key={i} className="break-keep text-[13px] leading-6 text-admin-text-soft">
+                        {r}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              ) : null}
+            </div>
 
             {/* 예상 효과는 시뮬레이션 계열 출력이라 배지 + 고지 문구를 붙인다 (절대 규칙 3) */}
-            <div className="rounded-lg bg-admin-primary-soft p-3">
+            <div className="rounded-xl bg-admin-primary-soft p-4 ring-1 ring-inset ring-admin-primary-line">
               <div className="flex flex-wrap items-center gap-2">
-                <h3 className="text-xs font-semibold text-admin-primary">예상 효과</h3>
+                <h3 className="text-[13px] font-bold text-admin-primary">예상 효과</h3>
                 <AssumptionBadge />
                 {proxyBadge}
               </div>
-              <p className="mt-1 break-keep text-sm leading-6 text-admin-text">
+              <p className="mt-2 break-keep text-[15px] leading-7 text-admin-text">
                 {card.ai.expected_effect}
               </p>
-              <AssumptionNote className="mt-1.5" />
+              <AssumptionNote className="mt-2" />
             </div>
           </div>
         </Section>
@@ -229,6 +251,7 @@ export default async function CardDetailPage({ params }: { params: Promise<{ id:
         {/* ── 원 Score 순위 (절대 규칙 5) ──────────────────────── */}
         {card.ai.original_ranking?.length ? (
           <Section
+            icon="scale"
             title="원 Score 순위 (정량 기준)"
             desc="2단계 후보 스코어의 원래 순위다. AI 제안 순위와 나란히 두어 조정 내역을 감출 수 없게 한다."
           >
@@ -245,6 +268,7 @@ export default async function CardDetailPage({ params }: { params: Promise<{ id:
         {/* ── 지도 ─────────────────────────────────────────────── */}
         {targetCandidate && target ? (
           <Section
+            icon="pin"
             title="후보 위치와 반경 500m"
             desc={`제안 후보를 중심으로 반경 500m를 그리고, ${target.eup}의 하이원포인트 가맹점을 업종 색으로 찍었다. 거점 마커는 후보까지의 거리·소요시간 기준점이다.`}
           >
@@ -269,7 +293,7 @@ export default async function CardDetailPage({ params }: { params: Promise<{ id:
                 address: m.address,
               }))}
             />
-            <p className="mt-2 break-keep text-[11px] leading-4 text-admin-text-muted">
+            <p className="u-note mt-3 border-t border-admin-border pt-2.5">
               {target.eup} 하이원포인트 가맹점 {eupMerchants.length}곳 (그중 {target.category}{" "}
               {sameCategoryMerchants}곳) · 후보 반경 500m 내 동일 업종 가맹점{" "}
               {targetCandidate.nearby_merchants}곳 / 전체 상가 {targetCandidate.nearby_stores}곳.
@@ -281,89 +305,84 @@ export default async function CardDetailPage({ params }: { params: Promise<{ id:
         {/* ── 후보 상세 (거리 병기) ────────────────────────────── */}
         {eupCandidates.length ? (
           <Section
+            icon="store"
             title="후보 상세"
             desc="같은 읍에서 업종별로 뽑힌 대표 후보다. 순서는 정량 Score 순이며, 도로 값으로 다시 정렬하지 않는다."
           >
-            <div className="overflow-x-auto">
-              <table className="w-full min-w-[640px] text-sm">
+            <div className="u-scroll-x">
+              <table className="u-table min-w-[680px]">
                 <thead>
-                  <tr className="border-b border-black/5 text-left text-xs text-admin-text-muted">
-                    <th scope="col" className="py-2 pr-3 font-medium">
-                      후보
-                    </th>
-                    <th scope="col" className="py-2 pr-3 text-right font-medium">
+                  <tr>
+                    <th scope="col">후보</th>
+                    <th scope="col" className="text-right">
                       Score
                     </th>
-                    <th scope="col" className="py-2 pr-3 text-right font-medium">
+                    <th scope="col" className="text-right">
                       업종공백도
                     </th>
-                    <th scope="col" className="py-2 pr-3 text-right font-medium">
+                    <th scope="col" className="text-right">
                       동선근접도
                     </th>
-                    <th scope="col" className="py-2 pr-3 text-right font-medium">
+                    <th scope="col" className="text-right">
                       기존가맹포화도
                     </th>
-                    <th scope="col" className="py-2 pr-3 text-right font-medium">
+                    <th scope="col" className="text-right">
                       반경 500m 내 (동일 업종 가맹점 / 전체 상가)
                     </th>
-                    <th scope="col" className="py-2 font-medium">
-                      거점에서의 거리
-                    </th>
+                    <th scope="col">거점에서의 거리</th>
                   </tr>
                 </thead>
                 <tbody>
                   {eupCandidates.map((c) => {
                     const isTarget = c.id === targetCandidate?.id;
                     return (
-                      <tr
-                        key={c.id}
-                        className={`border-b border-black/5 last:border-0 ${
-                          isTarget ? "bg-admin-primary-soft" : ""
-                        }`}
-                      >
-                        <td className="py-2 pr-3">
+                      <tr key={c.id} data-highlight={isTarget ? "true" : undefined}>
+                        <td>
                           <div
                             className={
-                              isTarget ? "font-semibold text-admin-primary" : "font-medium text-admin-text"
+                              isTarget ? "font-bold text-admin-primary" : "font-semibold text-admin-text"
                             }
                           >
                             {c.category}
                             {isTarget ? (
-                              <span className="ml-1.5 text-[11px] font-normal">이번 제안 후보</span>
+                              <span className="ml-1.5 whitespace-nowrap rounded-full bg-admin-surface px-1.5 py-0.5 text-[11px] font-semibold text-admin-primary ring-1 ring-inset ring-admin-primary-line">
+                                이번 제안 후보
+                              </span>
                             ) : null}
                           </div>
-                          <div className="text-[11px] text-admin-text-muted">
+                          <div className="mt-0.5 text-xs text-admin-text-muted">
                             {c.eup} · {c.name}
                           </div>
                         </td>
-                        <td className="py-2 pr-3 text-right tabular-nums font-medium">
+                        <td className="text-right font-semibold tabular-nums">
                           {c.score.toFixed(2)}
                         </td>
-                        <td className="py-2 pr-3 text-right tabular-nums text-admin-text-muted">
+                        <td className="text-right tabular-nums text-admin-text-muted">
                           {c.gap.toFixed(2)}
                         </td>
-                        <td className="py-2 pr-3 text-right tabular-nums text-admin-text-muted">
+                        <td className="text-right tabular-nums text-admin-text-muted">
                           {c.proximity.toFixed(2)}
                         </td>
-                        <td className="py-2 pr-3 text-right tabular-nums text-admin-text-muted">
+                        <td className="text-right tabular-nums text-admin-text-muted">
                           {c.saturation.toFixed(2)}
                         </td>
-                        <td className="py-2 pr-3 text-right tabular-nums text-admin-text-muted">
+                        <td className="text-right tabular-nums text-admin-text-muted">
                           {c.nearby_merchants}곳 / {c.nearby_stores}곳
                         </td>
                         {/* 직선·도로를 항상 함께 적는다 — 한쪽만 쓰면 "가장 가깝다"는 오독이 생긴다 (05 §1) */}
-                        <td className="py-2 tabular-nums text-admin-text">{distanceText(c)}</td>
+                        <td className="whitespace-nowrap tabular-nums">{distanceText(c)}</td>
                       </tr>
                     );
                   })}
                 </tbody>
               </table>
             </div>
-            <p className="mt-2 break-keep text-[11px] leading-4 text-admin-text-muted">
+            <p className="u-note mt-3 border-t border-admin-border pt-2.5">
               직선거리는 {ANCHOR.name} 좌표와 후보 좌표로 계산한 값이고, 도로 거리·소요시간은 공개
               라우팅 API 추정치로 비포장·임도 구간이 포함될 수 있다. 두 값은 절대 수치가 아니라 후보
-              간 상대 비교로만 읽으며, 어느 후보도 “거점에서 가장 가깝다”고 단정하지 않는다. 동선근접도는
-              직선거리 기반이라 산악 지형에서 실제 접근성과 역전될 수 있어 도로 값을 함께 싣는다.
+              간 상대 비교로만 읽으며, 어느 후보도 “거점에서 가장 가깝다”고 단정하지 않는다.
+              동선근접도는 직선거리 기반이라 산악 지형에서 실제 접근성과 역전될 수 있어 도로 값을
+              함께 싣는다.
             </p>
           </Section>
         ) : null}
@@ -371,6 +390,7 @@ export default async function CardDetailPage({ params }: { params: Promise<{ id:
         {/* ── 가맹 전환 시 예상 효과 (EXPANSION 전용) ──────────── */}
         {card.type === "EXPANSION" ? (
           <Section
+            icon="trend"
             title="가맹 전환 시 예상 효과"
             badge={<AssumptionBadge />}
             desc="이 후보가 하이원포인트 가맹점으로 전환됐다고 가정하고 지역 소비 집중도를 다시 계산한다. 결과는 확정이 아니라 의사결정 근거로만 쓴다."
@@ -382,6 +402,7 @@ export default async function CardDetailPage({ params }: { params: Promise<{ id:
         {/* ── 인센티브 시나리오 (INCENTIVE 전용) ───────────────── */}
         {card.scenarios?.length ? (
           <Section
+            icon="gift"
             title="페이백 시나리오 비교"
             badge={
               <>
@@ -391,54 +412,42 @@ export default async function CardDetailPage({ params }: { params: Promise<{ id:
             }
             desc="AI는 세 시나리오를 비교해 제시할 뿐이고, 적용할 페이백률은 담당자가 승인할 때 고른 값만 확정된다."
           >
-            <div className="overflow-x-auto">
-              <table className="w-full min-w-[420px] text-sm">
+            <div className="u-scroll-x">
+              <table className="u-table min-w-[440px]">
                 <thead>
-                  <tr className="border-b border-black/5 text-left text-xs text-admin-text-muted">
-                    <th scope="col" className="py-2 pr-3 font-medium">
-                      페이백률
-                    </th>
+                  <tr>
+                    <th scope="col">페이백률</th>
                     {/* 무엇의 개선폭인지 열 이름에 밝힌다 — 인센티브 화면(ScenarioTable)과 같은 라벨 */}
-                    <th scope="col" className="py-2 pr-3 font-medium">
-                      예상 지역 전환율 개선폭
-                    </th>
-                    <th scope="col" className="py-2 font-medium">
-                      재원 부담
-                    </th>
+                    <th scope="col">예상 지역 전환율 개선폭</th>
+                    <th scope="col">재원 부담</th>
                   </tr>
                 </thead>
                 <tbody>
                   {card.scenarios.map((s) => (
                     <tr
                       key={s.rate}
-                      className={`border-b border-black/5 last:border-0 ${
-                        card.selected_rate === s.rate ? "bg-admin-primary-soft" : ""
-                      }`}
+                      data-highlight={card.selected_rate === s.rate ? "true" : undefined}
                     >
-                      <td className="py-2 pr-3 tabular-nums font-medium">
+                      <td className="font-semibold tabular-nums">
                         {s.rate}%
                         {card.selected_rate === s.rate ? (
-                          <span className="ml-1.5 text-[11px] font-normal text-admin-primary">
+                          <span className="ml-1.5 whitespace-nowrap rounded-full bg-admin-surface px-1.5 py-0.5 text-[11px] font-semibold text-admin-primary ring-1 ring-inset ring-admin-primary-line">
                             담당자 확정
                           </span>
                         ) : null}
                       </td>
                       {/* delta_pp는 소수 1자리 고정 — 저장소 왕복에서 1.0이 1로 돌아올 여지가 있다 (05 §2) */}
-                      <td className="py-2 pr-3 tabular-nums text-admin-text">
-                        {range(s.delta_pp)}
-                      </td>
-                      <td className="py-2 text-admin-text-muted">{s.budget_note}</td>
+                      <td className="tabular-nums">{range(s.delta_pp)}</td>
+                      <td className="text-admin-text-muted">{s.budget_note}</td>
                     </tr>
                   ))}
                 </tbody>
               </table>
             </div>
             {card.assumption_note ? (
-              <p className="mt-2 break-keep text-[11px] leading-4 text-admin-text-muted">
-                {card.assumption_note}
-              </p>
+              <p className="u-note mt-3">{card.assumption_note}</p>
             ) : null}
-            <AssumptionNote className="mt-1" />
+            <AssumptionNote className="mt-1.5" />
           </Section>
         ) : null}
 
@@ -446,11 +455,12 @@ export default async function CardDetailPage({ params }: { params: Promise<{ id:
         {/* 전 지역 공통 카드(INCENTIVE)에는 "왜 이 지역인가"가 성립하지 않아 싣지 않는다 */}
         {target && eupBars.length ? (
           <Section
+            icon="compass"
             title="1단계 지역 진단 — 왜 이 지역인가"
             desc="소비저조도·소비증감을 0~1로 정규화해 합산한 지역 스코어다. 후보 선정보다 한 단계 앞선 정량 근거이며, 순위는 화면에서 감추지 않는다."
           >
             <BarRank data={eupBars} colors={eupColors} height={200} />
-            <p className="mt-2 break-keep text-[11px] leading-4 text-admin-text-muted">
+            <p className="u-note mt-3 border-t border-admin-border pt-2.5">
               제안 대상 지역 {target.eup}만 진한 색으로 표시했다. 막대 길이는 지역 스코어이며, 값이
               클수록 소비가 저조하거나 감소 폭이 크다는 뜻이다.
             </p>
@@ -458,23 +468,31 @@ export default async function CardDetailPage({ params }: { params: Promise<{ id:
         ) : null}
 
         {/* ── 출처·이력 ───────────────────────────────────────── */}
-        <Section title="근거 데이터와 처리 이력" desc="이 카드가 어떤 데이터로 만들어졌고 언제 어떤 결정을 거쳤는지.">
+        <Section
+          icon="database"
+          title="근거 데이터와 처리 이력"
+          desc="이 카드가 어떤 데이터로 만들어졌고 언제 어떤 결정을 거쳤는지."
+        >
           <div className="flex flex-wrap gap-1.5">
             {card.sources.map((s) => (
               <span
                 key={s}
-                className="inline-flex items-center rounded-full bg-admin-bg px-2 py-0.5 text-[11px] text-admin-text-muted"
+                className="inline-flex items-center rounded-full border border-admin-border bg-admin-surface-sunken px-2.5 py-1 text-xs font-medium text-admin-text-muted"
               >
                 {s}
               </span>
             ))}
           </div>
           {card.events?.length ? (
-            <ol className="mt-3 flex flex-col gap-1.5">
+            <ol className="mt-4 flex flex-col gap-2 border-l-2 border-admin-border pl-4">
               {card.events.map((e, i) => (
-                <li key={i} className="flex flex-wrap items-baseline gap-2 text-xs">
+                <li key={i} className="relative flex flex-wrap items-baseline gap-x-2.5 text-[13px]">
+                  <span
+                    aria-hidden
+                    className="absolute -left-[21px] top-1.5 h-2 w-2 rounded-full bg-admin-primary-line ring-2 ring-admin-surface"
+                  />
                   <span className="tabular-nums text-admin-text-muted">{timeText(e.at)}</span>
-                  <span className="text-admin-text">{eventLabel(e.action)}</span>
+                  <span className="font-medium text-admin-text">{eventLabel(e.action)}</span>
                 </li>
               ))}
             </ol>
@@ -488,8 +506,10 @@ export default async function CardDetailPage({ params }: { params: Promise<{ id:
 function Block({ title, children }: { title: string; children: React.ReactNode }) {
   return (
     <div className="min-w-0">
-      <h3 className="text-xs font-semibold text-admin-text-muted">{title}</h3>
-      <div className="mt-1">{children}</div>
+      <h3 className="text-[11px] font-semibold uppercase tracking-[0.1em] text-admin-text-muted">
+        {title}
+      </h3>
+      <div className="mt-1.5">{children}</div>
     </div>
   );
 }

@@ -51,25 +51,17 @@ export function ScenarioTable({
 
   return (
     <div>
-      <div className="overflow-x-auto">
-        <table className="w-full min-w-[460px] text-sm">
+      <div className="u-scroll-x">
+        <table className="u-table min-w-[480px]">
           <caption className="sr-only">
             페이백률 시나리오 비교 — 승인 시 이 표에서 고른 페이백률만 확정된다
           </caption>
           <thead>
-            <tr className="border-b border-black/5 text-left text-xs text-admin-text-muted">
-              <th scope="col" className="py-2 pr-3 font-medium">
-                선택
-              </th>
-              <th scope="col" className="py-2 pr-3 font-medium">
-                페이백률
-              </th>
-              <th scope="col" className="py-2 pr-3 font-medium">
-                예상 지역 전환율 개선폭
-              </th>
-              <th scope="col" className="py-2 font-medium">
-                재원 부담
-              </th>
+            <tr>
+              <th scope="col">선택</th>
+              <th scope="col">페이백률</th>
+              <th scope="col">예상 지역 전환율 개선폭</th>
+              <th scope="col">재원 부담</th>
             </tr>
           </thead>
           <tbody>
@@ -80,11 +72,10 @@ export function ScenarioTable({
                 <tr
                   key={s.rate}
                   onClick={editable ? () => setChoice(s.rate) : undefined}
-                  className={`border-b border-black/5 last:border-0 ${
-                    on ? "bg-admin-primary-soft" : ""
-                  } ${editable ? "cursor-pointer" : ""}`}
+                  data-highlight={on ? "true" : undefined}
+                  className={editable ? "cursor-pointer transition-colors hover:bg-admin-surface-sunken" : ""}
                 >
-                  <td className="py-2.5 pr-3">
+                  <td>
                     <input
                       type="radio"
                       id={inputId}
@@ -93,35 +84,37 @@ export function ScenarioTable({
                       checked={on}
                       disabled={!editable}
                       onChange={() => setChoice(s.rate)}
-                      className="h-4 w-4 accent-admin-primary"
+                      className="h-[18px] w-[18px] accent-admin-primary"
                     />
                   </td>
-                  <td className="py-2.5 pr-3">
+                  <td>
                     <label
                       htmlFor={inputId}
-                      className={`tabular-nums ${
-                        on ? "font-semibold text-admin-primary" : "font-medium text-admin-text"
+                      className={`text-lg tabular-nums ${
+                        on ? "font-bold text-admin-primary" : "font-semibold text-admin-text"
                       } ${editable ? "cursor-pointer" : ""}`}
                     >
                       {s.rate}%
                     </label>
                     {/* 색만으로 의미를 전달하지 않는다 (13 §4) — 확정 rate는 텍스트로도 적는다 */}
                     {!editable && selectedRate === s.rate ? (
-                      <span className="ml-1.5 rounded-full bg-admin-primary px-1.5 py-0.5 text-[10px] font-medium text-white">
+                      <span className="ml-1.5 whitespace-nowrap rounded-full bg-admin-primary px-1.5 py-0.5 text-[11px] font-semibold text-white">
                         담당자 선택
                       </span>
                     ) : null}
                   </td>
-                  <td className="py-2.5 pr-3">
-                    <div className="tabular-nums text-admin-text">{range(s.delta_pp)}</div>
-                    <span className="mt-1 flex h-1.5 w-full min-w-[80px] max-w-[160px] overflow-hidden rounded-full bg-admin-bg">
+                  <td>
+                    <div className="font-semibold tabular-nums text-admin-text">
+                      {range(s.delta_pp)}
+                    </div>
+                    <span className="mt-1.5 flex h-2 w-full min-w-[80px] max-w-[160px] overflow-hidden rounded-full bg-admin-surface-sunken ring-1 ring-inset ring-admin-border">
                       <span
                         className="block h-full rounded-full bg-admin-primary"
                         style={{ width: `${Math.min(100, (hiOf(s) / maxHi) * 100)}%` }}
                       />
                     </span>
                   </td>
-                  <td className="py-2.5 text-admin-text-muted">{s.budget_note}</td>
+                  <td className="text-admin-text-muted">{s.budget_note}</td>
                 </tr>
               );
             })}
@@ -129,32 +122,30 @@ export function ScenarioTable({
         </table>
       </div>
 
-      {assumptionNote ? (
-        <p className="mt-3 break-keep text-xs leading-5 text-admin-text-muted">{assumptionNote}</p>
-      ) : null}
-      <AssumptionNote className="mt-1" />
+      {assumptionNote ? <p className="u-note mt-3">{assumptionNote}</p> : null}
+      <AssumptionNote className="mt-1.5" />
 
-      <div className="mt-4 border-t border-black/5 pt-3">
+      <div className="mt-4 rounded-xl bg-admin-surface-sunken p-4">
         {editable ? (
           <>
-            <p className="mb-2 break-keep text-xs leading-5 text-admin-text-muted">
+            <p className="u-note mb-2.5">
               AI는 세 시나리오의 효과·재원 트레이드오프를 비교해 제시할 뿐입니다. 확정 페이백률은
               담당자가 이 표에서 고른 값만 저장됩니다 — 의사결정 근거 제공이 AI의 역할입니다.
             </p>
             <DecisionActions cardId={cardId} requireRate selectedRate={choice} />
           </>
         ) : selectedRate ? (
-          <p className="text-sm text-admin-text">
+          <p className="flex flex-wrap items-baseline gap-x-2 gap-y-1 text-sm text-admin-text">
             담당자가 선택한 페이백률{" "}
-            <b className="text-lg font-bold tabular-nums text-admin-primary">{selectedRate}%</b>
-            <span className="ml-2 text-xs text-admin-text-muted">
+            <b className="text-2xl font-bold tabular-nums text-admin-primary">{selectedRate}%</b>
+            <span className="u-note">
               (승인 시 확정된 값 — 방문객 위젯의 페이백 배지도 이 값을 씁니다)
             </span>
           </p>
         ) : (
-          <p className="break-keep text-xs leading-5 text-admin-text-muted">
-            {DECIDED_LABEL[status]} 처리된 카드라 확정된 페이백률이 없습니다. 시나리오 비교는 기록으로
-            남깁니다.
+          <p className="u-note">
+            {DECIDED_LABEL[status]} 처리된 카드라 확정된 페이백률이 없습니다. 시나리오 비교는
+            기록으로 남깁니다.
           </p>
         )}
       </div>

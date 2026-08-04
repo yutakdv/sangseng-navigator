@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { Icon, type IconName } from "@/components/Icon";
 import type { CardType } from "@/types";
 
 /**
@@ -9,18 +10,28 @@ import type { CardType } from "@/types";
  * mock JSON(merchants 포함)이 브라우저 번들에 실리지 않는다.
  *
  * 수치는 **승인 대기 건수**다 — 허브의 주 목록이 승인 대기이기 때문이며, 전체 카드 수가 아니다.
+ * 알약 3개가 떠 있던 것을 하나의 세그먼트 컨트롤로 묶었다 — 서로 배타적인 필터라는 사실이
+ * 형태로 읽히고, 선택된 탭이 흰 표면으로 떠올라 현재 필터가 한눈에 보인다.
  */
-const TABS: { value: CardType | null; label: string; href: string; note: string }[] = [
-  { value: null, label: "전체", href: "/", note: "확충·인센티브 카드 모두" },
+const TABS: {
+  value: CardType | null;
+  label: string;
+  icon: IconName;
+  href: string;
+  note: string;
+}[] = [
+  { value: null, label: "전체", icon: "cards", href: "/", note: "확충·인센티브 카드 모두" },
   {
     value: "EXPANSION",
     label: "가맹점 확충",
+    icon: "store",
     href: "/?type=EXPANSION",
     note: "공급 측 — 하이원포인트 가맹점을 늘릴 후보(읍×업종)",
   },
   {
     value: "INCENTIVE",
     label: "페이백 인센티브",
+    icon: "gift",
     href: "/?type=INCENTIVE",
     note: "수요 측 — 지역 결제분 한정 사용 리워드(발행액 증액 없음)",
   },
@@ -36,7 +47,10 @@ export function CardTypeTabs({
   pendingCounts: { all: number; EXPANSION: number; INCENTIVE: number };
 }) {
   return (
-    <nav aria-label="카드 종류 필터" className="flex flex-wrap gap-1.5">
+    <nav
+      aria-label="카드 종류 필터"
+      className="inline-flex max-w-full flex-wrap gap-1 rounded-[14px] border border-admin-border bg-admin-surface-sunken p-1"
+    >
       {TABS.map((t) => {
         const selected = t.value === active;
         const count = t.value === null ? pendingCounts.all : pendingCounts[t.value];
@@ -46,16 +60,21 @@ export function CardTypeTabs({
             href={t.href}
             title={t.note}
             aria-current={selected ? "page" : undefined}
-            className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-sm transition-colors ${
+            className={`inline-flex items-center gap-2 rounded-[10px] px-3 py-2 text-sm transition-colors ${
               selected
-                ? "bg-admin-primary font-semibold text-white"
-                : "bg-admin-surface text-admin-text shadow-card hover:bg-admin-primary-soft"
+                ? "bg-admin-surface font-semibold text-admin-primary shadow-card ring-1 ring-inset ring-admin-primary-line"
+                : "text-admin-text-muted hover:bg-admin-surface/70 hover:text-admin-text"
             }`}
           >
+            <Icon name={t.icon} size={16} />
             {t.label}
             {/* 색만으로 선택 상태를 전달하지 않는다 (13 §4) — 건수는 항상 숫자로 읽힌다 */}
             <span
-              className={`tabular-nums text-xs ${selected ? "text-white/80" : "text-admin-text-muted"}`}
+              className={`inline-flex min-w-[20px] justify-center rounded-full px-1.5 py-0.5 text-xs font-semibold tabular-nums ${
+                selected
+                  ? "bg-admin-primary text-white"
+                  : "bg-admin-surface text-admin-text-muted ring-1 ring-inset ring-admin-border"
+              }`}
               title={`승인 대기 ${count}건`}
             >
               {count}

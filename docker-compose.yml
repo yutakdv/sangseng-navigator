@@ -61,6 +61,10 @@ services:
       # (컨테이너 밖 `npm run dev` 는 frontend/.env.local 에 http://localhost:8000)
       # FRONTEND_API_BASE= 로 비우면 mock 모드(frontend/src/mocks/) — BE 없이 화면만 볼 때.
       NEXT_PUBLIC_API_BASE: "${FRONTEND_API_BASE-http://backend:8000}"
+      # 허브 히어로의 지역 진단 지도 (선택). 비우면 배치 개념도로 폴백한다.
+      # ⚠ KAKAO_REST_API_KEY(지오코딩용)와 다른 **JavaScript 키**이고, Kakao 앱의
+      #   [플랫폼]>[Web]에 이 컨테이너가 열리는 주소(기본 http://localhost:3000)를 등록해야 뜬다.
+      NEXT_PUBLIC_KAKAO_MAP_KEY: "${NEXT_PUBLIC_KAKAO_MAP_KEY-}"
       WATCHPACK_POLLING: "true"                   # 바인드 마운트에서 파일 변경 감지(HMR)
     volumes:
       - ./frontend:/app                           # 코드 핫리로드

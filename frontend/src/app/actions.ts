@@ -26,7 +26,7 @@ function toFail(error: unknown): { ok: false; status: number; detail: string } {
 
 /**
  * 변경 계열 성공 시 전 라우트를 무효화한다 — 허브·트래킹·위젯·대시보드가 한 번에 갱신돼야
- * 데모 루프(승인 → 트래킹 → 위젯 신규 배지)가 돈다. KPI도 카드 상태에서 파생되므로 같이 갱신된다.
+ * 데모 루프(승인 → 트래킹 → 위젯 확충 업종 배지)가 돈다. KPI도 카드 상태에서 파생되므로 같이 갱신된다.
  */
 function revalidateAll(): void {
   revalidatePath("/", "layout");

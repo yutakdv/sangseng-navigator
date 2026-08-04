@@ -2,6 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { generateAction } from "@/app/actions";
+import { Icon } from "@/components/Icon";
 import type { CardType } from "@/types";
 
 /**
@@ -18,9 +19,9 @@ import type { CardType } from "@/types";
 type Feedback = { tone: "ok" | "notice" | "bad"; text: string };
 
 const TONE: Record<Feedback["tone"], string> = {
-  ok: "bg-state-good-bg text-state-good",
-  notice: "bg-state-notice-bg text-state-notice",
-  bad: "bg-state-bad-bg text-state-bad",
+  ok: "bg-state-good-bg text-state-good ring-state-good-line",
+  notice: "bg-state-notice-bg text-state-notice ring-state-notice-line",
+  bad: "bg-state-bad-bg text-state-bad ring-state-bad-line",
 };
 
 export function GenerateCardButton({
@@ -82,24 +83,27 @@ export function GenerateCardButton({
         onClick={run}
         disabled={working}
         aria-busy={working}
-        className="inline-flex items-center gap-2 rounded-lg bg-admin-primary px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-admin-sidebar-active disabled:cursor-not-allowed disabled:opacity-70"
+        className="inline-flex items-center gap-2 rounded-xl bg-admin-primary px-5 py-2.5 text-sm font-bold text-white shadow-[0_6px_18px_-6px_rgb(79_70_229)] transition-colors hover:bg-admin-primary-strong disabled:cursor-not-allowed disabled:opacity-70"
       >
         {working ? (
           <>
             <span
               aria-hidden="true"
-              className="h-3.5 w-3.5 shrink-0 animate-spin rounded-full border-2 border-white/40 border-t-white"
+              className="h-4 w-4 shrink-0 animate-spin rounded-full border-2 border-white/40 border-t-white"
             />
             AI가 후보를 검토하는 중…
           </>
         ) : (
-          label
+          <>
+            <Icon name="sparkle" size={16} strokeWidth={2} />
+            {label}
+          </>
         )}
       </button>
 
       {/* 콜드스타트·LLM 대기를 "멈춤"으로 오인하지 않게 하는 장치 (11 §1 · 12 §5) */}
       {working ? (
-        <p role="status" className="max-w-xs break-keep text-[11px] leading-4 text-admin-text-muted">
+        <p role="status" className="u-note max-w-xs sm:text-right">
           Score·추진 상태·계절성 등을 종합해 후보를 비교하는 중입니다. 최대 12초(재시도 시 24초)까지
           걸릴 수 있습니다.
         </p>
@@ -108,7 +112,7 @@ export function GenerateCardButton({
       {feedback ? (
         <p
           role={feedback.tone === "bad" ? "alert" : "status"}
-          className={`max-w-xs break-keep rounded-lg px-2 py-1.5 text-[11px] leading-4 ${TONE[feedback.tone]}`}
+          className={`max-w-xs break-keep rounded-lg px-2.5 py-2 text-xs font-medium leading-5 ring-1 ring-inset ${TONE[feedback.tone]}`}
         >
           {feedback.text}
         </p>

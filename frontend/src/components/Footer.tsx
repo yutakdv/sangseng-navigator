@@ -1,3 +1,4 @@
+import { Icon } from "@/components/Icon";
 import { SOURCE_NOTE } from "@/lib/constants";
 
 /**
@@ -7,9 +8,18 @@ import { SOURCE_NOTE } from "@/lib/constants";
  */
 export function Footer({ periodNote }: { periodNote?: string }) {
   return (
-    <footer className="border-t border-black/5 px-5 py-4 text-[11px] leading-5 text-admin-text-muted">
-      <p>{SOURCE_NOTE}</p>
-      {periodNote ? <p>데이터 기준: {periodNote}</p> : null}
+    <footer className="mt-2 border-t border-admin-border px-4 py-5 sm:px-6">
+      <div className="flex flex-wrap items-start gap-x-2.5 gap-y-1.5 text-xs leading-5 text-admin-text-muted">
+        <Icon name="database" size={14} className="mt-0.5" />
+        <div className="min-w-0 break-keep">
+          <p>{SOURCE_NOTE}</p>
+          {periodNote ? (
+            <p className="mt-0.5">
+              데이터 기준: <span className="font-medium text-admin-text-soft">{periodNote}</span>
+            </p>
+          ) : null}
+        </div>
+      </div>
     </footer>
   );
 }

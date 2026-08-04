@@ -412,7 +412,7 @@ FE mock 동기화: 레포 루트에서 `./scripts/sync-mocks.sh` — 위 산출 
 | 없는 카드 ID | `404 {"detail": "card not found"}`. **검사 순서는 404 → 400(body 값) → 409(상태 전이)** — 없는 카드에 값이 잘못된 body를 보내도 404가 나간다. 단 body가 **요청 스키마 자체**를 못 넘기면(필드 누락·타입 불일치) 라우트 진입 전 FastAPI가 `422`를 낸다 |
 | KPI에서 분모 0 | 해당 지표를 `null`로 반환 (예: approved 0건 → `execution_rate: null`, 채택 0건 → `regional_balance_index: null`). FE는 `null`이면 `—` 표시 |
 | 위젯 추천 결과 0건 | `{"recommendations": [], "policy_note": ...}` 200 반환. FE는 "해당 조건의 가맹점이 아직 없어요" 빈 상태 UI |
-| 위젯 LLM 실패 | `blurb`를 규칙 기반 문구로 대체 (`"{region}의 {category} 하이원포인트 가맹점이에요"`) — 응답 지연 방지 위해 LLM 타임아웃 5초, **재시도 없음**(실패 즉시 fallback) |
+| 위젯 추천 문구 | 실명 가맹점의 검증되지 않은 맛·분위기·메뉴를 생성하지 않고, 원천 데이터의 지역·업종만으로 `"{region}의 {category} 하이원포인트 가맹점이에요"`를 결정론적으로 표시 |
 | 시각 표기 | 모든 타임스탬프 KST ISO8601 (`+09:00`) — `avg_approval_hours` 계산도 KST 기준 |
 | 숫자 직렬화 | **BE 구현 주의:** boto3가 DynamoDB 숫자를 `Decimal`로 반환 → FastAPI JSON 직렬화가 깨진다. `db.py` 읽기 경로에서 Decimal→int/float 변환을 일괄 적용할 것 (07 문서 B2). 변환 기준은 **저장 표기에 소수점이 있으면 float, 없으면 int** — 값이 정수라는 이유로 float를 int로 내리지 않는다(그러면 저장·조회를 반복할 때마다 §2 `scenarios[].delta_pp`가 `[1.0, 2.0]` → `[1, 2]`로 바뀐다) |
 | 날짜 기준 | "최근 3개월"·"전분기" 등은 **오늘이 아니라 데이터 최신 월 기준** (공공데이터 갱신 지연 대비, 06 문서 공통 원칙) |

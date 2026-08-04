@@ -2,6 +2,8 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { AdminShell } from "@/components/AdminShell";
 import { AssumptionBadge, AssumptionNote, ProxyBadge } from "@/components/Badge";
+import { Icon } from "@/components/Icon";
+import { PageHeader } from "@/components/PageHeader";
 import { PaybackCycle } from "@/components/PaybackCycle";
 import { ScenarioTable } from "@/components/ScenarioTable";
 import { Section } from "@/components/Section";
@@ -43,79 +45,99 @@ export default async function IncentivePage() {
 
   return (
     <AdminShell dashboard={dashboard}>
-      <div className="mx-auto flex max-w-5xl flex-col gap-4">
-        <div>
-          <h2 className="text-lg font-bold text-admin-text">인센티브 정책 카드</h2>
-          <p className="mt-0.5 break-keep text-sm text-admin-text-muted">
-            공급 측(가맹점 확충)에 이어 수요 측 카드입니다. AI는 페이백률 3·5·7% 시나리오를 비교해
-            제시하고, 확정 페이백률은 담당자가 고른 값만 저장됩니다.
-          </p>
-        </div>
+      <div className="mx-auto flex max-w-5xl flex-col gap-6">
+        <PageHeader
+          icon="gift"
+          eyebrow="수요 측 정책"
+          title="인센티브 정책 카드"
+          lede="공급 측(가맹점 확충)에 이어 수요 측 카드입니다. AI는 페이백률 3·5·7% 시나리오를 비교해 제시하고, 확정 페이백률은 담당자가 고른 값만 저장됩니다."
+        />
 
         {!card ? (
           <Section
+            icon="gift"
             title="인센티브 카드가 아직 없습니다"
             desc="이 화면은 가장 최근에 생성된 INCENTIVE 카드 1장을 보여줍니다."
           >
-            <p className="break-keep text-sm leading-6 text-admin-text">
+            <p className="u-body">
               카드 생성은 허브에서 합니다 — Action Card 허브의 &ldquo;이번 분기 카드 생성&rdquo;에서
               인센티브 카드를 만들면 이 화면에 시나리오 비교 표와 승인 UI가 나타납니다.
             </p>
             <Link
               href="/"
-              className="mt-3 inline-block rounded-lg bg-admin-primary px-3 py-1.5 text-sm font-medium text-white transition-colors hover:bg-admin-sidebar-active"
+              className="mt-4 inline-flex items-center gap-1.5 rounded-lg bg-admin-primary px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-admin-primary-strong"
             >
-              Action Card 허브로 가기 →
+              Action Card 허브로 가기
+              <Icon name="arrowRight" size={15} strokeWidth={2} />
             </Link>
           </Section>
         ) : (
           <>
             {/* ── 카드 헤더 ─────────────────────────────────────── */}
-            <article className="rounded-card border border-black/5 bg-admin-surface p-4 shadow-card sm:p-5">
-              <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
-                <span className="text-xs tabular-nums text-admin-text-muted">{card.id}</span>
-                <h3 className="min-w-0 break-keep text-base font-semibold text-admin-text">
+            <article className="u-panel overflow-hidden">
+              <div className="border-b border-admin-border bg-gradient-to-br from-visitor-primary-soft/60 to-admin-surface p-4 sm:p-6">
+                <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+                  <span className="rounded-md bg-admin-surface px-1.5 py-0.5 text-[11px] font-semibold tabular-nums text-admin-text-muted ring-1 ring-inset ring-admin-border">
+                    {card.id}
+                  </span>
+                  <StatusChip status={card.status} />
+                  {card.progress ? <ProgressChip progress={card.progress} /> : null}
+                </div>
+
+                <h2 className="mt-2 break-keep text-[20px] font-bold leading-7 text-admin-text sm:text-[22px] sm:leading-8">
                   {card.title}
-                </h3>
-                <StatusChip status={card.status} />
-                {card.progress ? <ProgressChip progress={card.progress} /> : null}
+                </h2>
+
+                <div className="mt-3 flex flex-wrap items-center gap-x-5 gap-y-1.5 text-[13px] text-admin-text-muted">
+                  {/* INCENTIVE는 target이 없다 — 전 지역 공통 적용이 기획 원칙 (13 §2-6) */}
+                  <span className="flex items-center gap-1.5">
+                    <Icon name="pin" size={14} />
+                    대상 <b className="font-semibold text-admin-text">전 지역 공통</b>
+                  </span>
+                  <span className="flex items-center gap-1.5">
+                    <Icon name="shield" size={14} />
+                    신뢰도 <b className="font-semibold text-admin-text">{card.confidence}</b>
+                  </span>
+                  <span className="flex items-center gap-1.5 tabular-nums">
+                    <Icon name="clock" size={14} />
+                    생성 {at(card.created_at)}
+                  </span>
+                  {card.decided_at ? (
+                    <span className="tabular-nums">결정 {at(card.decided_at)}</span>
+                  ) : null}
+                  {card.selected_rate ? (
+                    <span className="flex items-center gap-1.5">
+                      <Icon name="gift" size={14} />
+                      확정 페이백률{" "}
+                      <b className="font-semibold text-admin-text">{card.selected_rate}%</b>
+                    </span>
+                  ) : null}
+                </div>
               </div>
 
-              <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-admin-text-muted">
-                {/* INCENTIVE는 target이 없다 — 전 지역 공통 적용이 기획 원칙 (13 §2-6) */}
-                <span>대상 전 지역 공통</span>
-                <span>
-                  신뢰도 <span className="font-medium text-admin-text">{card.confidence}</span>
-                </span>
-                <span>생성 {at(card.created_at)}</span>
-                {card.decided_at ? <span>결정 {at(card.decided_at)}</span> : null}
-                {card.selected_rate ? (
-                  <span>
-                    확정 페이백률{" "}
-                    <span className="font-medium text-admin-text">{card.selected_rate}%</span>
-                  </span>
+              <div className="p-4 sm:p-6">
+                {/* 05 §2 표현 규칙 — 적립이 아니라 사용 단계 정책임을 카드 최상단에서 못 박는다 */}
+                <p className="u-body">
+                  이미 적립된 하이원포인트를 지역 가맹점에서 결제할 때만 붙는{" "}
+                  <b className="font-semibold">사용 단계 리워드</b>입니다. 적립률을 건드리지 않으므로
+                  콤프 발행액은 늘지 않습니다.
+                </p>
+
+                {card.status === "approved" ? (
+                  <Link
+                    href="/tracking"
+                    className="mt-3 inline-flex items-center gap-1 text-[13px] font-semibold text-admin-primary underline-offset-4 hover:underline"
+                  >
+                    추진 상태 관리하기
+                    <Icon name="arrowRight" size={14} strokeWidth={2} />
+                  </Link>
                 ) : null}
               </div>
-
-              {/* 05 §2 표현 규칙 — 적립이 아니라 사용 단계 정책임을 카드 최상단에서 못 박는다 */}
-              <p className="mt-2 break-keep text-xs leading-5 text-admin-text-muted">
-                이미 적립된 하이원포인트를 지역 가맹점에서 결제할 때만 붙는{" "}
-                <b className="font-medium text-admin-text">사용 단계 리워드</b>입니다. 적립률을
-                건드리지 않으므로 콤프 발행액은 늘지 않습니다.
-              </p>
-
-              {card.status === "approved" ? (
-                <Link
-                  href="/tracking"
-                  className="mt-3 inline-block text-xs font-medium text-admin-primary underline-offset-2 hover:underline"
-                >
-                  추진 상태 관리하기 →
-                </Link>
-              ) : null}
             </article>
 
             {/* ── 시나리오 비교 + 승인 ──────────────────────────── */}
             <Section
+              icon="scale"
               title="페이백률 시나리오 비교"
               badge={
                 <>
@@ -134,14 +156,13 @@ export default async function IncentivePage() {
                   assumptionNote={card.assumption_note}
                 />
               ) : (
-                <p className="text-sm text-admin-text-muted">
-                  이 카드에는 비교할 시나리오가 없습니다.
-                </p>
+                <p className="u-body text-admin-text-muted">이 카드에는 비교할 시나리오가 없습니다.</p>
               )}
             </Section>
 
             {/* ── 예상 효과 ─────────────────────────────────────── */}
             <Section
+              icon="trend"
               title="예상 효과"
               badge={
                 <>
@@ -150,14 +171,17 @@ export default async function IncentivePage() {
                 </>
               }
             >
-              <p className="break-keep text-sm leading-6 text-admin-text">
-                {card.ai.expected_effect}
-              </p>
-              <AssumptionNote className="mt-2" />
+              <div className="rounded-xl bg-admin-primary-soft p-4 ring-1 ring-inset ring-admin-primary-line">
+                <p className="break-keep text-[15px] leading-7 text-admin-text">
+                  {card.ai.expected_effect}
+                </p>
+                <AssumptionNote className="mt-2" />
+              </div>
             </Section>
 
             {/* ── 순환 구조 ─────────────────────────────────────── */}
             <Section
+              icon="compass"
               title="페이백 순환 구조"
               desc="적립 → 외부 사용 → 페이백 → 재사용. 이 카드가 손대는 구간이 어디인지 보여줍니다."
             >
@@ -166,23 +190,30 @@ export default async function IncentivePage() {
 
             {/* ── AI 근거 전문 ──────────────────────────────────── */}
             <Section
+              icon="sparkle"
               title="AI 시나리오 비교문"
               desc="AI 출력은 제안입니다. 확정은 담당자 승인을 거치며, AI의 역할은 의사결정 근거 제공입니다."
             >
-              <p className="break-keep text-sm leading-6 text-admin-text">{card.ai.comparison}</p>
+              <p className="u-body">{card.ai.comparison}</p>
 
-              <div className="mt-4 grid grid-cols-1 gap-4 lg:grid-cols-2">
-                <div>
-                  <h4 className="text-xs font-semibold text-admin-text">권고 근거</h4>
-                  <ul className="mt-1.5 flex list-disc flex-col gap-1.5 break-keep pl-4 text-xs leading-5 text-admin-text">
+              <div className="mt-4 grid grid-cols-1 gap-3 lg:grid-cols-2">
+                <div className="rounded-xl bg-admin-surface-sunken p-4">
+                  <h3 className="flex items-center gap-1.5 text-[13px] font-bold text-admin-text">
+                    <Icon name="check" size={15} className="text-state-good" />
+                    권고 근거
+                  </h3>
+                  <ul className="mt-2 flex list-disc flex-col gap-2 break-keep pl-4 text-[13px] leading-6 text-admin-text-soft">
                     {card.ai.reasons.map((r) => (
                       <li key={r}>{r}</li>
                     ))}
                   </ul>
                 </div>
-                <div>
-                  <h4 className="text-xs font-semibold text-admin-text">리스크</h4>
-                  <ul className="mt-1.5 flex list-disc flex-col gap-1.5 break-keep pl-4 text-xs leading-5 text-admin-text">
+                <div className="rounded-xl bg-admin-surface-sunken p-4">
+                  <h3 className="flex items-center gap-1.5 text-[13px] font-bold text-admin-text">
+                    <Icon name="warn" size={15} className="text-state-warn" />
+                    리스크
+                  </h3>
+                  <ul className="mt-2 flex list-disc flex-col gap-2 break-keep pl-4 text-[13px] leading-6 text-admin-text-soft">
                     {card.ai.risks.map((r) => (
                       <li key={r}>{r}</li>
                     ))}
@@ -191,7 +222,7 @@ export default async function IncentivePage() {
               </div>
 
               {/* 정량 순위 병기 원칙(절대 규칙 5)의 예외가 아니라, 병기할 순위가 없는 카드다 */}
-              <p className="mt-4 break-keep border-t border-black/5 pt-3 text-[11px] leading-4 text-admin-text-muted">
+              <p className="u-note mt-4 border-t border-admin-border pt-3">
                 이 카드는 후보 간 순위 비교가 아니라 전 지역 공통 시나리오 비교라 정량 순위 표가
                 없습니다(`original_ranking` = null, 05 §2). 순위 조정 병기는 가맹점 확충 카드에서
                 합니다. 근거 데이터: {card.sources.join(" · ")}

@@ -13,17 +13,19 @@ import Link from "next/link";
 export default function NotFound() {
   return (
     <main className="flex min-h-screen items-center justify-center bg-admin-bg px-5 py-10">
-      <div className="w-full max-w-lg rounded-card bg-admin-surface p-6 shadow-card">
-        <p className="text-xs font-medium text-admin-primary">상생 나침반</p>
-        <h1 className="mt-1 text-xl font-bold text-admin-text">
+      <div className="w-full max-w-lg rounded-card border border-admin-border bg-admin-surface p-6 shadow-card sm:p-7">
+        <p className="text-xs font-semibold uppercase tracking-[0.14em] text-admin-primary">
+          상생 나침반
+        </p>
+        <h1 className="mt-1.5 text-[22px] font-bold leading-8 text-admin-text">
           요청하신 화면을 찾을 수 없습니다
         </h1>
-        <p className="mt-2 break-keep text-sm leading-6 text-admin-text-muted">
-          주소가 바뀌었거나, 존재하지 않는 카드 번호일 수 있습니다. 아래에서 원하는 화면으로
-          이동해 주세요.
+        <p className="mt-2.5 break-keep text-[15px] leading-7 text-admin-text-soft">
+          주소가 바뀌었거나, 존재하지 않는 카드 번호일 수 있습니다. 아래에서 원하는 화면으로 이동해
+          주세요.
         </p>
 
-        <ul className="mt-5 flex flex-col gap-2">
+        <ul className="mt-6 flex flex-col gap-2">
           <NavItem href="/" title="Action Card 허브" desc="이번 분기 승인 대기 제안 목록 (첫 화면)" />
           <NavItem href="/tracking" title="정책 카드 관리" desc="승인된 카드의 추진 상태 4단계" />
           {/* 이 화면은 AdminShell 밖이라 헤더의 `근사 지표` 배지가 없다 — 배지 없이 "지역 전환율"이
@@ -46,9 +48,9 @@ function NavItem({ href, title, desc }: { href: string; title: string; desc: str
     <li>
       <Link
         href={href}
-        className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5 rounded-lg border border-black/5 px-3 py-2 transition-colors hover:bg-admin-primary-soft"
+        className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5 rounded-xl border border-admin-border px-3.5 py-2.5 transition-colors hover:border-admin-primary-line hover:bg-admin-primary-soft"
       >
-        <span className="text-sm font-medium text-admin-primary">{title}</span>
+        <span className="text-sm font-bold text-admin-primary">{title}</span>
         <span className="break-keep text-xs text-admin-text-muted">{desc}</span>
       </Link>
     </li>

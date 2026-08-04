@@ -1,7 +1,7 @@
 "use client";
 
 import { Cell, Pie, PieChart, ResponsiveContainer, Tooltip } from "recharts";
-import { CATEGORY_COLORS } from "@/lib/constants";
+import { CATEGORY_COLORS, CHART } from "@/lib/constants";
 
 /**
  * 업종 6분류 도넛 (docs/plan/13 §5 · 05 §1 `category_share`).
@@ -40,26 +40,26 @@ export function CategoryDonut({
             </Pie>
             <Tooltip
               formatter={(v, n) => [`${Number(v).toLocaleString("ko-KR")}건`, String(n)]}
-              contentStyle={{ fontSize: 12, borderRadius: 8, border: "1px solid #e5e7eb" }}
+              contentStyle={CHART.tooltip}
             />
           </PieChart>
         </ResponsiveContainer>
       </div>
-      <ul className="grid shrink-0 grid-cols-2 gap-x-4 gap-y-1 sm:grid-cols-1">
+      <ul className="grid shrink-0 grid-cols-2 gap-x-4 gap-y-1.5 sm:grid-cols-1">
         {data.map((d) => (
-          <li key={d.category} className="flex items-center gap-2 text-xs text-admin-text">
+          <li key={d.category} className="flex items-center gap-2 text-[13px] text-admin-text">
             <span
               aria-hidden
-              className="h-2.5 w-2.5 shrink-0 rounded-sm"
+              className="h-3 w-3 shrink-0 rounded-[3px]"
               style={{ background: CATEGORY_COLORS[d.category] ?? "#94a3b8" }}
             />
             <span className="min-w-0 flex-1 truncate">{d.category}</span>
-            <span className="tabular-nums text-admin-text-muted">
+            <span className="font-semibold tabular-nums text-admin-text">
               {Math.round(d.share * 100)}%
             </span>
           </li>
         ))}
-        <li className="col-span-2 mt-1 text-[11px] text-admin-text-muted sm:col-span-1">
+        <li className="col-span-2 mt-1.5 border-t border-admin-border pt-1.5 text-xs text-admin-text-muted sm:col-span-1">
           총 {total.toLocaleString("ko-KR")}건
         </li>
       </ul>

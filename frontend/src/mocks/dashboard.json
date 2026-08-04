@@ -362,7 +362,7 @@
     }
   ],
   "growth": {
-    "mom_pct": 1.5,
+    "mom_pct": -1.8,
     "qoq_pp": 1.1
   },
   "ai_stability": 80

@@ -1,27 +1,17 @@
 """B6: 방문객 위젯 추천 — merchants.json + 완료 카드 반영 (05 문서 §4, 07 문서 B6)."""
-import json
-import logging
 import math
 
 from fastapi import APIRouter, HTTPException
 
-from app import dataload, db, llm, prompts
+from app import dataload, db
 
 router = APIRouter()
-log = logging.getLogger(__name__)
-
 # pipeline/common.py ANCHOR 복제본 (Lambda 번들에 pipeline 모듈이 없어 import 금지)
 ANCHOR = {"lat": 37.21164, "lng": 128.82168}
 LIMIT = 3                                             # 상위 3곳 (07 문서 B6)
 DONE = "완료"
-NEW_BADGE = "신규"
-POLICY_NOTE = "확충 완료된 신규 가맹점을 우선 추천합니다"
-BLURB_SCHEMA = {
-    "type": "object",
-    "properties": {"blurbs": {"type": "array", "items": {"type": "string"}}},
-    "required": ["blurbs"],
-    "additionalProperties": False,
-}
+EXPANSION_BADGE = "이번 분기 확충 업종"
+POLICY_NOTE = "이번 분기 확충이 완료된 업종을 우선 추천합니다"
 
 
 def _haversine_km(lat1: float, lng1: float, lat2: float, lng2: float) -> float:
@@ -42,7 +32,7 @@ def _anchor_km(m: dict) -> float:
 
 
 def _new_targets(cards: list) -> set:
-    """`progress=완료`인 EXPANSION 카드의 (읍, 업종) 집합 — 신규 배지 매칭 키 (05 문서 §4)."""
+    """`progress=완료`인 EXPANSION 카드의 (읍, 업종) 집합 — 확충 업종 배지 매칭 키 (05 문서 §4)."""
     out = set()
     for card in cards:
         target = card.get("target") or {}
@@ -66,40 +56,14 @@ def _payback(cards: list) -> dict | None:
     return {"rate": rate, "label": f"지금 여기서 쓰면 {rate}% 페이백"}
 
 
-def _fallback_blurb(merchant: dict, is_new: bool) -> str:
-    """LLM 실패 시 규칙 기반 문구 (05 문서 §8) — 신규 가맹점만 '새로 생긴' 뉘앙스를 덧붙인다."""
-    if is_new:
-        return f"{merchant['eup']}에 새로 생긴 {merchant['category']} 하이원포인트 가맹점이에요"
+def _fallback_blurb(merchant: dict) -> str:
+    """원천 데이터에 있는 지역·업종만 말한다 — 실명 점포의 품질·메뉴를 추정하지 않는다."""
     return f"{merchant['eup']}의 {merchant['category']} 하이원포인트 가맹점이에요"
 
 
 def _blurbs(picked: list) -> list:
-    """추천 문구를 LLM 1회 호출로 일괄 생성 — 실패·개수 부족 시 규칙 기반 문구로 대체.
-
-    응답 지연 방지를 위해 타임아웃 5초 (05 문서 §8). 목록당 호출 1회로 묶어
-    3곳을 각각 호출할 때의 지연 누적을 피한다.
-    재시도도 끈다(attempts=1) — 기본 2회면 최악 10초라 위젯 체감 지연이 커진다.
-    문구는 없어도 fallback 으로 대체되는 부가 정보라 재시도보다 상한 5초가 낫다.
-    """
-    fallback = [_fallback_blurb(m, is_new) for m, is_new in picked]
-    payload = {
-        "가맹점": [{"이름": m["name"], "지역": m["eup"], "업종": m["category"], "신규 가맹점": is_new}
-                 for m, is_new in picked],
-        # 상호명에서 메뉴를 유추한 문구("BBQ하이캐슬점에서 맛있는 바베큐를 즐겨보세요")가 실호출로
-        # 확인돼 지침을 좁혔다 — A-4 프롬프트는 발표 공개용 원문이라 수정하지 않고 여기서 제한한다.
-        "작성 지침": ("가맹점마다 한 문장씩, 입력 순서 그대로 blurbs 배열에 담을 것. "
-                   "이름·지역·업종 외의 사실(분위기·풍경·메뉴·맛·인기도·거리)은 지어내지 말 것. "
-                   "상호명에서 취급 품목이나 맛을 유추해 쓰지 말 것"),
-    }
-    try:
-        out = llm.generate_json(prompts.WIDGET_BLURB_PROMPT, json.dumps(payload, ensure_ascii=False),
-                                BLURB_SCHEMA, schema_name="blurbs", timeout=5, attempts=1)
-        blurbs = out.get("blurbs") or []
-    except Exception:
-        log.warning("위젯 blurb LLM 실패 — 규칙 기반 문구로 대체 (%d곳)", len(picked), exc_info=True)
-        return fallback
-    return [blurbs[i] if i < len(blurbs) and isinstance(blurbs[i], str) and blurbs[i].strip() else fallback[i]
-            for i in range(len(picked))]
+    """검증되지 않은 실명 점포 묘사를 만들지 않도록 결정론적 문구만 반환한다."""
+    return [_fallback_blurb(m) for m, _ in picked]
 
 
 @router.get("/widget/recommend")
@@ -115,7 +79,7 @@ def recommend(region: str | None = None, category: str | None = None):
 
     rows = [m for m in merchants
             if (not region or m.get("eup") == region) and (not category or m.get("category") == category)]
-    # 정렬: ① 완료 카드와 매칭되는 가맹점(신규 배지) 먼저 ② 거점(ANCHOR)에서 가까운 순.
+    # 정렬: ① 완료 카드와 매칭되는 확충 업종 먼저 ② 거점(ANCHOR)에서 가까운 순.
     # 원본 순서(상호명순)로 두면 필터 없이 부를 때 방문객 동선과 무관한 가맹점이 먼저 나왔다.
     # 거리 값은 응답에도 blurb 프롬프트에도 싣지 않는다 — 05 §1 캐비엇("거점에서 가장 가깝다고
     # 단정하지 않는다")과 충돌하므로 정렬 근거로만 쓰고 LLM이 근접성을 주장할 수 없게 한다.
@@ -130,7 +94,8 @@ def recommend(region: str | None = None, category: str | None = None):
                 "address": m["address"],
                 "lat": m["lat"],
                 "lng": m["lng"],
-                "badge": NEW_BADGE if is_new else None,
+                "badge": EXPANSION_BADGE if is_new else None,
+                "directions_url": f"https://map.kakao.com/link/to/{m['name']},{m['lat']},{m['lng']}",
                 "payback": payback,
                 "blurb": blurbs[i],
             }

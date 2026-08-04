@@ -27,6 +27,27 @@ export const REGION_COLORS: Record<string, string> = Object.fromEntries(
 /** 단일 시리즈 차트(전환율 추이·지역별 막대)는 팔레트 대신 이 단색 (13 §5) */
 export const PRIMARY = "#4f46e5";
 
+/**
+ * 차트 공통 시각 토큰 (13 §5).
+ * Recharts는 Tailwind 클래스를 받지 않아 축·툴팁 스타일을 인라인으로 넘겨야 한다 —
+ * 파일마다 따로 적으면 축 글자 크기가 차트마다 어긋나므로 여기 한 곳에 모아 둔다.
+ * 축 라벨은 11px에서 12px로 올렸다(화면 최소 크기 기준, 13 §6).
+ */
+export const CHART = {
+  tick: { fontSize: 12, fill: "#626b82" },
+  /** 값 라벨(막대 끝 숫자) — 축보다 진하게 */
+  label: { fontSize: 12, fill: "#454c63", fontWeight: 600 },
+  grid: "#e2e7f0",
+  tooltip: {
+    fontSize: 13,
+    borderRadius: 10,
+    border: "1px solid #e2e7f0",
+    boxShadow: "0 10px 28px -10px rgb(24 21 52 / 0.3)",
+    padding: "8px 12px",
+  },
+  cursor: "rgba(79,70,229,0.07)",
+} as const;
+
 /** 거점 — pipeline/common.py ANCHOR. 라벨은 이 문자열 그대로 쓴다("정문" 표기 폐기, 13 §9) */
 export const ANCHOR = {
   name: "강원랜드 카지노(하이원리조트)",

@@ -35,7 +35,7 @@ import candidatesMock from "./candidates.json";
 const DONE = "완료";
 const RUNNING: CardProgress[] = ["추진중", "완료"];
 const WIDGET_LIMIT = 3;
-const POLICY_NOTE = "확충 완료된 신규 가맹점을 우선 추천합니다";
+const POLICY_NOTE = "이번 분기 확충이 완료된 업종을 우선 추천합니다";
 
 /** import한 JSON 모듈을 직접 변형하지 않도록 깊은 복사 후 보관 */
 let cards: Card[] = JSON.parse(JSON.stringify(cardsSeed.cards)) as Card[];
@@ -369,7 +369,7 @@ const anchorKm = (m: Merchant): number => {
   return 2 * R * Math.asin(Math.sqrt(a));
 };
 
-/** `progress=완료`인 EXPANSION 카드의 (읍, 업종) 집합 — `신규` 배지 매칭 키 */
+/** `progress=완료`인 EXPANSION 카드의 (읍, 업종) 집합 — 확충 업종 배지 매칭 키 */
 const newTargets = (): Set<string> => {
   const out = new Set<string>();
   for (const card of cards) {
@@ -395,13 +395,9 @@ const payback = (): Recommendation["payback"] => {
 };
 
 /**
- * mock 모드 blurb — 실 API는 LLM이 쓰고 실패 시 이 규칙 기반 문구로 대체한다 (05 §8).
- * mock에는 LLM이 없으므로 항상 규칙 기반. 이름·지역·업종 외의 사실은 지어내지 않는다.
+ * mock 모드 blurb — 실 API와 동일하게 이름·지역·업종만으로 결정론적으로 만든다.
  */
-const fallbackBlurb = (m: Merchant, isNew: boolean): string =>
-  isNew
-    ? `${m.eup}에 새로 생긴 ${m.category} 하이원포인트 가맹점이에요`
-    : `${m.eup}의 ${m.category} 하이원포인트 가맹점이에요`;
+const fallbackBlurb = (m: Merchant): string => `${m.eup}의 ${m.category} 하이원포인트 가맹점이에요`;
 
 export const deriveWidget = (region?: string, category?: string): WidgetResponse => {
   const targets = newTargets();
@@ -421,9 +417,10 @@ export const deriveWidget = (region?: string, category?: string): WidgetResponse
       address: m.address,
       lat: m.lat,
       lng: m.lng,
-      badge: isNew(m) ? ("신규" as const) : null,
+      badge: isNew(m) ? ("이번 분기 확충 업종" as const) : null,
+      directions_url: `https://map.kakao.com/link/to/${encodeURIComponent(m.name)},${m.lat},${m.lng}`,
       payback: pay,
-      blurb: fallbackBlurb(m, isNew(m)),
+      blurb: fallbackBlurb(m),
     })),
     policy_note: POLICY_NOTE,
   };

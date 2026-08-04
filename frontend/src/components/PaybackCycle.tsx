@@ -13,8 +13,8 @@ import type { PaybackRate } from "@/types";
  */
 const W = 252; // 노드 박스 크기
 const H = 112;
-const MUTED = "#6b7280";
-const TEXT = "#1e1b39";
+const MUTED = "#626b82";
+const TEXT = "#181534";
 const LINE = "#94a3b8";
 
 export function PaybackCycle({ rate = null }: { rate?: PaybackRate | null }) {
@@ -107,12 +107,12 @@ export function PaybackCycle({ rate = null }: { rate?: PaybackRate | null }) {
       </div>
 
       {/* 05 §2: 발행액 증액으로 읽히는 여지를 캡션에서 차단한다 */}
-      <p className="mt-3 break-keep text-xs leading-5 text-admin-text">
-        이 정책이 손대는 구간은 <b className="font-semibold">②→③ 사용 단계뿐</b>입니다. 적립(①)은
-        기존 제도 그대로여서 <b className="font-semibold">콤프 발행액은 늘지 않습니다</b> — 이미
-        적립된 포인트를 지역 가맹점에서 결제할 때만 리워드가 붙는 설계입니다.
+      <p className="u-body mt-4 rounded-xl bg-admin-surface-sunken p-3.5">
+        이 정책이 손대는 구간은 <b className="font-bold">②→③ 사용 단계뿐</b>입니다. 적립(①)은 기존
+        제도 그대로여서 <b className="font-bold">콤프 발행액은 늘지 않습니다</b> — 이미 적립된
+        포인트를 지역 가맹점에서 결제할 때만 리워드가 붙는 설계입니다.
       </p>
-      <p className="mt-1 break-keep text-[11px] leading-4 text-admin-text-muted">
+      <p className="u-note mt-2">
         하이원포인트는 카지노 게임 참여시간·베팅액에 비례해 적립되는 콤프라, 적립률을 올리거나
         포인트를 더 지급하는 설계는 이 카드의 제안 대상이 아닙니다. 게임 참여 유인은 그대로 두고
         사용처만 지역으로 돌리는 수요 측 정책입니다.
@@ -141,16 +141,16 @@ function CycleNode({
         y={y}
         width={W}
         height={H}
-        rx={12}
-        fill={accent ? "#eef2ff" : "#f5f6fa"}
-        stroke={accent ? PRIMARY : "rgba(0,0,0,0.08)"}
-        strokeWidth={accent ? 1.5 : 1}
+        rx={14}
+        fill={accent ? "#eef2ff" : "#f4f6fb"}
+        stroke={accent ? PRIMARY : "#e2e7f0"}
+        strokeWidth={accent ? 1.75 : 1.25}
       />
-      <text x={x + 18} y={y + 34} fontSize="15" fontWeight="700" fill={accent ? PRIMARY : TEXT}>
+      <text x={x + 18} y={y + 34} fontSize="16" fontWeight="700" fill={accent ? PRIMARY : TEXT}>
         {title}
       </text>
       {lines.map((line, i) => (
-        <text key={line} x={x + 18} y={y + 60 + i * 20} fontSize="11.5" fill={MUTED}>
+        <text key={line} x={x + 18} y={y + 61 + i * 21} fontSize="12.5" fill={MUTED}>
           {line}
         </text>
       ))}

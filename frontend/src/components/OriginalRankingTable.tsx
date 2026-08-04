@@ -1,3 +1,4 @@
+import { Icon } from "@/components/Icon";
 import type { CardAi } from "@/types";
 
 /**
@@ -26,23 +27,17 @@ export function OriginalRankingTable({
 
   return (
     <div className="min-w-0">
-      <div className="overflow-x-auto">
-        <table className="w-full min-w-[420px] text-sm">
-          <caption className="sr-only">
-            정량 Score 순위와 AI 제안 순위 비교표
-          </caption>
+      <div className="u-scroll-x">
+        <table className="u-table min-w-[460px]">
+          <caption className="sr-only">정량 Score 순위와 AI 제안 순위 비교표</caption>
           <thead>
-            <tr className="border-b border-black/5 text-left text-xs text-admin-text-muted">
-              <th scope="col" className="py-2 pr-3 font-medium">
-                정량 Score 순위
-              </th>
-              <th scope="col" className="py-2 pr-3 font-medium">
-                후보 (읍 · 업종)
-              </th>
-              <th scope="col" className="py-2 pr-3 text-right font-medium">
+            <tr>
+              <th scope="col">정량 Score 순위</th>
+              <th scope="col">후보 (읍 · 업종)</th>
+              <th scope="col" className="text-right">
                 Score
               </th>
-              <th scope="col" className="py-2 text-right font-medium">
+              <th scope="col" className="text-right">
                 AI 제안 순위
               </th>
             </tr>
@@ -53,26 +48,24 @@ export function OriginalRankingTable({
               return (
                 <tr
                   key={`${row.rank}-${row.candidate}`}
-                  className={`border-b border-black/5 last:border-0 ${
-                    target ? "bg-admin-primary-soft" : ""
-                  }`}
+                  data-highlight={target ? "true" : undefined}
                 >
-                  <td className="py-2 pr-3 tabular-nums text-admin-text-muted">{row.rank}위</td>
-                  <td className="py-2 pr-3">
-                    <span className={target ? "font-semibold text-admin-primary" : "text-admin-text"}>
+                  <td className="tabular-nums text-admin-text-muted">{row.rank}위</td>
+                  <td>
+                    <span className={target ? "font-bold text-admin-primary" : "text-admin-text"}>
                       {row.candidate}
                     </span>
                     {/* 색만으로 의미를 전달하지 않는다 (13 §4) */}
                     {target ? (
-                      <span className="ml-1.5 text-[11px] text-admin-primary">이번 제안 대상</span>
+                      <span className="ml-1.5 whitespace-nowrap rounded-full bg-admin-surface px-1.5 py-0.5 text-[11px] font-semibold text-admin-primary ring-1 ring-inset ring-admin-primary-line">
+                        이번 제안 대상
+                      </span>
                     ) : null}
                   </td>
-                  <td className="py-2 pr-3 text-right tabular-nums font-medium">
-                    {row.score.toFixed(2)}
-                  </td>
-                  <td className="py-2 text-right text-xs tabular-nums">
+                  <td className="text-right font-semibold tabular-nums">{row.score.toFixed(2)}</td>
+                  <td className="text-right tabular-nums">
                     {target && aiRank !== null ? (
-                      <span className="font-semibold text-admin-primary">{aiRank}위</span>
+                      <span className="font-bold text-admin-primary">{aiRank}위</span>
                     ) : (
                       <span className="text-admin-text-muted">—</span>
                     )}
@@ -84,10 +77,13 @@ export function OriginalRankingTable({
         </table>
       </div>
 
-      <p className="mt-2 break-keep text-[11px] leading-4 text-admin-text-muted">
-        {adjusted && scoreRank !== null && aiRank !== null
-          ? `AI는 정량 ${scoreRank}위 후보를 제안 ${aiRank}위로 올렸습니다. 조정 여부와 무관하게 원 Score 순위를 함께 싣습니다 — 담당자가 정량 근거와 AI 판단을 나란히 놓고 확인할 수 있어야 하기 때문입니다.`
-          : "AI 제안이 정량 1순위와 같더라도 원 Score 순위를 함께 싣습니다 — 담당자가 정량 근거와 AI 판단을 나란히 놓고 확인할 수 있어야 하기 때문입니다."}
+      <p className="u-note mt-3 flex items-start gap-1.5 border-t border-admin-border pt-2.5">
+        <Icon name="info" size={13} strokeWidth={2} className="mt-[3px]" />
+        <span>
+          {adjusted && scoreRank !== null && aiRank !== null
+            ? `AI는 정량 ${scoreRank}위 후보를 제안 ${aiRank}위로 올렸습니다. 조정 여부와 무관하게 원 Score 순위를 함께 싣습니다 — 담당자가 정량 근거와 AI 판단을 나란히 놓고 확인할 수 있어야 하기 때문입니다.`
+            : "AI 제안이 정량 1순위와 같더라도 원 Score 순위를 함께 싣습니다 — 담당자가 정량 근거와 AI 판단을 나란히 놓고 확인할 수 있어야 하기 때문입니다."}
+        </span>
       </p>
     </div>
   );
