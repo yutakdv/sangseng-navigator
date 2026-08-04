@@ -1,8 +1,41 @@
+# 로컬 통합 테스트 환경 — `docker compose up -d` 하나로 DynamoDB + BE + FE 가 전부 뜬다.
+# (개발 중 AWS 배포 금지 — 테스트는 전부 여기서, docs/plan/14 문서 머리말)
+#
+#   docker compose up -d          # 전체 기동 → FE http://localhost:3000, BE http://localhost:8000
+#   docker compose logs -f        # 로그
+#   docker compose down           # 정리
+#
+# 오버라이드 (레포 루트 .env 또는 셸 환경변수):
+#   FRONTEND_PORT=3100            # 호스트 3000 번이 다른 프로젝트에 잡혀 있을 때
+#   FRONTEND_API_BASE=            # 빈 값으로 두면 FE 가 mock 모드 (BE 없이 화면만 볼 때)
 services:
   dynamodb:
     image: amazon/dynamodb-local:latest
     command: -jar DynamoDBLocal.jar -inMemory -sharedDb
     ports: ["8001:8000"]
+
+  # 데모 카드 3장 시드 (11 문서 §1 '사전 상태'). 1회 실행 후 종료하는 one-shot 서비스다.
+  # dynamodb 가 -inMemory 라 컨테이너가 재시작되면 테이블 자체가 사라진다 —
+  # 그래서 매 `up` 마다 --reset 으로 다시 만드는 게 맞다 (데모 중 만든 카드는 초기화된다).
+  seed:
+    build: ./backend
+    env_file: .env
+    environment:
+      DYNAMO_ENDPOINT: http://dynamodb:8000
+      CARDS_TABLE: sangseng-cards
+      AWS_ACCESS_KEY_ID: local
+      AWS_SECRET_ACCESS_KEY: local
+      AWS_DEFAULT_REGION: ap-northeast-2
+    volumes:
+      - ./backend/app:/app/app:ro
+      - ./backend/seed_demo.py:/app/seed_demo.py:ro   # 이미지에는 app/ 만 들어 있다
+      - ./data/processed:/app/app/data:ro
+    depends_on: [dynamodb]
+    restart: "no"
+    # DynamoDB Local 기동을 기다린다 (healthcheck 를 붙일 수단이 없는 이미지라 재시도로 대신)
+    command: >
+      sh -c 'for i in $$(seq 1 30); do python seed_demo.py --reset && exit 0; sleep 2; done; exit 1'
+
   backend:
     build: ./backend
     ports: ["8000:8000"]
@@ -18,3 +51,19 @@ services:
       - ./data/processed:/app/app/data:ro         # Lambda 번들과 동일 경로에 정적 JSON
     depends_on: [dynamodb]
     command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+
+  frontend:
+    build: ./frontend
+    ports: ["${FRONTEND_PORT:-3000}:3000"]
+    environment:
+      # 기본값은 실 BE 연동이다. 페이지가 서버 컴포넌트라 fetch 가 **컨테이너 안에서** 일어나므로
+      # 컨테이너 네트워크 주소를 쓴다 — http://localhost:8000 을 넣으면 ECONNREFUSED 가 난다.
+      # (컨테이너 밖 `npm run dev` 는 frontend/.env.local 에 http://localhost:8000)
+      # FRONTEND_API_BASE= 로 비우면 mock 모드(frontend/src/mocks/) — BE 없이 화면만 볼 때.
+      NEXT_PUBLIC_API_BASE: "${FRONTEND_API_BASE-http://backend:8000}"
+      WATCHPACK_POLLING: "true"                   # 바인드 마운트에서 파일 변경 감지(HMR)
+    volumes:
+      - ./frontend:/app                           # 코드 핫리로드
+      - /app/node_modules                         # 호스트 마운트가 이미지의 의존성을 가리지 않게
+      - /app/.next
+    depends_on: [backend]
