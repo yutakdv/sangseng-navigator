@@ -1,3 +1,4 @@
 # 개발·테스트 전용 — requirements.txt에는 절대 넣지 않는다 (Lambda 번들 오염 방지, 07 의존성 원칙·15 §5)
 pytest
 httpx2      # starlette 1.3+ TestClient의 HTTP 클라이언트 (httpx로는 deprecation 경고)
+uvicorn     # 로컬 단독 실행(CLAUDE.md `uvicorn app.main:app`) 전용 — Lambda는 Mangum 핸들러라 불필요
