@@ -1,7 +1,7 @@
 """B4 입력 ③: 계절성 캘린더 규칙 — 고정 dict (docs/plan/07 B4 표 원문)."""
 from datetime import datetime
 
-from app.db import KST
+from app.clock import KST      # 순수 계산 모듈이라 app.db(boto3)를 끌어오지 않는다 (감사 2절 #5)
 
 # (월 집합, 신호, 근거) — 07 문서 B4 계절성 캘린더 규칙 표 그대로
 SEASON_RULES = [

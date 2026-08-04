@@ -214,7 +214,8 @@ else:
 **Files:** Create `backend/app/db.py` / Modify `backend/app/routes/cards.py`
 **Interfaces:** 07 B2의 함수들(`put_card/get_card/list_cards/next_card_id/now_iso`) + 05 §2 엔드포인트 4종
 
-- [ ] `db.py`는 **07 B2 코드 원문 + 아래 한 곳만 변경** (Docker 분기):
+- [ ] `db.py`·`clock.py`는 **07 B2 코드 원문 그대로** — 아래 Docker 분기(T7)는 이제 07 B2 원문에
+      포함돼 있다:
 
 ```python
 _kw = {"region_name": os.environ.get("AWS_REGION", "ap-northeast-2")}
@@ -232,7 +233,7 @@ _table = boto3.resource("dynamodb", **_kw).Table(os.environ.get("CARDS_TABLE") o
 
 **Files:** Create `backend/app/llm.py`, `backend/app/prompts.py`
 
-- [ ] `llm.py`는 07 B3 코드 원문 그대로 (+1회 재시도). `prompts.py`는 07 부록 A-1~A-4 원문 그대로
+- [ ] `llm.py`는 07 B3 코드 원문 그대로 (재시도·backoff·로그가 원문에 포함됨). `prompts.py`는 07 부록 A-1~A-4 원문 그대로
 - **검증:** `cd backend && ../.venv/bin/python -c "from app.llm import generate_json; print(generate_json('한 단어로 답하라','ping',{'type':'object','properties':{'r':{'type':'string'}},'required':['r'],'additionalProperties':False}))"`
 - **커밋:** `feat: B3 LLM 어댑터(openai/anthropic)+프롬프트`
 
@@ -297,12 +298,20 @@ _table = boto3.resource("dynamodb", **_kw).Table(os.environ.get("CARDS_TABLE") o
       인라인 정책 나열 방식은 SAM 배포 필수 권한(iam:CreateRole·PassRole, lambda:*, s3:*, logs:*)
       누락 리스크로 폐기 (15 §3-2). **캠프 종료 후 콘솔에서 정책 분리(회수) 필수.**
 
-- [ ] Step 2: `cd infra && ./deploy-backend.sh` → Outputs의 `ApiUrl`·`CardsTable` 기록
+- [ ] Step 2: `.env`에 배포 파라미터 2종을 넣고 `cd infra && ./deploy-backend.sh` → Outputs의
+      `ApiUrl`·`CardsTable` 기록
+      - `ALLOWED_ORIGINS=https://<project>.vercel.app,http://localhost:3000` — 앱 CORS 허용 도메인.
+        Vercel 도메인은 F1 머지 직후 첫 Deploy에서 이미 확정돼 있다(T15). 비우면 `*` 유지 (09 §5)
+      - `RESERVED_CONCURRENCY` — 생략하면 template Default **5**가 적용된다(무인증 공개 URL의
+        LLM 호출 남용 상한, 09 §5.5). 동시성 한도 부족으로 배포가 실패하면 `-1`로 재시도
 - [ ] Step 3: `.env`의 `CARDS_TABLE=`에 Outputs 값 → **실 DDB로** `python backend/seed_demo.py --reset`
       (DYNAMO_ENDPOINT 미설정 = 실 AWS)
-- [ ] Step 4: `curl $ApiUrl/api/health` → `{"ok":true,"data_loaded":true}` + dashboard·cards 스모크
+- [ ] Step 4: `curl $ApiUrl/api/health` → `{"ok":true,"data_loaded":true,"datasets":{...}}` —
+      `datasets` 5종이 전부 `true`인지까지 확인(번들 복사 누락 조기 발견, 05 §5) + dashboard·cards 스모크
 - [ ] Step 5: Vercel — 프로젝트 [Settings] > [Environment Variables]에 `NEXT_PUBLIC_API_BASE=$ApiUrl` (Production+Preview) → **Production 재배포** → 배포 URL 기록 (04 §6; Import·첫 Deploy는 F1 머지 직후 완료됨 — 15 §7)
-- [ ] Step 6: 배포 URL에서 11 §1 리허설 ×10 (Safari·휴대폰 실기기 포함), 09 §5 CORS 조이기·§5.5 워밍 룰(선택)
+- [ ] Step 6: 배포 URL에서 11 §1 리허설 ×10 (Safari·휴대폰 실기기 포함), 09 §5 CORS 검증
+      (앱 쪽은 Step 2에서 이미 좁혀졌으므로 게이트웨이 `CorsConfiguration`을 함께 좁힐지 판단)·
+      §5.5 워밍 룰(선택)
 - **Gate:** 01 성공 기준 전항 + 12 §6 체크리스트 전항
 
 ### T18. 제출·심사 운영

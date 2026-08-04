@@ -47,6 +47,23 @@ def concentration_index(counts: list) -> float:
     return spread / (1 - 1 / n) * 100
 
 
+def _base_month(usage: dict) -> str:
+    """기준월 — 파이프라인이 싣는 `base_month`를 우선 사용 (06 문서 공통 원칙 3).
+
+    months 배열의 정렬에 기대지 않기 위한 것. base_month가 없거나 months에 없는 값이면
+    기존 동작대로 months[-1]로 폴백한다 (현 산출물은 둘이 같다).
+    """
+    bm = usage.get("base_month")
+    return bm if bm in usage["months"] else usage["months"][-1]
+
+
+def _recent_months(usage: dict, n: int = 3) -> list:
+    """기준월을 끝으로 하는 최근 n개월 (06 문서 공통 원칙 3)."""
+    months = usage["months"]
+    end = months.index(_base_month(usage)) + 1
+    return months[max(0, end - n):end]
+
+
 def _avg_monthly(rows: list, recent: list, eups: list, category: str | None = None) -> float:
     """최근 recent 개월에서 (지역 목록 × 표시 업종) 건수 합의 월평균. category=None이면 전 업종."""
     total = 0
@@ -70,7 +87,7 @@ def expected_monthly_count(usage: dict, merchants: list, eup: str, category: str
 
     merchants가 비어 있지 않음(3단계 분모>0)은 호출부(라우트 503 가드)가 보장한다.
     """
-    recent = usage["months"][-3:]        # "최근 3개월" = 데이터 최신 월 기준 (06 문서 공통 원칙 3)
+    recent = _recent_months(usage)       # "최근 3개월" = 기준월(base_month)을 끝으로 (06 문서 공통 원칙 3)
     rows = usage["usage"]
     n1 = sum(1 for m in merchants if m.get("eup") == eup and m.get("category") == category)
     if n1 > 0:
@@ -81,14 +98,29 @@ def expected_monthly_count(usage: dict, merchants: list, eup: str, category: str
     return _avg_monthly(rows, recent, REGIONS) / len(merchants), 3
 
 
+def _round_pp(x: float) -> float:
+    """%p 값 소수 1자리 반올림 + **음의 0 정규화**.
+
+    round(-0.001, 1) 은 `-0.0` 이고 JSON 에도 `-0.0` 으로 실린다 — 실데이터에서 태백시 카페 등이
+    `delta_pp: [-0.0, -0.0]` 을 내므로 화면에 "-0.0~-0.0%p"가 찍힌다. 0 은 부호 없이 내보낸다.
+    """
+    r = round(x, 1)
+    return r + 0.0 if r == 0 else r
+
+
 def simulate_expansion(usage: dict, merchants: list, eup: str, category: str) -> dict:
     """반사실 재계산 — 05 §2 simulate 응답 수치의 원천.
 
-    최신 월 지역 분포에서 타깃 읍 건수에 예상 월 건수를 더해 지수를 재계산한다.
+    기준월 지역 분포에서 타깃 읍 건수에 예상 월 건수를 더해 지수를 재계산한다.
     delta_pp는 예상 건수 ×0.7/×1.3 두 시나리오의 개선폭(current−projected) 범위,
     낮은 값 먼저. 클램핑하지 않는다 (T12 브리프 — 상식 범위 밖이면 그대로 노출).
+
+    집계 대상 6개 지역 밖의 eup은 조용히 delta 0을 내지 않고 `ValueError` (라우트가 400으로 변환)
+    — 지수 분포에 더할 자리가 없어 "효과 없음"과 구분되지 않기 때문.
     """
-    latest = usage["months"][-1]
+    if eup not in REGIONS:
+        raise ValueError(f"집계 대상 지역이 아닙니다: {eup} (대상: {', '.join(REGIONS)})")
+    latest = _base_month(usage)
     dist = {r: 0 for r in REGIONS}
     for row in usage["usage"]:
         if row["month"] == latest:
@@ -104,7 +136,7 @@ def simulate_expansion(usage: dict, merchants: list, eup: str, category: str) ->
     return {
         "current_index": round(current),
         "projected_index": round(projected(1.0)),
-        "delta_pp": sorted(round(current - projected(m), 1) for m in (0.7, 1.3)),
+        "delta_pp": sorted(_round_pp(current - projected(m)) for m in (0.7, 1.3)),
         # 이하는 API 응답에 싣지 않는 내부 값 — LLM narrative 입력·검증 보고용
         "eup": eup,
         "category": category,

@@ -7,9 +7,14 @@
 LLM 최종 실패 시 규칙 기반 fallback (07 B3 — 데모 루프가 LLM 장애에도 완주되게).
 """
 import json
+import logging
+from datetime import datetime, timedelta
 
 from app import dataload, db, llm, prompts
+from app.clock import KST
 from app.services import season
+
+log = logging.getLogger(__name__)
 
 ASSUMPTION_NOTE = "가정 기반 전망이며 실제와 다를 수 있음"          # 절대 규칙 3 — 고정 문구
 INCENTIVE_ASSUMPTION_NOTE = "페이백률-전환율 관계는 실측 데이터가 없어 팀 설정 가정(탄력성)에 기반한 전망"
@@ -21,6 +26,7 @@ INCENTIVE_SOURCES = ["하이원포인트 사용현황"]
 INCENTIVE_TITLE = "하이원포인트 지역 결제 페이백 (전 지역 공통 — 발행액 증액 없음)"
 BLOCKED = ("추진중", "완료")            # A-1 프롬프트 규칙 — 중복 제안 금지 대상 progress
 LLM_TIMEOUT = 12                       # 1회 재시도 포함 최악 24s < Lambda 30s (07 의존성·09 타임아웃)
+RECENT_WINDOW_DAYS = 365               # A-1 프롬프트의 "최근 4분기" — AI 입력 ④·⑤ 집계 창
 
 # 3/5/7% 고정 골격 — delta_pp는 실측 없는 팀 설정 가정(탄력성) (05 문서 §2)
 SCENARIOS = [
@@ -53,6 +59,13 @@ CARD_AI_SCHEMA = {
 }
 
 
+class NoAvailableCandidate(Exception):
+    """전 후보가 추진중/완료라 새로 제안할 대상이 없음 — A-1 중복 제안 금지의 결론.
+
+    LLM 장애가 아니라 정상적인 도메인 신호라서 fallback 대상이 아니다 (라우트가 409로 변환).
+    """
+
+
 def _ranked_candidates() -> list:
     """candidates.json → Score 내림차순 순위 부여 (변경 불가 기준선 — AI 입력 ①)."""
     cands = sorted(dataload.load("candidates"), key=lambda c: c["score"], reverse=True)
@@ -73,17 +86,32 @@ def _target_state(cand: dict, cards: list) -> str:
     return "없음"
 
 
+def _is_recent(card: dict, cutoff: datetime) -> bool:
+    """결정 시각이 최근 창(RECENT_WINDOW_DAYS) 안인가 — AI 입력 ④·⑤ 공통 필터.
+
+    `decided_at`이 없거나 파싱 불가(naive 값이라 aware cutoff와 비교가 깨지는 경우 포함)면
+    **창 밖**으로 본다. 결정 시각을 모르는 카드를 "최근 4분기"로 세면 형평성 판단이
+    과대 집계되기 때문이다 (생성 경로는 모두 db.now_iso의 KST aware 값을 쓴다).
+    """
+    try:
+        return datetime.fromisoformat(card.get("decided_at") or "") >= cutoff
+    except (ValueError, TypeError):
+        return False
+
+
 def _build_inputs(cands: list, cards: list) -> dict:
     """AI 입력 ①~⑥ 조립 — user 메시지로 JSON 직렬화된다 (07 문서 B4 표)."""
+    cutoff = datetime.now(KST) - timedelta(days=RECENT_WINDOW_DAYS)   # ④·⑤는 "최근 4분기"만 (A-1)
     adopted: dict[str, int] = {}
-    for c in cards:                                     # ④ approved 카드의 target.eup 분포
+    for c in cards:                                     # ④ 최근 창 안 approved 카드의 target.eup 분포
         eup = (c.get("target") or {}).get("eup")
-        if c.get("status") == "approved" and c.get("type") == "EXPANSION" and eup:
+        if (c.get("status") == "approved" and c.get("type") == "EXPANSION" and eup
+                and _is_recent(c, cutoff)):
             adopted[eup] = adopted.get(eup, 0) + 1
-    rejected = [                                        # ⑤ 같은 타깃의 rejected 이력
+    rejected = [                                        # ⑤ 같은 타깃의 rejected 이력 (최근 창 안)
         {"타깃": f"{(c.get('target') or {}).get('eup')} {(c.get('target') or {}).get('category')}",
          "결정": "반려", "결정 시각": c.get("decided_at")}
-        for c in cards if c.get("status") == "rejected" and c.get("target")]
+        for c in cards if c.get("status") == "rejected" and c.get("target") and _is_recent(c, cutoff)]
     try:
         risk = dataload.load("risk_signal")             # ⑥ 참고용 — 없으면 컷 (07 문서 B4)
     except FileNotFoundError:
@@ -107,7 +135,13 @@ def _build_inputs(cands: list, cards: list) -> dict:
         "5_최근_정책_이력(반려)": rejected,
         "6_지역경제_위험_신호(참고용_진단_지표)": risk,
         "작성_지침": ("ai_rank_target에는 조정 후 1순위 타깃을 '지역 업종'(예: 영월군 소매점) "
-                   "형식으로 적을 것. 추진 상태가 추진중/완료인 후보는 1순위로 제안하지 말고, "
+                   "형식으로 적을 것. "
+                   # 시스템 프롬프트(A-1)는 발표 공개용 원문이라 수정하지 않는다. 프롬프트가 열거한
+                   # 4종(검토중/추진중/보류/완료) 밖의 값이 입력 2에 실제로 나오므로 여기서 설명한다.
+                   "입력 2의 '추진 상태' 값은 없음/승인 대기/검토중/추진중/보류/완료 중 하나이며, "
+                   "'없음'은 해당 타깃에 아직 카드가 없다는 뜻, '승인 대기'는 아직 결정되지 않은 "
+                   "pending 카드가 있다는 뜻이다. "
+                   "추진 상태가 추진중/완료인 후보는 1순위로 제안하지 말고, "
                    "그런 후보 때문에 제외·조정이 있었다면 해당 추진 상태('추진중' 등)를 reasons에 "
                    "명시할 것. 입력 1의 수치에 없는 사실은 지어내지 말 것. "
                    "관광동선근접도는 직선거리 기반이고 도로 소요시간은 공개 라우팅 API 추정치이므로, "
@@ -127,12 +161,21 @@ def _match_candidate(cands: list, text: str) -> dict | None:
     return None
 
 
+def _available(cands: list, cards: list) -> list:
+    """추진중/완료가 아닌 후보 목록 (Score 순위 유지)."""
+    return [c for c in cands if _target_state(c, cards) not in BLOCKED]
+
+
 def _first_available(cands: list, cards: list) -> dict:
-    """추진중/완료가 아닌 최상위 후보 — LLM이 금지 타깃·미매칭 문자열을 내면 이걸로 보정."""
-    for c in cands:
-        if _target_state(c, cards) not in BLOCKED:
-            return c
-    return cands[0]     # 전 후보가 추진중/완료인 극단 케이스 — 데모 규모에선 도달하지 않음
+    """추진중/완료가 아닌 최상위 후보 — LLM이 금지 타깃·미매칭 문자열을 내면 이걸로 보정.
+
+    전 후보가 추진중/완료면 `cands[0]`으로 물러서지 않고 예외를 낸다 — 후보가 5개뿐이라
+    실제로 도달 가능하고, 물러서면 A-1의 "추진중/완료 중복 제안 금지"를 어긴 카드가 저장된다.
+    """
+    available = _available(cands, cards)
+    if not available:
+        raise NoAvailableCandidate("모든 후보가 추진중/완료 상태라 새로 제안할 후보가 없습니다")
+    return available[0]
 
 
 def _fallback_ai(cands: list, cards: list) -> dict:
@@ -178,7 +221,10 @@ def _find_pending(cards: list, card_type: str, eup: str | None = None,
 
 
 def generate_card(card_type: str) -> tuple[dict, bool]:
-    """POST /api/cards/generate 본체 — (card, created) 반환. created=False면 기존 pending 카드."""
+    """POST /api/cards/generate 본체 — (card, created) 반환. created=False면 기존 pending 카드.
+
+    가용 후보가 하나도 없으면 `NoAvailableCandidate` (라우트가 409로 변환).
+    """
     cards = db.list_cards()
     if card_type == "INCENTIVE":
         return _generate_incentive(cards)
@@ -187,11 +233,26 @@ def generate_card(card_type: str) -> tuple[dict, bool]:
 
 def _generate_expansion(cards: list) -> tuple[dict, bool]:
     cands = _ranked_candidates()
+    # LLM 호출 **전**에 후보 가용성부터 본다 — NoAvailableCandidate가 아래 except에 잡혀
+    # fallback으로 흘러가면 안 되기 때문(그러면 금지 타깃 카드가 만들어진다).
+    available = _available(cands, cards)
+    if not available:
+        raise NoAvailableCandidate("모든 후보가 추진중/완료 상태라 새로 제안할 후보가 없습니다")
+    # 가용 후보 **전원**이 이미 pending EXPANSION 카드를 갖고 있으면 어떤 LLM 응답이 와도
+    # 아래 중복 가드(05 §8)에 걸려 새 카드가 안 나온다 → 12초짜리 호출이 순수 낭비라 건너뛴다.
+    # 이 조건에서만 건너뛰는 이유: "최상위 후보에 pending이 있으면 즉시 반환"으로 넓히면 05 §8의
+    # 타깃별 가드가 "pending EXPANSION은 동시에 1장"으로 좁아져, 시드에 pending 카드(AC-002)가
+    # 있는 상태에서 데모의 실시간 생성 버튼이 옛 카드만 돌려준다 (11 §1 파손).
+    pendings = [_find_pending(cards, "EXPANSION", c["eup"], c["category"]) for c in available]
+    if all(pendings):
+        return pendings[0], False
     try:
         out = llm.generate_json(prompts.CARD_SYSTEM_PROMPT,
                                 json.dumps(_build_inputs(cands, cards), ensure_ascii=False),
                                 CARD_AI_SCHEMA, schema_name="action_card", timeout=LLM_TIMEOUT)
     except Exception:
+        # 심사 기간에 키 만료·쿼터 초과를 알아챌 유일한 흔적 (감사 ⑤ — 이전엔 조용히 삼켰다)
+        log.warning("EXPANSION 카드 AI 설명 생성 실패 — 규칙 기반 fallback으로 진행합니다", exc_info=True)
         out = _fallback_ai(cands, cards)
     target = _match_candidate(cands, str(out.get("ai_rank_target", "")))
     if target is None or _target_state(target, cards) in BLOCKED:
@@ -273,6 +334,8 @@ def _generate_incentive(cards: list) -> tuple[dict, bool]:
         out = llm.generate_json(prompts.INCENTIVE_PROMPT, json.dumps(payload, ensure_ascii=False),
                                 CARD_AI_SCHEMA, schema_name="incentive_card", timeout=LLM_TIMEOUT)
     except Exception:
+        # 감사 ⑤ — 로그 없이 삼키면 LLM 장애를 심사 중에 알 방법이 없다
+        log.warning("INCENTIVE 카드 AI 설명 생성 실패 — 규칙 기반 fallback으로 진행합니다", exc_info=True)
         out = _incentive_fallback_ai()
 
     risks = [r for r in out.get("risks", []) if isinstance(r, str) and r.strip()]
