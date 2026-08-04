@@ -1,13 +1,15 @@
 """B2·B4·B5: Action Card CRUD·생성·상태 전이·시뮬레이션 (generate는 B4에서 추가)."""
 import json
+import logging
 
-from fastapi import APIRouter, HTTPException, Response
+from fastapi import APIRouter, HTTPException, Query, Response
 from pydantic import BaseModel
 
 from app import dataload, db, llm, prompts
 from app.services import cardgen, simulate
 
 router = APIRouter()
+log = logging.getLogger(__name__)
 
 DECISIONS = ("approved", "rejected", "held")
 PROGRESSES = ("검토중", "추진중", "보류", "완료")
@@ -48,10 +50,12 @@ def _log(card: dict, action: str):
 
 
 @router.get("/cards")
-def get_cards(type: str | None = None, status: str | None = None):
+def get_cards(card_type: str | None = Query(None, alias="type"), status: str | None = None):
+    # 쿼리스트링 이름 `?type=`은 05 문서 §2 계약이라 alias로 유지하고, 파이썬 인자명만 바꾼다
+    # (인자명 `type`은 내장 type을 가려서 이 함수 안에서 내장 함수를 못 쓰게 만든다).
     cards = db.list_cards()
-    if type:
-        cards = [c for c in cards if c.get("type") == type]
+    if card_type:
+        cards = [c for c in cards if c.get("type") == card_type]
     if status:
         cards = [c for c in cards if c.get("status") == status]
     cards.sort(key=lambda c: c.get("created_at") or "", reverse=True)
@@ -66,7 +70,10 @@ def generate(body: GenerateBody, response: Response):
     try:
         card, created = cardgen.generate_card(body.type)
     except FileNotFoundError as exc:
-        raise HTTPException(status_code=503, detail=f"{exc}.json이 아직 생성되지 않았습니다")
+        raise HTTPException(status_code=503, detail=f"{exc}.json이 아직 생성되지 않았습니다") from exc
+    except cardgen.NoAvailableCandidate as exc:     # 제안할 신규 후보가 하나도 없는 상태 = 409
+        raise HTTPException(status_code=409,
+                            detail="제안할 수 있는 신규 후보가 없습니다 (전 후보가 추진중/완료 상태)") from exc
     if not created:
         response.status_code = 200
     return {"card": card}
@@ -79,10 +86,14 @@ def get_one(cid: str):
 
 @router.post("/cards/{cid}/decision")
 def decide(cid: str, body: DecisionBody):
-    """승인/반려/보류 — pending 카드에서만 가능 (05 문서 §8)."""
+    """승인/반려/보류 — pending 카드에서만 가능 (05 문서 §8).
+
+    검사 순서는 404(없는 ID) → 400(body 값) → 409(상태 전이). 없는 카드에 잘못된 body를 보내면
+    05 §8대로 404가 나가야 하므로 카드 조회를 body 검증보다 먼저 한다.
+    """
+    card = _get_or_404(cid)
     if body.decision not in DECISIONS:
         raise HTTPException(status_code=400, detail="decision은 approved|rejected|held 중 하나여야 합니다")
-    card = _get_or_404(cid)
     if card.get("status") != "pending":
         raise HTTPException(status_code=409, detail=f"pending 카드만 결정할 수 있습니다 (현재 status={card.get('status')})")
     if body.decision == "approved" and card.get("type") == "INCENTIVE":
@@ -98,17 +109,53 @@ def decide(cid: str, body: DecisionBody):
     return {"card": card}
 
 
+def _direction(delta_pp: list) -> str:
+    """delta_pp 구간의 방향 판정 — "미미" | "개선" | "심화" | "혼재".
+
+    delta_pp = current − projected라 양수가 집중도 하락(개선)이다. 구간이 0을 걸치면
+    (lo<0<hi) 어느 쪽으로도 갈 수 있으므로 합(lo+hi) 부호로 뭉뚱그리지 않고 "혼재"로 따로 뺀다 —
+    합 기준으로 판정하면 "약 -0.1~0.3%p 개선"처럼 방향을 단정하는 문장이 나간다.
+
+    구간이 정확히 [0.0, 0.0]이면 "미미"로 먼저 뺀다. 실데이터에서 6지역×6업종 36조합 중 19개가
+    여기 해당하고(시드 카드 AC-001의 타깃 영월군 카페 포함), 부호 판정에 맡기면 "약 0.0~0.0%p
+    상승(집중 심화)"처럼 없는 변화를 방향까지 붙여 말하게 된다.
+    """
+    lo, hi = delta_pp
+    if lo == 0 and hi == 0:     # -0.0 도 0 과 같다 (simulate._round_pp가 부호를 지운다)
+        return "미미"
+    if hi <= 0:
+        return "심화"
+    if lo >= 0:
+        return "개선"
+    return "혼재"
+
+
 def _fallback_narrative(r: dict) -> str:
     """LLM 실패 시 규칙 기반 문구 — 수치 포함, '예상'·'가정' 포함, 3문장 이내 존댓말.
 
-    delta_pp 부호로 동사 분기: 양수=집중도 하락(개선), 음수=집중도 상승(집중 심화).
+    동사는 `_direction`의 판정을 따른다(미미/개선/심화/혼재).
     반올림 동률(current==projected)이면 "X에서 Y로" 구절은 생략한다.
     """
     lo, hi = r["delta_pp"]
     move = ("" if r["current_index"] == r["projected_index"]
             else f"{r['current_index']}에서 {r['projected_index']}로, ")
-    change = (f"약 {lo}~{hi}%p 개선될" if lo + hi >= 0
-              else f"약 {abs(hi)}~{abs(lo)}%p 상승(집중 심화)할")
+    kind = _direction(r["delta_pp"])
+    if kind == "미미":
+        # 변화가 0인 이유가 둘로 갈린다 — 추정치 자체가 0인 경우(유사 가맹점 실적 없음)와
+        # 추정치는 있으나 6지역 전체 규모에 견줘 작은 경우. 둘을 뭉뚱그리면 근거를 못 댄다.
+        basis = ("유사 가맹점의 최근 3개월 실적이 없어 예상 월 이용 건수 추정치가 0건이라"
+                 if not r["expected_monthly_count"]
+                 else f"예상 월 이용 건수 약 {r['expected_monthly_count']}건이 6개 지역 전체 규모에 견주면 작아")
+        return (f"{r['eup']} {r['category']} 업종에 신규 가맹점이 1곳 추가되어도 {basis}, "
+                "지역 소비 집중도는 소수점 첫째 자리 기준으로 변화가 나타나지 않을 것으로 예상됩니다. "
+                "이는 유사 가맹점의 평균 초기 실적을 가정한 전망이며, 실제 결과는 입지·홍보 여부에 따라 "
+                "달라질 수 있습니다.")
+    if kind == "개선":
+        change = f"약 {lo}~{hi}%p 개선될"
+    elif kind == "심화":
+        change = f"약 {abs(hi)}~{abs(lo)}%p 상승(집중 심화)할"
+    else:
+        change = f"약 {lo}~+{hi}%p 사이로 개선·심화 양방향이 모두 가능할"
     return (f"{r['eup']} {r['category']} 업종에 신규 가맹점이 1곳 추가되면 지역 소비 집중도가 "
             f"{move}{change} 것으로 예상됩니다. "
             "이는 유사 가맹점의 평균 초기 실적을 가정한 전망이며, 실제 결과는 입지·홍보 여부에 따라 "
@@ -129,35 +176,41 @@ def simulate_card(cid: str):
         usage = dataload.load("usage_monthly")
         merchants = dataload.load("merchants")      # §1 merchants 배열 — 요청 시점 로드
     except FileNotFoundError as exc:
-        raise HTTPException(status_code=503, detail=f"{exc}.json이 아직 생성되지 않았습니다")
+        raise HTTPException(status_code=503, detail=f"{exc}.json이 아직 생성되지 않았습니다") from exc
     if not merchants:       # 폴백 체인 3단계 분모(전체 가맹점 수) 0 방지 — 빈 산출물도 미준비로 본다
         raise HTTPException(status_code=503, detail="merchants.json에 가맹점이 없습니다")
     target = card.get("target") or {}
-    result = simulate.simulate_expansion(usage, merchants, target.get("eup"), target.get("category"))
+    try:
+        result = simulate.simulate_expansion(usage, merchants, target.get("eup"), target.get("category"))
+    except ValueError as exc:       # 집계 6지역 밖 타깃 — 계산 자체가 성립하지 않는 요청이라 400
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
 
     # narrative에 '예상'·'가정'이 항상 포함되도록 입력에 지침을 싣고, 누락 시 fallback으로 대체.
     # 음수 delta는 부호를 미리 말로 풀어 전달한다 — 원시 음수 범위를 주면 LLM이 "-0.7%p 개선"처럼
     # 방향을 잘못 서술하는 것을 실호출로 확인(픽스 라운드 1).
-    lo, hi = result["delta_pp"]
-    negative = lo + hi < 0
-    direction = (f"지역 소비 집중도가 약 {abs(hi)}~{abs(lo)}%p 상승(집중 심화)" if negative
-                 else f"지역 소비 집중도가 약 {lo}~{hi}%p 개선(집중 완화)")
-    user_payload = {
-        "대상": f"{result['eup']} {result['category']} 업종 신규 가맹점 1곳",
-        "현재 지역 소비 집중도": result["current_index"],
-        "가맹 전환 시 예상 집중도": result["projected_index"],
-        "예상 변화(부호 해석 완료)": direction,
-        "신규 가맹점 예상 월 이용 건수(가정치)": result["expected_monthly_count"],
-        "작성 지침": "'예상 변화'의 방향(개선/상승)을 그대로 서술하고, '예상'과 '가정' 두 단어를 반드시 포함할 것",
-    }
+    kind = _direction(result["delta_pp"])
     narrative = None
-    try:
-        out = llm.generate_json(prompts.SIMULATE_PROMPT, json.dumps(user_payload, ensure_ascii=False),
-                                NARRATIVE_SCHEMA, schema_name="narrative", timeout=8)
-        narrative = out.get("narrative")
-    except Exception:
-        pass
-    wrong_direction = bool(narrative) and negative and "개선" in narrative   # 집중 심화를 개선으로 서술 방지
+    # 0을 걸치는 구간(혼재)과 변화 자체가 없는 구간(미미)은 LLM에 맡기지 않는다 —
+    # 방향을 한쪽으로 단정하거나 없는 개선을 지어내는 것을 구조적으로 차단한다.
+    if kind not in ("혼재", "미미"):
+        lo, hi = result["delta_pp"]
+        direction = (f"지역 소비 집중도가 약 {abs(hi)}~{abs(lo)}%p 상승(집중 심화)" if kind == "심화"
+                     else f"지역 소비 집중도가 약 {lo}~{hi}%p 개선(집중 완화)")
+        user_payload = {
+            "대상": f"{result['eup']} {result['category']} 업종 신규 가맹점 1곳",
+            "현재 지역 소비 집중도": result["current_index"],
+            "가맹 전환 시 예상 집중도": result["projected_index"],
+            "예상 변화(부호 해석 완료)": direction,
+            "신규 가맹점 예상 월 이용 건수(가정치)": result["expected_monthly_count"],
+            "작성 지침": "'예상 변화'의 방향(개선/상승)을 그대로 서술하고, '예상'과 '가정' 두 단어를 반드시 포함할 것",
+        }
+        try:
+            out = llm.generate_json(prompts.SIMULATE_PROMPT, json.dumps(user_payload, ensure_ascii=False),
+                                    NARRATIVE_SCHEMA, schema_name="narrative", timeout=8)
+            narrative = out.get("narrative")
+        except Exception:
+            log.warning("simulate narrative LLM 실패 — 규칙 기반 문구로 대체 (card=%s)", cid, exc_info=True)
+    wrong_direction = bool(narrative) and kind == "심화" and "개선" in narrative  # 집중 심화를 개선으로 서술 방지
     if not narrative or wrong_direction or "예상" not in narrative or "가정" not in narrative:
         narrative = _fallback_narrative(result)
     return {"simulation": {
@@ -171,10 +224,13 @@ def simulate_card(cid: str):
 
 @router.post("/cards/{cid}/progress")
 def set_progress(cid: str, body: ProgressBody):
-    """추진 상태 변경 — approved 카드에서만 가능 (05 문서 §8)."""
+    """추진 상태 변경 — approved 카드에서만 가능 (05 문서 §8).
+
+    decision과 같은 순서: 404(없는 ID) → 400(body 값) → 409(상태 전이).
+    """
+    card = _get_or_404(cid)
     if body.progress not in PROGRESSES:
         raise HTTPException(status_code=400, detail="progress는 검토중|추진중|보류|완료 중 하나여야 합니다")
-    card = _get_or_404(cid)
     if card.get("status") != "approved":
         raise HTTPException(status_code=409, detail=f"승인된 카드만 추진 상태를 변경할 수 있습니다 (현재 status={card.get('status')})")
     card["progress"] = body.progress

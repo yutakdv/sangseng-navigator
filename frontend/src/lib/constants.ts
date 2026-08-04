@@ -1,0 +1,46 @@
+import type { DisplayCategory, Region } from "@/types";
+
+/** 6지역 고정 순서 — pipeline/common.py REGIONS와 동일. 차트 색 배정도 이 순서를 따른다 (13 §5) */
+export const REGIONS: Region[] = ["고한읍", "사북읍", "정선군", "태백시", "영월군", "삼척시"];
+
+/** 표시 업종 6분류 고정 순서 — 롤업 정본은 pipeline/category_map.py (05 §1) */
+export const CATEGORIES: DisplayCategory[] = ["카페", "음식점", "편의점", "숙박업", "소매점", "기타"];
+
+/**
+ * 카테고리 팔레트 (13 §5 — 검증 완료, 임의 변경 금지).
+ * 색은 **항목에 고정**한다 — 필터로 항목 수가 바뀌어도 남은 항목 색을 재배열하지 않는다.
+ */
+export const CATEGORY_COLORS: Record<string, string> = {
+  카페: "#4f46e5",
+  음식점: "#eb6834",
+  편의점: "#1baf7a",
+  숙박업: "#eda100",
+  소매점: "#e87ba4",
+  기타: "#008300",
+};
+
+/** 지역 6종에 색이 필요할 때도 같은 팔레트를 같은 순서로 (13 §5) */
+export const REGION_COLORS: Record<string, string> = Object.fromEntries(
+  REGIONS.map((r, i) => [r, Object.values(CATEGORY_COLORS)[i]]),
+);
+
+/** 단일 시리즈 차트(전환율 추이·지역별 막대)는 팔레트 대신 이 단색 (13 §5) */
+export const PRIMARY = "#4f46e5";
+
+/** 거점 — pipeline/common.py ANCHOR. 라벨은 이 문자열 그대로 쓴다("정문" 표기 폐기, 13 §9) */
+export const ANCHOR = {
+  name: "강원랜드 카지노(하이원리조트)",
+  lat: 37.21164,
+  lng: 128.82168,
+};
+
+/** 고지 문구 — 화면에서 문자열을 새로 쓰지 말고 이 상수를 쓴다 (절대 규칙 3, 13 §9) */
+export const ASSUMPTION_NOTE = "가정 기반 전망이며 실제와 다를 수 있음";
+
+export const SOURCE_NOTE =
+  "데이터: 공공데이터포털(강원랜드·소상공인시장진흥공단)·국세청 | 지도: © OpenStreetMap contributors, OpenFreeMap";
+
+/** 삼척시 = 시 전역이 아니라 하이원포인트 지역가맹 대상지역인 도계읍 (05 §1) */
+export const REGION_TOOLTIP: Partial<Record<Region, string>> = {
+  삼척시: "삼척시 도계읍 (하이원포인트 지역가맹 대상지역)",
+};

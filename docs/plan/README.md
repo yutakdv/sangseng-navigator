@@ -12,7 +12,7 @@
 API Gateway HTTP API)가 JSON 서빙 + Action Card 생성/승인(DynamoDB) + LLM 호출 →
 Next.js(Vercel)가 화면 렌더. FE는 API 계약 기반 mock으로 BE와 독립 개발 후 env 하나로 실 API 전환.
 
-**Tech Stack:** Next.js 14(App Router)+TS+Tailwind+Recharts+MapLibre GL(OpenFreeMap 타일, 키 불필요) /
+**Tech Stack:** Next.js 16(App Router)+TS+Tailwind 3+Recharts+MapLibre GL(OpenFreeMap 타일, 키 불필요) /
 Python 3.12+FastAPI+Mangum / pandas+PublicDataReader+Kakao REST 지오코딩(VWorld 폴백) /
 DynamoDB(온디맨드) / OpenAI 또는 Claude(어댑터) / 배포: Vercel(FE) + AWS SAM→Lambda+API Gateway(BE)
 

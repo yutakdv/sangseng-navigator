@@ -127,7 +127,21 @@ function circlePolygon(lng: number, lat: number, radiusM = 500, points = 64) {
 
 - [ ] KPI 카드 행: 집중도(등급 병기)·지역 전환율(근사 지표 배지)·증가율·채택률·실행 전환율·평균 승인 소요·지역 균형지수 (`/api/kpi` + `/api/dashboard` 병합)
 - [ ] 월별 집중도 라인차트, 지역 비중(히트맵은 컷 후보 — 우선 가로 막대), **"리조트 체류 규모(굵은 막대) vs 지역 전환 건수(가는 막대)"** 비교 차트 (문제 스케일 각인용)
-- [ ] **검증:** mock→실 데이터 전환 시 축·단위 깨지지 않음 (음수/0 데이터 방어)
+- [ ] **요인 카드** (13 §2-15가 확정한 산출 가능 지표만): 업종공백도 `gap`·동선근접도 `proximity`·
+      포화도 `saturation`은 `/api/candidates`에서, 운영 2년 미만 사업자 비중 `under2y_ratio`는
+      **`/api/risk-signal`**에서 받는다. `lib/api.ts`에 접근자 한 줄을 더해야 실 API 모드가 동작한다
+      (mock은 `src/mocks/risk_signal.json`이 이미 있고 BE 응답과 같은 배열이다):
+
+```ts
+import riskSignalMock from "@/mocks/risk_signal.json";
+// ...
+riskSignal: (): Promise<RiskSignal[]> => get("/api/risk-signal", () => riskSignalMock as RiskSignal[]),
+```
+
+- [ ] `under2y_ratio` 표시는 **중립 표기 고정** — '위험' 라벨·경고색·지역 순위 정렬 금지
+      (4개 시군 편차 0.5%p라 비교 근거가 못 된다 — 05 §1·§6, 13 §7)
+- [ ] **검증:** mock→실 데이터 전환 시 축·단위 깨지지 않음 (음수/0 데이터 방어),
+      요인 카드가 두 모드에서 같은 값을 낸다
 
 ## Task F6: ④ 인센티브 정책 카드 (`/incentive`)
 

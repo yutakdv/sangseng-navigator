@@ -94,14 +94,18 @@ cd ../frontend && npm install
 source .venv/bin/activate
 cd pipeline && python run_all.py                      # 데이터 갱신 시에만
 
-# BE + DynamoDB Local (Docker 테스트 환경 — 14 문서 T7, AWS 불필요)
-docker compose up -d && curl localhost:8000/api/health
+# 전체 기동 (Docker 통합 테스트 환경 — 14 문서 T7, AWS 불필요)
+#   dynamodb → seed(데모 카드 3장, 1회 실행 후 종료) → backend → frontend
+docker compose up -d && curl localhost:8000/api/health   # FE는 http://localhost:3000
+#   FRONTEND_PORT=3100      호스트 3000번이 이미 쓰일 때
+#   FRONTEND_API_BASE=      FE를 mock 모드로 (BE 없이 화면만)
 # (DynamoDB 없이 정적 서빙만 볼 때는 uvicorn 직접 실행도 가능:
 #  cd backend && uvicorn app.main:app --reload --port 8000)
 
-cd frontend && npm run dev                             # 별도 터미널
+cd frontend && npm run dev                             # 컨테이너 밖에서 FE만 띄울 때
 
-# FE에서 실 BE 붙이기: frontend/.env.local 에 NEXT_PUBLIC_API_BASE=http://localhost:8000
+# 컨테이너 밖 FE에서 실 BE 붙이기: frontend/.env.local 에 NEXT_PUBLIC_API_BASE=http://localhost:8000
+#   (컨테이너 안에서는 http://backend:8000 — 페이지가 서버 컴포넌트라 fetch가 컨테이너 안에서 일어난다)
 ```
 
 ## 커밋 컨벤션

@@ -125,6 +125,28 @@ Base URL: 로컬 `http://localhost:8000` / 배포 후 API Gateway URL. 경로 �
   (`pipeline/p4_stores.py`). 표시명은 원본 CSV 컬럼명을 따라 "삼척시"로 두되,
   툴팁·범례에는 "삼척시 도계읍"으로 적는다
 
+### `GET /api/risk-signal`
+대시보드 **요인 카드**(13 §2-15)가 쓰는 배경 지표. `risk_signal.json`을 **가공 없이 그대로** 돌려준다.
+
+```json
+[
+  {"sigungu": "정선군", "under2y_ratio": 0.1507},
+  {"sigungu": "태백시", "under2y_ratio": 0.1497},
+  {"sigungu": "영월군", "under2y_ratio": 0.15},
+  {"sigungu": "삼척시", "under2y_ratio": 0.1459}
+]
+```
+
+- 응답은 **최상위 배열**이며 산출 JSON과 완전히 같다 — `scripts/sync-mocks.sh`가 같은 파일을
+  `frontend/src/mocks/risk_signal.json`으로 복사하므로, 감싸거나 필드를 더하면 mock 모드와
+  실 API 모드가 갈린다 (§6 mock 원천 단일화)
+- 요인 카드 4지표 중 `gap`·`proximity`·`saturation`은 `GET /api/candidates`에서, `under2y_ratio`만
+  이 엔드포인트에서 온다 (13 §2-15가 확정한 "산출 가능한 지표"). FE는 `api.riskSignal()`로 받는다
+- **표시 규칙(필수):** 진단 참고용이며 처방 근거가 아니다(절대 규칙 6). 4개 시군 편차가 0.5%p뿐이라
+  지역 비교·순위 정렬·'위험' 라벨·경고색을 쓰지 않고 **"운영 2년 미만 사업자 비중(배경 정보)"**
+  중립 표기만 쓴다 (§6·13 §7과 동일 규칙)
+- 산출 전이면 `503 {"detail": "risk_signal.json이 아직 생성되지 않았습니다"}`
+
 ## 2. Action Card
 
 ### Card 객체 (공통 스키마)
@@ -249,6 +271,16 @@ Base URL: 로컬 `http://localhost:8000` / 배포 후 API Gateway URL. 경로 �
 }
 ```
 
+- `delta_pp`는 `[낮은 값, 높은 값]`이고 **부호 있는 %p**다(양수 = 집중도 하락 = 개선).
+  `narrative`의 방향 표현은 구간으로 판정한다 — 둘 다 양수면 "개선", 둘 다 음수면 "상승(집중 심화)",
+  **0을 걸치면**(`lo<0<hi`) 방향을 단정하지 않고 "양방향 모두 가능", **정확히 `[0.0, 0.0]`이면**
+  "소수점 첫째 자리 기준으로 변화가 나타나지 않음"으로 적는다. 뒤의 두 경우는 **LLM을 호출하지 않고**
+  규칙 기반 문구만 쓴다 — 없는 개선을 지어내거나 한쪽 방향으로 단정하는 것을 구조적으로 막기 위함이다
+  - `[0.0, 0.0]`은 예외가 아니라 흔한 결과다(실데이터 6지역×6업종 36조합 중 19개). 가맹점 1곳 추가가
+    6개 지역 전체 집계를 0.05%p도 못 움직이는 경우와, 유사 가맹점 실적이 없어 추정치가 0건인 경우로
+    나뉘며 문구가 그 근거를 밝힌다
+  - `-0.0`은 내보내지 않는다(반올림 결과가 음의 0이면 `0.0`으로 정규화 — 화면에 "-0.0%p"가 찍히는 것 방지)
+
 ## 3. KPI
 
 ### `GET /api/kpi`
@@ -300,12 +332,34 @@ Base URL: 로컬 `http://localhost:8000` / 배포 후 API Gateway URL. 경로 �
 - `badge:"신규"` = EXPANSION 카드가 `progress=완료`인 (읍×업종)과 매칭되는 가맹점 (데모: 목업 1~2건 허용)
 - `payback` = INCENTIVE 카드가 `완료` 상태일 때만 포함, 아니면 `null`. `rate`는 해당 카드의 `selected_rate` 값
 - `blurb` = LLM 생성 문구 (LLM 실패 시 규칙 기반 fallback 문구)
+- **추천 정렬 근거(BE 확정):** ① `badge:"신규"`가 붙는 가맹점 먼저 ② 그다음 거점(`ANCHOR`)까지의
+  **직선거리 오름차순**. 상위 3곳까지 반환한다. 원본 순서(상호명순)로 두면 필터 없이 호출할 때
+  방문객 동선과 무관한 가맹점이 먼저 나오기 때문이다
+  - **거리 값은 응답에 싣지 않는다**(정렬 근거로만 사용). `blurb` 생성 프롬프트에도 넣지 않는다 —
+    §1 캐비엇대로 화면·문구 어디에서도 "가장 가깝다"고 단정하지 않기 위함이다.
+    FE는 추천 순서를 "가까운 순"으로 라벨링하지 말고 `policy_note` 문구만 그대로 노출한다
+  - 좌표(`lat`/`lng`)가 없는 가맹점은 거리 비교에서 맨 뒤로 밀린다
 
 ## 5. 기타
 
 | 메서드 | 경로 | 응답 |
 |---|---|---|
-| GET | `/api/health` | `{"ok": true, "data_loaded": true}` |
+| GET | `/api/health` | `{"ok": true, "data_loaded": true, "datasets": {...}}` |
+
+```json
+{
+  "ok": true,
+  "data_loaded": true,
+  "datasets": {"dashboard": true, "eup_scores": true, "candidates": true,
+               "merchants": true, "risk_signal": true}
+}
+```
+
+- `datasets`: 산출 JSON 5종의 로드 성공 여부(각 `true`/`false`). `dashboard` 하나만 보면 나머지
+  결손을 놓치므로 개별로 보고한다 (배포 후 `deploy-backend.sh`의 data 복사 누락 진단용)
+- `data_loaded`: **필수 4종**(`dashboard`·`eup_scores`·`candidates`·`merchants`)의 AND.
+  `risk_signal`은 07 문서 B4 ⑥에서 "없으면 컷"인 선택 입력이라 `datasets`에만 싣고 AND에서는 뺀다
+- 기존 키 `ok`·`data_loaded`는 형태·의미 그대로다 — `datasets`만 추가되었다
 
 ## 6. 파이프라인 산출 JSON (data/processed/) 스키마
 
@@ -315,7 +369,7 @@ Base URL: 로컬 `http://localhost:8000` / 배포 후 API Gateway URL. 경로 �
 | `eup_scores.json` | §1 `eup_ranking` + `selected_eups` | BE(candidates, 카드 생성) |
 | `candidates.json` | §1 `candidates` 배열 | BE(candidates, 카드 생성) |
 | `merchants.json` | §1 `merchants` 배열 (지오코딩·주소 포함) | BE(candidates, 위젯) |
-| `risk_signal.json` | `[{"sigungu": "정선군", "under2y_ratio": 0.31}]` | BE(카드 생성 AI 입력 ⑥) |
+| `risk_signal.json` | `[{"sigungu": "정선군", "under2y_ratio": 0.1507}]` | BE(카드 생성 AI 입력 ⑥, `GET /api/risk-signal`), FE mock |
 | `sensitivity.json` | `{"combos": 25, "top3_stable_ratio": 0.88, "detail": [...]}` | 발표 슬라이드 |
 | `usage_monthly.json` | 월×지역×업종 원자료 집계 (재계산·검증용) | pipeline, simulate |
 
@@ -339,15 +393,17 @@ FE mock 동기화: 레포 루트에서 `./scripts/sync-mocks.sh` — 위 산출 
 
 | 상황 | 규칙 |
 |---|---|
-| 카드 ID 생성 | `AC-`(EXPANSION)/`INC-`(INCENTIVE) + 3자리 순번. BE가 Scan으로 해당 타입 개수+1 산정 (데모 규모에서 경합 무시 가능) |
-| generate 중복 | 동일 `(type, target.eup, target.category)`의 `pending` 카드가 이미 있으면 새로 만들지 않고 **기존 카드를 200으로 반환** (데모 중 버튼 연타 대비). INCENTIVE는 `target`이 없으므로 pending INCENTIVE는 동시에 1장만 존재 |
+| 카드 ID 생성 | `AC-`(EXPANSION)/`INC-`(INCENTIVE) + 3자리 순번. BE가 Scan으로 **해당 타입 기존 ID의 최대 순번 + 1** 산정. 개수+1이 아닌 이유: 카드가 삭제되거나 비순차 ID가 섞이면 이미 쓰인 ID가 다시 나와 기존 카드를 덮어쓴다. 순번으로 파싱되지 않는 ID는 건너뛴다 (동시 generate 경합은 데모 규모에서 무시) |
+| generate 중복 | 동일 `(type, target.eup, target.category)`의 `pending` 카드가 이미 있으면 새로 만들지 않고 **기존 카드를 200으로 반환** (데모 중 버튼 연타 대비). INCENTIVE는 `target`이 없으므로 pending INCENTIVE는 동시에 1장만 존재. **LLM 호출을 건너뛰고 기존 카드를 바로 돌려주는 것은 "가용 후보(추진중/완료가 아닌 후보) 전원이 이미 pending 카드를 가진 경우"뿐** — 한 후보라도 비어 있으면 LLM을 호출한다(가드 기준은 여전히 타깃별이며, 위 규칙의 의미는 불변) |
+| generate 시 제안 가능한 신규 후보가 없음 | 전 후보의 추진 상태가 `추진중`/`완료`여서 중복 제안 금지(07 A-1) 대상만 남으면 `409 {"detail": "제안할 수 있는 신규 후보가 없습니다 (전 후보가 추진중/완료 상태)"}`. LLM 장애가 아니라 정상적인 도메인 신호이므로 규칙 기반 fallback으로 넘기지 않는다 |
 | `simulate`를 INCENTIVE 카드에 호출 | `400 {"detail": "INCENTIVE 카드는 scenarios를 사용합니다"}` — 시뮬레이션은 EXPANSION 전용 |
+| `simulate` 타깃 `eup`이 집계 6개 지역 밖 | `400 {"detail": "집계 대상 지역이 아닙니다: <eup> (대상: 고한읍, 사북읍, 정선군, 태백시, 영월군, 삼척시)"}` — 지역 분포에 더할 자리가 없어 조용히 `delta 0`을 내면 "효과 없음"과 구분되지 않는다 |
 | INCENTIVE 승인 시 `selected_rate` 누락/범위 밖 | `400 {"detail": "selected_rate(3|5|7)가 필요합니다"}`. EXPANSION decision에 온 `selected_rate`는 무시 |
 | 잘못된 상태 전이 | `409 {"detail": ...}` — 예: pending이 아닌 카드에 decision, approved가 아닌 카드에 progress |
-| 없는 카드 ID | `404 {"detail": "card not found"}` |
+| 없는 카드 ID | `404 {"detail": "card not found"}`. **검사 순서는 404 → 400(body 값) → 409(상태 전이)** — 없는 카드에 잘못된 body를 보내도 404가 나간다 |
 | KPI에서 분모 0 | 해당 지표를 `null`로 반환 (예: approved 0건 → `execution_rate: null`, 채택 0건 → `regional_balance_index: null`). FE는 `null`이면 `—` 표시 |
 | 위젯 추천 결과 0건 | `{"recommendations": [], "policy_note": ...}` 200 반환. FE는 "해당 조건의 가맹점이 아직 없어요" 빈 상태 UI |
-| 위젯 LLM 실패 | `blurb`를 규칙 기반 문구로 대체 (`"{region}의 {category} 하이원포인트 가맹점이에요"`) — 응답 지연 방지 위해 LLM 타임아웃 5초 |
+| 위젯 LLM 실패 | `blurb`를 규칙 기반 문구로 대체 (`"{region}의 {category} 하이원포인트 가맹점이에요"`) — 응답 지연 방지 위해 LLM 타임아웃 5초, **재시도 없음**(실패 즉시 fallback) |
 | 시각 표기 | 모든 타임스탬프 KST ISO8601 (`+09:00`) — `avg_approval_hours` 계산도 KST 기준 |
-| 숫자 직렬화 | **BE 구현 주의:** boto3가 DynamoDB 숫자를 `Decimal`로 반환 → FastAPI JSON 직렬화가 깨진다. `db.py` 읽기 경로에서 Decimal→int/float 변환을 일괄 적용할 것 (07 문서 B2) |
+| 숫자 직렬화 | **BE 구현 주의:** boto3가 DynamoDB 숫자를 `Decimal`로 반환 → FastAPI JSON 직렬화가 깨진다. `db.py` 읽기 경로에서 Decimal→int/float 변환을 일괄 적용할 것 (07 문서 B2). 변환 기준은 **저장 표기에 소수점이 있으면 float, 없으면 int** — 값이 정수라는 이유로 float를 int로 내리지 않는다(그러면 저장·조회를 반복할 때마다 §2 `scenarios[].delta_pp`가 `[1.0, 2.0]` → `[1, 2]`로 바뀐다) |
 | 날짜 기준 | "최근 3개월"·"전분기" 등은 **오늘이 아니라 데이터 최신 월 기준** (공공데이터 갱신 지연 대비, 06 문서 공통 원칙) |
