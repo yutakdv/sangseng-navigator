@@ -1,12 +1,17 @@
 """B6: 방문객 위젯 추천 — merchants.json + 완료 카드 반영 (05 문서 §4, 07 문서 B6)."""
 import json
+import logging
+import math
 
 from fastapi import APIRouter, HTTPException
 
 from app import dataload, db, llm, prompts
 
 router = APIRouter()
+log = logging.getLogger(__name__)
 
+# pipeline/common.py ANCHOR 복제본 (Lambda 번들에 pipeline 모듈이 없어 import 금지)
+ANCHOR = {"lat": 37.21164, "lng": 128.82168}
 LIMIT = 3                                             # 상위 3곳 (07 문서 B6)
 DONE = "완료"
 NEW_BADGE = "신규"
@@ -17,6 +22,23 @@ BLURB_SCHEMA = {
     "required": ["blurbs"],
     "additionalProperties": False,
 }
+
+
+def _haversine_km(lat1: float, lng1: float, lat2: float, lng2: float) -> float:
+    """두 좌표 사이 직선거리(km) — 추천 정렬에만 쓰는 보조 계산."""
+    r = 6371.0
+    p1, p2 = math.radians(lat1), math.radians(lat2)
+    a = (math.sin((p2 - p1) / 2) ** 2
+         + math.cos(p1) * math.cos(p2) * math.sin(math.radians(lng2 - lng1) / 2) ** 2)
+    return 2 * r * math.asin(math.sqrt(a))
+
+
+def _anchor_km(m: dict) -> float:
+    """거점(ANCHOR)까지의 직선거리 — 좌표가 없는 가맹점은 맨 뒤로 (inf)."""
+    lat, lng = m.get("lat"), m.get("lng")
+    if lat is None or lng is None:
+        return float("inf")
+    return _haversine_km(ANCHOR["lat"], ANCHOR["lng"], lat, lng)
 
 
 def _new_targets(cards: list) -> set:
@@ -71,6 +93,7 @@ def _blurbs(picked: list) -> list:
                                 BLURB_SCHEMA, schema_name="blurbs", timeout=5, attempts=1)
         blurbs = out.get("blurbs") or []
     except Exception:
+        log.warning("위젯 blurb LLM 실패 — 규칙 기반 문구로 대체 (%d곳)", len(picked), exc_info=True)
         return fallback
     return [blurbs[i] if i < len(blurbs) and isinstance(blurbs[i], str) and blurbs[i].strip() else fallback[i]
             for i in range(len(picked))]
@@ -81,16 +104,19 @@ def recommend(region: str | None = None, category: str | None = None):
     """(region, category) 필터 → 완료 카드 매칭 가맹점 우선 정렬 → 상위 3곳 + 문구 (05 문서 §4)."""
     try:
         merchants = dataload.load("merchants")
-    except FileNotFoundError:
-        raise HTTPException(status_code=503, detail="merchants.json이 아직 생성되지 않았습니다")
+    except FileNotFoundError as exc:
+        raise HTTPException(status_code=503, detail="merchants.json이 아직 생성되지 않았습니다") from exc
     cards = db.list_cards()
     new_targets = _new_targets(cards)
     payback = _payback(cards)
 
     rows = [m for m in merchants
             if (not region or m.get("eup") == region) and (not category or m.get("category") == category)]
-    # 완료 카드와 매칭되는 가맹점을 최상단으로 (안정 정렬 — 그 외는 merchants.json 원본 순서 유지)
-    rows.sort(key=lambda m: 0 if (m.get("eup"), m.get("category")) in new_targets else 1)
+    # 정렬: ① 완료 카드와 매칭되는 가맹점(신규 배지) 먼저 ② 거점(ANCHOR)에서 가까운 순.
+    # 원본 순서(상호명순)로 두면 필터 없이 부를 때 방문객 동선과 무관한 가맹점이 먼저 나왔다.
+    # 거리 값은 응답에도 blurb 프롬프트에도 싣지 않는다 — 05 §1 캐비엇("거점에서 가장 가깝다고
+    # 단정하지 않는다")과 충돌하므로 정렬 근거로만 쓰고 LLM이 근접성을 주장할 수 없게 한다.
+    rows.sort(key=lambda m: (0 if (m.get("eup"), m.get("category")) in new_targets else 1, _anchor_km(m)))
     picked = [(m, (m.get("eup"), m.get("category")) in new_targets) for m in rows[:LIMIT]]
     blurbs = _blurbs(picked) if picked else []
     return {

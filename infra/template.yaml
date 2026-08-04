@@ -6,6 +6,12 @@ Parameters:
   LlmProvider:      { Type: String, Default: openai }
   OpenAiApiKey:     { Type: String, Default: '', NoEcho: true }
   AnthropicApiKey:  { Type: String, Default: '', NoEcho: true }
+  # 무인증 공개 URL의 generate 엔드포인트가 호출마다 LLM을 부르므로 동시성 상한을 기본값으로 건다 (09 §5.5)
+  ReservedConcurrency: { Type: Number, Default: 5 }   # -1이면 설정 자체를 생략(계정 동시성 한도가 낮아 배포 실패할 때)
+  AllowedOrigins:      { Type: String, Default: '*' }  # 앱 CORS 허용 도메인(콤마 구분). T17에서 Vercel 도메인으로 좁힌다
+
+Conditions:
+  HasReservedConcurrency: !Not [!Equals [!Ref ReservedConcurrency, '-1']]
 
 Globals:
   Function:
@@ -18,7 +24,9 @@ Resources:
     Type: AWS::Serverless::HttpApi
     Properties:
       CorsConfiguration:
-        AllowOrigins: ['*']   # 1차 배포용. Vercel 도메인 확정 후 09 문서 §5에서 좁힌다
+        # 게이트웨이 CORS는 '*' 유지. 앱 레벨은 AllowedOrigins 파라미터로 따로 제어하며,
+        # T17에서 Vercel 도메인 확정 후 게이트웨이·앱 양쪽을 함께 좁힌다 (09 문서 §5)
+        AllowOrigins: ['*']
         AllowMethods: [GET, POST, OPTIONS]
         AllowHeaders: ['*']
 
@@ -27,12 +35,14 @@ Resources:
     Properties:
       CodeUri: ../backend
       Handler: app.main.handler
+      ReservedConcurrentExecutions: !If [HasReservedConcurrency, !Ref ReservedConcurrency, !Ref 'AWS::NoValue']
       Environment:
         Variables:
           CARDS_TABLE: !Ref CardsTable
           LLM_PROVIDER: !Ref LlmProvider
           OPENAI_API_KEY: !Ref OpenAiApiKey
           ANTHROPIC_API_KEY: !Ref AnthropicApiKey
+          ALLOWED_ORIGINS: !Ref AllowedOrigins
       Policies:
         - DynamoDBCrudPolicy: { TableName: !Ref CardsTable }
       Events:

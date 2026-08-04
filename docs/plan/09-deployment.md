@@ -24,6 +24,12 @@ Parameters:
   LlmProvider:      { Type: String, Default: openai }
   OpenAiApiKey:     { Type: String, Default: '', NoEcho: true }
   AnthropicApiKey:  { Type: String, Default: '', NoEcho: true }
+  # 무인증 공개 URL의 generate 엔드포인트가 호출마다 LLM을 부르므로 동시성 상한을 기본값으로 건다 (§5.5)
+  ReservedConcurrency: { Type: Number, Default: 5 }   # -1이면 설정 자체를 생략(계정 동시성 한도가 낮아 배포 실패할 때)
+  AllowedOrigins:      { Type: String, Default: '*' }  # 앱 CORS 허용 도메인(콤마 구분). T17에서 Vercel 도메인으로 좁힌다
+
+Conditions:
+  HasReservedConcurrency: !Not [!Equals [!Ref ReservedConcurrency, '-1']]
 
 Globals:
   Function:
@@ -36,7 +42,9 @@ Resources:
     Type: AWS::Serverless::HttpApi
     Properties:
       CorsConfiguration:
-        AllowOrigins: ['*']   # 1차 배포용. Vercel 도메인 확정 후 §5에서 좁힌다
+        # 게이트웨이 CORS는 '*' 유지. 앱 레벨은 AllowedOrigins 파라미터로 따로 제어하며,
+        # T17에서 Vercel 도메인 확정 후 게이트웨이·앱 양쪽을 함께 좁힌다 (§5)
+        AllowOrigins: ['*']
         AllowMethods: [GET, POST, OPTIONS]
         AllowHeaders: ['*']
 
@@ -45,12 +53,14 @@ Resources:
     Properties:
       CodeUri: ../backend
       Handler: app.main.handler
+      ReservedConcurrentExecutions: !If [HasReservedConcurrency, !Ref ReservedConcurrency, !Ref 'AWS::NoValue']
       Environment:
         Variables:
           CARDS_TABLE: !Ref CardsTable
           LLM_PROVIDER: !Ref LlmProvider
           OPENAI_API_KEY: !Ref OpenAiApiKey
           ANTHROPIC_API_KEY: !Ref AnthropicApiKey
+          ALLOWED_ORIGINS: !Ref AllowedOrigins
       Policies:
         - DynamoDBCrudPolicy: { TableName: !Ref CardsTable }
       Events:
@@ -89,9 +99,12 @@ rm -rf ../backend/app/data && cp -r ../data/processed ../backend/app/data
 PARAMS=("LlmProvider=${LLM_PROVIDER:-openai}")
 [ -n "${OPENAI_API_KEY:-}" ] && PARAMS+=("OpenAiApiKey=${OPENAI_API_KEY}")
 [ -n "${ANTHROPIC_API_KEY:-}" ] && PARAMS+=("AnthropicApiKey=${ANTHROPIC_API_KEY}")
+# 비우면 template의 Default가 먹는다 (AllowedOrigins='*', ReservedConcurrency=5)
+[ -n "${ALLOWED_ORIGINS:-}" ] && PARAMS+=("AllowedOrigins=${ALLOWED_ORIGINS}")
+[ -n "${RESERVED_CONCURRENCY:-}" ] && PARAMS+=("ReservedConcurrency=${RESERVED_CONCURRENCY}")
 
 sam build -t template.yaml
-sam deploy -t template.yaml \
+sam deploy \
   --stack-name sangseng-backend \
   --resolve-s3 --capabilities CAPABILITY_IAM \
   --region ap-northeast-2 \
@@ -102,9 +115,14 @@ aws cloudformation describe-stacks --stack-name sangseng-backend \
   --query 'Stacks[0].Outputs' --output table
 ```
 
+- 스크립트가 `.env`에서 읽는 파라미터: `LLM_PROVIDER`·`OPENAI_API_KEY`·`ANTHROPIC_API_KEY`에 더해
+  **`ALLOWED_ORIGINS`(앱 CORS 허용 도메인, 콤마 구분)·`RESERVED_CONCURRENCY`**. 둘 다 비워 두면
+  template의 Default(`*` / `5`)가 그대로 적용된다 (§5·§5.5)
+- `sam deploy`에는 `-t`를 주지 않는다 — `sam build` 산출물(`.aws-sam/build/template.yaml`)이 배포 대상이다
 - [ ] 최초 배포 후 Outputs의 `CardsTable` 값을 `.env`의 `CARDS_TABLE`에 반영 (로컬 BE도 같은 테이블 사용)
 - [ ] `python backend/seed_demo.py` 실행 — 데모 사례(추진중 카드 등) 시드
-- [ ] **검증:** `curl $ApiUrl/api/health` → `{"ok":true,"data_loaded":true}`,
+- [ ] **검증:** `curl $ApiUrl/api/health` → `{"ok":true,"data_loaded":true,"datasets":{...}}`
+      (`datasets` 5종 전부 `true` — 번들 복사 누락 조기 발견, 05 §5),
       `curl $ApiUrl/api/dashboard | jq .conversion.headline_rate`
 
 ## 2. 프론트엔드 — Vercel
@@ -168,11 +186,20 @@ claude-sonnet-5 전환 시 $3/$15(인트로 $2/$10)로 수천 원 수준.
 - [ ] **미해결 선행조건: IAM 권한** — `Yutak_trading` 사용자에 CloudFormation·API Gateway·DynamoDB
       권한 없음(AccessDenied 실측). 최종 배포 **전날까지** 인라인 정책 부착 (14 문서 T17 Step 1)
 
-## 5. 마무리 조이기 (여유 있을 때)
+## 5. 마무리 조이기 (배포 URL 확정 후)
 
-- [ ] CORS `AllowOrigins`를 `['https://<project>.vercel.app', 'http://localhost:3000']`으로 좁혀 재배포
+**CORS는 2층이다** — ① API Gateway `CorsConfiguration.AllowOrigins`(게이트웨이) ② FastAPI
+`CORSMiddleware.allow_origins`(앱). 앱 쪽은 코드가 아니라 **`ALLOWED_ORIGINS` 환경변수**(콤마 구분)를
+읽으므로 SAM 파라미터 `AllowedOrigins`만 바꾸면 재배포로 좁혀진다 (07 B1 `app/main.py`).
+미설정·빈 값이면 지금까지와 같은 `*`다.
+
+- [ ] `.env`에 `ALLOWED_ORIGINS=https://<project>.vercel.app,http://localhost:3000` 기입 →
+      `./deploy-backend.sh` 재실행 (스크립트가 `AllowedOrigins` 파라미터로 넘긴다)
+- [ ] 같은 값으로 template의 게이트웨이 `CorsConfiguration.AllowOrigins`도 좁혀 함께 재배포
       (Vercel Preview URL도 쓸 거면 `https://*.vercel.app` 패턴은 HTTP API에서 안 되므로
       Preview 도메인을 명시 추가하거나 데모 기간엔 `*` 유지 판단)
+- [ ] **검증:** 브라우저에서 Vercel 배포 URL로 정상 호출되는지 + 임의 오리진(로컬 파일 등)에서
+      차단되는지 확인. FE가 CORS 에러를 내면 두 층 중 어느 쪽인지부터 가른다 (트러블슈팅 표)
 - [ ] Billing 콘솔 $0 스크린샷 (발표 Q&A "운영 비용?" 대비)
 
 ## 5.5 심사 기간 운영 (제출 ~ 심사 종료, 상세: 12 문서 §5)
@@ -197,7 +224,13 @@ claude-sonnet-5 전환 시 $3/$15(인트로 $2/$10)로 수천 원 수준.
 
 - [ ] (여유 시) 심사위원 조작으로 인한 데모 상태 오염 대비 — 시드 리셋을 EventBridge 스케줄(매시)로
       자동화하거나, 최소한 심사 기간 중 하루 1회 수동 리셋
-- [ ] (선택) `ApiFunction`에 `ReservedConcurrentExecutions: 5` — 공개 URL의 LLM 호출 남용 상한
+- [x] **동시성 상한은 기본 적용** — `ApiFunction`의 `ReservedConcurrentExecutions`를 SAM 파라미터
+      `ReservedConcurrency`(**기본 5**)로 건다. 무인증 공개 URL의 `POST /api/cards/generate`가
+      호출마다 LLM을 부르므로 남용 시 비용·rate limit이 곧바로 튄다 — "여유 있으면"에 둘 항목이 아니다
+      - 해제가 필요하면 `RESERVED_CONCURRENCY=-1` (template의 `Conditions`가 속성 자체를 생략)
+      - **배포가 `ReservedConcurrentExecutions` 관련 오류로 실패하면**(계정의 미예약 동시성 여유가
+        부족한 경우 — 신규 계정은 총 한도가 낮다) `RESERVED_CONCURRENCY=-1`로 다시 배포하고,
+        상한은 API Gateway 쪽 throttling 또는 수동 모니터링으로 대체한다
 - [ ] Vercel Password Protection **OFF** 확인 (제출 요건 — 로그인 없이 접속)
 
 ## 6. 철거 (종료 후)
@@ -217,8 +250,9 @@ sam delete --stack-name sangseng-backend --region ap-northeast-2
 | Lambda 500 + "Unable to import module" | `sam build`가 requirements 미설치 — `backend/requirements.txt` 위치 확인. pandas 등 무거운 패키지가 섞였는지도 확인 (07 문서 의존성 원칙) |
 | Lambda 500 + Decimal 직렬화 오류 | DDB 응답의 Decimal 미변환 — `db.py`의 `_clean` 경유 확인 (07 문서 B2) |
 | BE만 고쳤는데 Vercel이 재빌드 | (선택) Vercel Settings → Git → Ignored Build Step에 `git diff --quiet HEAD^ HEAD -- .` 설정 — Root Directory(frontend) 변경 없으면 빌드 스킵 |
-| `data_loaded: false` | `deploy-backend.sh`의 data 복사 단계 누락 — 스크립트로만 배포 |
-| FE에서 CORS 에러 | HTTP API CorsConfiguration 확인, API URL 끝 `/` 중복 확인 |
+| `data_loaded: false` | `deploy-backend.sh`의 data 복사 단계 누락 — 스크립트로만 배포. 응답의 `datasets`에서 어느 산출물이 `false`인지 바로 확인 (05 §5) |
+| FE에서 CORS 에러 | CORS는 2층(§5) — ① HTTP API `CorsConfiguration` ② Lambda 환경변수 `ALLOWED_ORIGINS`. 어느 쪽이 좁은지 확인하고 API URL 끝 `/` 중복도 확인 |
+| 배포 실패 — `ReservedConcurrentExecutions` 오류 | 계정의 미예약 동시성 여유 부족 → `.env`에 `RESERVED_CONCURRENCY=-1` 후 재배포 (속성 자체가 생략된다 — §5.5) |
 | Vercel 빌드 실패 | Root Directory가 `frontend/`인지, 환경변수 등록 후 **재배포**했는지 확인 (env는 빌드 시점 주입) |
 | Vercel에서 mock만 나옴 | `NEXT_PUBLIC_API_BASE` 미설정 상태로 빌드됨 — env 넣고 Redeploy |
 | LLM 타임아웃 | Lambda Timeout 30s 확인, gpt-4o-mini/claude-sonnet-5 유지 (대형 모델 금지) |

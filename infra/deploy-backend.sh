@@ -10,6 +10,9 @@ rm -rf ../backend/app/data && cp -r ../data/processed ../backend/app/data
 PARAMS=("LlmProvider=${LLM_PROVIDER:-openai}")
 [ -n "${OPENAI_API_KEY:-}" ] && PARAMS+=("OpenAiApiKey=${OPENAI_API_KEY}")
 [ -n "${ANTHROPIC_API_KEY:-}" ] && PARAMS+=("AnthropicApiKey=${ANTHROPIC_API_KEY}")
+# 비우면 template의 Default가 먹는다 (AllowedOrigins='*', ReservedConcurrency=5)
+[ -n "${ALLOWED_ORIGINS:-}" ] && PARAMS+=("AllowedOrigins=${ALLOWED_ORIGINS}")
+[ -n "${RESERVED_CONCURRENCY:-}" ] && PARAMS+=("ReservedConcurrency=${RESERVED_CONCURRENCY}")
 
 sam build -t template.yaml
 sam deploy \

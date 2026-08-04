@@ -11,7 +11,7 @@
 
 ## 레포 구조
 ```
-frontend/   Next.js 14(App Router, TS, Tailwind) — Vercel 네이티브 배포(정적 export 아님), FE 팀원 담당
+frontend/   Next.js 16(App Router, TS, Tailwind 3) — Vercel 네이티브 배포(정적 export 아님), FE 팀원 담당
 backend/    FastAPI (Lambda+Mangum) — app/main.py 이 진입점, 유탁 담당
 pipeline/   Python 배치 스크립트 — data/raw/ → data/processed/ JSON 생성, 유탁 담당
 data/raw/       공공데이터 원본 CSV (커밋함)
@@ -25,13 +25,14 @@ docs/plan/  개발 계획 문서 (단일 진실 원천)
 # 파이프라인 전체 실행 (data/processed/ 갱신)
 cd pipeline && python run_all.py
 
-# 백엔드 테스트 환경 (Docker: BE + DynamoDB Local — 개발 중 표준, AWS 불필요)
-docker compose up -d && curl localhost:8000/api/health
+# 통합 테스트 환경 (Docker: FE + BE + DynamoDB Local + 데모 카드 시드 — 개발 중 표준, AWS 불필요)
+docker compose up -d          # FE http://localhost:3000 · BE http://localhost:8000
+# 오버라이드: FRONTEND_PORT=3100 (3000 충돌 시) / FRONTEND_API_BASE= (FE mock 모드)
 
 # 백엔드 단독 로컬 실행 (정적 서빙만 볼 때, http://localhost:8000, .env 로드)
 cd backend && uvicorn app.main:app --reload --port 8000
 
-# 프론트 로컬 실행 (http://localhost:3000)
+# 프론트 단독 로컬 실행 (http://localhost:3000, 컨테이너 밖)
 cd frontend && npm run dev
 
 # 백엔드 배포 — ⚠ 개발 완료 후 최종 1회만 (docs/plan/09 §4, 14 문서 T17)

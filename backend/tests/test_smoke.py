@@ -15,8 +15,11 @@
 - 상태 의존을 없애기 위해 매 테스트 전에 `seed_demo` 재사용으로 `--reset`과 같은 상태로 되돌린다.
 """
 import json
+import math
 import os
 import sys
+import traceback
+import types
 from datetime import datetime
 from pathlib import Path
 from urllib.parse import urlparse
@@ -26,8 +29,9 @@ import pytest
 BACKEND_DIR = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(BACKEND_DIR))          # 어느 디렉터리에서 실행해도 `import app`이 되도록
 
-# DynamoDB Local로 인정하는 호스트 — localhost 계열 + docker compose 서비스명(컨테이너 안에서 실행할 때)
-LOCAL_HOSTS = {"localhost", "127.0.0.1", "::1", "dynamodb"}
+# DynamoDB Local로 인정하는 호스트 — localhost 계열 + docker compose 서비스명(컨테이너 안에서 실행할 때).
+# 0.0.0.0은 컨테이너가 전 인터페이스에 바인드했을 때 실제로 쓰이는 표기라 함께 인정한다.
+LOCAL_HOSTS = {"localhost", "127.0.0.1", "0.0.0.0", "::1", "dynamodb"}
 RUN_HINT = ("`docker compose up -d dynamodb` 후 "
             "`cd backend && DYNAMO_ENDPOINT=http://localhost:8001 ../.venv/bin/python -m pytest tests -q`")
 
@@ -35,6 +39,12 @@ RUN_HINT = ("`docker compose up -d dynamodb` 후 "
 _endpoint = os.environ.get("DYNAMO_ENDPOINT")
 if not _endpoint:
     pytest.fail(f"DYNAMO_ENDPOINT가 설정되지 않아 스모크를 실행할 수 없습니다 — {RUN_HINT}", pytrace=False)
+if "://" not in _endpoint:
+    # 스킴이 없으면 urlparse의 hostname이 None이라("localhost:8001" → scheme='localhost') 아래 로컬
+    # 판정이 무조건 실패한다. boto3의 endpoint_url도 스킴을 요구하므로 "로컬이 아님"이 아니라
+    # 표기 문제임을 알려주고 멈춘다 — fail-closed는 그대로다.
+    pytest.fail(f"DYNAMO_ENDPOINT={_endpoint} 에 스킴이 없습니다 — `http://localhost:8001`처럼 "
+                f"스킴을 포함해 지정하세요. {RUN_HINT}", pytrace=False)
 if urlparse(_endpoint).hostname not in LOCAL_HOSTS:
     # 시드 리셋이 테이블을 통째로 비우므로 실 AWS 엔드포인트로는 절대 돌리지 않는다.
     pytest.fail(f"DYNAMO_ENDPOINT={_endpoint} 는 DynamoDB Local이 아닙니다 — 이 스모크는 테이블을 "
@@ -47,8 +57,13 @@ os.environ.setdefault("CARDS_TABLE", "sangseng-cards")  # .env의 빈 값이 테
 from fastapi.testclient import TestClient        # noqa: E402
 
 from app.main import app                         # noqa: E402  (.env 로드가 app.db 바인딩보다 먼저)
+from app import dataload                         # noqa: E402
 from app import db                               # noqa: E402
 from app import llm                              # noqa: E402
+
+# 아래 fake_llm 픽스처가 llm.generate_json 을 통째로 갈아끼우므로, 어댑터 자체를 검증하는
+# 테스트(§8)를 위해 원본을 미리 잡아 둔다.
+REAL_GENERATE_JSON = llm.generate_json
 from app.services import simulate                # noqa: E402
 
 import seed_demo                                 # noqa: E402
@@ -62,6 +77,11 @@ POLICY_NOTE = "확충 완료된 신규 가맹점을 우선 추천합니다"
 EXPANSION_SOURCES = ["하이원포인트 사용현황", "가맹점 상세정보", "소진공 상가정보"]
 SCENARIO_RATES = [3, 5, 7]
 MANDATORY_INCENTIVE_RISKS = ["예산", "약관", "미구현"]
+KST_OFFSET = "+09:00"                                       # 05 §8 시각 표기 — 모든 타임스탬프 KST
+# health의 산출물별 보고 대상 (05 §6 산출 JSON). risk_signal은 07 B4 ⑥ "없으면 컷"인 선택 입력이라
+# data_loaded(필수 AND) 판정에서 빠진다.
+REQUIRED_DATASETS = ["dashboard", "eup_scores", "candidates", "merchants"]
+OPTIONAL_DATASET = "risk_signal"
 
 # ── LLM 목업 응답 (실호출 금지) ──
 FAKE_COMPARISON = "목업 비교문 — 1순위와 2순위를 비교한 문장입니다."
@@ -141,20 +161,47 @@ def _generate(card_type="EXPANSION"):
     return client.post("/api/cards/generate", json={"type": card_type})
 
 
-def _put_expansion(cid, eup, category):
-    """최소 EXPANSION 카드 직접 put — candidates.json에 없는 타깃이 필요할 때만 쓴다."""
-    db.put_card({"id": cid, "type": "EXPANSION", "status": "pending", "progress": None,
+def _put_expansion(cid, eup, category, status="pending", progress=None):
+    """최소 EXPANSION 카드 직접 put — 시드로는 못 만드는 타깃·상태 조합이 필요할 때만 쓴다."""
+    db.put_card({"id": cid, "type": "EXPANSION", "status": status, "progress": progress,
                  "title": f"{eup} {category} 업종 가맹점 확충",
                  "target": {"eup": eup, "category": category},
-                 "created_at": db.now_iso(), "decided_at": None, "events": []})
+                 "created_at": db.now_iso(),
+                 "decided_at": None if status == "pending" else db.now_iso(), "events": []})
 
 
 # ── 1. health / 정적 서빙 ────────────────────────────────────────────────
 
-def test_health_reports_data_loaded():
+def test_health_reports_dataset_breakdown():
+    """05 §5 — 기존 키(ok·data_loaded)를 유지한 채 산출물별 로드 여부를 함께 보고한다."""
     res = client.get("/api/health")
     assert res.status_code == 200
-    assert res.json() == {"ok": True, "data_loaded": True}
+    body = res.json()
+
+    assert body["ok"] is True and body["data_loaded"] is True
+    assert set(body["datasets"]) == set(REQUIRED_DATASETS) | {OPTIONAL_DATASET}
+    assert all(v is True for v in body["datasets"].values())    # 커밋된 data/processed 기준
+
+
+def test_health_data_loaded_counts_required_datasets_only(monkeypatch):
+    """data_loaded는 필수 4종의 AND — 선택 산출물(risk_signal) 결손으로는 내려가지 않는다 (07 B4 ⑥)."""
+    real_load = dataload.load
+
+    def _missing(name):
+        def _load(n):
+            if n == name:
+                raise FileNotFoundError(n)
+            return real_load(n)
+        return _load
+
+    monkeypatch.setattr(dataload, "load", _missing(OPTIONAL_DATASET))
+    body = client.get("/api/health").json()
+    assert body["datasets"][OPTIONAL_DATASET] is False and body["data_loaded"] is True
+
+    monkeypatch.setattr(dataload, "load", _missing("merchants"))
+    body = client.get("/api/health").json()
+    assert body["datasets"]["merchants"] is False and body["data_loaded"] is False
+    assert body["ok"] is True          # 엔드포인트 자체는 200 — 결손은 보고만 하고 죽지 않는다
 
 
 def test_dashboard_returns_real_data():
@@ -204,6 +251,22 @@ def test_candidates_merges_scores_and_merchants():
                for m in body["merchants"][:20])
 
 
+def test_risk_signal_serves_artifact_verbatim():
+    """05 §1 — 대시보드 요인 카드(13 §2-15)가 쓰는 under2y_ratio의 서빙 경로.
+
+    `sync-mocks.sh`가 같은 파일을 FE mock으로 복사하므로 응답은 산출 JSON과 **완전히 같아야** 한다
+    (감싸거나 필드를 더하면 mock 모드와 실 API 모드가 갈린다 — 05 §6 mock 원천 단일화).
+    """
+    res = client.get("/api/risk-signal")
+    assert res.status_code == 200
+    assert res.json() == dataload.load("risk_signal")               # 가공 없이 그대로
+
+    rows = res.json()
+    assert isinstance(rows, list) and rows                           # 최상위가 배열 (05 §6)
+    assert all({"sigungu", "under2y_ratio"} == set(r) for r in rows)
+    assert all(0 <= r["under2y_ratio"] <= 1 for r in rows)
+
+
 # ── 2. 카드 목록 (seed --reset 상태) ─────────────────────────────────────
 
 def test_cards_list_reflects_demo_seed():
@@ -218,6 +281,23 @@ def test_cards_list_reflects_demo_seed():
     one = client.get("/api/cards/AC-001")
     assert one.status_code == 200 and one.json()["card"]["progress"] == "추진중"
     assert client.get("/api/cards/AC-999").status_code == 404
+
+
+def test_cards_filter_combines_type_and_status():
+    """05 §2 — `?type=`·`?status=`는 각각도 조합도 걸린다. 결과 0건도 빈 배열 200."""
+    def ids(**params):
+        res = client.get("/api/cards", params=params)
+        assert res.status_code == 200
+        return {c["id"] for c in res.json()["cards"]}
+
+    assert ids(type="EXPANSION", status="pending") == {"AC-002"}
+    assert ids(type="EXPANSION", status="approved") == {"AC-001"}
+    assert ids(type="INCENTIVE", status="pending") == {"INC-001"}
+    assert ids(type="INCENTIVE", status="approved") == set()
+    assert ids(status="rejected") == set()
+    # 쿼리 이름 `type`은 05 §2 계약이고 파이썬 인자명(card_type)은 내부 사정이다 — 인자명이
+    # 쿼리로 새면 alias가 빠진 것이라 FE의 `?type=`이 조용히 무시된다.
+    assert ids(card_type="INCENTIVE") == {"AC-001", "AC-002", "INC-001"}
 
 
 # ── 3. generate (LLM monkeypatch) ────────────────────────────────────────
@@ -266,6 +346,41 @@ def test_generate_skips_target_already_in_progress(fake_llm):
     assert ASSUMPTION_NOTE in card["ai"]["expected_effect"]
 
 
+def test_generate_returns_409_when_every_candidate_is_blocked(fake_llm):
+    """전 후보가 추진중/완료면 A-1 중복 제안 금지의 결론은 '제안할 카드 없음' — 409로 알린다.
+
+    후보 하나를 골라 되돌아가면 A-1이 금지한 타깃의 카드가 저장되므로, 조용한 폴백이 아니라
+    에러가 정답이다.
+    """
+    for i, cand in enumerate(dataload.load("candidates"), start=100):
+        _put_expansion(f"AC-{i}", cand["eup"], cand["category"],
+                       status="approved", progress="추진중")
+    before = {c["id"] for c in _cards()}
+
+    res = _generate("EXPANSION")
+    assert res.status_code == 409
+    assert fake_llm.calls == []                     # 가용성 판정이 LLM 호출보다 앞선다 (12초 낭비 방지)
+    assert {c["id"] for c in _cards()} == before    # 새 카드도, 덮어쓴 카드도 없다
+
+
+def test_generate_does_not_overwrite_non_sequential_ids(fake_llm):
+    """비순차 ID가 섞여 있어도 다음 ID는 **최대 순번+1** (05 §8).
+
+    시드(AC-001·AC-002)에 AC-004를 더하면 AC- 카드가 3장이라 옛 '개수+1' 방식은 이미 존재하는
+    AC-004를 다시 내주고, put_card가 그 카드를 조용히 덮어쓴다. 그 최소 사례를 그대로 재현한다.
+    """
+    _put_expansion("AC-004", "태백시", "편의점")     # candidates.json 밖 타깃 = 중복 가드·가용성과 무관
+    before = client.get("/api/cards/AC-004").json()["card"]
+
+    res = _generate("EXPANSION")
+    assert res.status_code == 201
+    assert res.json()["card"]["id"] == "AC-005"
+
+    kept = client.get("/api/cards/AC-004").json()["card"]
+    assert kept == before                            # 같은 ID에 다른 카드가 덮이지 않았다
+    assert {c["id"] for c in _cards()} == {"AC-001", "AC-002", "INC-001", "AC-004", "AC-005"}
+
+
 def test_generate_incentive_builds_scenarios(fake_llm):
     dup = _generate("INCENTIVE")                            # 시드의 pending INC-001이 그대로 반환
     assert dup.status_code == 200 and dup.json()["card"]["id"] == "INC-001"
@@ -303,6 +418,28 @@ def test_decision_approves_expansion_card():
     assert again.status_code == 409                                  # pending이 아니면 409
 
 
+def test_decision_holds_card():
+    """05 §2 — held도 '결정'이라 decided_at·events를 남긴다. 승인이 아니므로 progress는 붙지 않는다."""
+    res = client.post("/api/cards/AC-002/decision", json={"decision": "held"})
+    assert res.status_code == 200
+    card = res.json()["card"]
+
+    assert card["status"] == "held" and card["progress"] is None
+    assert card["decided_at"].endswith(KST_OFFSET)                 # 05 §8 시각 표기
+    assert [e["action"] for e in card["events"]] == ["generated", "held"]
+    assert card["events"][-1]["at"].endswith(KST_OFFSET)
+
+    # pending이 아니게 됐으므로 재결정 409, 승인 상태가 아니므로 progress도 409 (05 §8)
+    assert client.post("/api/cards/AC-002/decision",
+                       json={"decision": "approved"}).status_code == 409
+    assert client.post("/api/cards/AC-002/progress",
+                       json={"progress": "추진중"}).status_code == 409
+
+    kpi = client.get("/api/kpi").json()
+    assert kpi["counts"]["held"] == 1                               # 05 §3 counts에 집계
+    assert kpi["avg_approval_hours"] > 0     # decided_at 있는 모든 카드가 평균 대상 (approved+rejected+held)
+
+
 def test_decision_error_paths():
     assert client.post("/api/cards/AC-999/decision", json={"decision": "approved"}).status_code == 404
     assert client.post("/api/cards/AC-002/decision", json={"decision": "yes"}).status_code == 400
@@ -323,6 +460,25 @@ def test_incentive_approval_requires_selected_rate():
     exp = client.post("/api/cards/AC-002/decision",
                       json={"decision": "approved", "selected_rate": 7}).json()["card"]
     assert exp.get("selected_rate") is None
+
+
+def test_incentive_scenarios_survive_decimal_round_trip():
+    """05 §8 숫자 직렬화 — 읽기-수정-쓰기를 반복해도 delta_pp가 float로 남는다 ([1.0, 2.0] → [1, 2] 방지).
+
+    승인·추진 상태 변경은 카드를 통째로 다시 저장하므로, Decimal 복원이 정수로 내려앉으면
+    FE의 "1~2%p"가 조용히 "1~2"로 바뀐다.
+    """
+    approved = client.post("/api/cards/INC-001/decision",
+                           json={"decision": "approved", "selected_rate": 5}).json()["card"]
+    assert client.post("/api/cards/INC-001/progress",
+                       json={"progress": "완료"}).status_code == 200      # 두 번째 왕복
+    stored = client.get("/api/cards/INC-001").json()["card"]
+
+    for card in (approved, stored):
+        assert [s["rate"] for s in card["scenarios"]] == SCENARIO_RATES
+        assert all(isinstance(v, float) for s in card["scenarios"] for v in s["delta_pp"])
+    assert next(s["delta_pp"] for s in stored["scenarios"] if s["rate"] == 5) == [1.0, 2.0]
+    assert stored["selected_rate"] == 5 and isinstance(stored["selected_rate"], int)
 
 
 def test_progress_transitions_require_approved_card():
@@ -390,9 +546,42 @@ def test_simulate_rejects_narrative_with_wrong_direction(fake_llm):
     assert "예상" in sim["narrative"] and "가정" in sim["narrative"]
 
 
+def test_simulate_reports_no_change_without_claiming_a_direction(fake_llm):
+    """변화가 없는 구간(delta [0.0, 0.0])은 방향을 붙이지 않고 LLM에도 맡기지 않는다.
+
+    실데이터 36조합 중 19개가 여기 해당하고 시드 카드 AC-001의 타깃(영월군 카페)도 포함된다.
+    부호로만 판정하면 "약 0.0~0.0%p 상승(집중 심화)"처럼 없는 변화를 단정하게 된다.
+    """
+    sim = client.post("/api/cards/AC-001/simulate").json()["simulation"]
+
+    assert sim["delta_pp"] == [0.0, 0.0]                        # 전제: 변화 없는 구간
+    assert fake_llm.calls == []                                 # LLM에 맡기지 않는다
+    assert "개선" not in sim["narrative"] and "심화" not in sim["narrative"]
+    assert "변화가 나타나지 않을" in sim["narrative"]
+    assert "예상" in sim["narrative"] and "가정" in sim["narrative"]
+    assert sim["assumption_note"] == ASSUMPTION_NOTE
+
+
+def test_simulate_never_emits_negative_zero():
+    """round(-0.001, 1)은 -0.0이라 그대로 실으면 화면에 "-0.0%p"가 찍힌다 (simulate._round_pp)."""
+    usage, merchants = dataload.load("usage_monthly"), dataload.load("merchants")
+    categories = sorted({m["category"] for m in merchants})
+
+    seen_zero = False
+    for eup in simulate.REGIONS:
+        for category in categories:
+            for value in simulate.simulate_expansion(usage, merchants, eup, category)["delta_pp"]:
+                assert not (value == 0 and math.copysign(1, value) < 0), f"{eup} {category}: -0.0"
+                seen_zero = seen_zero or value == 0
+    assert seen_zero, "0 값이 하나도 없으면 이 테스트는 공허하다"
+
+
 def test_simulate_error_paths():
     assert client.post("/api/cards/INC-001/simulate").status_code == 400     # EXPANSION 전용
     assert client.post("/api/cards/AC-999/simulate").status_code == 404
+    _put_expansion("AC-910", "서울시", "카페")                                # 집계 6지역 밖 타깃
+    res = client.post("/api/cards/AC-910/simulate")
+    assert res.status_code == 400 and "집계 대상 지역이 아닙니다" in res.json()["detail"]
 
 
 # ── 6. KPI ──────────────────────────────────────────────────────────────
@@ -480,3 +669,72 @@ def test_widget_returns_empty_for_unknown_region(fake_llm):
     body = client.get("/api/widget/recommend", params={"region": "없는읍"}).json()
     assert body == {"recommendations": [], "policy_note": POLICY_NOTE}
     assert fake_llm.calls == []                                   # 결과 0건이면 LLM 호출도 없다
+
+
+# ── 8. LLM 어댑터 (실호출 없이 어댑터 자체를 검증) ───────────────────────
+
+def test_llm_failure_never_logs_an_api_key(monkeypatch):
+    """인증 실패 메시지에는 SDK가 부분 마스킹한 키가 들어 있다 — 로그·트레이스백에 남기지 않는다.
+
+    호출부는 `log.warning(..., exc_info=True)`로 예외를 통째로 찍으므로, 원인 체인을 끊고
+    마스킹된 메시지만 담은 LLMError로 바꾸는 것이 유일한 차단 지점이다 (llm.LLMError).
+    """
+    leaky = "Error code: 401 - Incorrect API key provided: sk-proj-abc123DEF456ghi. Check your key."
+
+    class _FakeOpenAI:
+        class chat:
+            class completions:
+                @staticmethod
+                def create(**kwargs):
+                    raise RuntimeError(leaky)
+
+        def __init__(self, *args, **kwargs):
+            pass
+
+        def with_options(self, **kwargs):
+            return self
+
+    fake_sdk = types.ModuleType("openai")
+    fake_sdk.OpenAI = _FakeOpenAI
+    monkeypatch.setitem(sys.modules, "openai", fake_sdk)
+    monkeypatch.setenv("LLM_PROVIDER", "openai")
+
+    with pytest.raises(llm.LLMError) as caught:
+        REAL_GENERATE_JSON("system", "user", {"type": "object"}, attempts=1)
+
+    rendered = "".join(traceback.format_exception(caught.value))    # 호출부가 남기는 것과 같은 형태
+    assert "sk-proj" not in rendered and "abc123DEF456ghi" not in rendered
+    assert "<redacted-key>" in rendered
+    assert "401" in rendered and "RuntimeError" in rendered         # 원인 구분은 살아 있다
+    assert caught.value.__cause__ is None and caught.value.__suppress_context__
+
+
+def test_llm_retries_with_backoff_then_wraps(monkeypatch):
+    """attempts=2면 두 번 시도하고 사이에 backoff 만큼 쉰다 (llm.RETRY_BACKOFF_SECONDS)."""
+    slept, calls = [], []
+
+    class _FakeOpenAI:
+        class chat:
+            class completions:
+                @staticmethod
+                def create(**kwargs):
+                    calls.append(kwargs["model"])
+                    raise RuntimeError("api down")
+
+        def __init__(self, *args, **kwargs):
+            pass
+
+        def with_options(self, **kwargs):
+            return self
+
+    fake_sdk = types.ModuleType("openai")
+    fake_sdk.OpenAI = _FakeOpenAI
+    monkeypatch.setitem(sys.modules, "openai", fake_sdk)
+    monkeypatch.setenv("LLM_PROVIDER", "openai")
+    monkeypatch.setattr(llm.time, "sleep", slept.append)
+
+    with pytest.raises(llm.LLMError):
+        REAL_GENERATE_JSON("system", "user", {"type": "object"}, attempts=2)
+
+    assert len(calls) == 2
+    assert slept == [llm.RETRY_BACKOFF_SECONDS]                     # 마지막 시도 뒤에는 쉬지 않는다
