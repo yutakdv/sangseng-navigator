@@ -1,0 +1,20 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html {
+    /* 13 §8 반응형 최소선: 390px에서 어떤 화면도 가로 스크롤이 생기지 않아야 한다 */
+    overflow-x: hidden;
+  }
+
+  body {
+    @apply bg-admin-bg text-admin-text antialiased;
+    font-feature-settings: "tnum" 0;
+  }
+
+  /* KPI 값·표 숫자는 자릿수 흔들림 방지 (13 §6) */
+  .tabular-nums {
+    font-variant-numeric: tabular-nums;
+  }
+}

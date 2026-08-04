@@ -62,16 +62,18 @@ cp .env.example .env                       # 키 입력 절차: docs/plan/04-env
 # 데이터 파이프라인 (data/processed/ 재생성 — 이미 커밋돼 있어 생략 가능)
 cd pipeline && python run_all.py
 
-# 백엔드 (http://localhost:8000)
-cd backend && uvicorn app.main:app --reload --port 8000
+# 전체 기동 (FE + BE + DynamoDB Local + 데모 카드 시드)
+docker compose up -d                       # FE http://localhost:3000 · BE http://localhost:8000
+# 3000 번이 이미 쓰이면 FRONTEND_PORT=3100 docker compose up -d
 
-# 프론트엔드 (http://localhost:3000 — NEXT_PUBLIC_API_BASE 미설정 시 mock 모드로 즉시 실행)
-cd frontend && npm install && npm run dev
+# 개별 실행이 필요할 때
+cd backend && uvicorn app.main:app --reload --port 8000
+cd frontend && npm install && npm run dev  # NEXT_PUBLIC_API_BASE 미설정 시 mock 모드
 ```
 
 ## 기술 스택
 
-Next.js 14 (App Router, TS, Tailwind, Recharts, MapLibre GL + OpenFreeMap) /
+Next.js 16 (App Router, TS, Tailwind 3, Recharts, MapLibre GL + OpenFreeMap) /
 FastAPI on AWS Lambda + API Gateway + DynamoDB (SAM, 월 비용 사실상 $0) /
 Python 데이터 파이프라인 (정적 JSON 사전 계산) / LLM (OpenAI ↔ Anthropic 어댑터) /
 배포: Vercel(FE) + AWS SAM(BE)
