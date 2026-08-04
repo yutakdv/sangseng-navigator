@@ -30,11 +30,13 @@ export function MetricTile({
   suffix = "",
   unit,
   delta,
+  context,
   note,
   trend,
   trendNote,
   meter,
   accent = false,
+  compact = false,
   /** 진입 연출 단 — 타일 인덱스 × 60ms */
   delay = 0,
 }: {
@@ -51,6 +53,8 @@ export function MetricTile({
   /** 값과 띄워 쓰는 단위 — "건", "/ 100" 등 */
   unit?: string;
   delta?: { text: string; raw: number | null; note: string };
+  /** 이 지표의 지역별 기여·집중 맥락. 전체 KPI를 특정 지역 값으로 오해하지 않게 함께 표기한다. */
+  context?: ReactNode;
   note: ReactNode;
   /** 12개월 시계열 — 없으면 스파크라인을 그리지 않는다 */
   trend?: number[];
@@ -59,6 +63,8 @@ export function MetricTile({
   /** 시계열이 없는 지표(AI 제안 안정도)용 0~100 게이지 */
   meter?: number;
   accent?: boolean;
+  /** 홈 첫 화면용 압축 표현 — 값과 변화만 우선해 핵심 제안을 바로 이어서 보여 준다 */
+  compact?: boolean;
   delay?: number;
 }) {
   const tone = delta ? signTone(delta.raw) : "flat";
@@ -68,6 +74,70 @@ export function MetricTile({
       : tone === "bad"
         ? "bg-state-bad-bg text-state-bad ring-state-bad-line"
         : "bg-admin-surface-sunken text-admin-text-muted ring-admin-border";
+
+  if (compact) {
+    return (
+      <div
+        style={{ animationDelay: `${delay}ms` }}
+        className={`group animate-rise relative min-w-0 overflow-hidden rounded-2xl px-4 py-3.5 shadow-card ring-1 ring-inset transition-shadow hover:shadow-card-hover sm:px-4.5 ${
+          accent
+            ? "bg-gradient-to-br from-admin-primary-soft via-admin-surface to-admin-surface ring-admin-primary-line"
+            : "bg-admin-surface ring-admin-border"
+        }`}
+      >
+        <div className="flex min-w-0 items-center gap-2">
+          <span
+            className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-lg ${
+              accent ? "bg-admin-primary text-white" : "bg-admin-surface-sunken text-admin-text-muted"
+            }`}
+          >
+            <Icon name={icon} size={15} />
+          </span>
+          <span className="min-w-0 truncate text-[12px] font-semibold text-admin-text-muted">{label}</span>
+          {badge}
+        </div>
+
+        <div className="mt-2.5 flex min-w-0 items-end justify-between gap-2">
+          <div className="min-w-0">
+            <p className="flex items-baseline gap-1">
+              <span
+                className={`text-[28px] font-bold leading-none tracking-[-0.035em] tabular-nums sm:text-[31px] ${
+                  accent ? "text-admin-primary" : "text-admin-text"
+                }`}
+              >
+                {value === null ? "—" : <CountUp value={value} digits={digits} suffix={suffix} />}
+              </span>
+              {unit ? <span className="text-[11px] font-semibold text-admin-text-muted">{unit}</span> : null}
+            </p>
+            {delta ? (
+              <span
+                className={`mt-1.5 inline-flex items-center rounded-full px-1.5 py-0.5 text-[10px] font-bold leading-4 tabular-nums ring-1 ring-inset ${deltaTone}`}
+              >
+                {delta.text} <span className="ml-1 font-medium opacity-75">{delta.note}</span>
+              </span>
+            ) : trendNote ? (
+              <span className="mt-1 block truncate text-[10px] leading-4 text-admin-text-muted">{trendNote}</span>
+            ) : null}
+            {context ? (
+              <p className="mt-1.5 max-w-[175px] break-keep text-[10px] leading-4 text-admin-text-muted">{context}</p>
+            ) : null}
+          </div>
+
+          {trend && trend.length > 1 ? (
+            <div className="w-[68px] shrink-0 pb-1 sm:w-[78px]">
+              <Sparkline data={trend} id={`${sparkId}-compact`} height={30} bare />
+            </div>
+          ) : meter !== undefined ? (
+            <div className="w-[68px] shrink-0 pb-2 sm:w-[78px]">
+              <Meter value={meter} />
+            </div>
+          ) : null}
+        </div>
+
+        <span className="sr-only">{note}</span>
+      </div>
+    );
+  }
 
   return (
     <div

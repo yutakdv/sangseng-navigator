@@ -2,18 +2,19 @@ import { Icon } from "@/components/Icon";
 import type { Card } from "@/types";
 
 /**
- * `정량 Score N위 → AI 제안 M위` 병기 — **절대 규칙 5(정량 순위 병기)의 화면 구현**.
+ * `정량 Score N위 → 가용 후보 선택 M위` 병기 — 활성 업무 중복 제외를 숨기지 않는다.
  *
  * 허브 목록·트래킹·카드 상세 세 곳에서 같은 표기를 쓰는데, 세 곳 모두 회색 알약 안에 12px
  * 한 줄로 눌려 있어서 심사에서 가장 중요한 "감사 가능성" 장치가 화면에서 가장 안 보였다.
  * 두 값을 각각의 상자에 나눠 넣고 화살표로 이어 놓아, 무엇이 정량 순위이고 무엇이 AI 제안인지
- * 라벨과 함께 읽히게 한다. 조정 여부는 색이 아니라 **문구**가 진다 (13 §4).
+ * 라벨과 함께 읽히게 한다. 제외 여부는 색이 아니라 **문구**가 진다 (13 §4).
  */
 export function RankTrace({ card, size = "sm" }: { card: Card; size?: "sm" | "md" }) {
   if (card.score_rank === null || card.ai_rank === null) return null;
 
   const md = size === "md";
   const adjusted = card.ai.adjusted;
+  const selectionRank = card.selection_rank ?? card.ai_rank;
 
   return (
     <div
@@ -36,8 +37,8 @@ export function RankTrace({ card, size = "sm" }: { card: Card; size?: "sm" | "md
         className={adjusted ? "text-admin-primary" : "text-admin-text-muted"}
       />
       <RankBox
-        label="AI 제안"
-        rank={card.ai_rank}
+        label="가용 후보 선택"
+        rank={selectionRank}
         md={md}
         tone={adjusted ? "text-admin-primary" : "text-admin-text"}
       />
@@ -48,8 +49,8 @@ export function RankTrace({ card, size = "sm" }: { card: Card; size?: "sm" | "md
             : "bg-admin-surface text-admin-text-muted ring-admin-border"
         }`}
       >
-        {adjusted ? <Icon name="sparkle" size={12} strokeWidth={2} /> : null}
-        {adjusted ? "AI 조정 제안" : "정량 1순위와 동일"}
+        {adjusted ? <Icon name="workflow" size={12} strokeWidth={2} /> : null}
+        {adjusted ? "활성 업무 제외 후 선택" : "정량 1순위 선택"}
       </span>
     </div>
   );

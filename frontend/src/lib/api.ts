@@ -19,8 +19,13 @@ import type {
   CardStatus,
   CardType,
   Dashboard,
+  EligibilityCheck,
   Kpi,
   PaybackRate,
+  CreateProgressRecordResponse,
+  ProgressRecordInput,
+  ProgressRecordsResponse,
+  ProgressReport,
   RiskSignal,
   Simulation,
   WidgetResponse,
@@ -56,7 +61,11 @@ async function fail(res: Response, path: string): Promise<never> {
 
 async function get<T>(path: string, mock: () => T): Promise<T> {
   if (!BASE) return mock(); // mock 모드
-  const res = await fetch(`${BASE}${path}`, { cache: "no-store" });
+  const internalToken = process.env.API_MUTATION_TOKEN;
+  const res = await fetch(`${BASE}${path}`, {
+    cache: "no-store",
+    headers: internalToken ? { Authorization: `Bearer ${internalToken}` } : undefined,
+  });
   if (!res.ok) await fail(res, path);
   return res.json();
 }
@@ -76,17 +85,23 @@ async function postWithStatus<T>(
   mock: () => { data: T; status: number },
 ): Promise<{ data: T; status: number }> {
   if (!BASE) return mock(); // mock 모드: mock/store.ts가 로컬 상태를 갱신하고 그 결과를 돌려준다
+  const mutationToken = process.env.API_MUTATION_TOKEN;
   const res = await fetch(`${BASE}${path}`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: {
+      "Content-Type": "application/json",
+      ...(mutationToken ? { Authorization: `Bearer ${mutationToken}` } : {}),
+    },
     body: JSON.stringify(body ?? {}),
   });
   if (!res.ok) await fail(res, path);
   return { data: (await res.json()) as T, status: res.status };
 }
 
-const qs = (params: Record<string, string | undefined>): string => {
-  const entries = Object.entries(params).filter(([, v]) => v) as [string, string][];
+const qs = (params: Record<string, string | number | undefined>): string => {
+  const entries = Object.entries(params)
+    .filter(([, v]) => v !== undefined && v !== "")
+    .map(([key, value]) => [key, String(value)] as [string, string]);
   return entries.length ? `?${new URLSearchParams(entries).toString()}` : "";
 };
 
@@ -139,6 +154,18 @@ export const api = {
   progress: (id: string, progress: CardProgress): Promise<{ card: Card }> =>
     post(`/api/cards/${id}/progress`, { progress }, () => ({ card: store.setProgress(id, progress) })),
 
+  progressRecords: (id: string, cursor?: string): Promise<ProgressRecordsResponse> =>
+    get(`/api/cards/${id}/progress-records${qs({ cursor })}`, () => store.listProgressRecords(id, cursor)),
+
+  createProgressRecord: (
+    id: string,
+    input: ProgressRecordInput,
+  ): Promise<CreateProgressRecordResponse> =>
+    post(`/api/cards/${id}/progress-records`, input, () => store.createProgressRecord(id, input)),
+
+  verification: (id: string, checks: EligibilityCheck[]): Promise<{ card: Card }> =>
+    post(`/api/cards/${id}/verification`, { checks }, () => ({ card: store.setVerification(id, checks) })),
+
   /** EXPANSION 전용 — INCENTIVE에 호출하면 실 API는 400 (05 §8) */
   simulate: (id: string): Promise<{ simulation: Simulation }> =>
     post(`/api/cards/${id}/simulate`, {}, () => simulateMock as { simulation: Simulation }),
@@ -146,7 +173,12 @@ export const api = {
   /* ── KPI (05 §3) ───────────────────────────────────────────── */
   kpi: (): Promise<Kpi> => get("/api/kpi", () => store.deriveKpi()),
 
+  progressReport: (opts: { from?: string; to?: string } = {}): Promise<ProgressReport> =>
+    get(`/api/progress-report${qs(opts)}`, () => store.deriveProgressReport(opts)),
+
   /* ── 방문객 위젯 (05 §4) ───────────────────────────────────── */
-  widget: (region?: string, category?: string): Promise<WidgetResponse> =>
-    get(`/api/widget/recommend${qs({ region, category })}`, () => store.deriveWidget(region, category)),
+  widget: (region?: string, category?: string, limit = 12): Promise<WidgetResponse> =>
+    get(`/api/widget/recommend${qs({ region, category, limit })}`, () =>
+      store.deriveWidget(region, category, limit),
+    ),
 };

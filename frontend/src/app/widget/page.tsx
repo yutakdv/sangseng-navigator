@@ -3,8 +3,9 @@ import Link from "next/link";
 import { NewBadge, PaybackBadge } from "@/components/Badge";
 import { CategoryIcon } from "@/components/CategoryIcon";
 import { Icon } from "@/components/Icon";
+import { KakaoMapView } from "@/components/KakaoMapView";
 import { api } from "@/lib/api";
-import { CATEGORIES, REGIONS, REGION_TOOLTIP, SOURCE_NOTE } from "@/lib/constants";
+import { CATEGORIES, REGIONS, REGION_TOOLTIP, VISITOR_SOURCE_NOTE } from "@/lib/constants";
 
 export const metadata: Metadata = { title: "가맹점 찾기 · 상생 나침반" };
 
@@ -22,13 +23,16 @@ export const dynamic = "force-dynamic";
  * 필터 칩을 11~12px에서 13px·최소 높이 36px로 올리고 카드 정보를 이름 → 업종 → 설명 →
  * 주소 → 혜택 순으로 벌려 뒀다.
  */
-type Search = { region?: string; category?: string };
+type Search = { region?: string; category?: string; limit?: string };
+const DEFAULT_LIST_LIMIT = 12;
+const MAX_LIST_LIMIT = 120;
 
 const href = (next: Search, current: Search): string => {
   const merged = { ...current, ...next };
   const params = new URLSearchParams();
   if (merged.region) params.set("region", merged.region);
   if (merged.category) params.set("category", merged.category);
+  if (merged.limit) params.set("limit", merged.limit);
   const q = params.toString();
   return q ? `/widget?${q}` : "/widget";
 };
@@ -39,23 +43,28 @@ export default async function WidgetPage({ searchParams }: { searchParams: Promi
   // 계약에 없는 값이 쿼리로 들어오면 무시한다 (필터는 6지역·표시 6분류로 고정)
   const region = REGIONS.includes(sp.region as never) ? sp.region : undefined;
   const category = CATEGORIES.includes(sp.category as never) ? sp.category : undefined;
-  const current: Search = { region, category };
+  const requestedLimit = Number(sp.limit);
+  const listLimit = Number.isFinite(requestedLimit)
+    ? Math.max(DEFAULT_LIST_LIMIT, Math.min(MAX_LIST_LIMIT, Math.floor(requestedLimit)))
+    : DEFAULT_LIST_LIMIT;
+  const current: Search = { region, category, limit: sp.limit ? String(listLimit) : undefined };
+  const filters: Search = { region, category };
 
-  const [{ recommendations, policy_note }, dashboard] = await Promise.all([
-    api.widget(region, category),
+  const [{ recommendations, policy_note, total }, dashboard] = await Promise.all([
+    api.widget(region, category, listLimit),
     api.dashboard(),
   ]);
 
   return (
-    <div className="min-h-screen bg-slate-100 py-0 sm:py-10">
-      {/* 모바일 프레임 — "방문객 화면"임을 시각적으로 구분 (F7) */}
-      <div className="mx-auto w-full max-w-[390px] bg-visitor-bg shadow-card-hover sm:rounded-[28px] sm:ring-1 sm:ring-black/5">
+    <div className="min-h-screen bg-slate-100 py-0 sm:py-8">
+      {/* 모바일에서는 한 열, 넓은 화면에서는 레퍼런스(image-2)처럼 필터와 지도를 나란히 둔다. */}
+      <div className="mx-auto w-full max-w-[1180px] overflow-hidden bg-visitor-bg shadow-card-hover sm:rounded-[28px] sm:ring-1 sm:ring-black/5">
         <header className="relative overflow-hidden bg-gradient-to-br from-visitor-accent to-[#0e4a25] px-5 py-6 text-white sm:rounded-t-[28px]">
           <div
             aria-hidden
             className="pointer-events-none absolute -right-8 -top-12 h-40 w-40 rounded-full bg-white/10 blur-2xl"
           />
-          <p className="relative text-xs font-semibold uppercase tracking-[0.14em] text-white/85">
+          <p className="relative text-xs font-semibold uppercase tracking-[0.14em] text-white/90">
             강원랜드 지역상생
           </p>
           <h1 className="relative mt-1.5 break-keep text-[22px] font-bold leading-8">
@@ -66,26 +75,41 @@ export default async function WidgetPage({ searchParams }: { searchParams: Promi
           </p>
         </header>
 
-        <div className="px-5 py-5">
-          <Filter
-            label="관심 지역"
-            options={REGIONS}
-            selected={region}
-            makeHref={(v) => href({ region: v }, current)}
-            titleOf={(v) => REGION_TOOLTIP[v as keyof typeof REGION_TOOLTIP]}
-          />
-          <Filter
-            label="업종"
-            options={CATEGORIES}
-            selected={category}
-            makeHref={(v) => href({ category: v }, current)}
-            className="mt-4"
-          />
+        <div className="grid gap-6 px-5 py-5 sm:px-8 sm:py-8 lg:grid-cols-[0.72fr_1.28fr] lg:items-start">
+          <div>
+            <p className="text-[28px] font-bold leading-tight tracking-[-0.03em] text-emerald-950 sm:text-[34px]">
+              포인트, 지역에서<br />
+              가치로 이어지다
+            </p>
+            <p className="mt-3 max-w-md break-keep text-[14px] leading-7 text-slate-600">
+              관심 지역과 업종을 선택하면 하이원리조트 거점에서 이동을 시작하기 좋은 순서로
+              하이원포인트 가맹점을 보여드려요.
+            </p>
+            <Filter
+              label="관심 지역"
+              options={REGIONS}
+              selected={region}
+              makeHref={(v) => href({ region: v }, { category })}
+              titleOf={(v) => REGION_TOOLTIP[v as keyof typeof REGION_TOOLTIP]}
+              className="mt-6"
+            />
+            <Filter
+              label="업종"
+              options={CATEGORIES}
+              selected={category}
+              makeHref={(v) => href({ category: v }, { region })}
+              className="mt-4"
+            />
+          </div>
 
-          <div className="mt-6 flex items-baseline justify-between gap-2">
+          <KakaoMapView recommendations={recommendations} region={region} />
+        </div>
+
+        <div className="px-5 pb-5 sm:px-8 sm:pb-8">
+          <div className="flex items-baseline justify-between gap-2">
             <h2 className="text-[17px] font-bold text-admin-text">추천 가맹점</h2>
             <span className="rounded-full bg-visitor-primary-soft px-2 py-0.5 text-xs font-semibold text-visitor-primary">
-              {recommendations.length}곳
+              {recommendations.length} / {total}곳
             </span>
           </div>
           {/* 추천 순서는 거점 직선거리 오름차순이지만 "가까운 순"으로 라벨링하지 않는다 —
@@ -108,7 +132,7 @@ export default async function WidgetPage({ searchParams }: { searchParams: Promi
               </Link>
             </div>
           ) : (
-            <ul className="mt-4 flex flex-col gap-3">
+            <ul className="mt-4 grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
               {recommendations.map((r) => (
                 <li
                   key={`${r.name}-${r.address}`}
@@ -155,13 +179,38 @@ export default async function WidgetPage({ searchParams }: { searchParams: Promi
             </ul>
           )}
 
-          <section className="mt-7 rounded-2xl bg-visitor-primary-soft px-4 py-4">
+          {total > recommendations.length ? (
+            <div className="mt-5 flex flex-wrap items-center justify-between gap-3 rounded-2xl bg-slate-50 px-4 py-3 ring-1 ring-inset ring-slate-200">
+              <p className="text-xs leading-5 text-admin-text-muted">
+                현재 조건의 가맹점 {total}곳 중 {recommendations.length}곳을 보고 있어요.
+              </p>
+              <Link
+                href={href({ limit: String(Math.min(MAX_LIST_LIMIT, listLimit + DEFAULT_LIST_LIMIT)) }, current)}
+                className="inline-flex min-h-10 items-center rounded-xl bg-visitor-primary px-3.5 text-[13px] font-bold text-white shadow-[0_6px_16px_-8px_rgb(22_101_52_/_0.75)]"
+              >
+                가맹점 더 보기
+              </Link>
+            </div>
+          ) : recommendations.length > DEFAULT_LIST_LIMIT ? (
+            <Link
+              href={href({}, filters)}
+              className="mt-5 inline-flex min-h-10 items-center rounded-xl bg-slate-100 px-3.5 text-[13px] font-bold text-admin-text-muted ring-1 ring-inset ring-slate-200"
+            >
+              목록 접기
+            </Link>
+          ) : null}
+
+          <section className="mt-7 rounded-2xl bg-visitor-primary-soft px-4 py-4 sm:px-5 sm:py-5">
             <h3 className="flex items-center gap-1.5 text-[15px] font-bold text-visitor-primary">
               <Icon name="info" size={16} strokeWidth={2} />이 서비스는요
             </h3>
             <ul className="mt-2.5 flex list-disc flex-col gap-2 break-keep pl-4 text-[13px] leading-6 text-admin-text">
               <li>
                 하이원포인트로 결제할 수 있는 <b>지역 가맹점</b>을 지역·업종으로 찾아볼 수 있어요.
+              </li>
+              <li>
+                위치 권한을 사용하지 않으며, 추천 순서는 <b>하이원리조트 거점 직선거리</b>를 기준으로
+                합니다. 산악 지형에서는 실제 이동시간과 다를 수 있어요.
               </li>
               <li>
                 <b>이번 분기 확충 업종</b> 배지는 지역상생팀이 확충을 완료한 업종과 연결된 가맹점이에요.
@@ -177,7 +226,7 @@ export default async function WidgetPage({ searchParams }: { searchParams: Promi
             영업시간·영업 상태 정보는 제공하지 않아요. 방문 전 가맹점에 확인해 주세요.
           </p>
           <footer className="mt-3 border-t border-slate-200 pt-3 text-[11px] leading-5 text-admin-text-muted">
-            <p>{SOURCE_NOTE}</p>
+            <p>{VISITOR_SOURCE_NOTE}</p>
             <p>데이터 기준: {dashboard.period_note}</p>
           </footer>
         </div>

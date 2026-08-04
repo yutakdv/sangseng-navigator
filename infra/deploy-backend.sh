@@ -10,8 +10,11 @@ rm -rf ../backend/app/data && cp -r ../data/processed ../backend/app/data
 PARAMS=("LlmProvider=${LLM_PROVIDER:-openai}")
 [ -n "${OPENAI_API_KEY:-}" ] && PARAMS+=("OpenAiApiKey=${OPENAI_API_KEY}")
 [ -n "${ANTHROPIC_API_KEY:-}" ] && PARAMS+=("AnthropicApiKey=${ANTHROPIC_API_KEY}")
-# 비우면 template의 Default가 먹는다 (AllowedOrigins='*', ReservedConcurrency=5)
+[ -n "${MUTATION_API_TOKEN:-}" ] && PARAMS+=("MutationApiToken=${MUTATION_API_TOKEN}")
+# 비우면 template의 fail-safe Default가 먹는다
+# (AllowedOrigins='https://configure-me.invalid', DemoReadOnly='true', ReservedConcurrency=5)
 [ -n "${ALLOWED_ORIGINS:-}" ] && PARAMS+=("AllowedOrigins=${ALLOWED_ORIGINS}")
+[ -n "${DEMO_READ_ONLY:-}" ] && PARAMS+=("DemoReadOnly=${DEMO_READ_ONLY}")
 [ -n "${RESERVED_CONCURRENCY:-}" ] && PARAMS+=("ReservedConcurrency=${RESERVED_CONCURRENCY}")
 
 sam build -t template.yaml

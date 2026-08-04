@@ -1,4 +1,5 @@
 import type { Metadata, Viewport } from "next";
+import { headers } from "next/headers";
 import "./globals.css";
 
 /**
@@ -19,36 +20,43 @@ const TITLE = "상생 나침반";
 const DESCRIPTION =
   "강원랜드 담당자의 분기별 지역상생 의사결정을 지원하는 AI 정책 나침반 — 하이원포인트 소비 쏠림 진단부터 가맹점 확충·페이백 정책 제안, 담당자 승인, 방문객 추천 위젯 반영까지";
 
-export const metadata: Metadata = {
-  // 하위 페이지가 "지역 소비 분석 · 상생 나침반"처럼 완성된 제목을 직접 내보내므로
-  // template을 쓰지 않는다 (쓰면 접미사가 두 번 붙는다)
-  title: TITLE,
-  description: DESCRIPTION,
-  applicationName: TITLE,
-  openGraph: {
-    type: "website",
-    siteName: TITLE,
+export async function generateMetadata(): Promise<Metadata> {
+  const incoming = await headers();
+  const host = incoming.get("x-forwarded-host") ?? incoming.get("host") ?? "localhost:3100";
+  const protocol = incoming.get("x-forwarded-proto") ?? (host.startsWith("localhost") ? "http" : "https");
+  const ogImage = `${protocol}://${host}/og.png`;
+
+  return {
     title: TITLE,
     description: DESCRIPTION,
-    locale: "ko_KR",
-  },
-  twitter: {
-    card: "summary",
-    title: TITLE,
-    description: DESCRIPTION,
-  },
-};
+    applicationName: TITLE,
+    openGraph: {
+      type: "website",
+      siteName: TITLE,
+      title: TITLE,
+      description: DESCRIPTION,
+      locale: "ko_KR",
+      images: [{ url: ogImage, width: 1731, height: 909, alt: "상생 나침반 지역상생 의사결정 대시보드" }],
+    },
+    twitter: {
+      card: "summary_large_image",
+      title: TITLE,
+      description: DESCRIPTION,
+      images: [ogImage],
+    },
+  };
+}
 
 export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
   // 13 §8: 모바일은 "깨지지 않음"이 기준이다 — 확대 제한을 걸지 않아야 표·지도를 키워 볼 수 있다
-  themeColor: "#4f46e5",
+  themeColor: "#12372f",
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="ko">
+    <html lang="ko" data-scroll-behavior="smooth">
       <head>
         {/* Pretendard (13 §6). 오프라인이면 system-ui 폴백으로 자연히 내려간다 */}
         <link

@@ -20,6 +20,7 @@ import os
 import sys
 import traceback
 import types
+from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime
 from pathlib import Path
 from urllib.parse import urlparse
@@ -53,6 +54,7 @@ if urlparse(_endpoint).hostname not in LOCAL_HOSTS:
 os.environ.setdefault("AWS_ACCESS_KEY_ID", "local")     # DynamoDB Local은 자격증명 "형식"만 요구
 os.environ.setdefault("AWS_SECRET_ACCESS_KEY", "local")
 os.environ.setdefault("CARDS_TABLE", "sangseng-cards")  # .env의 빈 값이 테이블명을 덮지 않도록 선점
+os.environ.setdefault("MUTATION_API_TOKEN", "local-test-mutation-token")
 
 from fastapi.testclient import TestClient        # noqa: E402
 
@@ -64,16 +66,16 @@ from app import llm                              # noqa: E402
 # 아래 fake_llm 픽스처가 llm.generate_json 을 통째로 갈아끼우므로, 어댑터 자체를 검증하는
 # 테스트(§8)를 위해 원본을 미리 잡아 둔다.
 REAL_GENERATE_JSON = llm.generate_json
-from app.services import simulate                # noqa: E402
+from app.services import simulate, workflow      # noqa: E402
 
 import seed_demo                                 # noqa: E402
 
-client = TestClient(app)
+client = TestClient(app, headers={"Authorization": "Bearer local-test-mutation-token"})
 
 # ── 05 문서가 고정한 계약 문구·값 (바뀌면 FE와 어긋난다) ──
 ASSUMPTION_NOTE = "가정 기반 전망이며 실제와 다를 수 있음"
 INCENTIVE_ASSUMPTION_NOTE = "페이백률-전환율 관계는 실측 데이터가 없어 팀 설정 가정(탄력성)에 기반한 전망"
-POLICY_NOTE = "이번 분기 확충이 완료된 업종을 우선 추천합니다"
+POLICY_NOTE = "완료된 확충 업종 우선 · 그 외 하이원리조트 거점 직선거리 기준"
 EXPANSION_SOURCES = ["하이원포인트 사용현황", "가맹점 상세정보", "소진공 상가정보"]
 SCENARIO_RATES = [3, 5, 7]
 MANDATORY_INCENTIVE_RISKS = ["예산", "약관", "미구현"]
@@ -128,6 +130,7 @@ class FakeLLM:
 
 @pytest.fixture(autouse=True)
 def fake_llm(monkeypatch):
+    monkeypatch.delenv("DEMO_READ_ONLY", raising=False)
     fake = FakeLLM()
     monkeypatch.setattr(llm, "generate_json", fake)
     return fake
@@ -159,6 +162,14 @@ def _cards():
 
 def _generate(card_type="EXPANSION"):
     return client.post("/api/cards/generate", json={"type": card_type})
+
+
+def _verify_all(cid="AC-001"):
+    return client.post(
+        f"/api/cards/{cid}/verification",
+        json={"checks": [{"label": label, "status": "verified"}
+                         for label in workflow.REQUIRED_ELIGIBILITY_CHECKS]},
+    )
 
 
 def _put_expansion(cid, eup, category, status="pending", progress=None):
@@ -279,7 +290,11 @@ def test_cards_list_reflects_demo_seed():
     assert {c["id"] for c in pending} == {"AC-002", "INC-001"}
 
     one = client.get("/api/cards/AC-001")
-    assert one.status_code == 200 and one.json()["card"]["progress"] == "추진중"
+    assert one.status_code == 200 and one.json()["card"]["progress"] == "후보 접촉·검토 시작"
+    proposal = client.get("/api/cards/AC-002").json()["card"]
+    assert proposal["confidence"] == "하"  # 동일 업종 상가 표본 2곳 — 보수적 신뢰도
+    assert proposal["ai"]["grounding"]["status"] == "verified"
+    assert proposal["candidate_verification"]["status"] == "unverified"
     assert client.get("/api/cards/AC-999").status_code == 404
 
 
@@ -311,9 +326,14 @@ def test_generate_expansion_creates_pending_card(fake_llm):
 
     assert card["id"] == "AC-003" and card["type"] == "EXPANSION"
     assert card["status"] == "pending" and card["progress"] is None   # 절대 규칙 4 — AI는 제안만
-    assert card["target"] == {"eup": "영월군", "category": "소매점"}
+    # 정량 1위 음식점은 진행 중, 2위 소매점은 승인 대기라 서버가 가용 후보 1위(원 3위)를 고른다.
+    assert card["target"] == {"eup": "영월군", "category": "숙박업"}
     assert card["ai_rank"] == 1 and card["score_rank"] != 1 and card["ai"]["adjusted"] is True
-    assert card["ai"]["comparison"] == FAKE_COMPARISON                # LLM 출력이 그대로 실렸는지
+    assert card["ai"]["comparison"] != FAKE_COMPARISON                # LLM 자유서술은 그대로 노출하지 않는다
+    assert "Score 0.48" in card["ai"]["comparison"]                  # 정본 후보 수치로 재생성
+    assert card["ai"]["grounding"]["selection_method"] == "deterministic_highest_available_score"
+    assert card["ai"]["grounding"]["status"] == "verified"
+    assert card["candidate_verification"]["status"] == "unverified"
     assert card["ai"]["risks"]                                        # A-1 규칙 — 리스크 ≥1
     assert ASSUMPTION_NOTE in card["ai"]["expected_effect"]           # 절대 규칙 3 — 고정 문구 보장
     assert card["sources"] == EXPANSION_SOURCES
@@ -325,8 +345,8 @@ def test_generate_expansion_creates_pending_card(fake_llm):
     assert all({"rank", "candidate", "score"} == set(r) for r in ranking)
 
 
-def test_generate_expansion_is_idempotent_for_same_target():
-    """05 §8 중복 가드 — 동일 (type, target)의 pending 카드가 있으면 기존 카드를 200으로 반환."""
+def test_generate_expansion_deduplicates_immediate_retry():
+    """버튼/네트워크의 즉시 재전송은 최근 알고리즘 생성 카드를 200으로 재사용한다."""
     first = _generate("EXPANSION")
     assert first.status_code == 201
     second = _generate("EXPANSION")
@@ -336,18 +356,29 @@ def test_generate_expansion_is_idempotent_for_same_target():
 
 
 def test_generate_skips_target_already_in_progress(fake_llm):
-    """추진중 타깃(AC-001 영월군 카페)을 AI가 제안해도 다른 후보로 통째 교체된다 (A-1 중복 제안 금지)."""
+    """LLM이 어떤 타깃 문자열을 내도 서버가 활성 업무를 제외한 정량 최상위를 선택한다."""
     fake_llm.ai_rank_target = "영월군 카페"
     card = _generate("EXPANSION").json()["card"]
 
-    assert card["target"]["category"] != "카페"
+    assert card["target"] == {"eup": "영월군", "category": "숙박업"}
     assert card["ai"]["comparison"] != FAKE_COMPARISON       # 타깃-사유 불일치 방지: 텍스트까지 교체
     assert card["ai"]["risks"] and card["ai"]["original_ranking"]
     assert ASSUMPTION_NOTE in card["ai"]["expected_effect"]
 
 
+def test_generate_skips_target_already_under_review(fake_llm):
+    """승인 후 검토중인 지역×업종도 활성 Work Item이므로 새 카드로 복제하지 않는다."""
+    _put_expansion("AC-090", "영월군", "숙박업", status="approved", progress="검토중")
+    fake_llm.ai_rank_target = "영월군 숙박업"
+
+    card = _generate("EXPANSION").json()["card"]
+
+    assert card["target"] == {"eup": "삼척시", "category": "편의점"}
+    assert card["ai"]["grounding"]["status"] == "verified"
+
+
 def test_generate_returns_409_when_every_candidate_is_blocked(fake_llm):
-    """전 후보가 추진중/완료면 A-1 중복 제안 금지의 결론은 '제안할 카드 없음' — 409로 알린다.
+    """전 후보에 활성 업무가 있으면 중복 제안 금지의 결론은 '제안할 카드 없음' — 409로 알린다.
 
     후보 하나를 골라 되돌아가면 A-1이 금지한 타깃의 카드가 저장되므로, 조용한 폴백이 아니라
     에러가 정답이다.
@@ -381,6 +412,30 @@ def test_generate_does_not_overwrite_non_sequential_ids(fake_llm):
     assert {c["id"] for c in _cards()} == {"AC-001", "AC-002", "INC-001", "AC-004", "AC-005"}
 
 
+def test_card_id_counter_is_atomic_under_concurrency():
+    with ThreadPoolExecutor(max_workers=8) as pool:
+        ids = list(pool.map(lambda _: db.next_card_id("AC-"), range(8)))
+    assert len(ids) == len(set(ids)) == 8
+    assert sorted(int(cid.removeprefix("AC-")) for cid in ids) == list(range(3, 11))
+
+
+def test_scan_all_follows_last_evaluated_key(monkeypatch):
+    class PagedTable:
+        def __init__(self):
+            self.calls = []
+
+        def scan(self, **kwargs):
+            self.calls.append(kwargs)
+            if not kwargs:
+                return {"Items": [{"id": "AC-001"}], "LastEvaluatedKey": {"id": "AC-001"}}
+            return {"Items": [{"id": "AC-002"}]}
+
+    fake = PagedTable()
+    monkeypatch.setattr(db, "_table", fake)
+    assert [item["id"] for item in db._scan_all()] == ["AC-001", "AC-002"]
+    assert fake.calls == [{}, {"ExclusiveStartKey": {"id": "AC-001"}}]
+
+
 def test_generate_incentive_builds_scenarios(fake_llm):
     dup = _generate("INCENTIVE")                            # 시드의 pending INC-001이 그대로 반환
     assert dup.status_code == 200 and dup.json()["card"]["id"] == "INC-001"
@@ -411,7 +466,7 @@ def test_decision_approves_expansion_card():
     res = client.post("/api/cards/AC-002/decision", json={"decision": "approved"})
     assert res.status_code == 200
     card = res.json()["card"]
-    assert card["status"] == "approved" and card["progress"] == "검토중"
+    assert card["status"] == "approved" and card["progress"] == "후보 접촉·검토 시작"
     assert card["decided_at"] and card["events"][-1]["action"] == "approved"
 
     again = client.post("/api/cards/AC-002/decision", json={"decision": "approved"})
@@ -470,8 +525,9 @@ def test_incentive_scenarios_survive_decimal_round_trip():
     """
     approved = client.post("/api/cards/INC-001/decision",
                            json={"decision": "approved", "selected_rate": 5}).json()["card"]
-    assert client.post("/api/cards/INC-001/progress",
-                       json={"progress": "완료"}).status_code == 200      # 두 번째 왕복
+    for step in ("추진중", "완료"):
+        assert client.post("/api/cards/INC-001/progress",
+                           json={"progress": step}).status_code == 200
     stored = client.get("/api/cards/INC-001").json()["card"]
 
     for card in (approved, stored):
@@ -482,7 +538,13 @@ def test_incentive_scenarios_survive_decimal_round_trip():
 
 
 def test_progress_transitions_require_approved_card():
-    for step in ("추진중", "완료"):
+    # 후보 적격성이 미확인인 상태에서 가맹 심사·추진·완료로 건너뛸 수 없다.
+    assert client.post("/api/cards/AC-001/progress", json={"progress": "완료"}).status_code == 409
+    verified = _verify_all()
+    assert verified.status_code == 200
+    assert verified.json()["card"]["candidate_verification"]["status"] == "verified"
+
+    for step in ("적격성 확인", "가맹 심사", "추진중", "완료"):
         card = client.post("/api/cards/AC-001/progress", json={"progress": step}).json()["card"]
         assert card["progress"] == step
         assert card["events"][-1]["action"] == f"progress:{step}" and card["events"][-1]["at"]
@@ -493,6 +555,74 @@ def test_progress_transitions_require_approved_card():
                        json={"progress": "진행중"}).status_code == 400     # 허용 밖 값
     assert client.post("/api/cards/AC-999/progress",
                        json={"progress": "완료"}).status_code == 404
+
+
+def test_verification_marks_failed_candidate_ineligible():
+    checks = [{"label": label, "status": "verified"}
+              for label in workflow.REQUIRED_ELIGIBILITY_CHECKS]
+    checks[2]["status"] = "failed"
+    res = client.post("/api/cards/AC-001/verification", json={"checks": checks})
+    assert res.status_code == 200
+    verification = res.json()["card"]["candidate_verification"]
+    assert verification["status"] == "ineligible"
+    assert "사업자 참여 의향" in verification["note"]
+    assert client.post("/api/cards/AC-001/progress", json={"progress": "완료"}).status_code == 409
+
+
+def test_public_demo_read_only_blocks_mutations(monkeypatch):
+    monkeypatch.setenv("DEMO_READ_ONLY", "true")
+    mutations = [
+        ("/api/cards/generate", {"type": "EXPANSION"}),
+        ("/api/cards/AC-002/decision", {"decision": "held"}),
+        ("/api/cards/AC-001/simulate", {}),
+        ("/api/cards/AC-001/progress", {"progress": "보류"}),
+        ("/api/cards/AC-001/progress-records", {"progress": "보류", "note": "보안 확인"}),
+        ("/api/cards/AC-001/verification", {"checks": []}),
+    ]
+    for path, body in mutations:
+        res = client.post(path, json=body)
+        assert res.status_code == 403 and "읽기 전용" in res.json()["detail"]
+    assert client.get("/api/cards").status_code == 200
+
+
+def test_mutations_fail_closed_without_server_token(monkeypatch):
+    """읽기 전용이 아니어도 인증 설정이 빠진 배포는 POST를 무인증 허용하지 않는다."""
+    monkeypatch.delenv("MUTATION_API_TOKEN", raising=False)
+    res = client.post("/api/cards/generate", json={"type": "EXPANSION"})
+    assert res.status_code == 503
+    assert "MUTATION_API_TOKEN" in res.json()["detail"]
+    assert client.get("/api/cards").status_code == 200
+
+
+def test_mutations_reject_missing_or_wrong_bearer_token():
+    for authorization in ("", "Bearer wrong-token"):
+        res = client.post(
+            "/api/cards/generate",
+            json={"type": "EXPANSION"},
+            headers={"Authorization": authorization},
+        )
+        assert res.status_code == 401
+        assert res.headers["www-authenticate"] == "Bearer"
+
+
+def test_progress_notes_and_report_require_internal_bearer_token():
+    """담당자 메모·담당자명·장애물이 포함될 수 있는 조회는 공개 API로 열지 않는다."""
+    for path in ("/api/progress-report", "/api/cards/AC-001/progress-records"):
+        res = client.get(path, headers={"Authorization": ""})
+        assert res.status_code == 401
+        assert res.headers["www-authenticate"] == "Bearer"
+
+
+def test_conditional_progress_write_preserves_winning_event():
+    card = db.get_card("AC-001")
+    expected = card["progress"]
+    first = db.update_progress("AC-001", "보류", expected_progress=expected, require_verified=False)
+    assert first["progress"] == "보류" and first["events"][-1]["action"] == "progress:보류"
+    with pytest.raises(db.ConcurrentUpdate):
+        db.update_progress("AC-001", "후보 접촉·검토 시작", expected_progress=expected, require_verified=False)
+    stored = db.get_card("AC-001")
+    assert stored["progress"] == "보류"
+    assert stored["events"][-1]["action"] == "progress:보류"
 
 
 # ── 5. simulate (LLM monkeypatch) ────────────────────────────────────────
@@ -510,6 +640,13 @@ def test_simulate_expansion_card(fake_llm):
     assert sim["narrative"] == FAKE_NARRATIVE                     # LLM 문구 채택 (fallback 아님)
     assert "예상" in sim["narrative"] and "가정" in sim["narrative"]
     assert sim["assumption_note"] == ASSUMPTION_NOTE              # 절대 규칙 3 — 고정 문구
+    assert sim["expected_monthly_count"] >= 0
+    assert len(sim["expected_monthly_range"]) == 2
+    assert "25~75" in sim["uncertainty_method"]
+    assert sim["estimate_basis"]
+    assert sim["base_month"] == "2025-12"
+    assert sim["effect_assessment"] in ("미미", "개선", "심화", "혼재")
+    assert sim["decision_note"]
 
 
 def test_simulate_falls_back_when_llm_fails(monkeypatch):
@@ -531,7 +668,7 @@ def test_simulate_rejects_narrative_missing_required_words(fake_llm):
     assert fake_llm.calls == ["narrative"]                     # 예외가 아니라 내용 가드가 걸린 경로
     assert sim["narrative"] != fake_llm.narrative
     assert "예상" in sim["narrative"] and "가정" in sim["narrative"]
-    assert "영월군 음식점" in sim["narrative"]                  # 규칙 기반 문구 형태 (AC-002 타깃)
+    assert "영월군 소매점" in sim["narrative"]                  # 규칙 기반 문구 형태 (AC-002 타깃)
 
 
 def test_simulate_rejects_narrative_with_wrong_direction(fake_llm):
@@ -549,7 +686,7 @@ def test_simulate_rejects_narrative_with_wrong_direction(fake_llm):
     assert "상승(집중 심화)" in sim["narrative"]
     assert "예상" in sim["narrative"] and "가정" in sim["narrative"]
 
-    # 반대 방향 — AC-002(영월군 음식점)는 개선 구간이다
+    # 반대 방향 — AC-002(영월군 소매점)는 개선 구간이다
     fake_llm.narrative = "지역 소비 집중도가 상승(집중 심화)할 것으로 예상됩니다. 가정에 기반한 수치입니다."
     sim = client.post("/api/cards/AC-002/simulate").json()["simulation"]
 
@@ -598,7 +735,7 @@ def test_simulate_does_not_hand_indices_to_the_llm(monkeypatch):
 def test_simulate_reports_no_change_without_claiming_a_direction(fake_llm):
     """변화가 없는 구간(delta [0.0, 0.0])은 방향을 붙이지 않고 LLM에도 맡기지 않는다.
 
-    실데이터 36조합 중 19개가 여기 해당하고 시드 카드 AC-001의 타깃(영월군 카페)도 포함된다.
+    시드 카드 AC-001의 타깃(영월군 음식점)은 소수점 첫째 자리에서 변화가 없다.
     부호로만 판정하면 "약 0.0~0.0%p 상승(집중 심화)"처럼 없는 변화를 단정하게 된다.
     """
     sim = client.post("/api/cards/AC-001/simulate").json()["simulation"]
@@ -638,7 +775,11 @@ def test_simulate_error_paths():
 def test_kpi_matches_card_state():
     """05 §3 — 4지표 전부를 카드 목록에서 독립적으로 재계산해 대조한다."""
     client.post("/api/cards/AC-002/decision", json={"decision": "approved"})
-    client.post("/api/cards/AC-002/progress", json={"progress": "완료"})
+    _verify_all("AC-002")
+    for step in ("적격성 확인", "가맹 심사", "추진중", "완료"):
+        assert client.post(
+            "/api/cards/AC-002/progress", json={"progress": step}
+        ).status_code == 200
 
     cards = _cards()
     kpi = client.get("/api/kpi").json()
@@ -649,14 +790,16 @@ def test_kpi_matches_card_state():
     hours = [(datetime.fromisoformat(c["decided_at"]) - datetime.fromisoformat(c["created_at"])
               ).total_seconds() / 3600 for c in cards if c.get("decided_at")]
 
-    assert kpi["adoption_rate"] == round(len(approved) / len(cards), 2)
+    decided = [c for c in cards if c["status"] in ("approved", "rejected", "held")]
+    assert kpi["adoption_rate"] == round(len(approved) / len(decided), 2)
     assert kpi["execution_rate"] == round(len(running) / len(approved), 2)
-    assert kpi["avg_approval_hours"] == round(sum(hours) / len(hours), 1) > 0
+    assert kpi["avg_decision_hours"] == kpi["avg_approval_hours"] == round(sum(hours) / len(hours), 1) > 0
     assert 0 <= kpi["regional_balance_index"] <= 100
     assert kpi["counts"] == {
         "total": len(cards), "pending": sum(1 for c in cards if c["status"] == "pending"),
         "approved": len(approved), "rejected": sum(1 for c in cards if c["status"] == "rejected"),
-        "held": sum(1 for c in cards if c["status"] == "held"), "done": len(done),
+        "held": sum(1 for c in cards if c["status"] == "held"),
+        "decided": len(decided), "done": len(done),
     }
 
 
@@ -673,21 +816,28 @@ def test_kpi_survives_empty_table():
 
 def test_widget_promotes_completed_targets_and_payback(fake_llm):
     """05 §4 — 완료 카드 전/후로 추천 순서가 바뀌고, 배지·페이백이 붙는다 (데모 마지막 동선)."""
-    before = client.get("/api/widget/recommend", params={"region": "영월군"}).json()
+    before = client.get("/api/widget/recommend", params={"region": "영월군", "limit": 3}).json()
     assert before["policy_note"] == POLICY_NOTE
     assert len(before["recommendations"]) == 3
     assert all(r["badge"] is None and r["payback"] is None for r in before["recommendations"])
     assert all(r["blurb"] == f"영월군의 {r['category']} 하이원포인트 가맹점이에요" for r in before["recommendations"])
 
-    client.post("/api/cards/AC-001/progress", json={"progress": "완료"})     # 영월군 × 카페
+    _verify_all("AC-001")
+    for step in ("적격성 확인", "가맹 심사", "추진중", "완료"):
+        assert client.post(
+            "/api/cards/AC-001/progress", json={"progress": step}
+        ).status_code == 200  # 영월군 × 음식점
     client.post("/api/cards/INC-001/decision", json={"decision": "approved", "selected_rate": 5})
-    client.post("/api/cards/INC-001/progress", json={"progress": "완료"})
+    for step in ("추진중", "완료"):
+        assert client.post(
+            "/api/cards/INC-001/progress", json={"progress": step}
+        ).status_code == 200
 
-    after = client.get("/api/widget/recommend", params={"region": "영월군"}).json()
+    after = client.get("/api/widget/recommend", params={"region": "영월군", "limit": 3}).json()
     recs = after["recommendations"]
     assert [r["name"] for r in recs] != [r["name"] for r in before["recommendations"]]
-    assert [r["category"] for r in recs[:2]] == ["카페", "카페"]
-    assert [r["badge"] for r in recs[:2]] == ["이번 분기 확충 업종", "이번 분기 확충 업종"]
+    assert [r["category"] for r in recs] == ["음식점", "음식점", "음식점"]
+    assert [r["badge"] for r in recs] == ["이번 분기 확충 업종"] * 3
     assert all(r["payback"] == {"rate": 5, "label": "지금 여기서 쓰면 5% 페이백"} for r in recs)
     assert all({"name", "category", "address", "lat", "lng", "directions_url"} <= set(r) for r in recs)
     assert all(r["directions_url"].startswith("https://map.kakao.com/link/to/") for r in recs)
@@ -695,13 +845,13 @@ def test_widget_promotes_completed_targets_and_payback(fake_llm):
 
 def test_widget_blurb_is_deterministic_and_neutral(fake_llm):
     recs = client.get("/api/widget/recommend",
-                      params={"region": "영월군", "category": "카페"}).json()["recommendations"]
+                      params={"region": "영월군", "category": "카페", "limit": 3}).json()["recommendations"]
     assert recs and all("영월군" in r["blurb"] and "카페" in r["blurb"] for r in recs)
     assert all("새로 생긴" not in r["blurb"] and "맛" not in r["blurb"] for r in recs)
 
 
 def test_widget_blurbs_are_always_source_based(fake_llm):
-    recs = client.get("/api/widget/recommend", params={"region": "영월군"}).json()["recommendations"]
+    recs = client.get("/api/widget/recommend", params={"region": "영월군", "limit": 3}).json()["recommendations"]
 
     assert len(recs) == 3
     assert all(r["blurb"] == f"영월군의 {r['category']} 하이원포인트 가맹점이에요" for r in recs)
@@ -709,8 +859,22 @@ def test_widget_blurbs_are_always_source_based(fake_llm):
 
 def test_widget_returns_empty_for_unknown_region(fake_llm):
     body = client.get("/api/widget/recommend", params={"region": "없는읍"}).json()
-    assert body == {"recommendations": [], "policy_note": POLICY_NOTE}
+    assert body == {"recommendations": [], "policy_note": POLICY_NOTE, "total": 0}
     assert body["recommendations"] == []
+
+
+def test_widget_default_and_expanded_lists_expose_total(fake_llm):
+    """방문객 목록은 기본 12곳, '더 보기'는 같은 필터에서 그 다음 목록을 이어서 보여 준다."""
+    default = client.get("/api/widget/recommend").json()
+    expanded = client.get("/api/widget/recommend", params={"limit": 24}).json()
+
+    assert default["total"] > 12
+    assert len(default["recommendations"]) == 12
+    assert expanded["total"] == default["total"]
+    assert len(expanded["recommendations"]) == 24
+    assert [r["name"] for r in expanded["recommendations"][:12]] == [
+        r["name"] for r in default["recommendations"]
+    ]
 
 
 # ── 8. LLM 어댑터 (실호출 없이 어댑터 자체를 검증) ───────────────────────
@@ -780,3 +944,11 @@ def test_llm_retries_with_backoff_then_wraps(monkeypatch):
 
     assert len(calls) == 2
     assert slept == [llm.RETRY_BACKOFF_SECONDS]                     # 마지막 시도 뒤에는 쉬지 않는다
+
+
+def test_llm_rejects_unknown_provider(monkeypatch):
+    """provider 오타를 기본 OpenAI로 묵인하지 않고 명시적으로 실패시킨다."""
+    monkeypatch.setenv("LLM_PROVIDER", "opena1")
+
+    with pytest.raises(llm.LLMError, match="Unsupported LLM_PROVIDER: opena1"):
+        REAL_GENERATE_JSON("system", "user", {"type": "object"}, attempts=1)

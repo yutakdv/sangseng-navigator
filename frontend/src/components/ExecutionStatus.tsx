@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { Icon, type IconName } from "@/components/Icon";
 import { ProgressChip } from "@/components/StatusChip";
+import { normalizedProgress, sampleQuality } from "@/lib/cardWorkflow";
 import { dash, ratioPct } from "@/lib/format";
 import type { Card, CardProgress, Kpi } from "@/types";
 
@@ -13,7 +14,14 @@ import type { Card, CardProgress, Kpi } from "@/types";
  * 계산되는 **실행 전환율**을 넣는다 — 전부 Action Card 상태에서 나오는 값이라 승인·상태 변경이
  * 일어나면 즉시 바뀐다 (05 §3).
  */
-const STAGES: CardProgress[] = ["검토중", "추진중", "보류", "완료"];
+const STAGES: CardProgress[] = [
+  "후보 접촉·검토 시작",
+  "적격성 확인",
+  "가맹 심사",
+  "추진중",
+  "보류",
+  "완료",
+];
 
 export function ExecutionStatus({
   approved,
@@ -24,8 +32,10 @@ export function ExecutionStatus({
   kpi: Kpi;
   className?: string;
 }) {
-  const count = (p: CardProgress) => approved.filter((c) => (c.progress ?? "검토중") === p).length;
+  const count = (p: CardProgress) => approved.filter((card) => normalizedProgress(card) === p).length;
   const total = approved.length;
+  const quality = sampleQuality(kpi.counts.decided);
+  const sampleNote = quality === "demo" ? "데모 표본" : quality === "limited" ? "표본 부족" : null;
 
   return (
     <section
@@ -41,7 +51,7 @@ export function ExecutionStatus({
           <div className="min-w-0">
             <h3 className="u-panel-title">실행 현황 · 정책 성과</h3>
             <p className="mt-1.5 break-keep text-[13px] leading-[1.65] text-admin-text-muted">
-              승인한 카드가 지금 어느 단계에 있는지, 그리고 의사결정이 얼마나 쌓였는지입니다.
+              담당자가 검토를 시작한 Work Item의 단계와 의사결정 표본을 함께 봅니다.
             </p>
           </div>
         </div>
@@ -51,7 +61,7 @@ export function ExecutionStatus({
         {/* ── 추진 단계 ────────────────────────────────────────── */}
         {total === 0 ? (
           <p className="rounded-2xl bg-admin-surface-sunken px-4 py-5 text-center text-[13px] leading-6 text-admin-text-muted">
-            승인된 카드가 아직 없습니다. 카드를 승인하면 여기에 추진 단계가 쌓입니다.
+            검토를 시작한 카드가 아직 없습니다. 후보 접촉·검토를 시작하면 단계가 쌓입니다.
           </p>
         ) : (
           <>
@@ -90,27 +100,27 @@ export function ExecutionStatus({
             icon="check"
             label="채택률"
             value={ratioPct(kpi.adoption_rate)}
-            note={`승인 ${kpi.counts.approved} / 전체 ${kpi.counts.total}장`}
+            note={`승인 ${kpi.counts.approved} / 결정 ${kpi.counts.decided}건${sampleNote ? ` · ${sampleNote}` : ""}`}
           />
           <Stat
             icon="trend"
             label="실행 전환율"
             value={ratioPct(kpi.execution_rate)}
-            note="승인 카드 중 추진중·완료 비중"
+            note={`결정 카드 ${kpi.counts.approved}건 중 추진중·완료 비중${sampleNote ? ` · ${sampleNote}` : ""}`}
           />
           <Stat
             icon="clock"
             label="평균 의사결정 소요"
-            value={dash(kpi.avg_approval_hours)}
-            unit={kpi.avg_approval_hours === null ? undefined : "시간"}
-            note="승인·반려·보류까지 걸린 시간"
+            value={dash(kpi.avg_decision_hours)}
+            unit={kpi.avg_decision_hours === null ? undefined : "시간"}
+            note="검토 시작·반려·보류까지 걸린 시간"
           />
           <Stat
             icon="scale"
             label="지역 균형지수"
             value={dash(kpi.regional_balance_index)}
             unit={kpi.regional_balance_index === null ? undefined : "/ 100"}
-            note="승인 카드가 여러 지역에 고루 쌓일수록 상승"
+            note="결정 카드가 여러 지역에 고루 쌓일수록 상승"
           />
         </dl>
       </div>
@@ -130,6 +140,9 @@ export function ExecutionStatus({
 
 const STAGE_BAR: Record<CardProgress, string> = {
   검토중: "bg-state-notice",
+  "후보 접촉·검토 시작": "bg-admin-primary/55",
+  "적격성 확인": "bg-admin-primary/70",
+  "가맹 심사": "bg-admin-primary/85",
   추진중: "bg-admin-primary",
   보류: "bg-state-warn",
   완료: "bg-state-good",

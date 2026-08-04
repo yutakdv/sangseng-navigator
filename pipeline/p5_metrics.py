@@ -41,29 +41,47 @@ def with_shares(pairs, key):
 
 def quarter_rate(months, uses_by_month, visitors):
     """분기 전환율 = 3개월 건수 합 ÷ 3개월 입장객 합 × 100 (05 §1 growth.qoq_pp 정의)."""
-    return sum(uses_by_month[m] for m in months) / sum(visitors[m] for m in months) * 100
+    denominator = sum(visitors[m] for m in months)
+    if denominator <= 0:
+        raise ValueError("분기 입장 연인원 합계가 0 이하입니다")
+    return sum(uses_by_month[m] for m in months) / denominator * 100
 
 
 def main():
     src = PROCESSED_DIR / "usage_monthly.json"
     data = json.loads(src.read_text(encoding="utf-8"))
-    months, base_month = data["months"], data["base_month"]
+    raw_months, base_month = data["months"], data["base_month"]
+    if base_month not in raw_months:
+        raise SystemExit(f"P5 실패: base_month({base_month})가 months에 없음")
+    # 원본 배열 순서가 뒤섞여도 기준월 이후 값을 실수로 최신값으로 쓰지 않는다.
+    ordered = sorted(set(raw_months))
+    months = ordered[:ordered.index(base_month) + 1]
+    if len(months) < 2:
+        raise SystemExit("P5 실패: 전월 비교에 필요한 월이 2개 미만")
     visitors = data.get("visitors_monthly")
     if not visitors:
         raise SystemExit("P5 실패: usage_monthly.json에 visitors_monthly 없음 — P2(p2_visitors.py) 먼저 실행")
 
-    # 월 → 지역별 건수 / 업종별 건수 (업종은 하이원 원본 18종 기준 — 분산도용)
+    # 월 → 지역별 건수 / 표시 6분류 건수. HHI는 같은 의미의 원본 세부업종을 따로 세지 않고,
+    # 화면과 후보 산식이 공유하는 고정 6분류(누락 업종=0)를 기준으로 계산한다.
     region_by_month = {m: dict.fromkeys(REGIONS, 0) for m in months}
-    category_by_month = {m: {} for m in months}
+    category_by_month = {m: dict.fromkeys(DISPLAY_CATEGORIES, 0) for m in months}
     for row in data["usage"]:
         m = row["month"]
+        if m not in region_by_month:
+            continue
+        row_total = 0
         for region in REGIONS:
             region_by_month[m][region] += row[region]
-            category_by_month[m][row["category"]] = category_by_month[m].get(row["category"], 0) + row[region]
+            row_total += row[region]
+        category_by_month[m][display_of_highone(row["category"])] += row_total
 
     uses_by_month = {m: sum(region_by_month[m].values()) for m in months}
 
     # 지역 전환율 — 분자·분모가 겹치는 월만 (06 공통 원칙 4). is_proxy 고정 true
+    invalid_visitors = [m for m in months if m in visitors and visitors[m] <= 0]
+    if invalid_visitors:
+        raise SystemExit(f"P5 실패: 입장 연인원이 0 이하인 월 {', '.join(invalid_visitors)}")
     conv_months = [m for m in months if m in visitors]
     if not conv_months:
         raise SystemExit("P5 실패: 사용현황과 입장객의 겹치는 월이 없음")
@@ -81,17 +99,20 @@ def main():
         {"month": m, "index": gini_to_index(gini([region_by_month[m][r] for r in REGIONS]))} for m in months
     ]
     dispersion_monthly = [
-        {"month": m, "index": hhi_dispersion_index(list(category_by_month[m].values()))} for m in months
+        {"month": m, "index": hhi_dispersion_index(
+            [category_by_month[m][category] for category in DISPLAY_CATEGORIES]
+        )} for m in months
     ]
 
     # 전 기간 누적 — 지역 비중 / 표시 6분류 업종 비중(매핑 ① 롤업, 13 §5 고정 순서)
     region_total = {r: sum(region_by_month[m][r] for m in months) for r in REGIONS}
-    display_total = dict.fromkeys(DISPLAY_CATEGORIES, 0)
-    for m in months:
-        for category, count in category_by_month[m].items():
-            display_total[display_of_highone(category)] += count
+    display_total = {
+        category: sum(category_by_month[m][category] for m in months)
+        for category in DISPLAY_CATEGORIES
+    }
 
-    prev_month = months[-2]
+    base_index = months.index(base_month)
+    prev_month = months[base_index - 1]
     def days_in_month(month: str) -> int:
         year, month_num = (int(part) for part in month.split("-"))
         return calendar.monthrange(year, month_num)[1]
@@ -99,7 +120,7 @@ def main():
     base_daily = uses_by_month[base_month] / days_in_month(base_month)
     prev_daily = uses_by_month[prev_month] / days_in_month(prev_month)
     growth = {
-        "mom_pct": round((base_daily - prev_daily) / prev_daily * 100, 1),
+        "mom_pct": round((base_daily - prev_daily) / prev_daily * 100, 1) if prev_daily > 0 else None,
         "qoq_pp": (
             round(
                 quarter_rate(conv_months[-3:], uses_by_month, visitors)
@@ -112,7 +133,7 @@ def main():
     }
 
     sens_path = PROCESSED_DIR / "sensitivity.json"
-    ai_stability = (
+    ranking_stability = (
         round(json.loads(sens_path.read_text(encoding="utf-8"))["top3_stable_ratio"] * 100)
         if sens_path.exists()
         else None  # P8(p8_sensitivity.py) 실행 전
@@ -140,7 +161,9 @@ def main():
         "monthly_by_region": [{"month": m, **region_by_month[m]} for m in months],
         "category_share": with_shares(list(display_total.items()), "category"),
         "growth": growth,
-        "ai_stability": ai_stability,
+        # P8은 AI 모델 품질이 아니라 가중치 변화에 대한 정량 순위의 강건성을 측정한다.
+        "ranking_stability": ranking_stability,
+        "ai_stability": ranking_stability,  # 이전 API 소비자 호환용 별칭
     }
 
     path = PROCESSED_DIR / "dashboard.json"
@@ -152,7 +175,8 @@ def main():
     print(f"  지역 전환율(근사) {out['conversion']['headline_rate']}% · "
           f"지역 소비 집중도 {out['concentration']['index']}({out['concentration']['grade']}) · "
           f"업종별 소비 분산도 {out['category_dispersion']['index']}")
-    print(f"  전월 대비 {growth['mom_pct']}% · 전분기 대비 {growth['qoq_pp']}%p · AI 제안 안정도 {ai_stability}")
+    print(f"  전월 대비 {growth['mom_pct']}% · 전분기 대비 {growth['qoq_pp']}%p · "
+          f"추천 순위 안정도 {ranking_stability}")
     print("  지역 비중: " + ", ".join(f"{r['region']} {r['share']:.0%}" for r in out["region_share"]))
     print("  업종 비중: " + ", ".join(f"{c['category']} {c['share']:.0%}" for c in out["category_share"]))
 

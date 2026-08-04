@@ -53,13 +53,16 @@ def get_kpi():
     cards = db.list_cards()
     by_status = {s: [c for c in cards if c.get("status") == s] for s in STATUSES}
     approved = by_status["approved"]
+    decided = approved + by_status["rejected"] + by_status["held"]
     running = [c for c in approved if c.get("progress") in RUNNING]
     done = [c for c in approved if c.get("progress") == DONE]
     # 평균 의사결정 소요: decided_at이 있는 모든 카드(approved+rejected+held)가 대상 (05 문서 §3)
     hours = [h for h in (_elapsed_hours(c) for c in cards) if h is not None]
     return {
-        "adoption_rate": round(len(approved) / len(cards), 2) if cards else None,
+        # 승인 대기 카드는 아직 채택 여부가 결정되지 않았으므로 채택률 분모에서 제외한다.
+        "adoption_rate": round(len(approved) / len(decided), 2) if decided else None,
         "execution_rate": round(len(running) / len(approved), 2) if approved else None,
+        "avg_decision_hours": round(sum(hours) / len(hours), 1) if hours else None,
         "avg_approval_hours": round(sum(hours) / len(hours), 1) if hours else None,
         "regional_balance_index": _balance_index(approved),
         "counts": {
@@ -68,6 +71,7 @@ def get_kpi():
             "approved": len(approved),
             "rejected": len(by_status["rejected"]),
             "held": len(by_status["held"]),
+            "decided": len(decided),
             "done": len(done),
         },
     }

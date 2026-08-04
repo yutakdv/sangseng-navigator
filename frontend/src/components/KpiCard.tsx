@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
+import { DeltaValue, type DeltaValueProps } from "@/components/DeltaValue";
 import { Icon, type IconName } from "@/components/Icon";
-import { signTone } from "@/lib/format";
 
 /**
  * KPI 타일 — 라벨·값·부가설명 (docs/plan/08 F2 · 13 §6 "KPI 값 700 굵기 28~36px").
@@ -8,7 +8,7 @@ import { signTone } from "@/lib/format";
  *
  * 라벨(13px 보조색) → 값(32px 굵게) → 증감 칩 → 설명(12px)으로 네 단계를 벌려 둔다.
  * 이전에는 라벨 14px·설명 12px이라 값 말고는 전부 같은 무게로 뭉쳐 보였다.
- * 증감은 색과 함께 `signed()`가 붙이는 ▲/▼ 기호로도 읽힌다 (색만으로 전달 금지, 13 §4).
+ * 증감은 방향색과 함께 `DeltaValue`의 ▲/▼·스크린리더 문구로도 읽힌다 (색만으로 전달 금지, 13 §4).
  */
 export function KpiCard({
   label,
@@ -27,19 +27,11 @@ export function KpiCard({
   /** `근사 지표` 등 고지 배지 — 라벨 옆에 붙는다 */
   badge?: ReactNode;
   sub?: ReactNode;
-  /** 증감 표기: 이미 포맷된 문자열 + 방향 판단용 원값 + 기준 문구("전분기 대비") */
-  delta?: { text: string; raw: number | null; note?: string };
+  /** 증감 표기: 원값으로 방향과 표기를 함께 결정하고 기준 문구("전분기 대비")를 곁들인다. */
+  delta?: Omit<DeltaValueProps, "variant" | "className">;
   icon?: IconName;
   accent?: boolean;
 }) {
-  const tone = delta ? signTone(delta.raw) : "flat";
-  const deltaTone =
-    tone === "good"
-      ? "bg-state-good-bg text-state-good"
-      : tone === "bad"
-        ? "bg-state-bad-bg text-state-bad"
-        : "bg-admin-surface-sunken text-admin-text-muted";
-
   return (
     <div
       className={`flex min-w-0 flex-col rounded-card border bg-admin-surface p-4 shadow-card transition-shadow hover:shadow-card-hover sm:p-[18px] ${
@@ -80,13 +72,8 @@ export function KpiCard({
       </div>
 
       {delta ? (
-        <div className="mt-2 flex flex-wrap items-center gap-1.5">
-          <span
-            className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-semibold leading-5 tabular-nums ${deltaTone}`}
-          >
-            {delta.text}
-          </span>
-          {delta.note ? <span className="u-note">{delta.note}</span> : null}
+        <div className="mt-2">
+          <DeltaValue {...delta} />
         </div>
       ) : null}
 

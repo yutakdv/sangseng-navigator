@@ -4,8 +4,8 @@ import type { CardAi } from "@/types";
 /**
  * 원 Score 순위 표 — **절대 규칙 5(정량 순위 병기)의 화면 구현** (docs/plan/08 F4 · 13 §9).
  *
- * AI가 순위를 조정했든 아니든 항상 보인다. 조정된 카드에서 원 순위를 접거나 숨기면
- * 감사 가능성이 사라지므로, 이 표는 접히지 않고 타깃 행에 `Score N위`와 `AI 제안 N위`가
+ * 활성 업무가 상위 후보를 막았든 아니든 항상 보인다. 원 순위를 접거나 숨기면
+ * 감사 가능성이 사라지므로, 이 표는 접히지 않고 타깃 행에 `Score N위`와 `가용 후보 선택 N위`가
  * 한 줄에서 같이 읽히도록 둔다.
  */
 export function OriginalRankingTable({
@@ -29,7 +29,7 @@ export function OriginalRankingTable({
     <div className="min-w-0">
       <div className="u-scroll-x">
         <table className="u-table min-w-[460px]">
-          <caption className="sr-only">정량 Score 순위와 AI 제안 순위 비교표</caption>
+          <caption className="sr-only">정량 Score 순위와 가용 후보 선택 순위 비교표</caption>
           <thead>
             <tr>
               <th scope="col">정량 Score 순위</th>
@@ -38,7 +38,7 @@ export function OriginalRankingTable({
                 Score
               </th>
               <th scope="col" className="text-right">
-                AI 제안 순위
+                가용 후보 선택
               </th>
             </tr>
           </thead>
@@ -81,8 +81,8 @@ export function OriginalRankingTable({
         <Icon name="info" size={13} strokeWidth={2} className="mt-[3px]" />
         <span>
           {adjusted && scoreRank !== null && aiRank !== null
-            ? `AI는 정량 ${scoreRank}위 후보를 제안 ${aiRank}위로 올렸습니다. 조정 여부와 무관하게 원 Score 순위를 함께 싣습니다 — 담당자가 정량 근거와 AI 판단을 나란히 놓고 확인할 수 있어야 하기 때문입니다.`
-            : "AI 제안이 정량 1순위와 같더라도 원 Score 순위를 함께 싣습니다 — 담당자가 정량 근거와 AI 판단을 나란히 놓고 확인할 수 있어야 하기 때문입니다."}
+            ? `정량 ${scoreRank}위보다 앞선 후보는 활성 업무로 중복 제안에서 제외됐습니다. 서버가 가용 후보 중 ${aiRank}위를 결정론적으로 선택했으며, 원 Score 순위를 함께 싣습니다.`
+            : "서버가 정량 1순위를 그대로 선택했습니다. 선택 결과와 무관하게 원 Score 순위를 함께 싣습니다."}
         </span>
       </p>
     </div>

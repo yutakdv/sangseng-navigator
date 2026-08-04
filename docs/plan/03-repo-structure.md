@@ -96,8 +96,8 @@ cd pipeline && python run_all.py                      # 데이터 갱신 시에�
 
 # 전체 기동 (Docker 통합 테스트 환경 — 14 문서 T7, AWS 불필요)
 #   dynamodb → seed(데모 카드 3장, 1회 실행 후 종료) → backend → frontend
-docker compose up -d && curl localhost:8000/api/health   # FE는 http://localhost:3000
-#   FRONTEND_PORT=3100      호스트 3000번이 이미 쓰일 때
+docker compose up -d && curl localhost:8000/api/health   # FE는 http://localhost:3100
+#   FRONTEND_PORT=3200      3100번이 이미 쓰일 때
 #   FRONTEND_API_BASE=      FE를 mock 모드로 (BE 없이 화면만)
 # (DynamoDB 없이 정적 서빙만 볼 때는 uvicorn 직접 실행도 가능:
 #  cd backend && uvicorn app.main:app --reload --port 8000)

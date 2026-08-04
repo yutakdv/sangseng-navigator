@@ -2,17 +2,16 @@
 import json
 import logging
 
-from fastapi import APIRouter, HTTPException, Query, Response
-from pydantic import BaseModel
+from fastapi import APIRouter, Depends, HTTPException, Query, Response
+from pydantic import BaseModel, Field
 
-from app import dataload, db, llm, prompts
-from app.services import cardgen, simulate
+from app import dataload, db, llm, prompts, security
+from app.services import cardgen, progress_records, simulate, workflow
 
 router = APIRouter()
 log = logging.getLogger(__name__)
 
 DECISIONS = ("approved", "rejected", "held")
-PROGRESSES = ("검토중", "추진중", "보류", "완료")
 RATES = (3, 5, 7)
 
 ASSUMPTION_NOTE = "가정 기반 전망이며 실제와 다를 수 있음"   # 절대 규칙 3 — 고정 문구
@@ -31,6 +30,16 @@ class DecisionBody(BaseModel):
 
 class ProgressBody(BaseModel):
     progress: str
+    idempotency_key: str | None = Field(None, min_length=1, max_length=128)
+
+
+class EligibilityCheckBody(BaseModel):
+    label: str
+    status: str
+
+
+class VerificationBody(BaseModel):
+    checks: list[EligibilityCheckBody]
 
 
 class GenerateBody(BaseModel):
@@ -63,7 +72,11 @@ def get_cards(card_type: str | None = Query(None, alias="type"), status: str | N
 
 
 @router.post("/cards/generate", status_code=201)
-def generate(body: GenerateBody, response: Response):
+def generate(
+    body: GenerateBody,
+    response: Response,
+    _authorized: None = Depends(security.require_mutation_access),
+):
     """스코어링+AI로 카드 생성 (B4) — 신규 201, 동일 타깃 pending 중복 시 기존 카드 200 (05 문서 §2·§8)."""
     if body.type not in ("EXPANSION", "INCENTIVE"):
         raise HTTPException(status_code=400, detail="type은 EXPANSION|INCENTIVE 중 하나여야 합니다")
@@ -73,7 +86,7 @@ def generate(body: GenerateBody, response: Response):
         raise HTTPException(status_code=503, detail=f"{exc}.json이 아직 생성되지 않았습니다") from exc
     except cardgen.NoAvailableCandidate as exc:     # 제안할 신규 후보가 하나도 없는 상태 = 409
         raise HTTPException(status_code=409,
-                            detail="제안할 수 있는 신규 후보가 없습니다 (전 후보가 추진중/완료 상태)") from exc
+                            detail="제안할 수 있는 신규 후보가 없습니다 (전 후보에 승인 대기 또는 진행 중인 업무가 있음)") from exc
     if not created:
         response.status_code = 200
     return {"card": card}
@@ -85,7 +98,11 @@ def get_one(cid: str):
 
 
 @router.post("/cards/{cid}/decision")
-def decide(cid: str, body: DecisionBody):
+def decide(
+    cid: str,
+    body: DecisionBody,
+    _authorized: None = Depends(security.require_mutation_access),
+):
     """승인/반려/보류 — pending 카드에서만 가능 (05 문서 §8).
 
     검사 순서는 404(없는 ID) → 400(body 값) → 409(상태 전이). 없는 카드에 잘못된 body를 보내면
@@ -100,13 +117,18 @@ def decide(cid: str, body: DecisionBody):
         if body.selected_rate not in RATES:
             raise HTTPException(status_code=400, detail="selected_rate(3|5|7)가 필요합니다")
         card["selected_rate"] = body.selected_rate      # EXPANSION에 온 selected_rate는 무시
-    card["status"] = body.decision
-    card["decided_at"] = db.now_iso()                   # 반려·보류도 기록 (05 문서 §3 avg_approval_hours)
-    if body.decision == "approved":
-        card["progress"] = "검토중"
-    _log(card, body.decision)
-    db.put_card(card)
-    return {"card": card}
+    # EXPANSION의 approved는 가맹 확정이 아니라 후보 접촉·검토 Work Item 시작이다.
+    initial_progress = "후보 접촉·검토 시작" if card.get("type") == "EXPANSION" else "검토중"
+    try:
+        updated = db.decide_card(
+            cid,
+            body.decision,
+            initial_progress=initial_progress,
+            selected_rate=body.selected_rate if card.get("type") == "INCENTIVE" else None,
+        )
+    except db.ConcurrentUpdate:
+        raise HTTPException(status_code=409, detail="다른 요청이 먼저 카드 결정을 변경했습니다. 새로고침 후 다시 시도하세요") from None
+    return {"card": updated}
 
 
 def _direction(delta_pp: list) -> str:
@@ -163,7 +185,10 @@ def _fallback_narrative(r: dict) -> str:
 
 
 @router.post("/cards/{cid}/simulate")
-def simulate_card(cid: str):
+def simulate_card(
+    cid: str,
+    _authorized: None = Depends(security.require_mutation_access),
+):
     """가맹 전환 시 예상 효과 — EXPANSION 반사실 재계산 + LLM 설명 (05 문서 §2, 07 문서 B5).
 
     표시 문구에 "확보"를 쓰지 않는다 — 가맹점은 강원랜드가 지정하는 게 아니라 사업자가 신청하고
@@ -203,6 +228,8 @@ def simulate_card(cid: str):
             "대상": f"{result['eup']} {result['category']} 업종 신규 가맹점 1곳",
             "예상 변화(부호 해석 완료)": direction,
             "신규 가맹점 예상 월 이용 건수(가정치)": result["expected_monthly_count"],
+            "관측 기반 예상 월 이용 건수 범위": result["expected_monthly_range"],
+            "범위 산출 방법": result["uncertainty_method"],
             "작성 지침": ("'예상 변화'의 방향(개선/상승)과 폭을 그대로 서술하고, 주어지지 않은 "
                       "집중도 지수 값을 지어내지 말 것. '예상'과 '가정' 두 단어를 반드시 포함할 것"),
         }
@@ -218,27 +245,117 @@ def simulate_card(cid: str):
                                            or (kind == "개선" and "심화" in narrative))
     if not narrative or wrong_direction or "예상" not in narrative or "가정" not in narrative:
         narrative = _fallback_narrative(result)
+    estimate_basis = {
+        1: "대상 지역·업종의 최근 3개월 가맹점당 평균",
+        2: "전 지역 동일 업종의 최근 3개월 가맹점당 평균",
+        3: "전 지역·전 업종의 최근 3개월 가맹점당 평균",
+    }[result["fallback_step"]]
+    max_change = max(abs(value) for value in result["delta_pp"])
+    effect_assessment = (
+        "미미" if kind in ("개선", "심화") and max_change <= 0.1 else kind
+    )
+    if kind == "미미" or max_change <= 0.1:
+        decision_note = (
+            "집중도 개선폭이 매우 작게 추정됩니다. 승인 전에 가맹 유치 비용·사업자 참여 의향·"
+            "예상 월 사용건수를 비교하고, 보류도 정상적인 선택지로 검토하세요."
+        )
+    elif kind == "심화":
+        decision_note = "집중 심화 가능성이 있어 현재 가정만으로는 승인을 권하지 않습니다."
+    elif kind == "혼재":
+        decision_note = "효과 방향이 불확실해 추가 데이터 없이 승인 근거로 사용하기 어렵습니다."
+    else:
+        decision_note = "예상 효과 범위와 가맹 유치 비용을 함께 비교한 뒤 승인 여부를 결정하세요."
     return {"simulation": {
         "current_index": result["current_index"],
         "projected_index": result["projected_index"],
         "delta_pp": result["delta_pp"],
+        "expected_monthly_count": result["expected_monthly_count"],
+        "expected_monthly_range": result["expected_monthly_range"],
+        "uncertainty_method": result["uncertainty_method"],
+        "estimate_basis": estimate_basis,
+        "base_month": result["base_month"],
+        "effect_assessment": effect_assessment,
+        "decision_note": decision_note,
         "narrative": narrative,
         "assumption_note": ASSUMPTION_NOTE,
     }}
 
 
 @router.post("/cards/{cid}/progress")
-def set_progress(cid: str, body: ProgressBody):
+def set_progress(
+    cid: str,
+    body: ProgressBody,
+    _authorized: None = Depends(security.require_mutation_access),
+):
     """추진 상태 변경 — approved 카드에서만 가능 (05 문서 §8).
 
     decision과 같은 순서: 404(없는 ID) → 400(body 값) → 409(상태 전이).
     """
     card = _get_or_404(cid)
-    if body.progress not in PROGRESSES:
-        raise HTTPException(status_code=400, detail="progress는 검토중|추진중|보류|완료 중 하나여야 합니다")
+    try:
+        updated, record, created = progress_records.record_progress(
+            card,
+            {
+                "progress": body.progress,
+                "idempotency_key": body.idempotency_key,
+                "note": None,
+                "metrics": {},
+            },
+            default_source="quick_status",
+        )
+    except progress_records.UnsupportedProgress as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from None
+    except progress_records.InvalidProgressRecord as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from None
+    except progress_records.TransitionNotAllowed as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from None
+    except progress_records.IdempotencyConflict as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from None
+    except db.ConcurrentUpdate:
+        raise HTTPException(status_code=409, detail="다른 요청이 먼저 추진 상태를 변경했습니다. 새로고침 후 다시 시도하세요") from None
+    return {"card": updated, "record": record, "created": created}
+
+
+@router.post("/cards/{cid}/verification")
+def set_verification(
+    cid: str,
+    body: VerificationBody,
+    _authorized: None = Depends(security.require_mutation_access),
+):
+    """가맹점 후보의 필수 적격성 5개 항목을 기록한다.
+
+    이 API는 가맹 확정을 만들지 않는다. 모든 항목이 충족되어야 이후 가맹 심사·추진·완료
+    상태로 이동할 수 있고, 하나라도 미충족이면 후보를 부적격으로 표시한다.
+    """
+    card = _get_or_404(cid)
+    if card.get("type") != "EXPANSION":
+        raise HTTPException(status_code=400, detail="후보 적격성 확인은 EXPANSION 카드에만 적용됩니다")
     if card.get("status") != "approved":
-        raise HTTPException(status_code=409, detail=f"승인된 카드만 추진 상태를 변경할 수 있습니다 (현재 status={card.get('status')})")
-    card["progress"] = body.progress
-    _log(card, f"progress:{body.progress}")
-    db.put_card(card)
-    return {"card": card}
+        raise HTTPException(status_code=409, detail="후보 접촉·검토를 시작한 카드만 적격성을 기록할 수 있습니다")
+
+    seen: set[str] = set()
+    raw_checks = []
+    for check in body.checks:
+        if check.label not in workflow.REQUIRED_ELIGIBILITY_CHECKS:
+            raise HTTPException(status_code=400, detail=f"지원하지 않는 적격성 항목입니다: {check.label}")
+        if check.status not in workflow.CHECK_STATUSES:
+            raise HTTPException(status_code=400, detail="check status는 unverified|verified|failed 중 하나여야 합니다")
+        if check.label in seen:
+            raise HTTPException(status_code=400, detail=f"중복 적격성 항목입니다: {check.label}")
+        seen.add(check.label)
+        raw_checks.append({"key": check.label, "label": check.label, "status": check.status})
+
+    checks = workflow.normalize_checks(raw_checks)
+    status = workflow.verification_status(checks)
+    failed = [check["label"] for check in checks if check["status"] == "failed"]
+    note = {
+        "verified": "필수 적격성 5개 항목을 모두 확인했습니다. 다음 단계는 가맹 심사이며, 아직 가맹 확정은 아닙니다",
+        "ineligible": f"미충족 항목: {', '.join(failed)}. 부적격 사유를 확인하고 보류 또는 반려를 결정하세요",
+        "unverified": "미확인 항목이 남아 있습니다. 가맹 심사·추진·완료 상태로 이동할 수 없습니다",
+    }[status]
+    verification = {"status": status, "checks": checks, "note": note}
+    try:
+        updated = db.update_verification(cid, verification, expected_version=card.get("version"))
+    except db.ConcurrentUpdate:
+        raise HTTPException(status_code=409, detail="다른 요청이 먼저 적격성 정보를 변경했습니다. 새로고침 후 다시 시도하세요") from None
+    return {"card": updated}

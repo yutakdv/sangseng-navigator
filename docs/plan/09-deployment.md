@@ -26,7 +26,8 @@ Parameters:
   AnthropicApiKey:  { Type: String, Default: '', NoEcho: true }
   # 무인증 공개 URL의 generate 엔드포인트가 호출마다 LLM을 부르므로 동시성 상한을 기본값으로 건다 (§5.5)
   ReservedConcurrency: { Type: Number, Default: 5 }   # -1이면 설정 자체를 생략(계정 동시성 한도가 낮아 배포 실패할 때)
-  AllowedOrigins:      { Type: String, Default: '*' }  # 앱 CORS 허용 도메인(콤마 구분). T17에서 Vercel 도메인으로 좁힌다
+  AllowedOrigins:      { Type: String, Default: 'https://configure-me.invalid' }
+  DemoReadOnly:        { Type: String, Default: 'true', AllowedValues: ['true', 'false'] }
 
 Conditions:
   HasReservedConcurrency: !Not [!Equals [!Ref ReservedConcurrency, '-1']]
@@ -42,11 +43,10 @@ Resources:
     Type: AWS::Serverless::HttpApi
     Properties:
       CorsConfiguration:
-        # 게이트웨이 CORS는 '*' 유지. 앱 레벨은 AllowedOrigins 파라미터로 따로 제어하며,
-        # T17에서 Vercel 도메인 확정 후 게이트웨이·앱 양쪽을 함께 좁힌다 (§5)
-        AllowOrigins: ['*']
+        # 게이트웨이와 앱이 같은 명시적 오리진 목록을 사용한다.
+        AllowOrigins: !Split [',', !Ref AllowedOrigins]
         AllowMethods: [GET, POST, OPTIONS]
-        AllowHeaders: ['*']
+        AllowHeaders: [Authorization, Content-Type, X-Request-ID]
 
   ApiFunction:
     Type: AWS::Serverless::Function
@@ -61,6 +61,7 @@ Resources:
           OPENAI_API_KEY: !Ref OpenAiApiKey
           ANTHROPIC_API_KEY: !Ref AnthropicApiKey
           ALLOWED_ORIGINS: !Ref AllowedOrigins
+          DEMO_READ_ONLY: !Ref DemoReadOnly
       Policies:
         - DynamoDBCrudPolicy: { TableName: !Ref CardsTable }
       Events:
@@ -99,8 +100,10 @@ rm -rf ../backend/app/data && cp -r ../data/processed ../backend/app/data
 PARAMS=("LlmProvider=${LLM_PROVIDER:-openai}")
 [ -n "${OPENAI_API_KEY:-}" ] && PARAMS+=("OpenAiApiKey=${OPENAI_API_KEY}")
 [ -n "${ANTHROPIC_API_KEY:-}" ] && PARAMS+=("AnthropicApiKey=${ANTHROPIC_API_KEY}")
-# 비우면 template의 Default가 먹는다 (AllowedOrigins='*', ReservedConcurrency=5)
+# 비우면 fail-safe Default가 적용된다
+# (AllowedOrigins='https://configure-me.invalid', DemoReadOnly='true', ReservedConcurrency=5)
 [ -n "${ALLOWED_ORIGINS:-}" ] && PARAMS+=("AllowedOrigins=${ALLOWED_ORIGINS}")
+[ -n "${DEMO_READ_ONLY:-}" ] && PARAMS+=("DemoReadOnly=${DEMO_READ_ONLY}")
 [ -n "${RESERVED_CONCURRENCY:-}" ] && PARAMS+=("ReservedConcurrency=${RESERVED_CONCURRENCY}")
 
 sam build -t template.yaml
@@ -116,8 +119,8 @@ aws cloudformation describe-stacks --stack-name sangseng-backend \
 ```
 
 - 스크립트가 `.env`에서 읽는 파라미터: `LLM_PROVIDER`·`OPENAI_API_KEY`·`ANTHROPIC_API_KEY`에 더해
-  **`ALLOWED_ORIGINS`(앱 CORS 허용 도메인, 콤마 구분)·`RESERVED_CONCURRENCY`**. 둘 다 비워 두면
-  template의 Default(`*` / `5`)가 그대로 적용된다 (§5·§5.5)
+  **`ALLOWED_ORIGINS`·`DEMO_READ_ONLY`·`RESERVED_CONCURRENCY`**. 오리진과 read-only를 비워 두면
+  각각 차단용 오리진과 `true`가 적용되어 공개 mutation이 열리지 않는다 (§5·§5.5)
 - `sam deploy`에는 `-t`를 주지 않는다 — `sam build` 산출물(`.aws-sam/build/template.yaml`)이 배포 대상이다
 - [ ] 최초 배포 후 Outputs의 `CardsTable` 값을 `.env`의 `CARDS_TABLE`에 반영 (로컬 BE도 같은 테이블 사용)
 - [ ] `python backend/seed_demo.py` 실행 — 데모 사례(추진중 카드 등) 시드
@@ -197,16 +200,18 @@ claude-sonnet-5 전환 시 $3/$15(인트로 $2/$10)로 수천 원 수준.
 
 그래서 template이 두 층을 **같은 파라미터 하나**로 묶는다: 게이트웨이는
 `AllowOrigins: !Split [',', !Ref AllowedOrigins]`, Lambda 환경변수는 `ALLOWED_ORIGINS: !Ref AllowedOrigins`.
-`AllowedOrigins`(기본 `'*'`) 하나만 바꾸면 두 층이 함께 움직인다. 앱 레벨 설정은 로컬 uvicorn·Docker처럼
+`AllowedOrigins`(기본 `https://configure-me.invalid`) 하나만 바꾸면 두 층이 함께 움직인다. 앱 레벨 설정은 로컬 uvicorn·Docker처럼
 게이트웨이를 거치지 않는 경로에서 의미가 있다.
 
-- [ ] `.env`에 `ALLOWED_ORIGINS=https://<project>.vercel.app,http://localhost:3000` 기입 →
+- [ ] `.env`에 실제 확정된 프론트 오리지만 `ALLOWED_ORIGINS=https://<확정-도메인>`으로 기입 →
       `./deploy-backend.sh` 재실행 (스크립트가 `AllowedOrigins` 파라미터로 넘겨 두 층을 함께 좁힌다)
-      - Vercel Preview URL도 쓸 거면 `https://*.vercel.app` 와일드카드는 HTTP API에서 안 되므로
-        Preview 도메인을 콤마로 명시 추가하거나 데모 기간엔 `*` 유지 판단
+      - Preview도 써야 하면 해당 Preview 오리진을 콤마로 명시한다. `*`는 사용하지 않는다
 - [ ] **검증:** 브라우저에서 Vercel 배포 URL로 정상 호출되는지 + 임의 오리진(로컬 파일 등)에서
-      차단되는지 확인. 차단이 안 되면 **게이트웨이 쪽이 아직 `*`인지부터** 본다
+      차단되는지 확인. 차단이 안 되면 게이트웨이 실제 설정부터 확인한다
       (`aws apigatewayv2 get-api --api-id <id> --query CorsConfiguration`)
+- [ ] 인증·RBAC가 구현되기 전까지 `.env`의 `DEMO_READ_ONLY=true`를 유지하고, health 응답의
+      `demo_read_only:true`를 확인한다. 실운영 mutation을 열 때는 공통 mutation dependency에 조직 사용자
+      인증과 역할 검사를 먼저 연결한 뒤에만 `false`로 전환한다
 - [ ] Billing 콘솔 $0 스크린샷 (발표 Q&A "운영 비용?" 대비)
 
 ## 5.5 심사 기간 운영 (제출 ~ 심사 종료, 상세: 12 문서 §5)

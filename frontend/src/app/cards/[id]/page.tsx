@@ -3,20 +3,23 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { AdminShell } from "@/components/AdminShell";
 import { AssumptionBadge, AssumptionNote, ProxyBadge } from "@/components/Badge";
+import { CandidateVerification } from "@/components/CandidateVerification";
 import { DecisionActions } from "@/components/DecisionActions";
+import { DeltaValue } from "@/components/DeltaValue";
 import { Icon } from "@/components/Icon";
 import { MapView } from "@/components/MapView";
 import { OriginalRankingTable } from "@/components/OriginalRankingTable";
+import { ProgressRecordTimeline } from "@/components/ProgressRecordTimeline";
+import { ProgressSelect } from "@/components/ProgressSelect";
 import { RankTrace } from "@/components/RankTrace";
 import { Section } from "@/components/Section";
 import { SimulateButton } from "@/components/SimulateButton";
-import { ProgressChip, StatusChip } from "@/components/StatusChip";
+import { WorkflowChip } from "@/components/StatusChip";
 import { BarRank } from "@/components/charts/BarRank";
 import { api } from "@/lib/api";
 import { ANCHOR, PRIMARY } from "@/lib/constants";
 import { ApiError } from "@/lib/errors";
-import { range } from "@/lib/format";
-import type { Candidate } from "@/types";
+import type { Candidate, Card } from "@/types";
 
 export const dynamic = "force-dynamic";
 
@@ -43,7 +46,7 @@ export default async function CardDetailPage({ params }: { params: Promise<{ id:
   // Next 15+ 에서 params·searchParams 는 Promise 다 — await 없이 접근하면 런타임 에러
   const { id } = await params;
 
-  const [dashboard, cand, card] = await Promise.all([
+  const [dashboard, cand, card, progressResult] = await Promise.all([
     api.dashboard(),
     api.candidates(),
     api
@@ -54,6 +57,12 @@ export default async function CardDetailPage({ params }: { params: Promise<{ id:
         if (error instanceof ApiError && error.status === 404) return undefined;
         throw error;
       }),
+    api.progressRecords(id).catch((error) => {
+      if (error instanceof ApiError && error.status === 404) {
+        return { records: [], next_cursor: null };
+      }
+      throw error;
+    }),
   ]);
 
   if (!card) notFound();
@@ -104,9 +113,36 @@ export default async function CardDetailPage({ params }: { params: Promise<{ id:
           제안 목록으로
         </Link>
 
+        <nav aria-label="카드 검토 순서" className="rounded-panel border border-admin-border bg-admin-surface p-2 shadow-card">
+          <ol className="grid grid-cols-2 gap-1 sm:grid-cols-4">
+            <ReviewStep
+              href={isExpansion ? "#diagnosis" : "#evidence"}
+              step="01"
+              label={isExpansion ? "지역 진단" : "근거 확인"}
+              note={isExpansion ? "왜 이 지역인가" : "정책 근거와 리스크"}
+            />
+            {isExpansion ? (
+              <ReviewStep href="#evidence" step="02" label="후보 비교" note="정량 순위와 중복 제외" />
+            ) : (
+              <ReviewStep href="#scenarios" step="02" label="옵션 비교" note="3·5·7% 시나리오" />
+            )}
+            {isExpansion ? (
+              <ReviewStep href="#location" step="03" label="위치·효과" note="반경 500m와 전환 가정" />
+            ) : (
+              <ReviewStep href="#evidence" step="03" label="리스크 확인" note="재원·약관·연동" />
+            )}
+            <ReviewStep
+              href={card.status === "pending" ? "#decision" : "#execution"}
+              step="04"
+              label={card.status === "pending" ? "담당자 결정" : "실행 기록"}
+              note={card.status === "pending" ? "검토 후 승인·보류·반려" : "적격성·심사·추진 관리"}
+            />
+          </ol>
+        </nav>
+
         {/* ── 카드 요약 + 결정 ─────────────────────────────────── */}
         <div className="u-panel overflow-hidden">
-          <div className="border-b border-admin-border bg-gradient-to-br from-admin-primary-soft/70 to-admin-surface p-4 sm:p-6">
+          <div className="border-b border-admin-border bg-admin-surface-sunken p-4 sm:p-6">
             <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
               <span className="rounded-md bg-admin-surface px-1.5 py-0.5 text-[11px] font-semibold tabular-nums text-admin-text-muted ring-1 ring-inset ring-admin-border">
                 {card.id}
@@ -114,8 +150,7 @@ export default async function CardDetailPage({ params }: { params: Promise<{ id:
               <span className="text-[11px] font-semibold uppercase tracking-[0.1em] text-admin-text-muted">
                 {isExpansion ? "가맹점 확충" : "페이백 인센티브"}
               </span>
-              <StatusChip status={card.status} />
-              {card.progress ? <ProgressChip progress={card.progress} /> : null}
+              <WorkflowChip card={card} />
             </div>
 
             <h1 className="mt-2 break-keep text-[22px] font-bold leading-8 tracking-[-0.01em] text-admin-text sm:text-[26px] sm:leading-9">
@@ -155,42 +190,112 @@ export default async function CardDetailPage({ params }: { params: Promise<{ id:
             {/* 정량 순위 병기 — 조정 여부와 무관하게 항상 노출 (절대 규칙 5) */}
             {showRank ? <RankTrace card={card} size="md" /> : null}
 
-            {card.status === "pending" ? (
-              <div className="rounded-xl bg-admin-surface-sunken p-4">
-                <p className="u-note mb-2.5 flex items-start gap-1.5">
-                  <Icon name="info" size={13} strokeWidth={2} className="mt-[3px]" />
-                  <span>
-                    AI는 후보 비교와 근거까지만 제시합니다. 아래 버튼을 거쳐야 카드가 확정되며, 이
-                    화면의 수치·문구는 담당자 의사결정 근거로 쓰입니다.
-                  </span>
-                </p>
-                <DecisionActions
-                  cardId={card.id}
-                  requireRate={card.type === "INCENTIVE"}
-                  selectedRate={card.selected_rate ?? null}
-                />
-                {card.type === "INCENTIVE" ? (
-                  <p className="u-note mt-2">
-                    페이백률(3·5·7%) 선택은{" "}
-                    <Link
-                      href="/incentive"
-                      className="font-semibold text-admin-primary underline-offset-4 hover:underline"
-                    >
-                      인센티브 정책 화면
-                    </Link>
-                    에서 합니다.
-                  </p>
-                ) : null}
-              </div>
+            {card.ai.grounding?.status === "verified" ? (
+              <p className="flex items-start gap-2 rounded-xl bg-state-good-bg px-3.5 py-3 text-xs leading-5 text-state-good ring-1 ring-inset ring-state-good-line">
+                <Icon name="check" size={14} strokeWidth={2} className="mt-0.5 shrink-0" />
+                서버가 정량 규칙으로 고른 대상과 화면의 후보명·Score·순위·추진 상태·도로 시간을
+                정본 데이터로 다시 검증했습니다. AI는 비정량 리스크 설명만 보조합니다.
+              </p>
             ) : null}
+
+            {isExpansion && card.status !== "pending" ? (
+              <>
+                <CandidateVerification
+                  cardId={card.id}
+                  verification={card.candidate_verification}
+                  editable={card.status === "approved"}
+                />
+                <OperationsSummary card={card} />
+              </>
+            ) : null}
+
+            {card.status === "approved" ? (
+              <section id="execution" aria-labelledby={`execution-${card.id}`} className="scroll-mt-24 rounded-xl border border-admin-primary-line bg-admin-primary-soft p-4">
+                <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+                  <div className="max-w-xl">
+                    <div className="flex items-center gap-2">
+                      <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-admin-primary text-white">
+                        <Icon name="workflow" size={16} />
+                      </span>
+                      <div>
+                        <h2 id={`execution-${card.id}`} className="text-sm font-bold text-admin-text">추진 상태 기록</h2>
+                        <p className="mt-0.5 text-[11px] leading-4 text-admin-text-muted">결정 이후의 적격성·심사·추진·완료 상태를 기록합니다.</p>
+                      </div>
+                    </div>
+                    <div className="mt-3 flex flex-wrap items-center gap-3">
+                      <Link
+                        href={`/tracking/new?card_id=${encodeURIComponent(card.id)}`}
+                        className="inline-flex min-h-9 items-center gap-1.5 rounded-xl bg-admin-primary px-3.5 py-2 text-xs font-bold text-white hover:bg-admin-primary-strong"
+                      >
+                        경과·실측값 입력 <Icon name="arrowRight" size={13} />
+                      </Link>
+                      <Link href="/tracking" className="inline-flex items-center gap-1 text-xs font-semibold text-admin-primary underline-offset-4 hover:underline">
+                        전체 리포트 보기 <Icon name="arrowRight" size={13} />
+                      </Link>
+                    </div>
+                  </div>
+                  <div className="w-full rounded-xl bg-admin-surface p-3 ring-1 ring-inset ring-admin-border sm:w-60">
+                    <ProgressSelect
+                      cardId={card.id}
+                      cardType={card.type}
+                      progress={card.progress}
+                      verificationStatus={card.candidate_verification?.status}
+                    />
+                  </div>
+                </div>
+              </section>
+            ) : null}
+
           </div>
         </div>
 
-        {/* ── AI 조정 근거 전문 ────────────────────────────────── */}
+        {card.status === "approved" ? (
+          <Section
+            id="progress-history"
+            icon="report"
+            title={`추진 경과 기록 · ${progressResult.records.length}건`}
+            desc="상태 변경 근거, 장애 요인, 다음 행동과 실제 관측 성과를 최신 기록부터 보여 줍니다. 빠른 상태 변경은 메모 없음으로 구분합니다."
+            right={
+              <Link
+                href={`/tracking/new?card_id=${encodeURIComponent(card.id)}`}
+                className="inline-flex min-h-9 items-center gap-1.5 rounded-xl bg-admin-primary px-3.5 py-2 text-xs font-bold text-white hover:bg-admin-primary-strong"
+              >
+                기록 입력 <Icon name="arrowRight" size={13} />
+              </Link>
+            }
+          >
+            <ProgressRecordTimeline records={progressResult.records} cardId={card.id} />
+            {progressResult.next_cursor ? (
+              <p className="u-note mt-3 border-t border-admin-border pt-3">
+                최신 50건을 표시했습니다. 이전 기록은 추후 페이지네이션으로 이어서 확인할 수 있습니다.
+              </p>
+            ) : null}
+          </Section>
+        ) : null}
+
+        {/* ── 1단계 진단 근거 ─────────────────────────────────── */}
+        {/* 전 지역 공통 카드(INCENTIVE)에는 "왜 이 지역인가"가 성립하지 않아 싣지 않는다 */}
+        {target && eupBars.length ? (
+          <Section
+            id="diagnosis"
+            icon="compass"
+            title="1단계 지역 진단 — 왜 이 지역인가"
+            desc="소비저조도·소비증감을 0~1로 정규화해 합산한 지역 스코어다. 후보 선정보다 한 단계 앞선 정량 근거이며, 순위는 화면에서 감추지 않는다."
+          >
+            <BarRank data={eupBars} colors={eupColors} height={200} />
+            <p className="u-note mt-3 border-t border-admin-border pt-2.5">
+              제안 대상 지역 {target.eup}만 진한 색으로 표시했다. 막대 길이는 지역 스코어이며, 값이
+              클수록 소비가 저조하거나 감소 폭이 크다는 뜻이다.
+            </p>
+          </Section>
+        ) : null}
+
+        {/* ── 결정론적 추천 근거와 보조 설명 ───────────────────── */}
         <Section
+          id="evidence"
           icon="sparkle"
-          title="AI 조정 근거"
-          desc="AI가 후보를 비교한 내용을 요약하지 않고 그대로 싣는다. 담당자가 판단 근거를 직접 확인할 수 있어야 하기 때문이다."
+          title="추천 근거와 리스크 설명"
+          desc="서버가 활성 업무가 없는 후보 중 정량 Score 최상위를 결정론적으로 선택합니다. AI는 비정량 리스크 설명만 보조하며, 숫자·순위·상태는 정본 데이터로 다시 검증합니다."
         >
           <div className="flex flex-col gap-4">
             <Block title="후보 비교">
@@ -253,7 +358,7 @@ export default async function CardDetailPage({ params }: { params: Promise<{ id:
           <Section
             icon="scale"
             title="원 Score 순위 (정량 기준)"
-            desc="2단계 후보 스코어의 원래 순위다. AI 제안 순위와 나란히 두어 조정 내역을 감출 수 없게 한다."
+            desc="2단계 후보 스코어의 원래 순위입니다. 활성 업무로 제외된 상위 후보와 최종 가용 후보 선택을 함께 보여 줍니다."
           >
             <OriginalRankingTable
               rows={card.ai.original_ranking}
@@ -268,6 +373,7 @@ export default async function CardDetailPage({ params }: { params: Promise<{ id:
         {/* ── 지도 ─────────────────────────────────────────────── */}
         {targetCandidate && target ? (
           <Section
+            id="location"
             icon="pin"
             title="후보 위치와 반경 500m"
             desc={`제안 후보를 중심으로 반경 500m를 그리고, ${target.eup}의 하이원포인트 가맹점을 업종 색으로 찍었다. 거점 마커는 후보까지의 거리·소요시간 기준점이다.`}
@@ -296,7 +402,7 @@ export default async function CardDetailPage({ params }: { params: Promise<{ id:
             <p className="u-note mt-3 border-t border-admin-border pt-2.5">
               {target.eup} 하이원포인트 가맹점 {eupMerchants.length}곳 (그중 {target.category}{" "}
               {sameCategoryMerchants}곳) · 후보 반경 500m 내 동일 업종 가맹점{" "}
-              {targetCandidate.nearby_merchants}곳 / 전체 상가 {targetCandidate.nearby_stores}곳.
+              {targetCandidate.nearby_merchants}곳 / 동일 업종 상가 {targetCandidate.nearby_same_category_stores}곳.
               지도 표기는 {ANCHOR.name} 기준이며, 지도 저작자 표시는 화면 오른쪽 아래에 있다.
             </p>
           </Section>
@@ -307,7 +413,7 @@ export default async function CardDetailPage({ params }: { params: Promise<{ id:
           <Section
             icon="store"
             title="후보 상세"
-            desc="같은 읍에서 업종별로 뽑힌 대표 후보다. 순서는 정량 Score 순이며, 도로 값으로 다시 정렬하지 않는다."
+            desc="선정 지역의 업종별 대표 후보입니다. 업종공백도는 반경 500m 내 동일 업종 상가를 분모로 베이지안 보정하며, 순서는 정량 Score 순이고 도로 값으로 다시 정렬하지 않습니다."
           >
             <div className="u-scroll-x">
               <table className="u-table min-w-[680px]">
@@ -318,7 +424,10 @@ export default async function CardDetailPage({ params }: { params: Promise<{ id:
                       Score
                     </th>
                     <th scope="col" className="text-right">
-                      업종공백도
+                      업종공백도 / 커버리지
+                    </th>
+                    <th scope="col" className="text-right">
+                      표본 신뢰도
                     </th>
                     <th scope="col" className="text-right">
                       동선근접도
@@ -327,7 +436,7 @@ export default async function CardDetailPage({ params }: { params: Promise<{ id:
                       기존가맹포화도
                     </th>
                     <th scope="col" className="text-right">
-                      반경 500m 내 (동일 업종 가맹점 / 전체 상가)
+                      반경 500m 내 (동일 업종 가맹점 / 동일 업종 상가)
                     </th>
                     <th scope="col">거점에서의 거리</th>
                   </tr>
@@ -358,7 +467,11 @@ export default async function CardDetailPage({ params }: { params: Promise<{ id:
                           {c.score.toFixed(2)}
                         </td>
                         <td className="text-right tabular-nums text-admin-text-muted">
-                          {c.gap.toFixed(2)}
+                          <span className="block font-semibold text-admin-text">{c.gap.toFixed(2)}</span>
+                          <span className="block text-[11px]">커버리지 {(c.market_coverage * 100).toFixed(0)}%</span>
+                        </td>
+                        <td className="text-right tabular-nums text-admin-text-muted">
+                          {(c.gap_confidence * 100).toFixed(0)}%
                         </td>
                         <td className="text-right tabular-nums text-admin-text-muted">
                           {c.proximity.toFixed(2)}
@@ -367,7 +480,7 @@ export default async function CardDetailPage({ params }: { params: Promise<{ id:
                           {c.saturation.toFixed(2)}
                         </td>
                         <td className="text-right tabular-nums text-admin-text-muted">
-                          {c.nearby_merchants}곳 / {c.nearby_stores}곳
+                          {c.nearby_merchants}곳 / {c.nearby_same_category_stores}곳
                         </td>
                         {/* 직선·도로를 항상 함께 적는다 — 한쪽만 쓰면 "가장 가깝다"는 오독이 생긴다 (05 §1) */}
                         <td className="whitespace-nowrap tabular-nums">{distanceText(c)}</td>
@@ -390,6 +503,7 @@ export default async function CardDetailPage({ params }: { params: Promise<{ id:
         {/* ── 가맹 전환 시 예상 효과 (EXPANSION 전용) ──────────── */}
         {card.type === "EXPANSION" ? (
           <Section
+            id="simulation"
             icon="trend"
             title="가맹 전환 시 예상 효과"
             badge={<AssumptionBadge />}
@@ -402,6 +516,7 @@ export default async function CardDetailPage({ params }: { params: Promise<{ id:
         {/* ── 인센티브 시나리오 (INCENTIVE 전용) ───────────────── */}
         {card.scenarios?.length ? (
           <Section
+            id="scenarios"
             icon="gift"
             title="페이백 시나리오 비교"
             badge={
@@ -437,7 +552,14 @@ export default async function CardDetailPage({ params }: { params: Promise<{ id:
                         ) : null}
                       </td>
                       {/* delta_pp는 소수 1자리 고정 — 저장소 왕복에서 1.0이 1로 돌아올 여지가 있다 (05 §2) */}
-                      <td className="tabular-nums">{range(s.delta_pp)}</td>
+                      <td>
+                        <DeltaValue
+                          value={s.delta_pp}
+                          unit="%p"
+                          variant="text"
+                          className="font-semibold"
+                        />
+                      </td>
                       <td className="text-admin-text-muted">{s.budget_note}</td>
                     </tr>
                   ))}
@@ -451,19 +573,38 @@ export default async function CardDetailPage({ params }: { params: Promise<{ id:
           </Section>
         ) : null}
 
-        {/* ── 1단계 진단 근거 ─────────────────────────────────── */}
-        {/* 전 지역 공통 카드(INCENTIVE)에는 "왜 이 지역인가"가 성립하지 않아 싣지 않는다 */}
-        {target && eupBars.length ? (
+        {card.status === "pending" ? (
           <Section
-            icon="compass"
-            title="1단계 지역 진단 — 왜 이 지역인가"
-            desc="소비저조도·소비증감을 0~1로 정규화해 합산한 지역 스코어다. 후보 선정보다 한 단계 앞선 정량 근거이며, 순위는 화면에서 감추지 않는다."
+            id="decision"
+            icon="check"
+            title="담당자 결정"
+            desc="앞의 근거·위치·효과를 확인한 뒤 결정합니다. AI는 후보와 근거만 제시하며 승인하지 않습니다."
           >
-            <BarRank data={eupBars} colors={eupColors} height={200} />
-            <p className="u-note mt-3 border-t border-admin-border pt-2.5">
-              제안 대상 지역 {target.eup}만 진한 색으로 표시했다. 막대 길이는 지역 스코어이며, 값이
-              클수록 소비가 저조하거나 감소 폭이 크다는 뜻이다.
-            </p>
+            <div className="rounded-xl bg-admin-primary-soft p-4 ring-1 ring-inset ring-admin-primary-line">
+              <p className="mb-3 flex items-start gap-2 text-[13px] leading-6 text-admin-text-soft">
+                <Icon name="info" size={14} strokeWidth={2} className="mt-1 shrink-0 text-admin-primary" />
+                <span>
+                  {card.type === "EXPANSION"
+                    ? "검토 시작은 가맹 확정이 아닙니다. 결정 후 정책 카드 관리에서 후보 적격성 5개 항목과 가맹 심사를 이어갑니다."
+                    : "확정 페이백률은 담당자가 고른 값만 저장되며, 완료 후에만 방문객 화면의 혜택 배지에 반영됩니다."}
+                </span>
+              </p>
+              <DecisionActions
+                cardId={card.id}
+                cardType={card.type}
+                requireRate={card.type === "INCENTIVE"}
+                selectedRate={card.selected_rate ?? null}
+              />
+              {card.type === "INCENTIVE" ? (
+                <p className="u-note mt-2">
+                  페이백률(3·5·7%) 선택은{" "}
+                  <Link href="/incentive" className="font-semibold text-admin-primary underline-offset-4 hover:underline">
+                    인센티브 정책 화면
+                  </Link>
+                  에서 합니다.
+                </p>
+              ) : null}
+            </div>
           </Section>
         ) : null}
 
@@ -503,6 +644,55 @@ export default async function CardDetailPage({ params }: { params: Promise<{ id:
   );
 }
 
+function ReviewStep({ href, step, label, note }: { href: string; step: string; label: string; note: string }) {
+  return (
+    <li>
+      <Link href={href} className="group flex min-h-[68px] items-center gap-3 rounded-2xl px-3 py-2.5 hover:bg-admin-primary-soft">
+        <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-admin-primary-soft text-xs font-bold text-admin-primary ring-1 ring-inset ring-admin-primary-line">
+          {step}
+        </span>
+        <span className="min-w-0">
+          <span className="block text-[13px] font-bold text-admin-text group-hover:text-admin-primary">{label}</span>
+          <span className="mt-0.5 block text-[10px] leading-4 text-admin-text-muted">{note}</span>
+        </span>
+      </Link>
+    </li>
+  );
+}
+
+function OperationsSummary({ card }: { card: Card }) {
+  const operations = card.operations;
+  const fields = [
+    ["담당자", operations?.owner],
+    ["목표일", operations?.target_date],
+    ["예상 비용", operations?.expected_cost],
+    ["접촉 결과", operations?.contact_result],
+    ["부적격 사유", operations?.ineligible_reason],
+    ["완료 후 실제 성과", operations?.actual_outcome],
+  ] as const;
+  return (
+    <section aria-labelledby={`operations-${card.id}`} className="border-t border-admin-border pt-4">
+      <div className="flex flex-wrap items-baseline justify-between gap-2">
+        <h2 id={`operations-${card.id}`} className="text-sm font-bold text-admin-text">운영 기록</h2>
+        <span className="u-note">예상 효과와 실제 성과를 분리해 기록합니다.</span>
+      </div>
+      <dl className="mt-3 grid grid-cols-1 border-y border-admin-border sm:grid-cols-2 lg:grid-cols-3">
+        {fields.map(([label, value], index) => (
+          <div
+            key={label}
+            className={`min-w-0 py-3 sm:px-3 ${index === 0 ? "sm:pl-0" : ""} ${index % 3 !== 2 ? "lg:border-r lg:border-admin-border" : ""}`}
+          >
+            <dt className="text-xs font-semibold text-admin-text-muted">{label}</dt>
+            <dd className={`mt-1 break-keep text-[13px] ${value ? "font-medium text-admin-text" : "text-admin-text-muted"}`}>
+              {value || "아직 입력되지 않음"}
+            </dd>
+          </div>
+        ))}
+      </dl>
+    </section>
+  );
+}
+
 function Block({ title, children }: { title: string; children: React.ReactNode }) {
   return (
     <div className="min-w-0">
@@ -537,7 +727,10 @@ function anchorKm(lat: number, lng: number): number {
  * 도로 값은 계약대로 소수 1자리 그대로 쓴다 (05 §1).
  */
 function distanceText(c: Candidate): string {
-  const straight = `직선 ${anchorKm(c.lat, c.lng).toFixed(2)}km`;
+  const canonicalStraight = Number.isFinite(c.straight_distance_km)
+    ? c.straight_distance_km
+    : anchorKm(c.lat, c.lng);
+  const straight = `직선 ${canonicalStraight.toFixed(2)}km`;
   if (c.road_distance_km === null && c.road_minutes === null) return `${straight} / 도로 —`;
   const km = c.road_distance_km === null ? "—" : `${c.road_distance_km.toFixed(1)}km`;
   const min = c.road_minutes === null ? "—" : `${c.road_minutes.toFixed(1)}분`;

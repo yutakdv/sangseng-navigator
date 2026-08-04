@@ -26,7 +26,7 @@ export function PageSkeleton({ variant = "page" }: { variant?: "hub" | "page" })
             <span className="h-9 w-9 shrink-0 rounded-xl bg-admin-primary" />
             <span>
               <span className="block text-[17px] font-bold leading-5 text-white">상생 나침반</span>
-              <span className="mt-0.5 block text-[11px] leading-4 text-white/45">
+              <span className="mt-0.5 block text-[11px] leading-4 text-white/50">
                 강원랜드 지역상생 의사결정 지원
               </span>
             </span>

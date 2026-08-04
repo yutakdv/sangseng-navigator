@@ -44,6 +44,15 @@ OSRM_ROUTE_URL = "https://router.project-osrm.org/route/v1/driving"
 ROAD_CACHE_PATH = RAW_DIR / "api_cache" / "road_routes.json"
 ROAD_TIMEOUT_S = 20
 
+# 풀의 최솟값/최댓값에 따라 같은 후보 점수가 바뀌지 않도록 고정 척도를 쓴다.
+PROXIMITY_SCALE_M = 20_000
+SATURATION_HALF_COUNT = 3
+GAP_PRIOR_ALPHA = 1
+GAP_PRIOR_BETA = 1
+GAP_RELIABLE_SAMPLE = 5
+MAX_CANDIDATES = 5
+MIN_RELATIVE_SCORE = 0.55
+
 
 def is_corporate(name: str) -> bool:
     """상호명에 법인격 표기가 있는가 (개인사업자 자격 필터 — 추정, CORPORATE_MARKERS 주석 참조)."""
@@ -58,6 +67,36 @@ def minmax01(values: list[float]) -> list[float]:
     return [(v - lo) / (hi - lo) for v in values]
 
 
+def _decline_scores(raw_declines: list[float]) -> list[float]:
+    """증가를 감소 신호로 보지 않고, 전 지역 무감소이면 감소 점수를 0으로 둔다."""
+    clipped = [max(0.0, value) for value in raw_declines]
+    return [0.0] * len(clipped) if max(clipped, default=0.0) == 0 else minmax01(clipped)
+
+
+def market_gap(nearby_same_category_stores: int, nearby_merchants: int) -> tuple[float, float]:
+    """동일 업종 상가 표본에서 (업종공백도, 가맹 커버리지)를 계산한다."""
+    if nearby_same_category_stores <= 0 or nearby_merchants < 0:
+        raise ValueError("상가 수는 양수, 가맹점 수는 0 이상이어야 합니다")
+    covered = min(nearby_merchants, nearby_same_category_stores)
+    coverage = ((covered + GAP_PRIOR_ALPHA)
+                / (nearby_same_category_stores + GAP_PRIOR_ALPHA + GAP_PRIOR_BETA))
+    return 1 - coverage, coverage
+
+
+def proximity_score(distance_m: float) -> float:
+    """후보 풀에 무관한 관광 거점 거리 감쇠 점수."""
+    if distance_m < 0:
+        raise ValueError("거리는 음수일 수 없습니다")
+    return 1 / (1 + distance_m / PROXIMITY_SCALE_M)
+
+
+def saturation_score(nearby_merchants: int) -> float:
+    """가맹점 수가 늘수록 1에 점근하는 고정 포화 점수."""
+    if nearby_merchants < 0:
+        raise ValueError("가맹점 수는 음수일 수 없습니다")
+    return nearby_merchants / (nearby_merchants + SATURATION_HALF_COUNT)
+
+
 # ---------------------------------------------------------------- 1단계 (읍 단위 집계 데이터만)
 def stage1_eup_ranking(usage: dict, weights: dict = EUP_WEIGHTS) -> list[dict]:
     """1단계 — 읍 우선순위. **읍 단위 집계 데이터만** 사용한다 (좌표 인자 없음).
@@ -69,7 +108,11 @@ def stage1_eup_ranking(usage: dict, weights: dict = EUP_WEIGHTS) -> list[dict]:
 
     weights 는 P8 민감도 분석(p8_sensitivity.py)이 격자 값을 주입하는 용도 — 기본값은 정본 상수다.
     """
-    months = usage["months"]
+    months = sorted(set(usage["months"]))
+    base_month = usage.get("base_month")
+    if base_month not in months:
+        raise SystemExit(f"P6 실패: base_month({base_month})가 months에 없음")
+    months = months[:months.index(base_month) + 1]
     if len(months) < 6:
         raise SystemExit(f"P6 실패: 월 {len(months)}개 — 분기 비교(6개월)가 불가")
     recent_m, prev_m = months[-3:], months[-6:-3]
@@ -88,13 +131,15 @@ def stage1_eup_ranking(usage: dict, weights: dict = EUP_WEIGHTS) -> list[dict]:
             raise SystemExit(f"P6 실패: {region} 전분기 건수 0 — 감소율 정의 불가")
 
     low = {r: min(1.0, max(0.0, 1 - recent[r] / mean_recent)) for r in REGIONS}
-    decline = dict(zip(REGIONS, minmax01([(prev[r] - recent[r]) / prev[r] for r in REGIONS])))
+    raw_decline = {r: (prev[r] - recent[r]) / prev[r] for r in REGIONS}
+    decline = dict(zip(REGIONS, _decline_scores([raw_decline[r] for r in REGIONS])))
     rows = [
         {"eup": r, "score": weights["v1"] * low[r] + weights["v2"] * decline[r],
-         "low_usage": low[r], "decline": decline[r], "recent_3m": recent[r], "prev_3m": prev[r]}
+         "low_usage": low[r], "decline": decline[r], "raw_decline_rate": raw_decline[r],
+         "recent_3m": recent[r], "prev_3m": prev[r]}
         for r in REGIONS
     ]
-    rows.sort(key=lambda x: -x["score"])
+    rows.sort(key=lambda x: (-x["score"], REGIONS.index(x["eup"])))
     for rank, row in enumerate(rows, 1):
         row["rank"] = rank
     print(f"  1단계: 최근 3개월 {recent_m[0]}~{recent_m[-1]} vs 전분기 {prev_m[0]}~{prev_m[-1]} "
@@ -165,19 +210,25 @@ def stage2_candidates(eups_by_rank: list[str], select_n: int = SELECT_EUPS,
                       weights: dict = CAND_WEIGHTS) -> tuple[list[dict], list[str]]:
     """2단계 — 후보 지점. **좌표 데이터만** 사용한다 (usage_monthly 인자 없음).
 
-    업종공백도    = 1 − (반경 500m 내 동일 표시 업종 하이원 가맹점 수 / 반경 내 소진공 전체 상가 수)
-    관광동선근접도 = (1 / ANCHOR 까지 거리 m) 를 후보군 내 0~1 min-max
-    기존가맹포화도 = 반경 내 동일 표시 업종 하이원 가맹점 수를 후보군 내 0~1 min-max
+    업종공백도    = 1 − 베이지안 보정 가맹 커버리지. 분모는 반경 500m 내 **동일 표시 업종** 상가다.
+                    Beta(1,1) 사전분포로 표본 1~2곳의 0/100% 극단값을 완화한다.
+    관광동선근접도 = 1 / (1 + 직선거리/20km) 고정 감쇠 (후보 풀에 무관)
+    기존가맹포화도 = 가맹점수 / (가맹점수+3) 고정 포화 함수 (후보 풀에 무관)
     후보Score    = (1/3)×업종공백도 + (1/3)×관광동선근접도 − (1/3)×기존가맹포화도 (CAND_WEIGHTS)
-    업종별 최고점 상가 = 그 업종의 대표 후보 → 전 업종 대표 후보 Score 내림차순 상위 5개.
+    지역×업종별 최고점 상가를 만든 뒤, 선정 읍을 우선 한 곳씩 포함하고 품질 기준(최고점의 55%)을
+    통과한 업종 대표를 채운다. 최대 5개이며 품질 미달 업종을 억지로 채우지 않는다.
     후보 풀에서 **법인 추정 상호는 제외**한다 (상시모집 자격=개인사업자, CORPORATE_MARKERS 주석).
-    반경 분모(nearby_stores)는 그대로 전체 상가를 세므로 산식 자체는 바뀌지 않는다.
     반환: (candidates 배열, 실제 사용한 읍 목록 — 후보 0개면 차순위 읍 자동 재시도로 늘어날 수 있음)
 
     weights 는 P8 민감도 분석(p8_sensitivity.py)이 격자 값을 주입하는 용도 — 기본값은 정본 상수다.
     """
     # 반경 분모·가맹점 수는 수집분 전체에서 센다 — 읍 경계에 걸친 반경이 이웃 지역 상가를 놓치지 않게
-    count_stores = _radius_counter([s for region in REGIONS for s in load_stores(region)])
+    all_stores = [s for region in REGIONS for s in load_stores(region)]
+    count_stores = _radius_counter(all_stores)
+    count_category_stores = {
+        cat: _radius_counter([s for s in all_stores if store_display_category(s) == cat])
+        for cat in CANDIDATE_CATEGORIES
+    }
     merchants = json.loads((PROCESSED_DIR / "merchants.json").read_text(encoding="utf-8"))
     count_merchants = {
         cat: _radius_counter([m for m in merchants if m["category"] == cat])
@@ -196,7 +247,8 @@ def stage2_candidates(eups_by_rank: list[str], select_n: int = SELECT_EUPS,
                     corporate.append(f"{eup} {s['name']}")
                     continue
                 pool.append({"eup": eup, "category": cat, "name": s["name"],
-                             "lat": s["lat"], "lng": s["lng"]})
+                             "lat": s["lat"], "lng": s["lng"],
+                             "lcls": s.get("lcls"), "mcls": s.get("mcls"), "scls": s.get("scls")})
         if pool or not queue:
             break
         nxt = queue.pop(0)
@@ -217,31 +269,101 @@ def stage2_candidates(eups_by_rank: list[str], select_n: int = SELECT_EUPS,
         if dist == 0:
             raise SystemExit(f"P6 실패: {c['name']} 좌표가 ANCHOR와 동일 — 근접도(1/거리) 정의 불가")
         nearby_merchants = count_merchants[c["category"]](c["lat"], c["lng"])
-        c.update(nearby_stores=nearby_stores, nearby_merchants=nearby_merchants,
-                 gap=1 - nearby_merchants / nearby_stores, inv_dist=1 / dist)
+        nearby_same_category_stores = count_category_stores[c["category"]](c["lat"], c["lng"])
+        if nearby_same_category_stores == 0:
+            print(f"  [drop] {c['eup']} {c['name']}: 반경 동일 표시 업종 상가 0곳")
+            continue
+        # 서로 다른 원천의 위치/상호 매칭 오차로 가맹점 수가 상가 수를 넘으면 커버리지만 100%로
+        # 제한하고 원시 수치는 그대로 남겨 데이터 품질을 숨기지 않는다.
+        gap, coverage = market_gap(nearby_same_category_stores, nearby_merchants)
+        proximity = proximity_score(dist)
+        saturation = saturation_score(nearby_merchants)
+        c.update(
+            nearby_stores=nearby_stores,
+            nearby_same_category_stores=nearby_same_category_stores,
+            nearby_merchants=nearby_merchants,
+            market_coverage=coverage,
+            gap=gap,
+            gap_confidence=min(1.0, nearby_same_category_stores / GAP_RELIABLE_SAMPLE),
+            straight_distance_m=dist,
+            proximity=proximity,
+            saturation=saturation,
+        )
         kept.append(c)
     if not kept:
         raise SystemExit("P6 실패: 반경 내 상가 가드로 후보가 전부 제외됨")
 
-    for c, prox, sat in zip(kept, minmax01([c["inv_dist"] for c in kept]),
-                            minmax01([c["nearby_merchants"] for c in kept])):
-        c["proximity"], c["saturation"] = prox, sat
-        c["score"] = weights["w1"] * c["gap"] + weights["w2"] * prox - weights["w3"] * sat
-
-    best: dict[str, dict] = {}  # 업종별 최고점 상가 = 그 업종의 대표 후보
     for c in kept:
-        if c["category"] not in best or c["score"] > best[c["category"]]["score"]:
-            best[c["category"]] = c
-    top = sorted(best.values(), key=lambda c: -c["score"])[:5]
+        c["score"] = (weights["w1"] * c["gap"] + weights["w2"] * c["proximity"]
+                      - weights["w3"] * c["saturation"])
+
+    # 지역×업종 대표를 먼저 만들면 한 지역의 동일 업종 상가가 후보 슬롯을 독점하지 않는다.
+    best: dict[tuple[str, str], dict] = {}
+    for c in kept:
+        key = (c["eup"], c["category"])
+        current = best.get(key)
+        if (current is None or c["score"] > current["score"]
+                or (c["score"] == current["score"] and c["name"] < current["name"])):
+            best[key] = c
+    representatives = sorted(best.values(), key=lambda c: (-c["score"], c["eup"], c["category"], c["name"]))
+    best_score = representatives[0]["score"]
+    # 음수 점수에서 단순 곱셈을 쓰면 기준선이 최고점보다 커져 최고 후보마저 탈락한다.
+    quality_floor = (best_score * MIN_RELATIVE_SCORE if best_score >= 0
+                     else best_score / MIN_RELATIVE_SCORE)
+    qualified = [c for c in representatives if c["score"] >= quality_floor]
+
+    selected: list[dict] = []
+    selected_categories: set[str] = set()
+    region_counts = dict.fromkeys(used, 0)
+    represented_regions = [eup for eup in used if any(c["eup"] == eup for c in qualified)]
+    region_cap = ((MAX_CANDIDATES + len(represented_regions) - 1) // len(represented_regions)
+                  if represented_regions else MAX_CANDIDATES)
+    # 선정된 각 읍에 실제 후보가 있으면 우선 1곳씩 배정한다. 같은 업종 중복은 피한다.
+    for eup in used:
+        choice = next((c for c in qualified
+                       if c["eup"] == eup and c["category"] not in selected_categories), None)
+        if choice is not None:
+            choice["selection_basis"] = "selected_region_coverage"
+            selected.append(choice)
+            selected_categories.add(choice["category"])
+            region_counts[eup] += 1
+    for c in qualified:
+        if len(selected) >= MAX_CANDIDATES:
+            break
+        if c["category"] in selected_categories or region_counts.get(c["eup"], 0) >= region_cap:
+            continue
+        c["selection_basis"] = "quantitative_score"
+        selected.append(c)
+        selected_categories.add(c["category"])
+        region_counts[c["eup"]] = region_counts.get(c["eup"], 0) + 1
+    # 업종 중복 없이 슬롯이 남을 때만 지역 상한을 풀어 후보 수를 보충한다.
+    for c in qualified:
+        if len(selected) >= MAX_CANDIDATES:
+            break
+        if c["category"] in selected_categories:
+            continue
+        c["selection_basis"] = "score_fill_after_region_cap"
+        selected.append(c)
+        selected_categories.add(c["category"])
+        region_counts[c["eup"]] = region_counts.get(c["eup"], 0) + 1
+    top = sorted(selected, key=lambda c: (-c["score"], c["eup"], c["category"], c["name"]))
 
     dist_line = " / ".join(
         f"{cat} {sum(1 for c in kept if c['category'] == cat)}" for cat in CANDIDATE_CATEGORIES)
-    print(f"  2단계: 후보 풀 {len(kept)}개 ({dist_line}) → 업종 대표 {len(top)}개")
+    print(f"  2단계: 후보 풀 {len(kept)}개 ({dist_line}) → 지역×업종 대표 {len(representatives)}개 "
+          f"→ 품질 기준 {quality_floor:.3f} 이상·지역 배분 후보 {len(top)}개")
     candidates = [
         {"id": f"CAND-{i:03d}", "eup": c["eup"], "category": c["category"], "name": c["name"],
          "lat": c["lat"], "lng": c["lng"], "score": round(c["score"], 2), "gap": round(c["gap"], 2),
          "proximity": round(c["proximity"], 2), "saturation": round(c["saturation"], 2),
-         "nearby_stores": c["nearby_stores"], "nearby_merchants": c["nearby_merchants"]}
+         "market_coverage": round(c["market_coverage"], 2),
+         "gap_confidence": round(c["gap_confidence"], 2),
+         "nearby_stores": c["nearby_stores"],
+         "nearby_same_category_stores": c["nearby_same_category_stores"],
+         "nearby_merchants": c["nearby_merchants"],
+         "straight_distance_km": round(c["straight_distance_m"] / 1000, 2),
+         "selection_basis": c["selection_basis"],
+         "source_category": {"large": c["lcls"], "middle": c["mcls"], "small": c["scls"]}}
         for i, c in enumerate(top, 1)
     ]
     return candidates, used
@@ -280,7 +402,8 @@ def main() -> None:
         "base_month": usage["base_month"],
         "eup_ranking": [
             {"rank": r["rank"], "eup": r["eup"], "score": round(r["score"], 2),
-             "low_usage": round(r["low_usage"], 2), "decline": round(r["decline"], 2)}
+             "low_usage": round(r["low_usage"], 2), "decline": round(r["decline"], 2),
+             "raw_decline_rate": round(r["raw_decline_rate"], 4)}
             for r in ranking
         ],
         "selected_eups": selected,
@@ -301,7 +424,8 @@ def main() -> None:
                 else f"도로 {c['road_distance_km']}km·{c['road_minutes']}분")
         print(f"  {c['id']} {c['eup']} {c['category']:<3} {c['name']} score {c['score']:.2f} "
               f"(공백 {c['gap']:.2f} · 근접 {c['proximity']:.2f} · 포화 {c['saturation']:.2f} · "
-              f"반경상가 {c['nearby_stores']} · 동일업종가맹 {c['nearby_merchants']} · "
+              f"반경상가 {c['nearby_stores']} · 동일업종상가 {c['nearby_same_category_stores']} · "
+              f"동일업종가맹 {c['nearby_merchants']} · "
               f"직선 {haversine_m(ANCHOR['lat'], ANCHOR['lng'], c['lat'], c['lng']) / 1000:.2f}km · {road})")
     verify(eup_scores, candidates)
 

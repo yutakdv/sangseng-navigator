@@ -24,10 +24,10 @@ Next.js 16(App Router · TypeScript · React 18 · Tailwind 3). 배포는 **Verc
 ### Docker (권장 — 레포 루트에서)
 
 ```bash
-docker compose up -d               # FE(3000) + BE(8000) + DynamoDB(8001) + 데모 카드 시드
+docker compose up -d               # FE(3100) + BE(8000) + DynamoDB(8001) + 데모 카드 시드
 docker compose logs -f frontend
 
-FRONTEND_PORT=3100 docker compose up -d    # 호스트 3000번이 이미 쓰일 때
+FRONTEND_PORT=3200 docker compose up -d    # 3100번을 다른 용도로 써야 할 때
 FRONTEND_API_BASE= docker compose up -d frontend   # FE만 mock 모드로 (BE 불필요)
 ```
 
@@ -38,7 +38,7 @@ FRONTEND_API_BASE= docker compose up -d frontend   # FE만 mock 모드로 (BE �
 
 ```bash
 npm install
-npm run dev        # http://localhost:3000
+npm run dev        # http://localhost:3100
 npm run build      # 빌드 검증 (Vercel과 같은 조건)
 npm run lint       # eslint . (ESLint 9 flat config)
 npm run check:banned   # 금칙어 검사 (13 §9)
@@ -147,8 +147,8 @@ src/
 ## 남은 일 / 알려진 제약
 
 - **F3·F4·F6·F8 화면** — 자리표시자에 "이미 연결된 데이터"와 "남은 작업"을 적어 뒀다.
-- **지도(MapLibre GL)** — `maplibre-gl`은 설치돼 있지만 아직 컴포넌트가 없다. F4에서
-  `"use client"` + `next/dynamic(ssr:false)`로 만들고 `maplibre-gl/dist/maplibre-gl.css`를 import 한다.
+- **지도** — 카드 상세(F4)는 MapLibre GL + OpenFreeMap을 사용하고, 방문객 위젯(F7)은 Kakao Maps JS를
+  우선 사용한다. Kakao 키·도메인이 준비되지 않은 환경에서는 좌표 기반 지도형 fallback과 길찾기 링크를 보인다.
 - **로딩·에러 상태** — F9 항목. Lambda 콜드스타트 1~3초를 "고장"으로 오인하지 않게
   스켈레톤 + 재시도 UI가 필요하다.
 - **모바일 실기기 확인** — 390px 뷰포트 기준으로 짰지만(모바일 프레임·`overflow-x-auto` 표 래퍼·

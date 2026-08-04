@@ -170,8 +170,8 @@ Tailwind 설정(`tailwind.config.ts` theme.extend.colors)에 아래 이름으로
 - 거점 마커 라벨은 `ANCHOR.name`("강원랜드 카지노(하이원리조트)") — "정문" 표기는 근거가 없어 폐기됨
 - `가정 기반 전망이며 실제와 다를 수 있음`: 시뮬레이션·예상 효과·페이백 시나리오 출력 **블록마다** 고정
 - AI 조정 표시: `Score 2위 → AI 제안 1위` 병기 형식 고정 — 원 순위를 시각적으로 숨기지 않는다
-- 푸터 (전 화면): "데이터: 공공데이터포털(강원랜드·소상공인시장진흥공단)·국세청 | 지도: © OpenStreetMap
-  contributors, OpenFreeMap | 데이터 기준: {period_note}"
+- 푸터: 관리자·카드 상세는 "지도: © OpenStreetMap contributors, OpenFreeMap", 방문객 위젯은
+  "지도: © Kakao Maps"를 사용한다. 데이터 출처와 데이터 기준은 모든 화면에 고정 표기한다.
 - 금칙어 grep 체크(F2 검증 항목): `지니`, `Gini`, `HHI`, `실행하겠습니다` — UI 문자열에 존재 금지
 
 ## 10. 05 계약 변경 후보 (FE 시안 확정 시 — 절차: 05 수정 → `scripts/sync-mocks.sh` 재실행 → 팀 공유 → 코드)

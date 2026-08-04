@@ -8,10 +8,11 @@ import { SOURCE_NOTE } from "@/lib/constants";
  */
 export function Footer({ periodNote }: { periodNote?: string }) {
   return (
-    <footer className="mt-2 border-t border-admin-border px-4 py-5 sm:px-6">
+    <footer id="sources" className="mt-2 scroll-mt-28 border-t border-admin-border px-4 py-5 sm:px-6">
       <div className="flex flex-wrap items-start gap-x-2.5 gap-y-1.5 text-xs leading-5 text-admin-text-muted">
         <Icon name="database" size={14} className="mt-0.5" />
         <div className="min-w-0 break-keep">
+          <p className="font-semibold text-admin-text">데이터 관리 · 출처와 기준</p>
           <p>{SOURCE_NOTE}</p>
           {periodNote ? (
             <p className="mt-0.5">

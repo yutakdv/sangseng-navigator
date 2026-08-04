@@ -1,115 +1,121 @@
 import type { ReactNode } from "react";
+import Image from "next/image";
 import Link from "next/link";
-import { ProxyBadge } from "@/components/Badge";
 import { Footer } from "@/components/Footer";
-import { Icon } from "@/components/Icon";
 import { SideNav } from "@/components/SideNav";
-import { isMockMode } from "@/lib/api";
-import { pct } from "@/lib/format";
 import type { Dashboard } from "@/types";
+import { dataFreshness } from "@/lib/dataFreshness";
 
 /**
  * 담당자 화면 공통 레이아웃 (docs/plan/08 F2 · 13 §3).
- * - 상단 고정 헤더에 "이번 분기 지역 전환율 X% [근사 지표]" 헤드라인 — 전 화면 공통
+ * - 상세 화면은 데이터 기준 헤더를 제공하고, 홈은 핵심 KPI를 최상단에 바로 배치
  * - 사이드바는 lg 미만에서 상단 가로 네비로 전환 (13 §8 반응형 최소선)
  * - 푸터에 데이터 출처·기준 고정 표기
  *
- * 헤더가 16px 한 줄 + 11px 각주 한 줄이던 것을, 값(28px)과 라벨을 분리해 **화면 어디서나
- * 이번 분기 지표가 먼저 읽히게** 했다. `근사 지표` 배지와 `proxy_note` 전문은 그대로 유지한다
- * (절대 규칙 2 — 배지·주석은 줄이거나 요약하지 않는다).
+ * 홈의 KPI와 상세 화면의 데이터 기준이 역할을 나누므로, 같은 수치를 상단에 반복하지 않는다.
  */
 export function AdminShell({
   dashboard,
   children,
+  hideSummary = false,
+  hideFreshnessBanner = false,
 }: {
   dashboard: Dashboard;
   children: ReactNode;
+  /** 홈은 핵심 KPI가 이 역할을 하므로 상단 전환율 요약을 중복으로 두지 않는다. */
+  hideSummary?: boolean;
+  /** 홈은 KPI의 데이터 기준 셀로 경고를 합쳐 중복 경고를 피한다. */
+  hideFreshnessBanner?: boolean;
 }) {
-  const { conversion, period_note } = dashboard;
+  const { period_note } = dashboard;
+  const freshness = dataFreshness(period_note);
 
   return (
-    <div className="min-h-screen bg-admin-bg lg:flex">
-      <aside className="bg-gradient-to-b from-admin-sidebar to-admin-sidebar-deep lg:sticky lg:top-0 lg:flex lg:h-screen lg:w-[228px] lg:shrink-0 lg:flex-col">
-        <div className="hidden px-5 pb-2 pt-6 lg:block">
-          <Link href="/" className="flex items-center gap-2.5">
-            <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-admin-primary text-white shadow-[0_4px_14px_-4px_rgb(79_70_229)]">
-              <Icon name="compass" size={20} />
+    <div className="min-h-screen bg-admin-bg">
+      <a
+        href="#main-content"
+        className="fixed left-3 top-3 z-[60] -translate-y-20 rounded-lg bg-white px-3 py-2 text-sm font-bold text-admin-sidebar shadow-lg transition-transform focus:translate-y-0"
+      >
+        본문 바로가기
+      </a>
+      <aside className="relative overflow-hidden border-b border-white/10 bg-admin-sidebar lg:fixed lg:inset-y-0 lg:left-0 lg:z-40 lg:flex lg:h-dvh lg:w-[272px] lg:flex-col lg:border-b-0 lg:border-r">
+        <div aria-hidden className="pointer-events-none absolute -right-24 -top-24 h-72 w-72 rounded-full bg-white/[0.05] blur-3xl" />
+        <div className="relative flex items-center justify-between border-b border-white/10 px-4 py-3 lg:hidden">
+          <Link href="/" className="flex items-center gap-2.5 text-sm font-bold text-white">
+            <span className="flex h-9 w-9 items-center justify-center overflow-hidden rounded-xl bg-[#f2a86f] shadow-lg shadow-black/10">
+              <Image src="/brand/sangseng-navigator-mark.svg" alt="" width={36} height={36} priority />
             </span>
-            <span className="min-w-0">
-              <span className="block text-[17px] font-bold leading-5 text-white">상생 나침반</span>
-              <span className="mt-0.5 block text-[11px] leading-4 text-white/45">
-                강원랜드 지역상생 의사결정 지원
-              </span>
-            </span>
+            상생 나침반
           </Link>
+          <span className="rounded-full bg-white/10 px-2.5 py-1 text-[10px] font-semibold tracking-wide text-white/70">DECISION OS</span>
         </div>
 
-        <div className="lg:min-h-0 lg:flex-1 lg:overflow-y-auto">
+        <div className="relative hidden px-6 pb-5 pt-7 lg:block">
+          <Link href="/" className="flex items-center gap-3">
+            <span className="flex h-11 w-11 shrink-0 items-center justify-center overflow-hidden rounded-2xl bg-[#f2a86f] shadow-lg shadow-black/10">
+              <Image src="/brand/sangseng-navigator-mark.svg" alt="상생 나침반" width={44} height={44} priority />
+            </span>
+            <span className="min-w-0">
+              <span className="block text-[18px] font-bold tracking-[-0.02em] text-white">상생 나침반</span>
+              <span className="mt-0.5 block text-[11px] leading-4 text-white/50">지역상생 Decision OS</span>
+            </span>
+          </Link>
+          <p className="mt-6 max-w-[210px] text-xs leading-5 text-white/60">
+            데이터에서 실행까지, 담당자의 판단이 끊기지 않도록 연결합니다.
+          </p>
+        </div>
+
+        <div className="relative lg:flex lg:min-h-0 lg:flex-1 lg:flex-col">
           <SideNav />
         </div>
 
-        <div className="hidden px-5 pb-5 pt-3 lg:block">
-          <div className="flex items-center gap-2.5 rounded-xl bg-white/[0.06] px-3 py-2.5">
-            <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-white/10 text-[11px] font-bold text-white/80">
-              김
-            </span>
-            <span className="min-w-0 text-[11px] leading-4 text-white/60">
-              <span className="block font-semibold text-white/85">지역상생팀 김담당</span>
-              가상 페르소나 · 로그인 없음
-            </span>
+        <div className="relative hidden px-5 pb-5 pt-3 lg:block">
+          <div className="rounded-2xl border border-white/10 bg-white/[0.06] p-3.5">
+            <div className="flex items-center gap-3">
+              <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-white/10 text-xs font-bold text-white">김</span>
+              <span className="min-w-0 text-[11px] leading-4 text-white/60">
+                <span className="block font-semibold text-white/90">지역상생팀 김담당</span>
+                오늘 결정 대기 항목 확인
+              </span>
+            </div>
           </div>
         </div>
       </aside>
 
-      <div className="flex min-w-0 flex-1 flex-col">
-        <header className="sticky top-0 z-20 border-b border-admin-border bg-admin-surface/90 px-4 py-3 shadow-header backdrop-blur-md sm:px-6">
-          <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
-            <Link
-              href="/"
-              className="flex items-center gap-2 text-sm font-bold text-admin-text lg:hidden"
+      <div className="flex min-w-0 flex-1 flex-col lg:min-h-screen lg:pl-[272px]">
+        {!hideSummary ? (
+          <header className="sticky top-0 z-20 border-b border-admin-border/80 bg-admin-bg/90 px-4 py-3 backdrop-blur-xl sm:px-6 xl:px-8">
+            <div className="mx-auto flex max-w-[1500px] items-center gap-3">
+              <Link href="/" className="text-sm font-bold text-admin-text lg:hidden">상생 나침반</Link>
+              <span className="hidden text-xs font-semibold text-admin-text-muted lg:inline">지역상생 운영 콘솔</span>
+              <span
+                className={`ml-auto inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-semibold ${
+                  freshness.isStale
+                    ? "border-state-warn-line bg-state-warn-bg text-state-warn"
+                    : "border-admin-primary-line bg-admin-primary-soft text-admin-primary"
+                }`}
+              >
+                <span className={`h-1.5 w-1.5 rounded-full ${freshness.isStale ? "bg-state-warn" : "bg-admin-primary"}`} />
+                {freshness.label}
+              </span>
+            </div>
+          </header>
+        ) : null}
+
+        <main id="main-content" className={`min-w-0 flex-1 px-4 sm:px-6 xl:px-9 ${hideSummary ? "py-5 sm:py-7" : "py-6 sm:py-8"}`}>
+          {freshness.isStale && !hideFreshnessBanner ? (
+            <section
+              role="status"
+              aria-label="데이터 신선도 경고"
+              className="mx-auto mb-5 flex max-w-[1500px] items-start gap-2.5 rounded-2xl border border-state-warn-line bg-state-warn-bg px-4 py-3 text-xs leading-5 text-state-warn"
             >
-              <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-admin-primary text-white">
-                <Icon name="compass" size={16} />
-              </span>
-              상생 나침반
-            </Link>
-
-            <div className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1">
-              <h1 className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
-                <span className="text-[13px] font-medium text-admin-text-muted">
-                  이번 분기 지역 전환율
-                </span>
-                <span className="text-[28px] font-bold leading-8 tracking-[-0.02em] tabular-nums text-admin-primary">
-                  {pct(conversion.headline_rate)}
-                </span>
-              </h1>
-              {conversion.is_proxy ? <ProxyBadge note={conversion.proxy_note} /> : null}
-            </div>
-
-            <div className="ml-auto flex flex-wrap items-center gap-2">
-              <span className="hidden items-center gap-1.5 rounded-full bg-admin-surface-sunken px-2.5 py-1 text-xs font-medium text-admin-text-muted sm:inline-flex">
-                <Icon name="database" size={13} />
-                데이터 기준 {period_note}
-              </span>
-              {isMockMode ? (
-                <span
-                  className="inline-flex items-center gap-1 rounded-full bg-state-notice-bg px-2.5 py-1 text-xs font-semibold text-state-notice ring-1 ring-inset ring-state-notice-line"
-                  title="NEXT_PUBLIC_API_BASE 미설정 — src/mocks/의 정적 데이터로 렌더 중"
-                >
-                  <Icon name="info" size={12} strokeWidth={2} />
-                  mock 모드
-                </span>
-              ) : null}
-            </div>
-          </div>
-          {/* 절대 규칙 2 — proxy_note는 요약하지 않고 그대로 노출한다 */}
-          <p className="mt-1.5 break-keep text-xs leading-5 text-admin-text-muted">
-            {conversion.proxy_note}
-          </p>
-        </header>
-
-        {/* 허브는 1600px까지 열리는 화면이라 큰 뷰포트에서 좌우 여백을 한 단계 더 준다 (13 §8) */}
-        <main className="min-w-0 flex-1 px-4 py-6 sm:px-6 sm:py-7 2xl:px-10 2xl:py-9">
+              <span aria-hidden className="mt-0.5">⚠</span>
+              <p>
+                <b>{freshness.label}</b> — 현재 결과는 데모·사전 검토용입니다. 실제 결정 전 최신 사용현황과
+                가맹점 영업 상태를 갱신해 다시 계산하세요. 기준: {period_note}
+              </p>
+            </section>
+          ) : null}
           {children}
         </main>
         <Footer periodNote={period_note} />

@@ -2,7 +2,9 @@
 
 import { useState, useTransition } from "react";
 import { decideAction } from "@/app/actions";
-import type { CardStatus, PaybackRate } from "@/types";
+import { decisionPrimaryLabel } from "@/lib/cardWorkflow";
+import { isDemoReadOnly } from "@/lib/runtime";
+import type { CardStatus, CardType, PaybackRate } from "@/types";
 
 /**
  * 승인/반려/보류 버튼 묶음 (docs/plan/08 F3·F6).
@@ -16,12 +18,12 @@ const DECISIONS: { value: CardStatus; label: string; tone: string }[] = [
   {
     value: "approved",
     label: "승인",
-    tone: "bg-admin-primary text-white shadow-[0_4px_12px_-4px_rgb(79_70_229_/_0.8)] hover:bg-admin-primary-strong",
+    tone: "bg-admin-primary text-white hover:bg-admin-primary-strong",
   },
   {
     value: "rejected",
     label: "반려",
-    tone: "border border-state-bad-line bg-admin-surface text-state-bad hover:bg-state-bad-bg",
+    tone: "border border-admin-border bg-admin-surface text-admin-text hover:bg-admin-surface-sunken",
   },
   {
     value: "held",
@@ -35,6 +37,7 @@ export function DecisionActions({
   disabled = false,
   selectedRate = null,
   requireRate = false,
+  cardType = "EXPANSION",
 }: {
   cardId: string;
   disabled?: boolean;
@@ -42,6 +45,7 @@ export function DecisionActions({
   selectedRate?: PaybackRate | null;
   /** INCENTIVE 승인은 페이백률 선택이 필수 — 미선택이면 승인 버튼 비활성 (08 F6) */
   requireRate?: boolean;
+  cardType?: CardType;
   /** 서버 컴포넌트에서 함수를 props로 넘길 수 없다 — 갱신은 액션의 revalidate가 맡는다 */
   onDone?: never;
 }) {
@@ -51,6 +55,7 @@ export function DecisionActions({
 
   const rateMissing = requireRate && !selectedRate;
   const working = pending || busy !== null;
+  const readOnly = isDemoReadOnly;
   const hintId = `decision-hint-${cardId}`;
 
   const run = (decision: CardStatus) => {
@@ -70,10 +75,11 @@ export function DecisionActions({
   };
 
   return (
-    <div>
+    <div aria-label="카드 결정" role="group">
       <div className="flex flex-wrap gap-2">
         {DECISIONS.map((d) => {
-          const blocked = disabled || working || (d.value === "approved" && rateMissing);
+          const blocked = disabled || readOnly || working || (d.value === "approved" && rateMissing);
+          const label = d.value === "approved" ? decisionPrimaryLabel(requireRate ? "INCENTIVE" : cardType) : d.label;
           return (
             <button
               key={d.value}
@@ -82,9 +88,9 @@ export function DecisionActions({
               disabled={blocked}
               aria-busy={busy === d.value}
               aria-describedby={d.value === "approved" && rateMissing ? hintId : undefined}
-              className={`rounded-lg px-4 py-2 text-sm font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${d.tone}`}
+              className={`min-h-10 rounded-lg px-4 py-2 text-sm font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${d.tone}`}
             >
-              {busy === d.value ? "처리 중…" : d.label}
+              {busy === d.value ? "처리 중…" : label}
             </button>
           );
         })}
@@ -94,6 +100,10 @@ export function DecisionActions({
         <p id={hintId} className="u-note mt-2">
           승인하려면 페이백률(3·5·7%)을 먼저 선택하세요 — 확정 rate는 담당자가 고른 값만 저장됩니다.
         </p>
+      ) : null}
+
+      {readOnly ? (
+        <p className="u-note mt-2">공개 데모 읽기 전용 · 상태 변경이 잠겨 있습니다.</p>
       ) : null}
 
       {error ? (

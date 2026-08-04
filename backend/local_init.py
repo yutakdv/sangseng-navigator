@@ -1,4 +1,4 @@
-"""DynamoDB Local에 cards 테이블 생성 (호스트에서: DYNAMO_ENDPOINT=http://localhost:8001 python local_init.py)"""
+"""DynamoDB Local에 cards·progress records 테이블을 생성한다."""
 import os
 import boto3
 
@@ -13,3 +13,9 @@ if name not in [t.name for t in ddb.tables.all()]:
     print(f"created: {name}")
 else:
     print(f"exists: {name}")
+
+# 애플리케이션과 동일한 GSI 정의를 한 곳에서 유지한다.
+from app import progress_db  # noqa: E402
+
+created = progress_db.ensure_table()
+print(("created: " if created else "exists: ") + progress_db.TABLE_NAME)

@@ -2,24 +2,31 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { AdminShell } from "@/components/AdminShell";
 import { Icon } from "@/components/Icon";
-import { KpiCard } from "@/components/KpiCard";
 import { PageHeader } from "@/components/PageHeader";
+import { ProgressReportDashboard } from "@/components/ProgressReportDashboard";
 import { ProgressSelect } from "@/components/ProgressSelect";
 import { RankTrace } from "@/components/RankTrace";
 import { Section } from "@/components/Section";
-import { ProgressChip, StatusChip } from "@/components/StatusChip";
+import { ProgressChip, WorkflowChip } from "@/components/StatusChip";
 import { api } from "@/lib/api";
+import { eligibilityStatus, normalizedProgress, workflowLabel } from "@/lib/cardWorkflow";
 import { REGIONS } from "@/lib/constants";
-import { dash, ratioPct } from "@/lib/format";
 import type { Card, CardProgress } from "@/types";
 
-export const metadata: Metadata = { title: "정책 카드 관리 · 상생 나침반" };
+export const metadata: Metadata = { title: "추진 경과 리포트 · 상생 나침반" };
 
 // 상태를 바꾸면 KPI·완료 안내가 곧바로 달라져야 한다 (데모 6→7단계) — 캐시하지 않는다
 export const dynamic = "force-dynamic";
 
-/** 4단계 고정 순서 — 05 §2. 단계별 집계 칩의 나열 순서이기도 하다 */
-const STAGES: CardProgress[] = ["검토중", "추진중", "보류", "완료"];
+/** 가맹점 확충 Work Item의 실제 의미 순서. 인센티브의 `검토중`은 별도 행에서 그대로 보인다. */
+const STAGES: CardProgress[] = [
+  "후보 접촉·검토 시작",
+  "적격성 확인",
+  "가맹 심사",
+  "추진중",
+  "보류",
+  "완료",
+];
 
 /**
  * ⑥ 실행 상태 트래킹 (docs/plan/08 F8 · 13 §3 "정책 카드 관리").
@@ -31,10 +38,11 @@ const STAGES: CardProgress[] = ["검토중", "추진중", "보류", "완료"];
  * 그 인과가 화면에서 읽히도록 완료 행마다 위젯 링크와 한 줄 설명을 둔다.
  */
 export default async function TrackingPage() {
-  const [dashboard, { cards }, kpi] = await Promise.all([
+  const [dashboard, { cards }, kpi, report] = await Promise.all([
     api.dashboard(),
     api.cards({ status: "approved" }),
     api.kpi(),
+    api.progressReport(),
   ]);
 
   // 최근에 승인한 카드가 맨 위 — 허브에서 막 승인하고 넘어온 카드를 바로 조작할 수 있게 한다.
@@ -42,53 +50,32 @@ export default async function TrackingPage() {
   const rows = [...cards].sort((a, b) =>
     (b.decided_at ?? b.created_at).localeCompare(a.decided_at ?? a.created_at),
   );
-  const stageCount = (p: CardProgress) => rows.filter((c) => (c.progress ?? "검토중") === p).length;
-
+  const stageCount = (p: CardProgress) => rows.filter((card) => normalizedProgress(card) === p).length;
   return (
     <AdminShell dashboard={dashboard}>
       <div className="mx-auto flex max-w-6xl flex-col gap-6">
         <PageHeader
           icon="cards"
           eyebrow="운영"
-          title="정책 카드 관리"
-          lede="승인된 카드의 추진 상태를 담당자가 기록하는 화면입니다. AI 제안은 승인 시점에 확정됐고, 여기서 바뀌는 것은 담당자가 남기는 추진 기록입니다."
+          title="추진 경과 리포트"
+          lede="담당자가 남긴 실제 경과 기록으로 상태 분포, 정체 항목, 목표일 준수와 관측 성과 변화를 확인합니다. 예상값은 실제 성과에 섞지 않습니다."
+          actions={
+            <Link
+              href="/tracking/new"
+              className="inline-flex min-h-10 items-center gap-2 rounded-xl bg-admin-primary px-4 py-2 text-sm font-bold text-white shadow-card transition-colors hover:bg-admin-primary-strong"
+            >
+              <Icon name="workflow" size={15} />
+              추진 기록 입력
+            </Link>
+          }
         />
 
-        {/* ── 운영 KPI — 상태를 바꾸면 실행 전환율이 즉시 움직인다 (05 §3) ── */}
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
-          <KpiCard
-            icon="check"
-            label="채택률"
-            value={ratioPct(kpi.adoption_rate)}
-            sub={`승인 ${kpi.counts.approved} / 전체 ${kpi.counts.total}장`}
-          />
-          <KpiCard
-            accent
-            icon="trend"
-            label="실행 전환율"
-            value={ratioPct(kpi.execution_rate)}
-            sub="승인 카드 중 추진중·완료 비중 — 검토중·보류를 추진중으로 바꾸면 즉시 올라갑니다"
-          />
-          <KpiCard
-            icon="clock"
-            label="평균 의사결정 소요"
-            value={dash(kpi.avg_approval_hours)}
-            unit={kpi.avg_approval_hours === null ? undefined : "시간"}
-            sub="승인·반려·보류까지 걸린 시간의 평균"
-          />
-          <KpiCard
-            icon="scale"
-            label="지역 균형지수"
-            value={dash(kpi.regional_balance_index)}
-            unit={kpi.regional_balance_index === null ? undefined : "/ 100"}
-            sub={`승인 카드가 여러 지역에 고루 쌓일수록 상승 (현재 승인 ${kpi.counts.approved}건)`}
-          />
-        </div>
+        <ProgressReportDashboard report={report} />
 
         <Section
           icon="cards"
-          title={`승인 카드 ${rows.length}건`}
-          desc="추진 상태는 검토중·추진중·보류·완료 4단계로 기록합니다. 완료로 바꾸면 그 카드의 (읍×업종)과 매칭되는 가맹점이 방문객 위젯에서 확충 업종 배지와 함께 추천 상단에 노출됩니다."
+          title={`진행 Work Item ${rows.length}건`}
+          desc="확충 카드는 후보 접촉·검토 시작 → 적격성 확인 → 가맹 심사 → 추진중 → 완료 순서로 기록합니다. 필수 적격성 5개 항목 확인 전에는 가맹 심사·추진·완료로 이동할 수 없습니다."
         >
           {rows.length === 0 ? (
             <div className="rounded-xl border border-dashed border-admin-border bg-admin-surface-sunken px-4 py-10 text-center">
@@ -139,8 +126,7 @@ export default async function TrackingPage() {
                         <span className="rounded-md bg-admin-surface-sunken px-1.5 py-0.5 text-[11px] font-semibold tabular-nums text-admin-text-muted">
                           {card.id}
                         </span>
-                        <StatusChip status={card.status} />
-                        {card.progress ? <ProgressChip progress={card.progress} /> : null}
+                        <WorkflowChip card={card} />
                       </div>
 
                       <h3 className="mt-1.5 break-keep text-[15px] font-bold leading-6 text-admin-text">
@@ -159,7 +145,8 @@ export default async function TrackingPage() {
                         </span>
                         <span className="flex items-center gap-1.5">
                           <Icon name="clock" size={14} />
-                          승인 <span className="tabular-nums">{stamp(card.decided_at)}</span>
+                          {card.type === "EXPANSION" ? "검토 시작" : "승인"}{" "}
+                          <span className="tabular-nums">{stamp(card.decided_at)}</span>
                         </span>
                         {/* 확정 rate는 담당자가 승인할 때 고른 값만 존재한다 (05 §2) */}
                         {card.selected_rate ? (
@@ -169,6 +156,32 @@ export default async function TrackingPage() {
                             <b className="font-semibold text-admin-text">{card.selected_rate}%</b>
                           </span>
                         ) : null}
+                      </div>
+
+                      <div
+                        aria-label="담당자 다음 행동"
+                        className="mt-3 flex flex-wrap items-center justify-between gap-x-3 gap-y-1.5 rounded-xl bg-admin-primary-soft px-3 py-2.5 text-admin-primary ring-1 ring-inset ring-admin-primary-line"
+                      >
+                        <div className="flex min-w-0 items-center gap-2">
+                          <Icon
+                            name={card.progress === "완료" ? "check" : "workflow"}
+                            size={15}
+                            strokeWidth={2}
+                          />
+                          <span className="text-[11px] font-bold uppercase tracking-[0.1em]">
+                            다음 행동
+                          </span>
+                          <span className="break-keep text-[13px] font-bold">
+                            {card.progress === "완료"
+                              ? "방문객 위젯 반영 확인"
+                              : card.type === "EXPANSION" && eligibilityStatus(card) !== "verified"
+                                ? "필수 적격성 5개 항목 확인"
+                                : "추진 상태 업데이트"}
+                          </span>
+                        </div>
+                        <span className="text-[11px] font-medium text-admin-primary/70">
+                          현재 {workflowLabel(card)}
+                        </span>
                       </div>
 
                       {/* 정량 순위 병기 — AI가 순위를 조정해도 원 Score 순위를 감추지 않는다 (절대 규칙 5) */}
@@ -181,6 +194,13 @@ export default async function TrackingPage() {
                       {card.progress === "완료" ? <DoneNote card={card} /> : null}
 
                       <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-2">
+                        <Link
+                          href={`/tracking/new?card_id=${encodeURIComponent(card.id)}`}
+                          className="inline-flex items-center gap-1 rounded-lg bg-admin-primary-soft px-2.5 py-1.5 text-[13px] font-semibold text-admin-primary ring-1 ring-inset ring-admin-primary-line hover:bg-admin-surface"
+                        >
+                          상세 경과 입력
+                          <Icon name="arrowRight" size={14} strokeWidth={2} />
+                        </Link>
                         <Link
                           href={`/cards/${card.id}`}
                           className="inline-flex items-center gap-1 text-[13px] font-semibold text-admin-primary underline-offset-4 hover:underline"
@@ -234,8 +254,17 @@ export default async function TrackingPage() {
                       </div>
                     </div>
 
-                    <div className="shrink-0 sm:w-44">
-                      <ProgressSelect cardId={card.id} progress={card.progress} />
+                    <div className="shrink-0 rounded-xl bg-admin-surface-sunken p-3 ring-1 ring-inset ring-admin-border sm:w-52">
+                      <p className="mb-2 flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-[0.1em] text-admin-primary">
+                        <Icon name="workflow" size={13} /> 실행 기록
+                      </p>
+                      <ProgressSelect
+                        cardId={card.id}
+                        cardType={card.type}
+                        progress={card.progress}
+                        verificationStatus={card.candidate_verification?.status}
+                      />
+                      <p className="mt-2 text-[10px] leading-4 text-admin-text-muted">빠른 변경도 경과 이력과 리포트에 기록됩니다.</p>
                     </div>
                   </li>
                 ))}

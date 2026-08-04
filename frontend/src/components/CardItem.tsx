@@ -1,9 +1,10 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
 import { AssumptionBadge, AssumptionNote } from "@/components/Badge";
-import { Icon } from "@/components/Icon";
+import { Icon, type IconName } from "@/components/Icon";
 import { RankTrace } from "@/components/RankTrace";
-import { ProgressChip, StatusChip } from "@/components/StatusChip";
+import { WorkflowChip } from "@/components/StatusChip";
+import { eligibilityStatus, workflowLabel } from "@/lib/cardWorkflow";
 import type { Card } from "@/types";
 
 /**
@@ -21,6 +22,7 @@ export function CardItem({ card, children }: { card: Card; children?: ReactNode 
   // INCENTIVE는 순위 개념이 없어(target·score_rank·ai_rank가 null) 이 블록을 숨긴다 (05 §2)
   const showRank = card.type === "EXPANSION" && card.score_rank !== null && card.ai_rank !== null;
   const isExpansion = card.type === "EXPANSION";
+  const nextAction = getNextAction(card);
 
   return (
     <article className="u-panel transition-shadow hover:shadow-card-hover">
@@ -45,8 +47,7 @@ export function CardItem({ card, children }: { card: Card; children?: ReactNode 
               <span className="text-[11px] font-semibold uppercase tracking-[0.1em] text-admin-text-muted">
                 {isExpansion ? "가맹점 확충" : "페이백 인센티브"}
               </span>
-              <StatusChip status={card.status} />
-              {card.progress ? <ProgressChip progress={card.progress} /> : null}
+              <WorkflowChip card={card} />
             </div>
 
             <h3 className="mt-1.5 break-keep text-base font-bold leading-6 text-admin-text">
@@ -60,6 +61,11 @@ export function CardItem({ card, children }: { card: Card; children?: ReactNode 
               <Meta icon="shield" label="신뢰도">
                 {card.confidence}
               </Meta>
+              <Meta icon="clock" label="생성">
+                {card.created_at.length >= 16
+                  ? `${card.created_at.slice(5, 10)} ${card.created_at.slice(11, 16)}`
+                  : "—"}
+              </Meta>
               {/* 확정 rate는 담당자가 승인할 때 고른 값만 존재한다 (05 §2) */}
               {card.selected_rate ? (
                 <Meta icon="gift" label="확정 페이백률">
@@ -68,6 +74,18 @@ export function CardItem({ card, children }: { card: Card; children?: ReactNode 
               ) : null}
             </dl>
           </div>
+        </div>
+
+        <div
+          aria-label="담당자 다음 행동"
+          className={`flex flex-wrap items-center justify-between gap-x-3 gap-y-1.5 rounded-xl px-3 py-2.5 ring-1 ring-inset ${nextAction.tone}`}
+        >
+          <div className="flex min-w-0 items-center gap-2">
+            <Icon name={nextAction.icon} size={15} strokeWidth={2} />
+            <span className="text-[11px] font-bold uppercase tracking-[0.1em]">다음 행동</span>
+            <span className="break-keep text-[13px] font-bold">{nextAction.label}</span>
+          </div>
+          <span className="text-[11px] font-medium text-current/70">{nextAction.detail}</span>
         </div>
 
         {showRank ? <RankTrace card={card} /> : null}
@@ -93,7 +111,7 @@ export function CardItem({ card, children }: { card: Card; children?: ReactNode 
         ) : null}
       </div>
 
-      <div className="flex flex-wrap items-center gap-x-3 gap-y-2 border-t border-admin-border px-4 py-3 sm:px-5">
+      <div className="flex flex-wrap items-center gap-x-3 gap-y-2 border-t border-admin-border px-4 py-3 sm:items-center sm:px-5">
         <Link
           href={`/cards/${card.id}`}
           className="inline-flex items-center gap-1 text-[13px] font-semibold text-admin-primary underline-offset-4 hover:underline"
@@ -101,7 +119,7 @@ export function CardItem({ card, children }: { card: Card; children?: ReactNode 
           제안 근거 전문 보기
           <Icon name="arrowRight" size={14} strokeWidth={2} />
         </Link>
-        {children ? <div className="ml-auto">{children}</div> : null}
+        {children ? <div className="w-full sm:ml-auto sm:w-auto">{children}</div> : null}
       </div>
     </article>
   );
@@ -112,7 +130,7 @@ function Meta({
   label,
   children,
 }: {
-  icon: "pin" | "shield" | "gift";
+  icon: "pin" | "shield" | "gift" | "clock";
   label: string;
   children: ReactNode;
 }) {
@@ -123,4 +141,67 @@ function Meta({
       <dd className="font-semibold text-admin-text">{children}</dd>
     </div>
   );
+}
+
+function getNextAction(card: Card): {
+  icon: IconName;
+  label: string;
+  detail: string;
+  tone: string;
+} {
+  if (card.status === "pending") {
+    return card.type === "INCENTIVE"
+      ? {
+          icon: "gift",
+          label: "페이백률 선택 후 승인 검토",
+          detail: "결정 전",
+          tone: "bg-admin-primary-soft text-admin-primary ring-admin-primary-line",
+        }
+      : {
+          icon: "sparkle",
+          label: "근거 확인 후 후보 접촉·검토 시작 여부 결정",
+          detail: "결정 전",
+          tone: "bg-admin-primary-soft text-admin-primary ring-admin-primary-line",
+        };
+  }
+
+  if (card.status === "approved") {
+    if (card.type === "EXPANSION" && eligibilityStatus(card) !== "verified") {
+      return {
+        icon: "shield",
+        label: eligibilityStatus(card) === "ineligible" ? "부적격 사유 확인" : "필수 적격성 5개 항목 확인",
+        detail: workflowLabel(card),
+        tone: "bg-state-warn-bg text-state-warn ring-state-warn-line",
+      };
+    }
+    return card.progress === "완료"
+      ? {
+          icon: "check",
+          label: "방문객 위젯 반영 확인",
+          detail: "실행 완료",
+          tone: "bg-state-good-bg text-state-good ring-state-good-line",
+        }
+      : {
+          icon: "workflow",
+          label: "추진 상태 기록",
+          detail: workflowLabel(card),
+          tone: "bg-admin-primary-soft text-admin-primary ring-admin-primary-line",
+        };
+  }
+
+  if (card.status === "rejected") {
+    return {
+      icon: "warn",
+      label: "반려 완료 · 재검토 시 새 카드 생성",
+      detail: "결정 완료",
+      tone: "bg-admin-surface-sunken text-admin-text-muted ring-admin-border",
+    };
+  }
+
+  return {
+    icon: "clock",
+    label: "보류 사유와 재검토 일정 확인",
+    detail: "결정 완료",
+    tone: "bg-state-notice-bg text-state-notice ring-state-notice-line",
+  };
 }

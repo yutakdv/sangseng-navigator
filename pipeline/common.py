@@ -46,9 +46,20 @@ def grade(index):
 
 
 def hhi_dispersion_index(counts):
-    """업종별 소비 분산도 = (1 - HHI) 0~100."""
+    """업종별 소비 분산도 = 정규화된 ``1 - HHI`` (0~100).
+
+    표시 업종 수가 ``n``개일 때 ``1-HHI``의 이론상 최댓값은 ``1-1/n``이다. 기존
+    구현은 이 최댓값으로 나누지 않아, 업종 수에 따라 만점이 달라지는 값을 0~100 지수처럼
+    노출했다. 호출부는 누락 업종도 0으로 채운 고정 표시 분류를 넘겨야 한다.
+    """
+    if not counts:
+        return 0
+    if any(c < 0 for c in counts):
+        raise ValueError("HHI 건수는 음수일 수 없습니다")
     total = sum(counts)
-    if total == 0:
+    n = len(counts)
+    if total == 0 or n <= 1:
         return 0
     hhi = sum((c / total) ** 2 for c in counts)
-    return round((1 - hhi) * 100)
+    normalized = (1 - hhi) / (1 - 1 / n)
+    return round(min(1.0, max(0.0, normalized)) * 100)

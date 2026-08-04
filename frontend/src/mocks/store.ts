@@ -21,24 +21,44 @@ import type {
   CardProgress,
   CardStatus,
   CardType,
+  CreateProgressRecordResponse,
   Kpi,
   Merchant,
   PaybackRate,
+  ProgressMetricChange,
+  ProgressMetricKey,
+  ProgressMetrics,
+  ProgressRecord,
+  ProgressRecordInput,
+  ProgressRecordsResponse,
+  ProgressReport,
   Recommendation,
+  EligibilityCheck,
   WidgetResponse,
 } from "@/types";
 import { ANCHOR, ASSUMPTION_NOTE, REGIONS } from "@/lib/constants";
 import { ApiError } from "@/lib/errors";
+import {
+  REQUIRED_ELIGIBILITY_CHECKS,
+  normalizeEligibility,
+  progressOptions,
+} from "@/lib/cardWorkflow";
 import cardsSeed from "./cards.json";
 import candidatesMock from "./candidates.json";
 
 const DONE = "완료";
 const RUNNING: CardProgress[] = ["추진중", "완료"];
-const WIDGET_LIMIT = 3;
-const POLICY_NOTE = "이번 분기 확충이 완료된 업종을 우선 추천합니다";
+const WIDGET_DEFAULT_LIMIT = 12;
+const WIDGET_MAX_LIMIT = 120;
+const POLICY_NOTE = "완료된 확충 업종 우선 · 그 외 하이원리조트 거점 직선거리 기준";
 
 /** import한 JSON 모듈을 직접 변형하지 않도록 깊은 복사 후 보관 */
 let cards: Card[] = JSON.parse(JSON.stringify(cardsSeed.cards)) as Card[];
+
+/** 실측·서술 기록은 카드와 분리해 보관한다. 초기값은 비워 두며 성과 수치를 임의로 만들지 않는다. */
+let progressRecords: ProgressRecord[] = [];
+const progressIdempotency = new Map<string, string>();
+let progressRecordSequence = 1;
 
 export const listCards = (opts: { type?: string; status?: string } = {}): Card[] =>
   cards.filter(
@@ -71,22 +91,204 @@ export const decide = (id: string, decision: CardStatus, selectedRate?: PaybackR
   const at = nowIso();
   card.status = decision;
   card.decided_at = at;
-  card.progress = decision === "approved" ? "검토중" : null;
+  card.progress =
+    decision === "approved"
+      ? card.type === "EXPANSION"
+        ? "후보 접촉·검토 시작"
+        : "검토중"
+      : null;
   if (card.type === "INCENTIVE" && decision === "approved") card.selected_rate = selectedRate ?? null;
   card.events = [...(card.events ?? []), { at, action: decision }];
   return card;
 };
 
 /** 추진 상태 변경 — approved 카드만 가능 (05 §8) */
-export const setProgress = (id: string, progress: CardProgress): Card => {
+export const setProgress = (id: string, progress: CardProgress): Card =>
+  writeProgressRecord(
+    id,
+    { progress, note: null, source: "quick_status" },
+    false,
+  ).card;
+
+const ALL_PROGRESS: CardProgress[] = [
+  "검토중",
+  "후보 접촉·검토 시작",
+  "적격성 확인",
+  "가맹 심사",
+  "추진중",
+  "보류",
+  "완료",
+];
+
+const METRIC_KEYS: ProgressMetricKey[] = [
+  "usage_count",
+  "conversion_rate_pct",
+  "active_merchant_count",
+  "spend_krw",
+  "concentration_index",
+];
+
+const nullableText = (value: string | undefined): string | null => {
+  const clean = value?.trim();
+  return clean ? clean : null;
+};
+
+const validIso = (value: string): boolean => Number.isFinite(new Date(value).getTime());
+
+const cleanMetrics = (input?: ProgressMetrics): ProgressMetrics => {
+  if (!input) return {};
+  const metrics: ProgressMetrics = {};
+  for (const key of METRIC_KEYS) {
+    const value = input[key];
+    if (value === undefined || value === null) continue;
+    if (!Number.isFinite(value) || value < 0) {
+      throw new ApiError(400, `${key}는 0 이상의 숫자여야 합니다`);
+    }
+    if ((key === "conversion_rate_pct" || key === "concentration_index") && value > 100) {
+      throw new ApiError(400, `${key}는 100 이하여야 합니다`);
+    }
+    metrics[key] = value;
+  }
+  return metrics;
+};
+
+/** 카드별 기록 최신순. mock cursor는 다음 배열 offset을 문자열로 인코딩한다. */
+export const listProgressRecords = (id: string, cursor?: string): ProgressRecordsResponse => {
+  if (!getCard(id)) throw new ApiError(404, "card not found");
+  const start = cursor === undefined ? 0 : Number(cursor);
+  if (!Number.isInteger(start) || start < 0) throw new ApiError(400, "invalid progress record cursor");
+  const rows = progressRecords
+    .filter((record) => record.card_id === id)
+    .sort((a, b) =>
+      b.recorded_at.localeCompare(a.recorded_at) || b.record_id.localeCompare(a.record_id),
+    );
+  const records = rows.slice(start, start + 50);
+  const next = start + records.length;
+  return { records, next_cursor: next < rows.length ? String(next) : null };
+};
+
+type InternalProgressRecordInput = Omit<ProgressRecordInput, "note" | "idempotency_key"> & {
+  note: string | null;
+  idempotency_key?: string;
+};
+
+/** 추진 상태와 근거 메모·실측값을 한 감사 기록으로 저장하는 mock 내부 원자 연산. */
+function writeProgressRecord(
+  id: string,
+  input: InternalProgressRecordInput,
+  requireNote: boolean,
+): CreateProgressRecordResponse {
   const card = getCard(id);
   if (!card) throw new ApiError(404, "card not found");
-  if (card.status !== "approved") {
-    throw new ApiError(409, `approved 카드만 추진 상태를 바꿀 수 있습니다 (현재 status=${card.status})`);
+
+  const idempotencyKey = input.idempotency_key?.trim();
+  if (requireNote && !idempotencyKey) throw new ApiError(400, "idempotency_key가 필요합니다");
+  const dedupeKey = idempotencyKey ? `${id}:${idempotencyKey}` : null;
+  if (dedupeKey) {
+    const existingId = progressIdempotency.get(dedupeKey);
+    if (existingId) {
+      const record = progressRecords.find((item) => item.record_id === existingId);
+      if (record) return { card, record, created: false };
+    }
   }
+
+  if (card.status !== "approved") {
+    throw new ApiError(409, `approved 카드만 추진 기록을 남길 수 있습니다 (현재 status=${card.status})`);
+  }
+  const option = progressOptions(card).find((item) => item.value === input.progress);
+  if (!option) throw new ApiError(400, "지원하지 않는 추진 상태입니다");
+  if (option.disabled) throw new ApiError(409, option.reason ?? "현재 선택할 수 없는 추진 상태입니다");
+
+  const note = input.note?.trim() || null;
+  if (requireNote && !note) throw new ApiError(400, "note는 필수입니다");
+  if (
+    input.progress_pct !== undefined &&
+    (!Number.isFinite(input.progress_pct) || input.progress_pct < 0 || input.progress_pct > 100)
+  ) {
+    throw new ApiError(400, "progress_pct는 0~100 사이여야 합니다");
+  }
+
+  const recordedAt = input.recorded_at ?? nowIso();
+  if (!validIso(recordedAt)) throw new ApiError(400, "recorded_at은 ISO8601 형식이어야 합니다");
+  if (input.due_at && !/^\d{4}-\d{2}-\d{2}$/.test(input.due_at)) {
+    throw new ApiError(400, "due_at은 YYYY-MM-DD 형식이어야 합니다");
+  }
+
+  const createdAt = nowIso();
+  const previousProgress = card.progress;
+  const record: ProgressRecord = {
+    record_id: `PR-MOCK-${String(progressRecordSequence).padStart(6, "0")}`,
+    card_id: card.id,
+    recorded_at: recordedAt,
+    created_at: createdAt,
+    progress: input.progress,
+    previous_progress: previousProgress,
+    progress_changed: previousProgress !== input.progress,
+    progress_pct: input.progress_pct ?? null,
+    note,
+    blocker: nullableText(input.blocker),
+    next_action: nullableText(input.next_action),
+    owner: nullableText(input.owner),
+    due_at: nullableText(input.due_at),
+    source: nullableText(input.source) ?? "manual",
+    metrics: cleanMetrics(input.metrics),
+    card_snapshot: {
+      type: card.type,
+      title: card.title,
+      eup: card.target?.eup ?? null,
+      category: card.target?.category ?? null,
+    },
+  };
+  progressRecordSequence += 1;
+  progressRecords = [...progressRecords, record];
+  if (dedupeKey) progressIdempotency.set(dedupeKey, record.record_id);
+
+  card.progress = input.progress;
+  card.events = [
+    ...(card.events ?? []),
+    { at: recordedAt, action: `progress:${input.progress}`, record_id: record.record_id },
+  ];
+  card.version = (card.version ?? 0) + 1;
+  card.last_progress_record_at = recordedAt;
+  card.last_progress_record_id = record.record_id;
+  if (input.progress === "완료" && !card.completed_at) card.completed_at = recordedAt;
+  return { card, record, created: true };
+}
+
+/** 추진 상태와 근거 메모·실측값을 한 감사 기록으로 저장한다. */
+export const createProgressRecord = (
+  id: string,
+  input: ProgressRecordInput,
+): CreateProgressRecordResponse => writeProgressRecord(id, input, true);
+
+/** 후보 적격성 기록 — 실 API `/verification`과 같은 상태 파생 규칙을 쓴다. */
+export const setVerification = (id: string, checks: EligibilityCheck[]): Card => {
+  const card = getCard(id);
+  if (!card) throw new ApiError(404, "card not found");
+  if (card.type !== "EXPANSION") throw new ApiError(400, "후보 적격성 확인은 EXPANSION 카드에만 적용됩니다");
+  if (card.status !== "approved") {
+    throw new ApiError(409, "후보 접촉·검토를 시작한 카드만 적격성을 기록할 수 있습니다");
+  }
+  const normalized = normalizeEligibility({ status: "unverified", checks, note: "" });
+  const status = normalized.some((check) => check.status === "failed")
+    ? "ineligible"
+    : normalized.every((check) => check.status === "verified")
+      ? "verified"
+      : "unverified";
+  const failed = normalized.filter((check) => check.status === "failed").map((check) => check.label);
+  card.candidate_verification = {
+    status,
+    checks: normalized,
+    note:
+      status === "verified"
+        ? "필수 적격성 5개 항목을 모두 확인했습니다. 다음 단계는 가맹 심사이며, 아직 가맹 확정은 아닙니다"
+        : status === "ineligible"
+          ? `미충족 항목: ${failed.join(", ")}. 부적격 사유를 확인하고 보류 또는 반려를 결정하세요`
+          : "미확인 항목이 남아 있습니다. 가맹 심사·추진·완료 상태로 이동할 수 없습니다",
+  };
   const at = nowIso();
-  card.progress = progress;
-  card.events = [...(card.events ?? []), { at, action: `progress:${progress}` }];
+  card.events = [...(card.events ?? []), { at, action: `verification:${status}` }];
+  card.version = (card.version ?? 0) + 1;
   return card;
 };
 
@@ -98,8 +300,17 @@ export const addCard = (card: Card): Card => {
 
 /* ── 카드 생성 (05 §2·§8 / backend/app/services/cardgen.py와 동일 규칙) ────── */
 
-/** A-1 중복 제안 금지 대상 progress — 백엔드 `cardgen.BLOCKED`. (KPI의 RUNNING과 값은 같지만 다른 규칙이다) */
-const BLOCKED: CardProgress[] = ["추진중", "완료"];
+/** 동일 지역×업종의 활성 Work Item — 백엔드 `cardgen.ACTIVE_TARGET_STATES`와 동일 */
+const BLOCKED = [
+  "승인 대기",
+  "검토중",
+  "후보 접촉·검토 시작",
+  "적격성 확인",
+  "가맹 심사",
+  "추진중",
+  "보류",
+  "완료",
+] as const;
 const isBlocked = (state: string): boolean => BLOCKED.some((p) => p === state);
 /** 백엔드 `cardgen.EXPANSION_SOURCES`와 동일 */
 const EXPANSION_SOURCES = ["하이원포인트 사용현황", "가맹점 상세정보", "소진공 상가정보"];
@@ -176,7 +387,7 @@ const generateExpansion = (): GeneratedCard => {
   const available = ranked.filter((c) => !isBlocked(targetState(c.eup, c.category)));
   if (available.length === 0) {
     // LLM 장애가 아니라 정상적인 도메인 신호 — 화면은 에러가 아니라 안내로 다룬다 (05 §8)
-    throw new ApiError(409, "제안할 수 있는 신규 후보가 없습니다 (전 후보가 추진중/완료 상태)");
+    throw new ApiError(409, "제안할 수 있는 신규 후보가 없습니다 (전 후보에 승인 대기 또는 진행 중인 업무가 있음)");
   }
 
   const top = available[0];
@@ -206,9 +417,9 @@ const generateExpansion = (): GeneratedCard => {
       (c) =>
         `Score ${c.rank}위 ${candidateLabel(c)}은(는) 추진 상태=${targetState(c.eup, c.category)}로 중복 제안 대상에서 제외`,
     ),
-    `${candidateLabel(top)} ${top.name} — 업종공백도 ${top.gap.toFixed(2)}, 반경 500m 내 동일 업종 하이원포인트 가맹점 ${top.nearby_merchants}곳(전체 상가 ${top.nearby_stores}곳)`,
+    `${candidateLabel(top)} ${top.name} — 업종공백도 ${top.gap.toFixed(2)}, 반경 500m 내 동일 업종 하이원포인트 가맹점 ${top.nearby_merchants}곳 / 동일 업종 상가 ${top.nearby_same_category_stores}곳`,
     `동선근접도 ${top.proximity.toFixed(2)}(직선거리 기반) / ${roadPhrase(top)}`,
-    "mock 모드에서 규칙 기반으로 생성된 카드입니다 — 실 API 모드에서는 AI가 후보 비교·근거 문장을 생성합니다",
+    "활성 업무가 없는 후보 중 정량 Score 최상위를 결정론적으로 선택하고 설명만 구조화 데이터로 다시 검증합니다",
   ];
 
   const risks = [
@@ -228,13 +439,23 @@ const generateExpansion = (): GeneratedCard => {
     target: { eup: top.eup, category: top.category },
     score_rank: top.rank,
     ai_rank: 1,
-    confidence: "중", // LLM 없이 규칙만으로 고른 제안이라 상으로 올리지 않는다
+    selection_rank: 1,
+    confidence: top.gap_confidence >= 0.8 && top.road_minutes !== null ? "중" : "하",
     ai: {
       adjusted: top.rank !== 1,
       comparison,
       reasons,
       risks,
-      expected_effect: `${candidateLabel(top)} 공백 해소로 지역 소비 접점 확대 예상 (${ASSUMPTION_NOTE})`,
+      expected_effect: `${candidateLabel(top)} 후보의 가맹 전환 효과는 반사실 시뮬레이션과 사업자 적격성 확인 후 판단해야 합니다 (${ASSUMPTION_NOTE})`,
+      grounding: {
+        status: "verified",
+        numeric_status: "verified",
+        narrative_status: "rule_based",
+        selection_method: "deterministic_highest_available_score",
+        explanation_source: "mock_rule",
+        source: "structured",
+        checks: ["target", "score", "rank", "progress", "road_time"],
+      },
       // 정량 순위 상시 병기 — AI가 순위를 조정해도 원 Score 순위를 감추지 않는다 (절대 규칙 5)
       original_ranking: ranked.map((c) => ({
         rank: c.rank,
@@ -243,6 +464,19 @@ const generateExpansion = (): GeneratedCard => {
       })),
     },
     scenarios: null,
+    candidate_verification: {
+      status: "unverified",
+      checks: REQUIRED_ELIGIBILITY_CHECKS.map((label) => ({ key: label, label, status: "unverified" })),
+      note: "후보 접촉·검토 시작은 가맹 확정이 아닙니다. 필수 적격성 확인 후 별도 가맹 심사를 거칩니다",
+    },
+    operations: {
+      owner: null,
+      target_date: null,
+      expected_cost: null,
+      contact_result: null,
+      ineligible_reason: null,
+      actual_outcome: null,
+    },
     sources: EXPANSION_SOURCES,
     created_at: now,
     decided_at: null,
@@ -329,16 +563,19 @@ export const deriveKpi = (): Kpi => {
   const all = listCards();
   const by = (s: CardStatus) => all.filter((c) => c.status === s);
   const approved = by("approved");
+  const decided = [...approved, ...by("rejected"), ...by("held")];
   const running = approved.filter((c) => c.progress && RUNNING.includes(c.progress));
   const done = approved.filter((c) => c.progress === DONE);
   const hours = all.map(elapsedHours).filter((h): h is number => h !== null);
   const round2 = (v: number) => Math.round(v * 100) / 100;
+  const averageDecisionHours = hours.length
+    ? Math.round((hours.reduce((a, b) => a + b, 0) / hours.length) * 10) / 10
+    : null;
   return {
-    adoption_rate: all.length ? round2(approved.length / all.length) : null,
+    adoption_rate: decided.length ? round2(approved.length / decided.length) : null,
     execution_rate: approved.length ? round2(running.length / approved.length) : null,
-    avg_approval_hours: hours.length
-      ? Math.round((hours.reduce((a, b) => a + b, 0) / hours.length) * 10) / 10
-      : null,
+    avg_decision_hours: averageDecisionHours,
+    avg_approval_hours: averageDecisionHours,
     regional_balance_index: balanceIndex(approved),
     counts: {
       total: all.length,
@@ -346,8 +583,254 @@ export const deriveKpi = (): Kpi => {
       approved: approved.length,
       rejected: by("rejected").length,
       held: by("held").length,
+      decided: decided.length,
       done: done.length,
     },
+  };
+};
+
+/* ── 추진 경과 리포트 파생 (backend/app/services/progress_report.py와 동일 규칙) ── */
+
+const DAY_MS = 86_400_000;
+const KST_OFFSET_MS = 9 * 3_600_000;
+const STALE_DAYS = 14;
+
+const kstDateFromMs = (ms: number): string =>
+  new Date(ms + KST_OFFSET_MS).toISOString().slice(0, 10);
+
+const kstBoundaryMs = (date: string, end = false): number => {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) throw new ApiError(400, "기간은 YYYY-MM-DD 형식이어야 합니다");
+  const suffix = end ? "T23:59:59.999+09:00" : "T00:00:00.000+09:00";
+  const ms = new Date(`${date}${suffix}`).getTime();
+  if (!Number.isFinite(ms) || kstDateFromMs(ms) !== date) {
+    throw new ApiError(400, "유효하지 않은 날짜입니다");
+  }
+  return ms;
+};
+
+const reportPeriod = (opts: { from?: string; to?: string }) => {
+  const today = kstDateFromMs(Date.now());
+  const to = opts.to ?? today;
+  const toStart = kstBoundaryMs(to);
+  const from = opts.from ?? kstDateFromMs(toStart - 89 * DAY_MS);
+  const startMs = kstBoundaryMs(from);
+  const endMs = kstBoundaryMs(to, true);
+  if (startMs > endMs) throw new ApiError(400, "from은 to보다 늦을 수 없습니다");
+  if (to > today) throw new ApiError(400, "to는 KST 오늘보다 미래일 수 없습니다");
+  return {
+    from,
+    to,
+    startMs,
+    endMs,
+    days: Math.floor((toStart - startMs) / DAY_MS) + 1,
+  };
+};
+
+const recordTime = (record: ProgressRecord): number => new Date(record.recorded_at).getTime();
+
+const recordsByCard = (records: ProgressRecord[]): Map<string, ProgressRecord[]> => {
+  const grouped = new Map<string, ProgressRecord[]>();
+  for (const record of records) {
+    const rows = grouped.get(record.card_id) ?? [];
+    rows.push(record);
+    grouped.set(record.card_id, rows);
+  }
+  for (const rows of grouped.values()) {
+    rows.sort((a, b) => recordTime(a) - recordTime(b) || a.record_id.localeCompare(b.record_id));
+  }
+  return grouped;
+};
+
+const average = (values: number[]): number | null =>
+  values.length ? values.reduce((sum, value) => sum + value, 0) / values.length : null;
+
+const median = (values: number[]): number | null => {
+  if (!values.length) return null;
+  const sorted = [...values].sort((a, b) => a - b);
+  const middle = Math.floor(sorted.length / 2);
+  return sorted.length % 2 ? sorted[middle] : (sorted[middle - 1] + sorted[middle]) / 2;
+};
+
+const reportNumber = (value: number | null, digits = 2): number | null => {
+  if (value === null) return null;
+  const scale = 10 ** digits;
+  return Math.round(value * scale) / scale;
+};
+
+const metricChange = (
+  key: ProgressMetricKey,
+  grouped: Map<string, ProgressRecord[]>,
+): ProgressMetricChange => {
+  const baselines: number[] = [];
+  const latest: number[] = [];
+  for (const rows of grouped.values()) {
+    const observed = rows
+      .map((record) => record.metrics[key])
+      .filter((value): value is number => value !== undefined && value !== null && Number.isFinite(value));
+    if (observed.length < 2) continue;
+    baselines.push(observed[0]);
+    latest.push(observed[observed.length - 1]);
+  }
+
+  const baselineAverage = average(baselines);
+  const latestAverage = average(latest);
+  const delta = baselineAverage === null || latestAverage === null ? null : latestAverage - baselineAverage;
+  const relativeEligible = key === "usage_count" || key === "active_merchant_count" || key === "spend_krw";
+  const relative =
+    relativeEligible && baselineAverage !== null && baselineAverage !== 0 && delta !== null
+      ? (delta / Math.abs(baselineAverage)) * 100
+      : null;
+  const lowerIsBetter = key === "concentration_index";
+  const deltaUnit: ProgressMetricChange["delta_unit"] =
+    key === "conversion_rate_pct"
+      ? "%p"
+      : key === "concentration_index"
+        ? "point"
+        : key === "spend_krw"
+          ? "KRW"
+          : "count";
+
+  return {
+    baseline_average: reportNumber(baselineAverage),
+    latest_average: reportNumber(latestAverage),
+    delta: reportNumber(delta),
+    delta_unit: deltaUnit,
+    relative_change_pct: reportNumber(relative),
+    improvement: reportNumber(delta === null ? null : lowerIsBetter ? -delta : delta),
+    lower_is_better: lowerIsBetter,
+    sample_size: baselines.length,
+  };
+};
+
+export const deriveProgressReport = (opts: { from?: string; to?: string } = {}): ProgressReport => {
+  const period = reportPeriod(opts);
+  const inPeriod = progressRecords
+    .filter((record) => {
+      const at = recordTime(record);
+      return at >= period.startMs && at <= period.endMs;
+    })
+    .sort((a, b) => recordTime(a) - recordTime(b) || a.record_id.localeCompare(b.record_id));
+  const grouped = recordsByCard(inPeriod);
+  const approved = cards.filter((card) => card.status === "approved");
+  const latestByCard = new Map<string, ProgressRecord>();
+
+  for (const card of approved) {
+    const latest = progressRecords
+      .filter((record) => record.card_id === card.id && recordTime(record) <= period.endMs)
+      .sort((a, b) => recordTime(b) - recordTime(a) || b.record_id.localeCompare(a.record_id))[0];
+    if (latest) latestByCard.set(card.id, latest);
+  }
+
+  const statusDistribution = Object.fromEntries(ALL_PROGRESS.map((progress) => [progress, 0])) as Record<
+    CardProgress,
+    number
+  >;
+  for (const record of latestByCard.values()) statusDistribution[record.progress] += 1;
+
+  const completedCount = [...latestByCard.values()].filter((record) => record.progress === "완료").length;
+  const latestProgressValues: number[] = [];
+  for (const rows of grouped.values()) {
+    const value = [...rows].reverse().find((record) => record.progress_pct !== null)?.progress_pct;
+    if (value !== undefined && value !== null) latestProgressValues.push(value);
+  }
+
+  const staleItems = approved
+    .flatMap((card) => {
+      const record = latestByCard.get(card.id);
+      if (!record || record.progress === "완료") return [];
+      const days = Math.floor((period.endMs - recordTime(record)) / DAY_MS);
+      return days >= STALE_DAYS
+        ? [{
+            card_id: card.id,
+            title: card.title,
+            progress: record.progress,
+            last_recorded_at: record.recorded_at,
+            days_since_update: days,
+          }]
+        : [];
+    })
+    .sort((a, b) => b.days_since_update - a.days_since_update || a.card_id.localeCompare(b.card_id));
+
+  let onTimeCount = 0;
+  let onTimeSample = 0;
+  for (const rows of grouped.values()) {
+    const completed = rows.find((record) => record.progress === "완료");
+    if (!completed) continue;
+    const completedAt = recordTime(completed);
+    const dueRecord = [...rows]
+      .reverse()
+      .find((record) => recordTime(record) <= completedAt && record.due_at !== null);
+    if (!dueRecord?.due_at) continue;
+    onTimeSample += 1;
+    if (kstDateFromMs(completedAt) <= dueRecord.due_at) onTimeCount += 1;
+  }
+
+  const durationBuckets = new Map<
+    string,
+    { from: CardProgress; to: CardProgress; hours: number[] }
+  >();
+  for (const rows of grouped.values()) {
+    const entries: ProgressRecord[] = [];
+    for (const record of rows) {
+      if (entries.at(-1)?.progress === record.progress) continue;
+      entries.push(record);
+    }
+    for (let index = 1; index < entries.length; index += 1) {
+      const from = entries[index - 1];
+      const to = entries[index];
+      const hours = (recordTime(to) - recordTime(from)) / 3_600_000;
+      if (hours <= 0) continue;
+      const key = `${from.progress}\u0000${to.progress}`;
+      const bucket = durationBuckets.get(key) ?? { from: from.progress, to: to.progress, hours: [] };
+      bucket.hours.push(hours);
+      durationBuckets.set(key, bucket);
+    }
+  }
+
+  const metricChanges = Object.fromEntries(
+    METRIC_KEYS.map((key) => [key, metricChange(key, grouped)]),
+  ) as Record<ProgressMetricKey, ProgressMetricChange>;
+  const averageProgress = average(latestProgressValues);
+  const recordedCardCount = latestByCard.size;
+
+  return {
+    period: {
+      from: period.from,
+      to: period.to,
+      timezone: "Asia/Seoul",
+      days: period.days,
+    },
+    record_count: inPeriod.length,
+    recorded_card_count: recordedCardCount,
+    cards_without_records: Math.max(0, approved.length - recordedCardCount),
+    status_distribution: statusDistribution,
+    completion: {
+      rate: recordedCardCount ? reportNumber(completedCount / recordedCardCount, 4) : null,
+      completed_count: completedCount,
+      sample_size: recordedCardCount,
+    },
+    average_progress_pct: {
+      value: reportNumber(averageProgress, 1),
+      sample_size: latestProgressValues.length,
+    },
+    stale: {
+      threshold_days: STALE_DAYS,
+      count: staleItems.length,
+      items: staleItems,
+    },
+    on_time: {
+      rate: onTimeSample ? reportNumber(onTimeCount / onTimeSample, 4) : null,
+      on_time_count: onTimeCount,
+      sample_size: onTimeSample,
+    },
+    stage_durations: [...durationBuckets.values()].map((bucket) => ({
+      from_progress: bucket.from,
+      to_progress: bucket.to,
+      sample_size: bucket.hours.length,
+      average_hours: reportNumber(average(bucket.hours)),
+      median_hours: reportNumber(median(bucket.hours)),
+    })),
+    metric_changes: metricChanges,
   };
 };
 
@@ -399,7 +882,11 @@ const payback = (): Recommendation["payback"] => {
  */
 const fallbackBlurb = (m: Merchant): string => `${m.eup}의 ${m.category} 하이원포인트 가맹점이에요`;
 
-export const deriveWidget = (region?: string, category?: string): WidgetResponse => {
+export const deriveWidget = (
+  region?: string,
+  category?: string,
+  limit = WIDGET_DEFAULT_LIMIT,
+): WidgetResponse => {
   const targets = newTargets();
   const pay = payback();
   const rows = merchants.filter(
@@ -410,8 +897,9 @@ export const deriveWidget = (region?: string, category?: string): WidgetResponse
   const sorted = [...rows].sort(
     (a, b) => Number(isNew(b)) - Number(isNew(a)) || anchorKm(a) - anchorKm(b),
   );
+  const visibleLimit = Math.max(1, Math.min(WIDGET_MAX_LIMIT, limit));
   return {
-    recommendations: sorted.slice(0, WIDGET_LIMIT).map((m) => ({
+    recommendations: sorted.slice(0, visibleLimit).map((m) => ({
       name: m.name,
       category: m.category,
       address: m.address,
@@ -423,5 +911,6 @@ export const deriveWidget = (region?: string, category?: string): WidgetResponse
       blurb: fallbackBlurb(m),
     })),
     policy_note: POLICY_NOTE,
+    total: sorted.length,
   };
 };

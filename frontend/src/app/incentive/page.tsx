@@ -5,6 +5,7 @@ import { AssumptionBadge, AssumptionNote, ProxyBadge } from "@/components/Badge"
 import { Icon } from "@/components/Icon";
 import { PageHeader } from "@/components/PageHeader";
 import { PaybackCycle } from "@/components/PaybackCycle";
+import { PolicyOutcomeGuide } from "@/components/PolicyOutcomeGuide";
 import { ScenarioTable } from "@/components/ScenarioTable";
 import { Section } from "@/components/Section";
 import { ProgressChip, StatusChip } from "@/components/StatusChip";
@@ -75,7 +76,7 @@ export default async function IncentivePage() {
           <>
             {/* ── 카드 헤더 ─────────────────────────────────────── */}
             <article className="u-panel overflow-hidden">
-              <div className="border-b border-admin-border bg-gradient-to-br from-visitor-primary-soft/60 to-admin-surface p-4 sm:p-6">
+              <div className="border-b border-admin-border bg-admin-surface-sunken p-4 sm:p-6">
                 <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
                   <span className="rounded-md bg-admin-surface px-1.5 py-0.5 text-[11px] font-semibold tabular-nums text-admin-text-muted ring-1 ring-inset ring-admin-border">
                     {card.id}
@@ -158,6 +159,7 @@ export default async function IncentivePage() {
               ) : (
                 <p className="u-body text-admin-text-muted">이 카드에는 비교할 시나리오가 없습니다.</p>
               )}
+              <PolicyOutcomeGuide card={card} headlineRate={dashboard.conversion.headline_rate} />
             </Section>
 
             {/* ── 예상 효과 ─────────────────────────────────────── */}

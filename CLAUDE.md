@@ -26,13 +26,13 @@ docs/plan/  개발 계획 문서 (단일 진실 원천)
 cd pipeline && python run_all.py
 
 # 통합 테스트 환경 (Docker: FE + BE + DynamoDB Local + 데모 카드 시드 — 개발 중 표준, AWS 불필요)
-docker compose up -d          # FE http://localhost:3000 · BE http://localhost:8000
-# 오버라이드: FRONTEND_PORT=3100 (3000 충돌 시) / FRONTEND_API_BASE= (FE mock 모드)
+docker compose up -d          # FE http://localhost:3100 · BE http://localhost:8000
+# 오버라이드: FRONTEND_PORT= (포트 변경 시) / FRONTEND_API_BASE= (FE mock 모드)
 
 # 백엔드 단독 로컬 실행 (정적 서빙만 볼 때, http://localhost:8000, .env 로드)
 cd backend && uvicorn app.main:app --reload --port 8000
 
-# 프론트 단독 로컬 실행 (http://localhost:3000, 컨테이너 밖)
+# 프론트 단독 로컬 실행 (http://localhost:3100, 컨테이너 밖)
 cd frontend && npm run dev
 
 # 백엔드 배포 — ⚠ 개발 완료 후 최종 1회만 (docs/plan/09 §4, 14 문서 T17)

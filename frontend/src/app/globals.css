@@ -14,7 +14,13 @@
 
   body {
     @apply bg-admin-bg text-admin-text antialiased;
+    overflow-x: hidden;
+    font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", "Pretendard", sans-serif;
     font-feature-settings: "tnum" 0;
+    background-image:
+      radial-gradient(circle at 78% 0%, rgb(225 239 231 / 0.72), transparent 27rem),
+      radial-gradient(circle at 15% 78%, rgb(248 218 192 / 0.30), transparent 24rem);
+    background-attachment: fixed;
   }
 
   /* KPI 값·표 숫자는 자릿수 흔들림 방지 (13 §6) */
@@ -26,7 +32,7 @@
      마우스 클릭에는 뜨지 않도록 :focus-visible 로만 건다 */
   :focus-visible {
     @apply outline-none ring-2 ring-admin-primary/45 ring-offset-2 ring-offset-admin-surface;
-    border-radius: 6px;
+    border-radius: 12px;
   }
 
   ::selection {
@@ -127,7 +133,7 @@
 
   /** 본문 패널 공통 표면 */
   .u-panel {
-    @apply min-w-0 rounded-card border border-admin-border bg-admin-surface shadow-card;
+    @apply min-w-0 rounded-panel border border-admin-border bg-admin-surface shadow-card;
   }
 
   /**
@@ -135,10 +141,10 @@
    * 테두리를 완전히 없애면 고대비 모드·인쇄에서 카드 경계가 사라지므로 아주 옅은 링만 남긴다.
    */
   .u-float {
-    @apply min-w-0 rounded-panel bg-admin-surface shadow-float ring-1 ring-inset ring-admin-border/70;
+    @apply min-w-0 overflow-hidden rounded-panel border border-admin-border bg-admin-surface shadow-float;
   }
   .u-float-hover {
-    @apply transition-[box-shadow,transform] duration-200 hover:-translate-y-0.5 hover:shadow-lift;
+    @apply transition-all duration-200 hover:-translate-y-0.5 hover:border-admin-primary-line hover:shadow-lift;
   }
 
   /* ── 표 ─────────────────────────────────────────────────────────────────

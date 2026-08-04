@@ -2,8 +2,8 @@
 
 import { useState } from "react";
 import { AssumptionNote } from "@/components/Badge";
+import { DeltaValue } from "@/components/DeltaValue";
 import { DecisionActions } from "@/components/DecisionActions";
-import { range } from "@/lib/format";
 import type { CardStatus, PaybackRate, Scenario } from "@/types";
 
 /**
@@ -44,6 +44,7 @@ export function ScenarioTable({
 }) {
   const editable = status === "pending";
   const [choice, setChoice] = useState<PaybackRate | null>(selectedRate);
+  const chooseRate = (rate: PaybackRate) => setChoice(rate);
   // 결정된 카드는 읽기 전용 — 담당자가 고른 rate만 체크된 채로 남는다
   const checked = editable ? choice : selectedRate;
   // 크기 인코딩 막대는 단색 + 값 직접 표기 (13 §5). 0으로 나누지 않도록 하한을 둔다
@@ -71,7 +72,7 @@ export function ScenarioTable({
               return (
                 <tr
                   key={s.rate}
-                  onClick={editable ? () => setChoice(s.rate) : undefined}
+                  onClick={editable ? () => chooseRate(s.rate) : undefined}
                   data-highlight={on ? "true" : undefined}
                   className={editable ? "cursor-pointer transition-colors hover:bg-admin-surface-sunken" : ""}
                 >
@@ -83,13 +84,16 @@ export function ScenarioTable({
                       value={s.rate}
                       checked={on}
                       disabled={!editable}
-                      onChange={() => setChoice(s.rate)}
+                      onChange={() => chooseRate(s.rate)}
+                      onInput={() => chooseRate(s.rate)}
+                      onClick={() => chooseRate(s.rate)}
                       className="h-[18px] w-[18px] accent-admin-primary"
                     />
                   </td>
                   <td>
                     <label
                       htmlFor={inputId}
+                      onClick={editable ? () => chooseRate(s.rate) : undefined}
                       className={`text-lg tabular-nums ${
                         on ? "font-bold text-admin-primary" : "font-semibold text-admin-text"
                       } ${editable ? "cursor-pointer" : ""}`}
@@ -104,9 +108,12 @@ export function ScenarioTable({
                     ) : null}
                   </td>
                   <td>
-                    <div className="font-semibold tabular-nums text-admin-text">
-                      {range(s.delta_pp)}
-                    </div>
+                    <DeltaValue
+                      value={s.delta_pp}
+                      unit="%p"
+                      variant="text"
+                      className="font-semibold"
+                    />
                     <span className="mt-1.5 flex h-2 w-full min-w-[80px] max-w-[160px] overflow-hidden rounded-full bg-admin-surface-sunken ring-1 ring-inset ring-admin-border">
                       <span
                         className="block h-full rounded-full bg-admin-primary"

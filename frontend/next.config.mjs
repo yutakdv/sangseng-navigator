@@ -36,10 +36,29 @@ function fromRootEnv(keys) {
 // 동적 라우트 `/cards/[id]`를 그대로 쓰기 위한 결정 (docs/plan/08 F1).
 const nextConfig = {
   reactStrictMode: true,
+  // Docker 검증 주소(127.0.0.1:3100)에서 dev 번들·HMR 요청이 차단되지 않도록 허용한다.
+  // 이 설정이 없으면 서버 HTML은 보이지만 라디오·승인·생성 같은 클라이언트 이벤트가 연결되지 않는다.
+  allowedDevOrigins: ["127.0.0.1", "localhost"],
   // Next 16이 dev 기동 때마다 frontend/AGENTS.md·CLAUDE.md 를 자동 생성한다 —
   // 레포 루트에 팀이 관리하는 CLAUDE.md 가 이미 있어 지침이 둘로 갈리므로 끈다.
   agentRules: false,
-  env: fromRootEnv(["NEXT_PUBLIC_API_BASE"]),
+  env: fromRootEnv(["NEXT_PUBLIC_API_BASE", "NEXT_PUBLIC_KAKAO_MAP_KEY", "NEXT_PUBLIC_DEMO_READ_ONLY"]),
+  /**
+   * 관리자 화면은 승인·추진 상태가 바뀐 직후 같은 브라우저에서 확인해야 한다.
+   * 페이지/API 응답은 캐시하지 않고, Next의 해시된 정적 자산(_next/static)만 캐시 대상으로 남긴다.
+   */
+  async headers() {
+    return [
+      {
+        source: "/((?!_next/static|_next/image|favicon.ico).*)",
+        headers: [
+          { key: "Cache-Control", value: "no-store, no-cache, must-revalidate, max-age=0" },
+          { key: "Pragma", value: "no-cache" },
+          { key: "Expires", value: "0" },
+        ],
+      },
+    ];
+  },
 };
 
 export default nextConfig;

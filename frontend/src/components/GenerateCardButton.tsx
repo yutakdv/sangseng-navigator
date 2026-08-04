@@ -3,6 +3,7 @@
 import { useState, useTransition } from "react";
 import { generateAction } from "@/app/actions";
 import { Icon } from "@/components/Icon";
+import { isDemoReadOnly } from "@/lib/runtime";
 import type { CardType } from "@/types";
 
 /**
@@ -52,8 +53,8 @@ export function GenerateCardButton({
             setFeedback({
               tone: created ? "ok" : "notice",
               text: created
-                ? `${card.id} 카드를 새로 만들었습니다 — 승인 대기 목록에서 확인하세요.`
-                : `${card.id} — 같은 대상(${card.target?.eup} ${card.target?.category})의 승인 대기 카드가 이미 있어 새로 만들지 않고 기존 카드를 불러왔습니다.`,
+                ? `${card.id} 카드를 새로 만들었습니다 — 결정 대기 목록에서 확인하세요.`
+                : `${card.id} — 같은 대상(${card.target?.eup} ${card.target?.category})의 결정 대기 카드가 이미 있어 새로 만들지 않고 기존 카드를 불러왔습니다.`,
             });
             return;
           }
@@ -81,9 +82,9 @@ export function GenerateCardButton({
       <button
         type="button"
         onClick={run}
-        disabled={working}
+        disabled={working || isDemoReadOnly}
         aria-busy={working}
-        className="inline-flex items-center gap-2 rounded-xl bg-admin-primary px-5 py-2.5 text-sm font-bold text-white shadow-[0_6px_18px_-6px_rgb(79_70_229)] transition-colors hover:bg-admin-primary-strong disabled:cursor-not-allowed disabled:opacity-70"
+        className="inline-flex min-h-10 items-center gap-2 rounded-lg bg-admin-primary px-4 py-2 text-sm font-bold text-white transition-colors hover:bg-admin-primary-strong disabled:cursor-not-allowed disabled:opacity-70"
       >
         {working ? (
           <>
@@ -100,6 +101,8 @@ export function GenerateCardButton({
           </>
         )}
       </button>
+
+      {isDemoReadOnly ? <p className="u-note">공개 데모 읽기 전용</p> : null}
 
       {/* 콜드스타트·LLM 대기를 "멈춤"으로 오인하지 않게 하는 장치 (11 §1 · 12 §5) */}
       {working ? (

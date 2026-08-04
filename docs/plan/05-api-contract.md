@@ -50,6 +50,7 @@ Base URL: 로컬 `http://localhost:8000` / 배포 후 API Gateway URL. 경로 �
     {"category": "음식점", "count": 6800, "share": 0.37}
   ],
   "growth": {"mom_pct": -2.1, "qoq_pp": -0.4},
+  "ranking_stability": null,
   "ai_stability": null
 }
 ```
@@ -74,8 +75,9 @@ Base URL: 로컬 `http://localhost:8000` / 배포 후 API Gateway URL. 경로 �
 - `growth.qoq_pp`: **지역 전환율의 전분기 대비 변화(%p)** — 분기는 데이터 최신 월(2025-12) 기준
   최근 3개월(2025-10~12) vs 직전 3개월(2025-07~09)이며, 분기 전환율은
   3개월 건수 합 ÷ 3개월 **입장 연인원(교대 합산)** 합 × 100
-- `ai_stability`: P8 민감도 분석 `sensitivity.json`의 `top3_stable_ratio × 100` (정수, "AI 제안 안정도" 타일).
-  P8 실행 전에는 `null` — FE는 `null`이면 타일을 숨기거나 `—` 표시
+- `ranking_stability`: P8 민감도 분석 `sensitivity.json`의 `top3_stable_ratio × 100`
+  (정수, "추천 순위 안정도" 타일). AI 모델 품질 지표가 아니다. P8 실행 전에는 `null`.
+  `ai_stability`는 이전 소비자 호환용 별칭이며 신규 화면은 사용하지 않는다
 
 ### `GET /api/candidates`
 지도·카드 상세용 스코어링 결과 (`eup_scores.json` + `candidates.json` 병합).
@@ -91,8 +93,10 @@ Base URL: 로컬 `http://localhost:8000` / 배포 후 API Gateway URL. 경로 �
     {
       "id": "CAND-001", "eup": "사북읍", "category": "카페",
       "lat": 37.2211, "lng": 128.8123, "name": "OO카페",
-      "score": 0.57, "gap": 1.0, "proximity": 0.7, "saturation": 0.0,
-      "nearby_merchants": 0, "nearby_stores": 34,
+      "score": 0.57, "gap": 0.83, "proximity": 0.7, "saturation": 0.0,
+      "market_coverage": 0.17, "gap_confidence": 0.8,
+      "nearby_merchants": 0, "nearby_same_category_stores": 4, "nearby_stores": 34,
+      "straight_distance_km": 9.4, "selection_basis": "selected_region_coverage",
       "road_distance_km": 11.0, "road_minutes": 50.8
     }
   ],
@@ -161,18 +165,43 @@ Base URL: 로컬 `http://localhost:8000` / 배포 후 API Gateway URL. 경로 �
   "target": {"eup": "사북읍", "category": "카페"},
   "score_rank": 2,
   "ai_rank": 1,
-  "confidence": "상",
+  "confidence": "중",
   "ai": {
     "adjusted": true,
-    "comparison": "1순위 사북 카페: Score 2위지만 반경 내 공백 업종이며 즉시 착수 가능. 2순위(Score 1위) 고한 편의점: 추진 상태=추진중으로 중복 착수 시 자원 낭비.",
-    "reasons": ["사북읍은 1단계 소비저조도 상위 지역", "반경 500m 내 하이원포인트 가맹점 0곳", "겨울 시즌 유동인구 집중 예상(계절성)"],
+    "comparison": "정량 2위 사북읍 카페(Score 0.57)를 AI 제안 1위로 검토했습니다. 정량 1위 고한읍 편의점(Score 0.59)보다 Score가 0.02 낮습니다. 두 후보의 도로 소요시간을 함께 확인한 뒤 결정해야 합니다.",
+    "reasons": ["정량 기준: Score 0.57 · 2위", "상권 기준: 업종공백도 1.0 · 반경 500m 내 동일 업종 가맹점 0곳", "AI는 후보 선택에만 사용했으며 숫자·순위·상태는 서버가 정본 데이터로 재검증했습니다"],
     "risks": ["신규 가맹점 초기 실적 저조 가능성", "가맹 협상이 분기 내 완료되지 않을 수 있음"],
-    "expected_effect": "지역 소비 집중도 약 3~4%p 개선 예상 (가정 기반 전망이며 실제와 다를 수 있음)",
+    "expected_effect": "가맹 전환 효과는 카드 상세의 반사실 시뮬레이션과 사업자 적격성 확인 후 판단해야 합니다 (가정 기반 전망이며 실제와 다를 수 있음)",
+    "grounding": {
+      "status": "verified",
+      "source": "structured",
+      "checks": ["target", "score", "rank", "progress", "road_time"]
+    },
     "original_ranking": [
       {"rank": 1, "candidate": "고한읍 편의점", "score": 0.59},
       {"rank": 2, "candidate": "사북읍 카페", "score": 0.57}
     ]
   },
+  "candidate_verification": {
+    "status": "unverified",
+    "checks": [
+      {"key": "business_status", "label": "영업 상태", "status": "unverified"},
+      {"key": "membership_eligibility", "label": "가맹 자격", "status": "unverified"},
+      {"key": "participation_intent", "label": "사업자 참여 의향", "status": "unverified"},
+      {"key": "visitor_fit", "label": "관광객 이용 적합성", "status": "unverified"},
+      {"key": "settlement_integration", "label": "정산 연동 가능성", "status": "unverified"}
+    ],
+    "note": "후보 접촉·검토 시작은 가맹 확정이 아니며, 적격성 확인과 가맹 심사를 별도로 거칩니다"
+  },
+  "operations": {
+    "owner": null,
+    "target_date": null,
+    "estimated_cost": null,
+    "contact_result": null,
+    "ineligibility_reason": null,
+    "actual_outcome": null
+  },
+  "version": 0,
   "scenarios": null,
   "sources": ["하이원포인트 사용현황", "가맹점 상세정보", "소진공 상가정보"],
   "created_at": "2026-08-01T10:00:00+09:00",
@@ -185,8 +214,19 @@ Base URL: 로컬 `http://localhost:8000` / 배포 후 API Gateway URL. 경로 �
   "가맹 전환"·"우선 모집·유치"로 적는다 (`simulate`의 표시 라벨은 "가맹 전환 시 예상 효과").
   API 필드명·`type` 값(`EXPANSION`)은 그대로 둔다 — 바뀌는 것은 표시 문구뿐이다
 - `type`: `EXPANSION`(확충) | `INCENTIVE`(페이백)
-- `status`: `pending`(승인 대기) | `approved` | `rejected` | `held`
-- `progress`: 승인 후에만 — `검토중` | `추진중` | `보류` | `완료` (승인 시 자동으로 `검토중`)
+- `status`: API 호환용 결정 상태 `pending` | `approved` | `rejected` | `held`. EXPANSION에서 `approved`는
+  **후보 접촉·검토 시작을 승인했다는 뜻**이며 가맹 확정이 아니다
+- `progress`: EXPANSION은 `후보 접촉·검토 시작` → `적격성 확인` → `가맹 심사` → `추진중` → `완료`,
+  그리고 어느 단계에서나 `보류`. INCENTIVE는 `검토중` | `추진중` | `보류` | `완료`를 유지한다
+- `candidate_verification.checks[].status`: `unverified` | `verified` | `failed`. 다섯 필수 항목이 모두
+  `verified`가 아니면 `적격성 확인` 이후 단계와 `완료`를 선택할 수 없다. 하나라도 `failed`면 카드의
+  사용자 표시 상태는 `부적격 또는 반려`이며 재검토 전 최종 상태로 이동하지 않는다
+- **AI 사실성 경계:** LLM은 `ai_rank_target` 선택과 비정량 리스크 초안에만 관여한다. 사용자에게
+  보이는 후보명·Score·순위·진행 상태·도로 소요시간·비교 문장은 서버가 구조화 데이터로 다시 만든다.
+  `ai.grounding.status=verified`는 이 재검증을 통과했다는 뜻이지 후보 사업자의 적격성이 확인됐다는 뜻은
+  아니다. 후자는 `candidate_verification.status=unverified`에서 별도로 관리한다.
+- 후보 적격성 확인 전 생성 카드의 `confidence`는 최대 `중`이다. `상`은 영업 상태·가맹 자격·참여 의향
+  등 운영 검증을 저장하고 감사할 수 있게 된 뒤에만 허용한다.
 - `INCENTIVE` 타입은 `target`/`score_rank`/`ai_rank` 대신 `scenarios` + `selected_rate` 사용:
 
 ```json
@@ -254,8 +294,9 @@ Base URL: 로컬 `http://localhost:8000` / 배포 후 API Gateway URL. 경로 �
 | GET | `/api/cards` | 목록. 쿼리: `type`, `status` (선택) | — | `{"cards": [Card]}` |
 | GET | `/api/cards/{id}` | 단건 | — | `{"card": Card}` |
 | POST | `/api/cards/generate` | 스코어링+AI로 카드 생성 | `{"type": "EXPANSION"}` 또는 `{"type": "INCENTIVE"}` | `{"card": Card}` — 신규 201, 동일 타깃 pending 중복 시 기존 카드 200 (§8) |
-| POST | `/api/cards/{id}/decision` | 승인/반려/보류 | `{"decision": "approved"\|"rejected"\|"held", "selected_rate": 3\|5\|7}` — `selected_rate`는 **INCENTIVE 카드를 approved할 때만 필수**, 그 외 생략 | `{"card": Card}` |
-| POST | `/api/cards/{id}/progress` | 추진 상태 변경 (approved만 가능) | `{"progress": "검토중"\|"추진중"\|"보류"\|"완료"}` | `{"card": Card}` |
+| POST | `/api/cards/{id}/decision` | 담당자 결정. EXPANSION의 `approved` 표시는 **후보 접촉·검토 시작** | `{"decision": "approved"\|"rejected"\|"held", "selected_rate": 3\|5\|7}` — `selected_rate`는 **INCENTIVE 카드를 approved할 때만 필수**, 그 외 생략 | `{"card": Card}` |
+| POST | `/api/cards/{id}/verification` | EXPANSION 후보 적격성 5항목 저장 | `{"checks": [{"key": "business_status", "status": "verified"}, ...], "note": "..."}` | `{"card": Card}` |
+| POST | `/api/cards/{id}/progress` | 추진 상태 변경 (approved만 가능) | `{"progress": "후보 접촉·검토 시작"\|"적격성 확인"\|"가맹 심사"\|"추진중"\|"보류"\|"완료"}` (INCENTIVE는 기존 4단계) | `{"card": Card}` |
 | POST | `/api/cards/{id}/simulate` | 가맹 전환 시 예상 효과 (반사실 재계산+LLM) | — | 아래 |
 
 `simulate` 응답:
@@ -263,13 +304,24 @@ Base URL: 로컬 `http://localhost:8000` / 배포 후 API Gateway URL. 경로 �
 {
   "simulation": {
     "current_index": 42.5,
-    "projected_index": 42.4,
+    "projected_index": 42.5,
     "delta_pp": [0.0, 0.1],
-    "narrative": "사북읍 카페 업종에 신규 가맹점이 1곳 추가되면, 시뮬레이션상 지역 소비 집중도가 약 3~4%p 개선되고 지역 전환율도 소폭 상승할 것으로 예상됩니다. 다만 이 추정은 유사 신규 가맹점의 평균 초기 실적을 가정한 것이며, 실제 결과는 입지·홍보 여부에 따라 달라질 수 있습니다.",
+    "expected_monthly_count": 62.4,
+    "estimate_basis": "대상 지역·업종의 최근 3개월 가맹점당 평균",
+    "base_month": "2025-12",
+    "effect_assessment": "미미",
+    "decision_note": "집중도 개선폭이 매우 작게 추정됩니다. 승인 전에 가맹 유치 비용·사업자 참여 의향·예상 월 사용건수를 비교하고, 보류도 정상적인 선택지로 검토하세요.",
+    "narrative": "사북읍 카페 업종에 신규 가맹점이 1곳 추가되어도 예상 월 이용 건수가 6개 지역 전체 규모에 견주면 작아, 지역 소비 집중도는 소수점 첫째 자리 기준으로 변화가 나타나지 않을 것으로 예상됩니다. 이는 유사 가맹점의 평균 초기 실적을 가정한 전망이며, 실제 결과는 입지·홍보 여부에 따라 달라질 수 있습니다.",
     "assumption_note": "가정 기반 전망이며 실제와 다를 수 있음"
   }
 }
 ```
+
+- `expected_monthly_count`는 반사실 계산에 더한 예상 월 이용 건수, `estimate_basis`는 3단계 폴백 중
+  실제 적용 근거, `base_month`는 전망의 기준월이다. FE는 효과 지수만 보여주지 말고 세 값을 함께 보여
+  “0.0%p”가 계산 실패인지 규모가 작은 정상 결과인지 구분하게 한다.
+- `effect_assessment`는 `개선|심화|혼재|미미`이며 `decision_note`는 승인 권고가 아니라 담당자가 다음에
+  확인할 사항을 제시한다. `미미` 또는 최대 변화폭 0.1%p 이하는 보류도 정상 선택지라고 명시한다.
 
 - `current_index`·`projected_index`는 **소수 1자리**다(§1 `concentration.index`의 정수 표기와 다름).
   정수로 반올림하면 원시 집중도가 42.53처럼 경계에 걸릴 때 0.05%p 변화가 "43 → 42"로 보여
@@ -334,7 +386,8 @@ Base URL: 로컬 `http://localhost:8000` / 배포 후 API Gateway URL. 경로 �
       "blurb": "사북 시장 골목의 신규 하이원포인트 가맹점이에요. 산책 후 들르기 좋아요."
     }
   ],
-  "policy_note": "확충 완료된 신규 가맹점을 우선 추천합니다"
+  "policy_note": "완료된 확충 업종 우선 · 그 외 하이원리조트 거점 직선거리 기준",
+  "total": 18
 }
 ```
 
@@ -346,7 +399,8 @@ Base URL: 로컬 `http://localhost:8000` / 배포 후 API Gateway URL. 경로 �
   방문객 동선과 무관한 가맹점이 먼저 나오기 때문이다
   - **거리 값은 응답에 싣지 않는다**(정렬 근거로만 사용). `blurb` 생성 프롬프트에도 넣지 않는다 —
     §1 캐비엇대로 화면·문구 어디에서도 "가장 가깝다"고 단정하지 않기 위함이다.
-    FE는 추천 순서를 "가까운 순"으로 라벨링하지 말고 `policy_note` 문구만 그대로 노출한다
+    FE는 위치 권한을 사용하지 않는다는 점과 하이원리조트 거점 직선거리 기준임을 함께 밝힌다. 산악
+    도로 실제 이동시간과 순서가 다를 수 있으므로 “내 주변”·“가까운 순”이라고 라벨링하지 않는다.
   - 좌표(`lat`/`lng`)가 없는 가맹점은 거리 비교에서 맨 뒤로 밀린다
 
 ## 5. 기타
@@ -395,24 +449,29 @@ FE mock 동기화: 레포 루트에서 `./scripts/sync-mocks.sh` — 위 산출 
 
 - 테이블: `sangseng-cards` (SAM이 생성, 실제 이름은 Outputs 참조)
 - PK: `id` (S) — 예: `AC-001`, `INC-001`
-- 항목 = Card 객체 그대로 (map). 소량(수십 건)이므로 목록은 Scan, GSI 없음
+- 항목 = Card 객체 그대로 (map). 소량(수십 건)이므로 목록은 GSI 없이 Scan하되
+  `LastEvaluatedKey`가 사라질 때까지 모든 페이지를 읽는다
 - 상태 변경 이력은 `events` 리스트 속성에 append: `{"at": iso8601, "action": "approved" | "progress:완료" | ...}`
+- decision/progress/verification은 DynamoDB conditional update 한 번에 상태·이벤트·`version`을 함께 갱신한다.
+  같은 이전 상태에서 출발한 동시 요청 중 하나만 성공하고 나머지는 도메인 `409`가 된다
 
 ## 8. 동작 규칙·엣지 케이스 (FE·BE 공통 합의)
 
 | 상황 | 규칙 |
 |---|---|
-| 카드 ID 생성 | `AC-`(EXPANSION)/`INC-`(INCENTIVE) + 3자리 순번. BE가 Scan으로 **해당 타입 기존 ID의 최대 순번 + 1** 산정. 개수+1이 아닌 이유: 카드가 삭제되거나 비순차 ID가 섞이면 이미 쓰인 ID가 다시 나와 기존 카드를 덮어쓴다. 순번으로 파싱되지 않는 ID는 건너뛴다 (동시 generate 경합은 데모 규모에서 무시) |
-| generate 중복 | 동일 `(type, target.eup, target.category)`의 `pending` 카드가 이미 있으면 새로 만들지 않고 **기존 카드를 200으로 반환** (데모 중 버튼 연타 대비). INCENTIVE는 `target`이 없으므로 pending INCENTIVE는 동시에 1장만 존재. **LLM 호출을 건너뛰고 기존 카드를 바로 돌려주는 것은 "가용 후보(추진중/완료가 아닌 후보) 전원이 이미 pending 카드를 가진 경우"뿐** — 한 후보라도 비어 있으면 LLM을 호출한다(가드 기준은 여전히 타깃별이며, 위 규칙의 의미는 불변) |
-| generate 시 제안 가능한 신규 후보가 없음 | 전 후보의 추진 상태가 `추진중`/`완료`여서 중복 제안 금지(07 A-1) 대상만 남으면 `409 {"detail": "제안할 수 있는 신규 후보가 없습니다 (전 후보가 추진중/완료 상태)"}`. LLM 장애가 아니라 정상적인 도메인 신호이므로 규칙 기반 fallback으로 넘기지 않는다 |
+| 카드 ID 생성 | `AC-`(EXPANSION)/`INC-`(INCENTIVE) + 3자리 순번. 타입별 내부 counter item을 DynamoDB `ADD`로 원자 증가시킨다. 최초 1회만 기존 최대 ID로 counter를 초기화하고, 카드 `PutItem`에도 `attribute_not_exists(id)` 조건을 걸어 기존 항목 덮어쓰기를 이중 방지한다 |
+| EXPANSION generate 중복 | 동일 `(target.eup, target.category)`에 `승인 대기` 또는 진행 중 업무가 있으면 새 Work Item 후보에서 제외한다. LLM이 기존 pending 타깃을 선택하면 새 카드를 만들지 않고 **기존 카드를 200으로 반환**한다. 승인된 업무가 진행 중인 타깃을 다른 카드로 다시 제안하지 않는다. INCENTIVE는 기존대로 pending 카드를 동시에 1장만 허용한다. |
+| generate 시 제안 가능한 신규 후보가 없음 | 전 후보에 승인 대기 또는 진행 중인 업무가 있으면 `409 {"detail": "모든 후보에 승인 대기 또는 진행 중인 업무가 있어 새로 제안할 후보가 없습니다"}`. LLM 장애가 아니라 정상적인 도메인 신호이므로 규칙 기반 fallback으로 넘기지 않는다. |
 | `simulate`를 INCENTIVE 카드에 호출 | `400 {"detail": "INCENTIVE 카드는 scenarios를 사용합니다"}` — 시뮬레이션은 EXPANSION 전용 |
 | `simulate` 타깃 `eup`이 집계 6개 지역 밖 | `400 {"detail": "집계 대상 지역이 아닙니다: <eup> (대상: 고한읍, 사북읍, 정선군, 태백시, 영월군, 삼척시)"}` — 지역 분포에 더할 자리가 없어 조용히 `delta 0`을 내면 "효과 없음"과 구분되지 않는다 |
 | INCENTIVE 승인 시 `selected_rate` 누락/범위 밖 | `400 {"detail": "selected_rate(3|5|7)가 필요합니다"}`. EXPANSION decision에 온 `selected_rate`는 무시. 이 400만은 상태 전이 확인(409) **뒤**에 온다 — pending이 아니라 애초에 결정할 수 없는 카드의 body를 먼저 따질 이유가 없다 |
-| 잘못된 상태 전이 | `409 {"detail": ...}` — 예: pending이 아닌 카드에 decision, approved가 아닌 카드에 progress |
+| 적격성 미확인 EXPANSION의 최종 단계 요청 | `409 {"detail": ...}` — 다섯 항목 검증 전에는 `적격성 확인`·`가맹 심사`·`추진중`·`완료`로 이동할 수 없다 |
+| 잘못된 상태 전이·동시 요청 | `409 {"detail": ...}` — 예: pending이 아닌 카드에 decision, approved가 아닌 카드에 progress, 같은 이전 상태를 조건으로 한 중복 요청의 패자 |
+| 공개 데모 mutation | `DEMO_READ_ONLY=true`이면 generate/decision/verification/progress를 `403`으로 차단한다. 인증·권한 도입 시 이 공통 mutation dependency에 연결한다 |
 | 없는 카드 ID | `404 {"detail": "card not found"}`. **검사 순서는 404 → 400(body 값) → 409(상태 전이)** — 없는 카드에 값이 잘못된 body를 보내도 404가 나간다. 단 body가 **요청 스키마 자체**를 못 넘기면(필드 누락·타입 불일치) 라우트 진입 전 FastAPI가 `422`를 낸다 |
 | KPI에서 분모 0 | 해당 지표를 `null`로 반환 (예: approved 0건 → `execution_rate: null`, 채택 0건 → `regional_balance_index: null`). FE는 `null`이면 `—` 표시 |
 | 위젯 추천 결과 0건 | `{"recommendations": [], "policy_note": ...}` 200 반환. FE는 "해당 조건의 가맹점이 아직 없어요" 빈 상태 UI |
 | 위젯 추천 문구 | 실명 가맹점의 검증되지 않은 맛·분위기·메뉴를 생성하지 않고, 원천 데이터의 지역·업종만으로 `"{region}의 {category} 하이원포인트 가맹점이에요"`를 결정론적으로 표시 |
 | 시각 표기 | 모든 타임스탬프 KST ISO8601 (`+09:00`) — `avg_approval_hours` 계산도 KST 기준 |
 | 숫자 직렬화 | **BE 구현 주의:** boto3가 DynamoDB 숫자를 `Decimal`로 반환 → FastAPI JSON 직렬화가 깨진다. `db.py` 읽기 경로에서 Decimal→int/float 변환을 일괄 적용할 것 (07 문서 B2). 변환 기준은 **저장 표기에 소수점이 있으면 float, 없으면 int** — 값이 정수라는 이유로 float를 int로 내리지 않는다(그러면 저장·조회를 반복할 때마다 §2 `scenarios[].delta_pp`가 `[1.0, 2.0]` → `[1, 2]`로 바뀐다) |
-| 날짜 기준 | "최근 3개월"·"전분기" 등은 **오늘이 아니라 데이터 최신 월 기준** (공공데이터 갱신 지연 대비, 06 문서 공통 원칙) |
+| 날짜 기준 | "최근 3개월"·"전분기" 등 계산은 **오늘이 아니라 데이터 최신 월 기준**으로 재현한다. 별도로 FE는 최신 월과 현재 월의 차이를 계산해 4개월 이상이면 `갱신 필요` 운영 경고를 모든 담당자 화면에 표시한다. 오래된 데이터로 계산했다는 사실을 숨기지 않으며 승인 전 최신 사용현황·가맹점 영업 상태 재확인을 요구한다. |

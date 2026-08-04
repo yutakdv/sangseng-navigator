@@ -8,7 +8,7 @@ import { Icon, type IconName } from "@/components/Icon";
  * 붙여 **이동 가능한 진행 표시**로 만든다 — 그림만 있으면 "이 시스템은 이런 절차입니다"라는
  * 설명에 그치지만, 건수가 붙으면 담당자가 지금 어느 단계에 병목이 있는지 바로 읽는다.
  *
- * 문구는 절대 규칙 4를 따른다: AI 단계는 "제안"까지이고, 확정은 담당자 승인 단계에서 일어난다.
+ * 문구는 절대 규칙 4를 따른다: AI 단계는 "제안"까지이고, 가맹 확정은 적격성·가맹 심사 뒤에만 가능하다.
  */
 type Step = {
   icon: IconName;
@@ -47,15 +47,15 @@ export function PolicyFlow({
     },
     {
       icon: "check",
-      title: "승인 확정",
-      desc: "담당자 승인으로만 확정",
+      title: "검토 시작",
+      desc: "후보 접촉 · 아직 가맹 확정 아님",
       href: "/?type=EXPANSION#pending",
       count: { value: counts.approved, unit: "건" },
     },
     {
       icon: "workflow",
-      title: "추진 기록",
-      desc: "검토중 · 추진중 · 보류 · 완료",
+      title: "적격성·실행",
+      desc: "5항목 확인 · 가맹 심사 · 추진",
       href: "/tracking",
       count: { value: counts.inProgress, unit: "건" },
     },
@@ -84,7 +84,7 @@ export function PolicyFlow({
           <Link
             href={s.href}
             style={{ animationDelay: `${i * 60}ms` }}
-            className="animate-fade-up flex h-full min-w-0 flex-col rounded-2xl bg-admin-surface-sunken p-4 transition-colors hover:bg-admin-primary-soft"
+            className="animate-fade-up flex h-full min-w-0 flex-col border border-admin-border bg-admin-surface p-4 transition-colors hover:border-admin-primary-line"
           >
             <span className="flex items-center gap-2">
               <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-[10px] bg-admin-surface text-admin-primary shadow-card">

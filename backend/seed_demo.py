@@ -7,21 +7,12 @@
 --reset은 테이블이 없으면 만들고, 있으면 전부 비운 뒤 시드한다 (리허설·심사 리셋 — 11 문서 §4).
 전체 비우는 이유: 비순차 목업 ID(AC-9xx 등)가 남아 있으면 next_card_id가 충돌한다 (T9 보고서 인계).
 
-시드 카드 (사용자 확정 결정 2026-08-03 — 영월군 서사, 실측 candidates.json 기준.
-2026-08-04 제도 부합성 수정으로 파이프라인을 재산출해 카드 B의 타깃·수치를 갱신했다):
-  A) AC-001 EXPANSION 영월군×카페 문갤러리   — approved+추진중 (created 2일 전·decided 1.5일 전
-     → avg_approval_hours 12.0h, 0.0h 방지 — 15 §5). 데모에서 '완료'로 바꾸면 위젯이
-     영월군×카페 가맹점 2곳(느리게·별빛마루)에 확충 업종 배지 — 일치 1~3곳 조건 충족 (T13 인계)
-  B) AC-002 EXPANSION 영월군×음식점 동원각 — pending, "Score 2위 → 1순위 제안" 조정 사례 **예시**.
-     ⚠ **이 카드는 LLM이 만든 결과가 아니라 재현성을 위해 사람이 고정한 JSON이다**
-     (리허설·심사 리셋 때 서사가 항상 같아야 해서 — 15 §5 T11). 실시간 생성은
-     `POST /api/cards/generate`(허브의 "이번 분기 카드 생성" 버튼)로 별도 시연하며 **호출마다
-     결과가 달라질 수 있다** — 실호출 테스트에서 같은 입력에 조정 없이 Score 1위를 유지한
-     응답도 나왔다. 대본·발표에서 이 카드를 "AI가 방금 해냈다"고 말하지 말 것 (11 §1 머리말).
-     아래 ai.reasons 는 "담당자에게 이런 근거가 제시된다"는 예시로서 유효하며, 조정 사유에
-     추진중인 카드 A와의 관계(중복 회피)와 도로 접근성(05 §1 road_minutes) 역전을 명시한다.
-     ※ 직전 시드는 소매점 강원선바위협동조합이었는데, 상시모집 자격이 개인사업자(법인 제외)라
-       협동조합이 후보에서 빠졌다(p6_scoring.CORPORATE_MARKERS) — 새 산출 기준으로 교체
+시드 카드 (2026-08-05 개선 산식으로 재산출한 candidates.json 기준):
+  A) AC-001 EXPANSION 영월군×음식점 — approved+후보 접촉·검토 시작. 정량 1위가 이미
+     진행 중이라는 운영 상태를 만든다. created 2일 전·decided 1.5일 전이라 의사결정 12시간이다.
+  B) AC-002 EXPANSION 영월군×소매점 — pending. 정량 1위가 활성 업무여서 서버가 가용 후보 중
+     최고점인 2위를 선택한 중복 회피 사례다. 대상 선택은 결정론적이며 LLM은 리스크 설명만 보조한다.
+     ⚠ 두 카드는 리허설 재현성을 위한 고정 JSON이고, 방금 생성된 AI 결과라고 말하지 않는다.
   C) INC-001 INCENTIVE — pending, 05 §2 INC-001 예시 구조 재사용 (수치는 실데이터와 정합 확인됨)
 """
 import argparse
@@ -34,7 +25,7 @@ if os.environ.get("DYNAMO_ENDPOINT"):       # DynamoDB Local은 자격증명 "�
     os.environ.setdefault("AWS_SECRET_ACCESS_KEY", "local")
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))   # backend/ 밖에서 실행해도 app import
-from app import db  # noqa: E402  (환경변수 세팅 뒤에 import해야 boto3 리소스가 올바로 붙는다)
+from app import db, progress_db  # noqa: E402  (환경변수 세팅 뒤에 import해야 boto3 리소스가 올바로 붙는다)
 
 TABLE_NAME = os.environ.get("CARDS_TABLE") or "sangseng-cards"   # 빈 문자열 방어 — db.py 와 동일
 
@@ -46,19 +37,38 @@ def _iso(hours_ago: float) -> str:
 # ── 실측 정량 순위 (data/processed/candidates.json, 2026-08-04 재산출분) — 전 카드 공통 병기 ──
 # 05 §2 계약 형태(rank/candidate/score)라 상호명은 넣지 않는다. 상호명은 아래 별도 상수로 대조한다.
 ORIGINAL_RANKING = [
-    {"rank": 1, "candidate": "영월군 숙박업", "score": 0.67},
-    {"rank": 2, "candidate": "영월군 음식점", "score": 0.57},
-    {"rank": 3, "candidate": "영월군 편의점", "score": 0.56},
-    {"rank": 4, "candidate": "영월군 소매점", "score": 0.56},
-    {"rank": 5, "candidate": "영월군 카페", "score": 0.47},
+    {"rank": 1, "candidate": "영월군 음식점", "score": 0.5},
+    {"rank": 2, "candidate": "영월군 소매점", "score": 0.49},
+    {"rank": 3, "candidate": "영월군 숙박업", "score": 0.48},
+    {"rank": 4, "candidate": "삼척시 편의점", "score": 0.45},
+    {"rank": 5, "candidate": "삼척시 카페", "score": 0.42},
 ]
 # 카드 문구(비교문·근거)에 상호명이 직접 박혀 있다 — 순위·점수가 같아도 대표 상가는 바뀔 수 있어 함께 대조
-ORIGINAL_CANDIDATE_NAMES = ["동빈네민박&캠핑장", "동원각", "메이플", "한결퇴비", "문갤러리"]
-# 카드 B의 조정 근거가 "직선 1위는 차로 50분대, 2위는 30분대"라는 도로 소요시간에 걸려 있다
-# (05 §1 road_minutes). rank·score·상호가 그대로여도 이 값이 바뀌면 문구가 거짓이 되므로 함께 대조한다.
-# 문구는 '분대' 단위라 소폭 변동이면 이 상수만 갱신해도 되지만, 십분대가 바뀌면 문구를 다시 써야 한다.
-ORIGINAL_CANDIDATE_ROAD_MINUTES = [50.8, 33.9, 34.5, 30.8, 39.9]
+ORIGINAL_CANDIDATE_NAMES = ["황금식당", "백민농장", "솔고개민박", "빈이슈퍼", "삼척맛척커피이야기"]
+# 카드 근거에 도로 소요시간을 표시하므로 rank·score·상호와 함께 대조한다.
+ORIGINAL_CANDIDATE_ROAD_MINUTES = [35.2, 35.9, 44.1, 41.5, 34.2]
 EXPANSION_SOURCES = ["하이원포인트 사용현황", "가맹점 상세정보", "소진공 상가정보"]
+GROUNDING = {
+    "status": "verified",
+    "numeric_status": "verified",
+    "narrative_status": "rule_based",
+    "selection_method": "deterministic_highest_available_score",
+    "explanation_source": "rule_seed",
+    "source": "structured",
+    "checks": ["target", "score", "rank", "progress", "road_time"],
+}
+CANDIDATE_VERIFICATION = {
+    "status": "unverified",
+    "checks": [
+        {"key": label, "label": label, "status": "unverified"}
+        for label in ("영업 상태", "가맹 자격", "사업자 참여 의향", "관광객 이용 적합성", "정산 연동 가능성")
+    ],
+    "note": "후보 접촉·검토 시작은 가맹 확정이 아닙니다. 필수 적격성 확인 후 별도 가맹 심사를 거칩니다",
+}
+EMPTY_OPERATIONS = {
+    "owner": None, "target_date": None, "expected_cost": None,
+    "contact_result": None, "ineligible_reason": None, "actual_outcome": None,
+}
 
 
 def assert_ranking_matches_pipeline() -> None:
@@ -86,7 +96,7 @@ def assert_ranking_matches_pipeline() -> None:
         # null 이면 OSRM 조회 실패분이 그대로 산출된 것 — 카드 B의 "차로 50분대/30분대" 근거가
         # 사라지므로 조용히 넘기지 않는다. p6_scoring.annotate_road_access 로그를 먼저 확인할 것.
         raise SystemExit(
-            "seed_demo 중단: 카드 B 조정 근거인 도로 소요시간이 candidates.json 과 다릅니다 "
+            "seed_demo 중단: 카드 근거인 도로 소요시간이 candidates.json 과 다릅니다 "
             "(null이면 OSRM 조회 실패 — 재조회 후 다시 시도).\n"
             f"  하드코딩: {ORIGINAL_CANDIDATE_ROAD_MINUTES}\n"
             f"  실산출  : {roads}"
@@ -96,77 +106,75 @@ def assert_ranking_matches_pipeline() -> None:
 def demo_cards() -> list:
     """데모 3장 — 문구의 수치는 전부 실데이터 검증본 (task-11-report.md 근거 기재)."""
     assert_ranking_matches_pipeline()
-    # 카드 A: approved+추진중 — 위젯 배지 조건(영월군×카페 가맹점 2곳)으로 타깃 선정 (T13 인계)
+    # 카드 A: 후보 접촉·검토 시작 — 적격성 확인 전 가맹 확정처럼 보이지 않게 한다.
     card_a = {
-        "id": "AC-001", "type": "EXPANSION", "status": "approved", "progress": "추진중",
-        "title": "영월군 카페 업종 가맹점 확충",
-        "target": {"eup": "영월군", "category": "카페"},
-        "score_rank": 5, "ai_rank": 1, "confidence": "중",
+        "id": "AC-001", "type": "EXPANSION", "status": "approved", "progress": "후보 접촉·검토 시작",
+        "title": "영월군 음식점 업종 가맹점 확충",
+        "target": {"eup": "영월군", "category": "음식점"},
+        "score_rank": 1, "ai_rank": 1, "selection_rank": 1, "confidence": "중",
         "ai": {
-            "adjusted": True,
+            "adjusted": False,
             "comparison": (
-                "1순위(조정) 영월군 카페 문갤러리: Score 5위(0.47)지만 영월군 내 카페 하이원포인트 "
-                "가맹점이 2곳뿐이고 최근 3개월 카페 업종 사용 실적이 0건 — 가맹 공백이 실적 공백으로 "
-                "이어진 상태라 확충 시 방문객 체감 개선이 가장 빠를 것으로 예상. "
-                "2순위(Score 1위) 영월군 숙박업 동빈네민박&캠핑장(0.67): 업종공백도는 같으나 "
-                "숙박업 특성상 가맹 협상·시설 확인에 시간이 걸릴 가능성."),
+                "정량 1위 영월군 음식점(Score 0.5)을 서버 제안 대상으로 유지했습니다. 차순위 "
+                "영월군 소매점(Score 0.49)과 비교했으며, 영월군 음식점의 도로 소요시간 약 "
+                "35.2분을 함께 확인해야 합니다."),
             "reasons": [
-                "영월군 내 카페 하이원포인트 가맹점 2곳 — 방문객 체감 공백이 큰 업종",
-                "최근 3개월 영월군 카페 업종 하이원포인트 사용 실적 0건 — 가맹 공백이 실적 공백으로 이어진 상태",
-                "문갤러리 반경 500m 내 동일 업종 하이원 가맹점 0곳(업종공백도 1.0), 여름 성수기(휴가철·워터월드) 유동인구 흡수 가능성",
+                "정량 기준: Score 0.5 · 1위",
+                "상권 기준: 업종공백도 0.83 · 반경 500m 내 동일 업종 하이원포인트 가맹점 0곳 / 동일 업종 상가 4곳",
+                "이동 기준: 동선근접도 0.68은 직선거리 기반 · 도로 소요시간 약 35.2분",
+                "대상은 서버의 정량 규칙이 선택했고 AI는 비정량 리스크 문구 생성에만 사용했습니다",
             ],
             "risks": [
                 "신규 가맹점 초기 실적 저조 가능성",
-                "Score 상위 후보(숙박·소매) 대비 정량 점수가 낮아 효과가 제한적일 가능성",
+                "가맹 신청은 사업자 의사에 달려 있어 후보 접촉 후에도 계약이 성사되지 않을 가능성",
+                "영업 상태·가맹 자격·관광객 이용 적합성은 승인 전 별도 확인 필요",
             ],
-            "expected_effect": "영월군 카페 공백 해소로 방문객 소비 접점 확대 예상 (가정 기반 전망이며 실제와 다를 수 있음)",
+            "expected_effect": "영월군 음식점 후보의 가맹 전환 효과는 카드 상세의 반사실 시뮬레이션과 사업자 적격성 확인 후 판단해야 합니다 (가정 기반 전망이며 실제와 다를 수 있음)",
+            "grounding": GROUNDING,
             "original_ranking": ORIGINAL_RANKING,
         },
         "scenarios": None,
+        "candidate_verification": CANDIDATE_VERIFICATION,
+        "operations": EMPTY_OPERATIONS,
         "sources": EXPANSION_SOURCES,
         "created_at": _iso(48), "decided_at": _iso(36),     # 승인 소요 12.0h — 0.0h 방지 (15 §5)
         "events": [
             {"at": _iso(48), "action": "generated"},
             {"at": _iso(36), "action": "approved"},
-            {"at": _iso(24), "action": "progress:추진중"},
+            {"at": _iso(24), "action": "progress:후보 접촉·검토 시작"},
         ],
     }
-    # 카드 B: pending, "Score 2위 → 1순위 제안" 조정 사례 예시 — 데모 핵심.
-    # LLM 결과가 아니라 재현성을 위해 사람이 고정한 JSON이다 (모듈 docstring B 참조).
-    # 조정 근거는 candidates.json 실측: 동빈네민박 직선 5.55km / 차로 50.8분,
-    # 동원각 직선 7.56km / 차로 33.9분 (직선 근접도와 실제 접근성이 역전된 구간 — 05 §1).
-    # 도로 거리(km)는 공개 라우팅 API 추정치라 비포장·임도가 섞일 수 있어 문구에 쓰지 않는다 —
-    # **소요시간 비교로만** 서술한다 (05 §1 캐비엇).
+    # 카드 B: 정량 1위가 이미 진행 중이라 서버가 가용 후보 1위(원 순위 2위)를 고른 고정 예시.
     card_b = {
         "id": "AC-002", "type": "EXPANSION", "status": "pending", "progress": None,
-        "title": "영월군 음식점 업종 가맹점 확충",
-        "target": {"eup": "영월군", "category": "음식점"},
-        "score_rank": 2, "ai_rank": 1, "confidence": "상",
+        "title": "영월군 소매점 업종 가맹점 확충",
+        "target": {"eup": "영월군", "category": "소매점"},
+        "score_rank": 2, "ai_rank": 1, "selection_rank": 1, "confidence": "하",
         "ai": {
             "adjusted": True,
             "comparison": (
-                "1순위(조정) 영월군 음식점 동원각(상동읍 구래리): Score 2위(0.57). "
-                "Score 1위 숙박업 후보는 거점에서 직선 5.6km로 가장 가깝지만 차로는 50분대가 걸리고, "
-                "동원각은 직선 7.6km로 더 먼데도 차로 30분대라 실제 접근성이 앞선다 — "
-                "직선거리 기반 근접도가 산악 지형에서 역전되는 구간. 여름 성수기(휴가철·워터월드)가 "
-                "진행 중이라 분기 내 착수 확실성이 관건인 점도 음식점 쪽에 유리할 것으로 예상. "
-                "2순위(Score 1위) 영월군 숙박업 동빈네민박&캠핑장(0.67): 업종공백도는 같으나 숙박업 "
-                "특성상 가맹 협상·시설 확인 소요가 길 가능성이 있어 성수기 내 효과 확인이 어려울 수 있음."),
+                "정량 상위 후보 영월군 음식점(후보 접촉·검토 시작)은 활성 업무가 있어 중복 제안에서 "
+                "제외했습니다. 따라서 가용 후보 중 최고점인 정량 2위 영월군 소매점(Score 0.49)을 "
+                "서버가 선택했습니다. 동일 업종 상가 표본이 2곳으로 작아 담당자 확인이 필요합니다."),
             "reasons": [
-                "실제 접근성 역전 — Score 1위 숙박업 후보는 직선 5.6km(근접도 1.00)로 가장 가깝지만 차로는 50분대인 반면, 동원각은 직선 7.6km(근접도 0.71)로 밀렸는데 차로는 30분대다. 정량 Score는 직선거리 기준이라 이 역전을 반영하지 못한다",
-                "여름 성수기(계절성 신호) 내 착수 확실성 — 음식점은 성수기 수요에 즉시 대응 가능할 것으로 예상되는 반면 숙박업은 가맹 협상·시설 확인 소요가 길 가능성",
-                "이미 추진중인 영월군 카페 확충 카드(문갤러리·산솔면 녹전리)와 업종·지점이 겹치지 않아 중복 착수 위험이 없고, 카페(녹전리)·음식점(상동읍 구래리)으로 영월군 내 소비 접점을 서로 다른 생활권에 넓히는 조합",
-                "동원각 반경 500m 내 동일 업종 하이원 가맹점 0곳(업종공백도 1.0) — 영월군 소비 전환의 공백 지점",
+                "정량 기준: Score 0.49 · 2위",
+                "상권 기준: 업종공백도 0.75 · 반경 500m 내 동일 업종 하이원포인트 가맹점 0곳 / 동일 업종 상가 2곳",
+                "이동 기준: 동선근접도 0.71은 직선거리 기반 · 도로 소요시간 약 35.9분",
+                "대상은 서버의 정량 규칙이 선택했고 AI는 비정량 리스크 문구 생성에만 사용했습니다",
             ],
             "risks": [
                 "신규 가맹점 초기 실적 저조 가능성",
                 "가맹 신청은 사업자 의사에 달려 있어(상시모집·개인사업자 대상) 접촉해도 분기 내 계약이 성사되지 않을 가능성",
-                "도로 소요시간은 공개 라우팅 API 추정치로 비포장·임도 구간이 포함될 수 있어, 절대 수치가 아니라 후보 간 상대 비교로만 해석해야 함(계절·기상 영향도 미반영)",
+                "동일 업종 상가 표본이 2곳뿐이라 업종공백도 불확실성이 큼",
+                "영업 상태·가맹 자격·관광객 이용 적합성은 승인 전 별도 확인 필요",
             ],
-            "expected_effect": "지역 소비 집중도 약 0.1%p 내외 개선 예상 — 규모는 작지만 영월군 방향 소비 전환의 시작점 (가정 기반 전망이며 실제와 다를 수 있음)",
+            "expected_effect": "영월군 소매점 후보의 가맹 전환 효과는 카드 상세의 반사실 시뮬레이션과 사업자 적격성 확인 후 판단해야 합니다 (가정 기반 전망이며 실제와 다를 수 있음)",
+            "grounding": GROUNDING,
             "original_ranking": ORIGINAL_RANKING,
         },
         "scenarios": None,
+        "candidate_verification": CANDIDATE_VERIFICATION,
+        "operations": EMPTY_OPERATIONS,
         "sources": EXPANSION_SOURCES,
         "created_at": _iso(3), "decided_at": None,
         "events": [{"at": _iso(3), "action": "generated"}],
@@ -213,26 +221,28 @@ def demo_cards() -> list:
 
 
 def ensure_table() -> bool:
-    """테이블이 없으면 생성하고 True 반환 (local_init.py와 동일 스키마 — 05 문서 §7).
+    """카드·추진 기록 테이블이 없으면 생성하고 하나라도 만들었으면 True 반환.
 
     db.py가 이미 연 접속(엔드포인트·리전·자격증명)을 그대로 재사용한다.
     """
     client = db._table.meta.client  # noqa: SLF001
+    cards_created = False
     try:
         client.describe_table(TableName=TABLE_NAME)
-        return False
     except client.exceptions.ResourceNotFoundException:
         client.create_table(TableName=TABLE_NAME,
                             KeySchema=[{"AttributeName": "id", "KeyType": "HASH"}],
                             AttributeDefinitions=[{"AttributeName": "id", "AttributeType": "S"}],
                             BillingMode="PAY_PER_REQUEST")
         client.get_waiter("table_exists").wait(TableName=TABLE_NAME)
-        return True
+        cards_created = True
+    return progress_db.ensure_table() or cards_created
 
 
 def clear_table():
-    """테이블 전체 비우기 — 비순차 목업 ID 잔존 시 next_card_id 충돌 방지 (T9 인계)."""
-    ids = [c["id"] for c in db.list_cards()]
+    """카드와 추진 기록 전체 비우기 — 로컬 데모·테스트 리셋 전용."""
+    progress_db.clear_table()
+    ids = [c["id"] for c in db._scan_all()]  # 내부 counter 레코드까지 함께 초기화한다
     for cid in ids:
         db._table.delete_item(Key={"id": cid})  # noqa: SLF001
     return ids

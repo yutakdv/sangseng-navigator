@@ -40,8 +40,10 @@ export interface Dashboard {
   monthly_by_region: ({ month: string } & Record<string, number | string>)[];
   category_share: { category: string; count: number; share: number }[];
   growth: { mom_pct: number; qoq_pp: number };
-  /** P8 민감도 top3_stable_ratio×100. 미산출이면 null → FE는 타일을 숨기거나 `—` */
-  ai_stability: number | null;
+  /** P8 민감도 top3_stable_ratio×100. 추천 순위가 가중치 변화에도 유지되는 비율. */
+  ranking_stability?: number | null;
+  /** 구형 응답 호환 별칭. 신규 화면은 ranking_stability를 우선한다. */
+  ai_stability?: number | null;
 }
 
 export interface EupScore {
@@ -63,8 +65,23 @@ export interface Candidate {
   gap: number;
   proximity: number;
   saturation: number;
+  /** 반경 내 동일 업종 상가 중 기존 가맹점 비중. */
+  market_coverage: number;
+  /** 동일 업종 상가 표본 규모에 따른 공백도 신뢰도(0~1). */
+  gap_confidence: number;
+  /** 반경 내 전체 상가 수. 업종 공백도의 분모로 사용하지 않는다. */
   nearby_stores: number;
+  /** 반경 내 후보와 동일한 표시 업종 상가 수. */
+  nearby_same_category_stores: number;
   nearby_merchants: number;
+  /** 거점에서 후보까지의 직선거리. */
+  straight_distance_km: number;
+  selection_basis: string;
+  source_category: {
+    large: string;
+    middle: string;
+    small: string;
+  };
   /** 공개 라우팅 API 추정치 — 절대 수치로 인용 금지, 후보 간 상대 비교만 (05 §1) */
   road_distance_km: number | null;
   road_minutes: number | null;
@@ -100,8 +117,38 @@ export interface CandidatesResponse {
 
 export type CardType = "EXPANSION" | "INCENTIVE";
 export type CardStatus = "pending" | "approved" | "rejected" | "held";
-export type CardProgress = "검토중" | "추진중" | "보류" | "완료";
+export type CardProgress =
+  | "검토중"
+  | "후보 접촉·검토 시작"
+  | "적격성 확인"
+  | "가맹 심사"
+  | "추진중"
+  | "보류"
+  | "완료";
 export type PaybackRate = 3 | 5 | 7;
+export type EligibilityCheckStatus = "unverified" | "verified" | "failed";
+
+export interface EligibilityCheck {
+  key: string;
+  label: string;
+  status: EligibilityCheckStatus;
+}
+
+export interface CandidateVerification {
+  status: "unverified" | "verified" | "ineligible";
+  /** 구형 시드의 string[]도 읽되, 새 저장은 구조화된 체크를 사용한다. */
+  checks: (string | EligibilityCheck)[];
+  note: string;
+}
+
+export interface CardOperations {
+  owner: string | null;
+  target_date: string | null;
+  expected_cost: string | null;
+  contact_result: string | null;
+  ineligible_reason: string | null;
+  actual_outcome: string | null;
+}
 
 export interface CardAi {
   adjusted: boolean;
@@ -111,6 +158,16 @@ export interface CardAi {
   expected_effect: string;
   /** 정량 순위 병기용 — 절대 규칙 5. INCENTIVE는 null */
   original_ranking: { rank: number; candidate: string; score: number }[] | null;
+  /** LLM 자유서술의 숫자·순위·상태를 정본 데이터로 재검증했는지 */
+  grounding?: {
+    status: "verified" | "fallback";
+    numeric_status?: "verified" | "fallback";
+    narrative_status?: "verified" | "fallback" | "rule_based" | "ai_generated_unverified";
+    selection_method?: string;
+    explanation_source?: string;
+    source: "structured";
+    checks: string[];
+  };
 }
 
 export interface Scenario {
@@ -128,22 +185,162 @@ export interface Card {
   target: { eup: string; category: string } | null;
   score_rank: number | null;
   ai_rank: number | null;
+  /** 활성 업무 제외 후 가용 후보 안에서의 순위. */
+  selection_rank?: number | null;
   confidence: "상" | "중" | "하";
   ai: CardAi;
   scenarios: Scenario[] | null;
+  /** 사업자 접촉 전 적격성 확인 상태. 기존 시드 카드에 없으면 미확인으로 본다. */
+  candidate_verification?: CandidateVerification;
+  /** 실제 값이 없으면 화면에서 명시적인 미입력 상태로 표시한다. */
+  operations?: CardOperations;
   /** INCENTIVE 승인 시 담당자가 고른 페이백률. 위젯 payback.rate의 유일한 출처 (05 §2) */
   selected_rate?: PaybackRate | null;
   assumption_note?: string;
   sources: string[];
   created_at: string;
   decided_at: string | null;
-  events?: { at: string; action: string }[];
+  events?: { at: string; action: string; record_id?: string }[];
+  last_progress_record_at?: string | null;
+  last_progress_record_id?: string | null;
+  progress_before_hold?: CardProgress | null;
+  completed_at?: string | null;
+  /** DynamoDB 조건부 갱신용 낙관적 잠금 버전. 구형 카드에는 없을 수 있다. */
+  version?: number;
+}
+
+/* ── §2-1 추진 경과 기록·리포트 ───────────────────────────────── */
+
+export interface ProgressMetrics {
+  usage_count?: number | null;
+  conversion_rate_pct?: number | null;
+  active_merchant_count?: number | null;
+  spend_krw?: number | null;
+  concentration_index?: number | null;
+}
+
+export interface ProgressRecordInput {
+  progress: CardProgress;
+  recorded_at?: string;
+  progress_pct?: number;
+  note: string;
+  blocker?: string;
+  next_action?: string;
+  owner?: string;
+  due_at?: string;
+  source?: string;
+  metrics?: ProgressMetrics;
+  idempotency_key: string;
+}
+
+export interface ProgressRecord {
+  record_id: string;
+  card_id: string;
+  recorded_at: string;
+  created_at: string;
+  progress: CardProgress;
+  previous_progress: CardProgress | null;
+  progress_changed: boolean;
+  progress_pct: number | null;
+  /** 빠른 상태 변경으로 만들어진 기록은 메모가 없을 수 있다. */
+  note: string | null;
+  blocker: string | null;
+  next_action: string | null;
+  owner: string | null;
+  due_at: string | null;
+  source: string;
+  metrics: ProgressMetrics;
+  card_snapshot: {
+    type: CardType;
+    title: string;
+    eup: string | null;
+    category: string | null;
+  };
+}
+
+export interface ProgressRecordsResponse {
+  records: ProgressRecord[];
+  next_cursor: string | null;
+}
+
+export interface CreateProgressRecordResponse {
+  card: Card;
+  record: ProgressRecord;
+  created: boolean;
+}
+
+export type ProgressMetricKey = keyof Required<ProgressMetrics>;
+
+export interface ProgressMetricChange {
+  baseline_average: number | null;
+  latest_average: number | null;
+  delta: number | null;
+  delta_unit: "%p" | "point" | "KRW" | "count" | string;
+  relative_change_pct: number | null;
+  /** 양수면 개선, 음수면 악화. 집중도는 감소가 개선이라 delta의 부호를 반전한다. */
+  improvement: number | null;
+  lower_is_better: boolean;
+  sample_size: number;
+}
+
+export interface ProgressReport {
+  period: {
+    from: string;
+    to: string;
+    timezone: string;
+    days: number;
+  };
+  record_count: number;
+  recorded_card_count: number;
+  cards_without_records: number;
+  status_distribution: Record<CardProgress, number>;
+  completion: {
+    rate: number | null;
+    completed_count: number;
+    sample_size: number;
+  };
+  average_progress_pct: {
+    value: number | null;
+    sample_size: number;
+  };
+  stale: {
+    threshold_days: number;
+    count: number;
+    items: {
+      card_id: string;
+      title: string;
+      progress: CardProgress;
+      last_recorded_at: string;
+      days_since_update: number;
+    }[];
+  };
+  on_time: {
+    rate: number | null;
+    on_time_count: number;
+    sample_size: number;
+  };
+  stage_durations: {
+    from_progress: CardProgress;
+    to_progress: CardProgress;
+    sample_size: number;
+    average_hours: number | null;
+    median_hours: number | null;
+  }[];
+  metric_changes: Record<ProgressMetricKey, ProgressMetricChange>;
 }
 
 export interface Simulation {
   current_index: number;
   projected_index: number;
   delta_pp: number[];
+  expected_monthly_count: number;
+  /** 최근 3개월 월별 가맹점당 사용 건수의 관측 분위수 범위. */
+  expected_monthly_range?: number[];
+  uncertainty_method?: string;
+  estimate_basis: string;
+  base_month: string;
+  effect_assessment: "미미" | "개선" | "심화" | "혼재";
+  decision_note: string;
   narrative: string;
   assumption_note: string;
 }
@@ -154,6 +351,8 @@ export interface Simulation {
 export interface Kpi {
   adoption_rate: number | null;
   execution_rate: number | null;
+  avg_decision_hours: number | null;
+  /** 구형 화면·응답 호환 별칭. */
   avg_approval_hours: number | null;
   regional_balance_index: number | null;
   counts: {
@@ -162,6 +361,7 @@ export interface Kpi {
     approved: number;
     rejected: number;
     held: number;
+    decided: number;
     done: number;
   };
 }
@@ -185,4 +385,6 @@ export interface Recommendation {
 export interface WidgetResponse {
   recommendations: Recommendation[];
   policy_note: string;
+  /** 현재 필터에 맞는 전체 가맹점 수 — 화면은 한 번에 읽기 좋은 만큼만 보여 준다. */
+  total: number;
 }

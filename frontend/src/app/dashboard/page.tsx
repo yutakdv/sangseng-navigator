@@ -4,6 +4,9 @@ import { AssumptionBadge, GradeChip, ProxyBadge } from "@/components/Badge";
 import { Icon } from "@/components/Icon";
 import { KpiCard } from "@/components/KpiCard";
 import { PageHeader } from "@/components/PageHeader";
+import { RegionFilter } from "@/components/RegionFilter";
+import { RegionStatusGrid } from "@/components/RegionStatusGrid";
+import { MenuDemoGuide } from "@/components/MenuDemoGuide";
 import { GroupHeading, Section } from "@/components/Section";
 import { BarRank } from "@/components/charts/BarRank";
 import { CategoryDonut } from "@/components/charts/CategoryDonut";
@@ -11,7 +14,7 @@ import { LineTrend } from "@/components/charts/LineTrend";
 import { ScaleCompare } from "@/components/charts/ScaleCompare";
 import { api } from "@/lib/api";
 import { REGIONS, REGION_TOOLTIP } from "@/lib/constants";
-import { dash, monthLabel, num, pct, ratioPct, signed } from "@/lib/format";
+import { dash, monthLabel, num, pct, ratioPct } from "@/lib/format";
 
 export const metadata: Metadata = { title: "지역 소비 분석 · 상생 나침반" };
 
@@ -27,7 +30,17 @@ export const dynamic = "force-dynamic";
  * 패널이 열 장 넘게 세로로 쌓이는 화면이라 `GroupHeading`으로 세 묶음(진단 / 추이·분포 /
  * 제안의 정량 근거)으로 갈라 둔다 — 스크롤 도중에도 지금 보는 게 어느 단계인지 읽혀야 한다.
  */
-export default async function DashboardPage() {
+export default async function DashboardPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ region?: string; demo?: string }>;
+}) {
+  const sp = await searchParams;
+  const selectedRegion = REGIONS.includes(sp.region as (typeof REGIONS)[number])
+    ? (sp.region as (typeof REGIONS)[number])
+    : null;
+  const demo = sp.demo === "merchant" || sp.demo === "report" || sp.demo === "data" ? sp.demo : null;
+
   const [d, kpi, cand, risk] = await Promise.all([
     api.dashboard(),
     api.kpi(),
@@ -50,7 +63,8 @@ export default async function DashboardPage() {
     uses: m.local_uses,
   }));
   // 지역 고정 순서로 정렬 — 값 순 정렬은 하지 않는다(색·순서 고정 원칙, 13 §5)
-  const regionBars = REGIONS.map((r) => {
+  const visibleRegions = selectedRegion ? [selectedRegion] : REGIONS;
+  const regionBars = visibleRegions.map((r) => {
     const row = (d.region_share ?? []).find((x) => x.region === r);
     return {
       label: r,
@@ -76,6 +90,16 @@ export default async function DashboardPage() {
           </p>
         </PageHeader>
 
+        <section aria-label="지역 필터" className="animate-rise">
+          <RegionFilter selectedRegion={selectedRegion} />
+          <p className="mt-2 flex items-center gap-1.5 text-xs text-admin-text-muted" aria-live="polite">
+            <Icon name="info" size={13} />
+            {selectedRegion
+              ? `${selectedRegion}의 지역별 소비 지표를 보고 있습니다. 추이·업종·정책 운영 KPI는 전체 기준입니다.`
+              : "전체 지역을 보고 있습니다. 지역을 고르면 해당 지역의 누적 사용·최근 월·진단 상태를 좁혀 볼 수 있습니다."}
+          </p>
+        </section>
+
         {/* ── 진단 지표 ─────────────────────────────────────────── */}
         <GroupHeading note="원천 데이터에서 바로 계산한 값">진단 지표</GroupHeading>
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
@@ -86,8 +110,8 @@ export default async function DashboardPage() {
             badge={d.conversion.is_proxy ? <ProxyBadge note={d.conversion.proxy_note} /> : null}
             value={pct(d.conversion.headline_rate)}
             delta={{
-              text: signed(d.growth?.qoq_pp),
-              raw: d.growth?.qoq_pp ?? null,
+              value: d.growth?.qoq_pp ?? null,
+              unit: "%p",
               note: "전분기 대비",
             }}
             sub="지역 사용 건수 ÷ 입장 연인원(교대 합산) — 비율이 아니라 연인원 1인당 건수"
@@ -106,8 +130,8 @@ export default async function DashboardPage() {
             value={num(totalUses)}
             unit="건"
             delta={{
-              text: signed(d.growth?.mom_pct, "%"),
-              raw: d.growth?.mom_pct ?? null,
+              value: d.growth?.mom_pct ?? null,
+              unit: "%",
               note: "전월 대비",
             }}
             sub="전 기간 누적 · 전월 대비 일평균 사용 건수"
@@ -125,15 +149,23 @@ export default async function DashboardPage() {
         <Section
           id="kpi"
           icon="report"
-          title="정책 운영 KPI"
+          title="성과 리포트 · 정책 운영 KPI"
           desc="Action Card 상태값으로 계산한 지표다. 승인·상태 변경이 일어나면 즉시 바뀐다."
         >
+          {demo === "report" ? (
+            <MenuDemoGuide
+              icon="report"
+              title="성과 리포트 데모"
+              description={`현재 시드 카드 ${kpi.counts.total}장을 기준으로 계산합니다. 승인·반려·보류와 추진 상태를 바꾸면 아래 네 지표가 바뀝니다.`}
+              steps={["채택률에서 승인 카드 비중을 확인합니다.", "실행 전환율에서 승인 후 추진 상태를 봅니다.", "균형지수로 승인 확충 카드의 지역 쏠림을 점검합니다."]}
+            />
+          ) : null}
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
             <KpiCard
               icon="check"
               label="채택률"
               value={ratioPct(kpi.adoption_rate)}
-              sub={`승인 ${kpi.counts.approved} / 전체 ${kpi.counts.total}장`}
+              sub={`승인 ${kpi.counts.approved} / 결정 ${kpi.counts.decided}장`}
             />
             <KpiCard
               icon="trend"
@@ -144,8 +176,8 @@ export default async function DashboardPage() {
             <KpiCard
               icon="clock"
               label="평균 의사결정 소요"
-              value={dash(kpi.avg_approval_hours)}
-              unit={kpi.avg_approval_hours === null ? undefined : "시간"}
+              value={dash(kpi.avg_decision_hours)}
+              unit={kpi.avg_decision_hours === null ? undefined : "시간"}
               sub="승인·반려·보류까지 걸린 시간의 평균"
             />
             <KpiCard
@@ -191,8 +223,8 @@ export default async function DashboardPage() {
         <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
           <Section
             icon="pin"
-            title="지역별 하이원포인트 사용 건수"
-            desc="전 기간 누적. 괄호 안은 전체 대비 비중."
+            title={selectedRegion ? `${selectedRegion} 하이원포인트 사용 건수` : "지역별 하이원포인트 사용 건수"}
+            desc={selectedRegion ? "선택한 지역의 전 기간 누적 사용 건수와 전체 대비 비중." : "전 기간 누적. 괄호 안은 전체 대비 비중."}
           >
             {regionBars.some((b) => b.value > 0) ? (
               <>
@@ -218,6 +250,20 @@ export default async function DashboardPage() {
             )}
           </Section>
         </div>
+
+        <Section
+          icon="map"
+          title="지역별 현재 상태"
+          desc="6개 지역을 같은 기준으로 나란히 비교한다. 누적 사용 건수·전체 비중·최근 월 흐름·1단계 진단 순위를 함께 표시한다."
+        >
+          <RegionStatusGrid
+            shares={d.region_share ?? []}
+            monthlyByRegion={d.monthly_by_region ?? []}
+            ranking={eupRanking}
+            selectedRegions={cand.selected_eups ?? []}
+            onlyRegion={selectedRegion}
+          />
+        </Section>
 
         {/* ── 문제 스케일 각인 ─────────────────────────────────── */}
         <Section
@@ -293,12 +339,21 @@ export default async function DashboardPage() {
 
         {/* ── 2단계 후보 스코어 요인 + 배경 정보 ───────────────── */}
         <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-          <Section
-            icon="store"
-            title="2단계 후보 스코어 요인"
+        <Section
+          id="merchant-candidates"
+          icon="store"
+            title="가맹점 관리 · 2단계 후보 스코어"
             desc="세 요인을 같은 가중치로 합산한다. 현재 데이터에서는 업종공백도·기존가맹포화도가 후보 간 동률인지 함께 확인한다."
-          >
-            {(cand.candidates ?? []).length ? (
+        >
+          {demo === "merchant" ? (
+            <MenuDemoGuide
+              icon="store"
+              title="가맹점 후보 관리 데모"
+              description={`현재 ${cand.candidates.length}개 후보를 점수 순으로 보여 줍니다. 아래 표는 데모 시드의 후보·업종·생활권 데이터를 그대로 사용합니다.`}
+              steps={["종합 점수로 검토 순서를 잡습니다.", "업종공백도·동선근접도·기존가맹포화도를 비교합니다.", "후보를 선택해 확충 Action Card를 생성·결정합니다."]}
+            />
+          ) : null}
+          {(cand.candidates ?? []).length ? (
               <>
                 <div className="u-scroll-x">
                   <table className="u-table min-w-[480px]">
@@ -387,21 +442,41 @@ export default async function DashboardPage() {
         </div>
 
         {/* ── AI 제안 안정도 (P8 민감도) ───────────────────────── */}
-        {d.ai_stability !== null && d.ai_stability !== undefined ? (
+        {(d.ranking_stability ?? d.ai_stability) !== null &&
+        (d.ranking_stability ?? d.ai_stability) !== undefined ? (
           <Section
             icon="shield"
-            title="AI 제안 안정도 · 해석 주의"
+            title="추천 순위 안정도 · 해석 주의"
             badge={<AssumptionBadge />}
             desc="가중치 조합에서 상위 3개 후보가 유지된 비율이다. 후보 요인이 동률로 고정된 경우에는 선발 기준의 다양성이나 강건성을 의미하지 않는다."
           >
             <div className="flex items-baseline gap-1.5">
               <span className="text-[32px] font-bold leading-none tabular-nums text-admin-text">
-                {d.ai_stability}
+                {d.ranking_stability ?? d.ai_stability}
               </span>
               <span className="text-[13px] font-medium text-admin-text-muted">%</span>
             </div>
           </Section>
         ) : null}
+
+        <Section
+          id="data-demo"
+          icon="database"
+          title="데이터 관리 · 출처와 기준"
+          desc="지표를 계산한 원천·기준 시점을 확인하는 영역입니다. 현재 버전은 원본 수정·적재 기능이 아니라 검증용 조회 화면입니다."
+        >
+          {demo === "data" ? (
+            <MenuDemoGuide
+              icon="database"
+              title="데이터 관리 데모"
+              description={`현재 화면은 ${d.period_note} 데이터를 기준으로 그려집니다. 원천 파일을 바꾸는 대신, 어떤 데이터가 의사결정에 쓰였는지 확인합니다.`}
+              steps={["푸터의 원천 데이터 출처를 확인합니다.", "기준 시점과 산출일을 확인합니다.", "수치 이상 시 지역 소비 분석과 원천 파일을 함께 점검합니다."]}
+            />
+          ) : null}
+          <div className="rounded-xl bg-admin-surface-sunken px-3.5 py-3 text-xs leading-5 text-admin-text-muted">
+            데이터 기준: <span className="font-semibold text-admin-text">{d.period_note}</span>
+          </div>
+        </Section>
       </div>
     </AdminShell>
   );

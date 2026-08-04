@@ -1,8 +1,8 @@
 {
  "endpoint": "https://apis.data.go.kr/B552525/pbdata/getStoreInfo",
- "fetched_at": "2026-08-03T09:58:37+00:00",
+ "fetched_at": "2026-08-04T18:30:57+00:00",
  "params_note": "serviceKey/pageNo/numOfRows 필수, numOfRows=1000, totalCount 기준 페이징 완주",
- "total_count": 1681,
+ "total_count": 1682,
  "data": [
   {
    "FRCS_REG_NO": 3526,
@@ -242,7 +242,7 @@
    "FRCS_REG_NO": 5360,
    "FRCS_NM": "강원열쇠",
    "FRCS_ADDR": "강원특별자치도 태백시 연지로 14(황지동) ",
-   "PNT_USABLE_AMT": 4000000
+   "PNT_USABLE_AMT": 3600000
   },
   {
    "FRCS_REG_NO": 3039,
@@ -446,7 +446,7 @@
    "FRCS_REG_NO": 5346,
    "FRCS_NM": "고기마을",
    "FRCS_ADDR": "강원특별자치도 정선군 고한읍 고한2길 8 ",
-   "PNT_USABLE_AMT": 3741000
+   "PNT_USABLE_AMT": 3456000
   },
   {
    "FRCS_REG_NO": 5145,
@@ -488,7 +488,7 @@
    "FRCS_REG_NO": 4510,
    "FRCS_NM": "고원김치",
    "FRCS_ADDR": "강원도 태백시 태백로 1112(황지동) ",
-   "PNT_USABLE_AMT": 2900000
+   "PNT_USABLE_AMT": 2590000
   },
   {
    "FRCS_REG_NO": 4419,
@@ -608,7 +608,7 @@
    "FRCS_REG_NO": 5464,
    "FRCS_NM": "골든메이플관광호텔",
    "FRCS_ADDR": "강원특별자치도 정선군 남면 무릉1로 85 ",
-   "PNT_USABLE_AMT": 3890000
+   "PNT_USABLE_AMT": 3710000
   },
   {
    "FRCS_REG_NO": 5418,
@@ -638,7 +638,7 @@
    "FRCS_REG_NO": 5493,
    "FRCS_NM": "공구사",
    "FRCS_ADDR": "강원특별자치도 정선군 사북읍 지장천로 515 ",
-   "PNT_USABLE_AMT": 3286000
+   "PNT_USABLE_AMT": 2866000
   },
   {
    "FRCS_REG_NO": 5480,
@@ -1064,7 +1064,7 @@
    "FRCS_REG_NO": 5407,
    "FRCS_NM": "꼬모김밥",
    "FRCS_ADDR": "강원특별자치도 정선군 고한읍 고한로 39 1층1호(황금빌딩)",
-   "PNT_USABLE_AMT": 3299500
+   "PNT_USABLE_AMT": 3021500
   },
   {
    "FRCS_REG_NO": 4309,
@@ -1148,13 +1148,13 @@
    "FRCS_REG_NO": 4868,
    "FRCS_NM": "끌리다",
    "FRCS_ADDR": "강원특별자치도 태백시 황지로 186(황지동) ",
-   "PNT_USABLE_AMT": 3710000
+   "PNT_USABLE_AMT": 3411000
   },
   {
    "FRCS_REG_NO": 5362,
    "FRCS_NM": "나드리 김밥",
    "FRCS_ADDR": "강원특별자치도 태백시 황지로 81(황지동) ",
-   "PNT_USABLE_AMT": 3663000
+   "PNT_USABLE_AMT": 3335000
   },
   {
    "FRCS_REG_NO": 5220,
@@ -1286,7 +1286,7 @@
    "FRCS_REG_NO": 5412,
    "FRCS_NM": "네일바이원(Nail by won)",
    "FRCS_ADDR": "강원특별자치도 정선군 사북읍 지장천로 583 102호",
-   "PNT_USABLE_AMT": 4000000
+   "PNT_USABLE_AMT": 3800000
   },
   {
    "FRCS_REG_NO": 4713,
@@ -1316,7 +1316,7 @@
    "FRCS_REG_NO": 5351,
    "FRCS_NM": "노랑통닭",
    "FRCS_ADDR": "강원특별자치도 정선군 사북읍 사북중앙로 73 ",
-   "PNT_USABLE_AMT": 4000000
+   "PNT_USABLE_AMT": 3500000
   },
   {
    "FRCS_REG_NO": 4873,
@@ -1472,7 +1472,7 @@
    "FRCS_REG_NO": 5387,
    "FRCS_NM": "다정한오후",
    "FRCS_ADDR": "강원특별자치도 태백시 황지로 81(황지동) ",
-   "PNT_USABLE_AMT": 4000000
+   "PNT_USABLE_AMT": 3660000
   },
   {
    "FRCS_REG_NO": 4376,
@@ -1658,13 +1658,13 @@
    "FRCS_REG_NO": 5411,
    "FRCS_NM": "대성건설광고",
    "FRCS_ADDR": "강원특별자치도 정선군 남면 무릉2로 47 D동2호(증산공공단지)",
-   "PNT_USABLE_AMT": 3360000
+   "PNT_USABLE_AMT": 2720000
   },
   {
    "FRCS_REG_NO": 5476,
    "FRCS_NM": "대성슈퍼",
    "FRCS_ADDR": "강원특별자치도 정선군 사북읍 사북중앙로 17-14 ",
-   "PNT_USABLE_AMT": 1244450
+   "PNT_USABLE_AMT": 95150
   },
   {
    "FRCS_REG_NO": 3794,
@@ -2144,7 +2144,7 @@
    "FRCS_REG_NO": 4406,
    "FRCS_NM": "드림카페앤호프",
    "FRCS_ADDR": "강원도 태백시 시장북길 39(황지동) ",
-   "PNT_USABLE_AMT": 4000000
+   "PNT_USABLE_AMT": 3997000
   },
   {
    "FRCS_REG_NO": 5452,
@@ -2348,7 +2348,7 @@
    "FRCS_REG_NO": 5466,
    "FRCS_NM": "로봇초밥마켓 태백문화로점",
    "FRCS_ADDR": "강원특별자치도 태백시 문화로3길 112(황지동) 1층",
-   "PNT_USABLE_AMT": 4000000
+   "PNT_USABLE_AMT": 3590000
   },
   {
    "FRCS_REG_NO": 3602,
@@ -2486,7 +2486,7 @@
    "FRCS_REG_NO": 5467,
    "FRCS_NM": "막걸리한잔",
    "FRCS_ADDR": "강원특별자치도 태백시 먹거리길 45(황지동) ",
-   "PNT_USABLE_AMT": 3772000
+   "PNT_USABLE_AMT": 3470000
   },
   {
    "FRCS_REG_NO": 4891,
@@ -2540,7 +2540,7 @@
    "FRCS_REG_NO": 5469,
    "FRCS_NM": "만희네 막국수",
    "FRCS_ADDR": "강원특별자치도 태백시 시장안1길 32(황지동) ",
-   "PNT_USABLE_AMT": 3233000
+   "PNT_USABLE_AMT": 2733000
   },
   {
    "FRCS_REG_NO": 5477,
@@ -2654,7 +2654,7 @@
    "FRCS_REG_NO": 5345,
    "FRCS_NM": "메가엠지씨커피강원고한역점",
    "FRCS_ADDR": "강원특별자치도 정선군 고한읍 고한로 149-2 ",
-   "PNT_USABLE_AMT": 3939200
+   "PNT_USABLE_AMT": 3636900
   },
   {
    "FRCS_REG_NO": 4895,
@@ -2786,7 +2786,7 @@
    "FRCS_REG_NO": 5460,
    "FRCS_NM": "모텔 리치",
    "FRCS_ADDR": "강원특별자치도 정선군 고한읍 고한2길 52 ",
-   "PNT_USABLE_AMT": 3650000
+   "PNT_USABLE_AMT": 3450000
   },
   {
    "FRCS_REG_NO": 2259,
@@ -2942,7 +2942,7 @@
    "FRCS_REG_NO": 3941,
    "FRCS_NM": "미소반점",
    "FRCS_ADDR": "강원특별자치도 정선군 정선읍 녹송1길 15 1층",
-   "PNT_USABLE_AMT": 3035000
+   "PNT_USABLE_AMT": 2218000
   },
   {
    "FRCS_REG_NO": 708,
@@ -2954,7 +2954,7 @@
    "FRCS_REG_NO": 5438,
    "FRCS_NM": "미소컬렉션",
    "FRCS_ADDR": "강원특별자치도 정선군 사북읍 소금강로 3518 B-101",
-   "PNT_USABLE_AMT": 2296180
+   "PNT_USABLE_AMT": 2158930
   },
   {
    "FRCS_REG_NO": 5279,
@@ -2978,7 +2978,7 @@
    "FRCS_REG_NO": 2909,
    "FRCS_NM": "미향",
    "FRCS_ADDR": "강원특별자치도 태백시 시장안2길 19-1(황지동) ",
-   "PNT_USABLE_AMT": 3530000
+   "PNT_USABLE_AMT": 3198000
   },
   {
    "FRCS_REG_NO": 3536,
@@ -3134,7 +3134,7 @@
    "FRCS_REG_NO": 5396,
    "FRCS_NM": "방주철물건재상사",
    "FRCS_ADDR": "강원특별자치도 태백시 광원길 39(문곡동) ",
-   "PNT_USABLE_AMT": 3500000
+   "PNT_USABLE_AMT": 3310000
   },
   {
    "FRCS_REG_NO": 4211,
@@ -3404,7 +3404,7 @@
    "FRCS_REG_NO": 5368,
    "FRCS_NM": "부경한우",
    "FRCS_ADDR": "강원특별자치도 태백시 황지연못길 6-8(황지동) ",
-   "PNT_USABLE_AMT": 4000000
+   "PNT_USABLE_AMT": 3920000
   },
   {
    "FRCS_REG_NO": 1048,
@@ -3536,7 +3536,7 @@
    "FRCS_REG_NO": 5363,
    "FRCS_NM": "블랙커피",
    "FRCS_ADDR": "강원특별자치도 태백시 번영로 14(황지동) ",
-   "PNT_USABLE_AMT": 4000000
+   "PNT_USABLE_AMT": 3540000
   },
   {
    "FRCS_REG_NO": 5071,
@@ -3992,7 +3992,7 @@
    "FRCS_REG_NO": 5393,
    "FRCS_NM": "샤론미용실",
    "FRCS_ADDR": "강원특별자치도 정선군 정선읍 용담길 89-1 ",
-   "PNT_USABLE_AMT": 3175000
+   "PNT_USABLE_AMT": 2365000
   },
   {
    "FRCS_REG_NO": 4925,
@@ -4130,7 +4130,7 @@
    "FRCS_REG_NO": 5344,
    "FRCS_NM": "설빙고한점",
    "FRCS_ADDR": "강원특별자치도 정선군 고한읍 고한로 85 1층 101호",
-   "PNT_USABLE_AMT": 3705400
+   "PNT_USABLE_AMT": 3651700
   },
   {
    "FRCS_REG_NO": 4841,
@@ -4214,7 +4214,7 @@
    "FRCS_REG_NO": 5491,
    "FRCS_NM": "세븐일레븐 사북베르사유점",
    "FRCS_ADDR": "강원특별자치도 정선군 사북읍 소금강로 3518 1층",
-   "PNT_USABLE_AMT": 3693550
+   "PNT_USABLE_AMT": 3667750
   },
   {
    "FRCS_REG_NO": 2929,
@@ -4736,7 +4736,7 @@
    "FRCS_REG_NO": 5494,
    "FRCS_NM": "시장기름방",
    "FRCS_ADDR": "강원특별자치도 정선군 사북읍 사북중앙로 17-9 ",
-   "PNT_USABLE_AMT": 3690000
+   "PNT_USABLE_AMT": 3570000
   },
   {
    "FRCS_REG_NO": 3553,
@@ -4946,7 +4946,7 @@
    "FRCS_REG_NO": 5465,
    "FRCS_NM": "써브웨이커피숍",
    "FRCS_ADDR": "강원특별자치도 태백시 문화로3길 112(황지동) 3층",
-   "PNT_USABLE_AMT": 3060000
+   "PNT_USABLE_AMT": 2634000
   },
   {
    "FRCS_REG_NO": 4946,
@@ -4958,7 +4958,7 @@
    "FRCS_REG_NO": 5388,
    "FRCS_NM": "쎄느호프",
    "FRCS_ADDR": "강원특별자치도 태백시 연지로 38(황지동) 2층",
-   "PNT_USABLE_AMT": 3750000
+   "PNT_USABLE_AMT": 3605000
   },
   {
    "FRCS_REG_NO": 4947,
@@ -5060,7 +5060,7 @@
    "FRCS_REG_NO": 5350,
    "FRCS_NM": "씨유정선아리점",
    "FRCS_ADDR": "강원특별자치도 정선군 사북읍 지장천로 583 103호, 104, 105(라마다앙코르정선점)",
-   "PNT_USABLE_AMT": 3741400
+   "PNT_USABLE_AMT": 3541300
   },
   {
    "FRCS_REG_NO": 3977,
@@ -5132,7 +5132,7 @@
    "FRCS_REG_NO": 5385,
    "FRCS_NM": "아라리분식",
    "FRCS_ADDR": "강원특별자치도 정선군 정선읍 5일장길 38-8 ",
-   "PNT_USABLE_AMT": 3180000
+   "PNT_USABLE_AMT": 2310000
   },
   {
    "FRCS_REG_NO": 3079,
@@ -5162,7 +5162,7 @@
    "FRCS_REG_NO": 5349,
    "FRCS_NM": "아란",
    "FRCS_ADDR": "강원특별자치도 정선군 사북읍 사북2길 10 2층 202호(사북시장 청년몰)",
-   "PNT_USABLE_AMT": 3494000
+   "PNT_USABLE_AMT": 3257000
   },
   {
    "FRCS_REG_NO": 3555,
@@ -5342,7 +5342,7 @@
    "FRCS_REG_NO": 5468,
    "FRCS_NM": "안동황지본점",
    "FRCS_ADDR": "강원특별자치도 태백시 태백로 932(황지동) ",
-   "PNT_USABLE_AMT": 2625000
+   "PNT_USABLE_AMT": 2383000
   },
   {
    "FRCS_REG_NO": 5324,
@@ -5420,7 +5420,7 @@
    "FRCS_REG_NO": 5488,
    "FRCS_NM": "약산정",
    "FRCS_ADDR": "강원특별자치도 정선군 고한읍 함백산로 1673 ",
-   "PNT_USABLE_AMT": 3847000
+   "PNT_USABLE_AMT": 3819000
   },
   {
    "FRCS_REG_NO": 3616,
@@ -5480,7 +5480,7 @@
    "FRCS_REG_NO": 5432,
    "FRCS_NM": "어수정수제돈까스",
    "FRCS_ADDR": "강원특별자치도 정선군 고한읍 고한로 34-1 1층",
-   "PNT_USABLE_AMT": 3745000
+   "PNT_USABLE_AMT": 3649000
   },
   {
    "FRCS_REG_NO": 4243,
@@ -5528,7 +5528,7 @@
    "FRCS_REG_NO": 5420,
    "FRCS_NM": "엄마김밥",
    "FRCS_ADDR": "강원특별자치도 태백시 대학길 52(황지동) ",
-   "PNT_USABLE_AMT": 4000000
+   "PNT_USABLE_AMT": 3688000
   },
   {
    "FRCS_REG_NO": 5144,
@@ -5612,13 +5612,13 @@
    "FRCS_REG_NO": 5517,
    "FRCS_NM": "에이치제이(HJ)스킨&바디",
    "FRCS_ADDR": "강원특별자치도 태백시 황지로 138(황지동) 2층",
-   "PNT_USABLE_AMT": 3616000
+   "PNT_USABLE_AMT": 3166000
   },
   {
    "FRCS_REG_NO": 5454,
    "FRCS_NM": "엔젤파비안느",
    "FRCS_ADDR": "강원특별자치도 정선군 정선읍 정선로 1354 ",
-   "PNT_USABLE_AMT": 3323000
+   "PNT_USABLE_AMT": 2601000
   },
   {
    "FRCS_REG_NO": 4318,
@@ -5642,7 +5642,7 @@
    "FRCS_REG_NO": 5443,
    "FRCS_NM": "엘에이(LA)갈비 총판",
    "FRCS_ADDR": "강원특별자치도 태백시 번영로 192-13(황지동) 1층",
-   "PNT_USABLE_AMT": 4000000
+   "PNT_USABLE_AMT": 3884000
   },
   {
    "FRCS_REG_NO": 199,
@@ -5819,6 +5819,12 @@
    "PNT_USABLE_AMT": 4000000
   },
   {
+   "FRCS_REG_NO": 5536,
+   "FRCS_NM": "영월군농특산물판매장",
+   "FRCS_ADDR": "강원특별자치도 영월군 한반도면 강원남로 277 ",
+   "PNT_USABLE_AMT": 4000000
+  },
+  {
    "FRCS_REG_NO": 2950,
    "FRCS_NM": "영월농산",
    "FRCS_ADDR": "강원 영월군 중동면 강원남로 3007",
@@ -5828,7 +5834,7 @@
    "FRCS_REG_NO": 5478,
    "FRCS_NM": "영월다슬기직판장",
    "FRCS_ADDR": "강원특별자치도 영월군 한반도면 강원남로 273 ",
-   "PNT_USABLE_AMT": 3252000
+   "PNT_USABLE_AMT": 3142000
   },
   {
    "FRCS_REG_NO": 4038,
@@ -5840,7 +5846,7 @@
    "FRCS_REG_NO": 5459,
    "FRCS_NM": "영월랜드휴게소",
    "FRCS_ADDR": "강원특별자치도 영월군 한반도면 강원남로 273 ",
-   "PNT_USABLE_AMT": 3298400
+   "PNT_USABLE_AMT": 3072300
   },
   {
    "FRCS_REG_NO": 2329,
@@ -5855,16 +5861,16 @@
    "PNT_USABLE_AMT": 4000000
   },
   {
-   "FRCS_REG_NO": 5455,
-   "FRCS_NM": "영주상회",
-   "FRCS_ADDR": "강원특별자치도 정선군 사북읍 사북중앙로 17-7 1호",
-   "PNT_USABLE_AMT": 3450000
-  },
-  {
    "FRCS_REG_NO": 2299,
    "FRCS_NM": "영주상회",
    "FRCS_ADDR": "강원도 태백시 황지로 227 행운시장 나동 8~9호",
    "PNT_USABLE_AMT": 4000000
+  },
+  {
+   "FRCS_REG_NO": 5455,
+   "FRCS_NM": "영주상회",
+   "FRCS_ADDR": "강원특별자치도 정선군 사북읍 사북중앙로 17-7 1호",
+   "PNT_USABLE_AMT": 3270000
   },
   {
    "FRCS_REG_NO": 5450,
@@ -6050,7 +6056,7 @@
    "FRCS_REG_NO": 5340,
    "FRCS_NM": "오테",
    "FRCS_ADDR": "강원특별자치도 정선군 고한읍 고한로 47 202호(경빌딩)",
-   "PNT_USABLE_AMT": 3869500
+   "PNT_USABLE_AMT": 3827500
   },
   {
    "FRCS_REG_NO": 3140,
@@ -6152,7 +6158,7 @@
    "FRCS_REG_NO": 5433,
    "FRCS_NM": "왼발오른발",
    "FRCS_ADDR": "강원특별자치도 삼척시 도계읍 도계로 248 ",
-   "PNT_USABLE_AMT": 3690000
+   "PNT_USABLE_AMT": 3400000
   },
   {
    "FRCS_REG_NO": 5271,
@@ -6392,7 +6398,7 @@
    "FRCS_REG_NO": 5506,
    "FRCS_NM": "웰메이드",
    "FRCS_ADDR": "강원특별자치도 정선군 정선읍 봉양6길 35-1 ",
-   "PNT_USABLE_AMT": 3137000
+   "PNT_USABLE_AMT": 2737000
   },
   {
    "FRCS_REG_NO": 5375,
@@ -6464,7 +6470,7 @@
    "FRCS_REG_NO": 5355,
    "FRCS_NM": "유명약국",
    "FRCS_ADDR": "강원특별자치도 정선군 사북읍 사북중앙로 11 ",
-   "PNT_USABLE_AMT": 2138200
+   "PNT_USABLE_AMT": 1502800
   },
   {
    "FRCS_REG_NO": 4055,
@@ -6476,7 +6482,7 @@
    "FRCS_REG_NO": 3306,
    "FRCS_NM": "유진먹거리식당",
    "FRCS_ADDR": "강원특별자치도 태백시 시장안2길 18(황지동) ",
-   "PNT_USABLE_AMT": 4000000
+   "PNT_USABLE_AMT": 3980000
   },
   {
    "FRCS_REG_NO": 4166,
@@ -6500,7 +6506,7 @@
    "FRCS_REG_NO": 5497,
    "FRCS_NM": "육해공",
    "FRCS_ADDR": "강원특별자치도 정선군 정선읍 비봉로 1 ",
-   "PNT_USABLE_AMT": 3173000
+   "PNT_USABLE_AMT": 2347000
   },
   {
    "FRCS_REG_NO": 4983,
@@ -7526,13 +7532,13 @@
    "FRCS_REG_NO": 5343,
    "FRCS_NM": "지에스(GS)25 고한센터점",
    "FRCS_ADDR": "강원특별자치도 정선군 고한읍 고한로 85 1층 102호",
-   "PNT_USABLE_AMT": 2735850
+   "PNT_USABLE_AMT": 2431400
   },
   {
    "FRCS_REG_NO": 5347,
    "FRCS_NM": "지에스(GS)25 고한하이힐점",
    "FRCS_ADDR": "강원특별자치도 정선군 고한읍 고한로 30 1층",
-   "PNT_USABLE_AMT": 2726860
+   "PNT_USABLE_AMT": 2212610
   },
   {
    "FRCS_REG_NO": 4705,
@@ -7604,7 +7610,7 @@
    "FRCS_REG_NO": 5490,
    "FRCS_NM": "지에스25사북선명점",
    "FRCS_ADDR": "강원특별자치도 정선군 사북읍 파랑새길 28 상가동 101-102호(사북선명아파트)",
-   "PNT_USABLE_AMT": 3439620
+   "PNT_USABLE_AMT": 3232870
   },
   {
    "FRCS_REG_NO": 3933,
@@ -7718,7 +7724,7 @@
    "FRCS_REG_NO": 5354,
    "FRCS_NM": "집밥이 생각날때",
    "FRCS_ADDR": "강원특별자치도 정선군 사북읍 사북4길 1 1층",
-   "PNT_USABLE_AMT": 3562000
+   "PNT_USABLE_AMT": 3379000
   },
   {
    "FRCS_REG_NO": 1857,
@@ -7730,7 +7736,7 @@
    "FRCS_REG_NO": 4884,
    "FRCS_NM": "짬뽕관 태백황지점",
    "FRCS_ADDR": "강원특별자치도 태백시 먹거리길 68(황지동) ",
-   "PNT_USABLE_AMT": 3683000
+   "PNT_USABLE_AMT": 3398000
   },
   {
    "FRCS_REG_NO": 4722,
@@ -7760,7 +7766,7 @@
    "FRCS_REG_NO": 5513,
    "FRCS_NM": "짱밥상",
    "FRCS_ADDR": "강원특별자치도 정선군 고한읍 지장천로 861 1층2호",
-   "PNT_USABLE_AMT": 3670000
+   "PNT_USABLE_AMT": 3590000
   },
   {
    "FRCS_REG_NO": 4369,
@@ -7904,7 +7910,7 @@
    "FRCS_REG_NO": 5336,
    "FRCS_NM": "철암장수건강원",
    "FRCS_ADDR": "강원특별자치도 태백시 동태백로 375(철암동,철암연립상가및주택) 가동16호",
-   "PNT_USABLE_AMT": 3742000
+   "PNT_USABLE_AMT": 3642000
   },
   {
    "FRCS_REG_NO": 4414,
@@ -8036,7 +8042,7 @@
    "FRCS_REG_NO": 2753,
    "FRCS_NM": "충주상회",
    "FRCS_ADDR": "강원도 태백시 태백로 934 황지시장 입구",
-   "PNT_USABLE_AMT": 3715000
+   "PNT_USABLE_AMT": 3415000
   },
   {
    "FRCS_REG_NO": 4682,
@@ -8156,7 +8162,7 @@
    "FRCS_REG_NO": 5361,
    "FRCS_NM": "케이투(K2)태백점",
    "FRCS_ADDR": "강원특별자치도 태백시 황지로 181(황지동) ",
-   "PNT_USABLE_AMT": 3851000
+   "PNT_USABLE_AMT": 3623000
   },
   {
    "FRCS_REG_NO": 2670,
@@ -8252,7 +8258,7 @@
    "FRCS_REG_NO": 5339,
    "FRCS_NM": "탁이네국밥",
    "FRCS_ADDR": "강원특별자치도 삼척시 도계읍 도계로 236-1 ",
-   "PNT_USABLE_AMT": 3780000
+   "PNT_USABLE_AMT": 3380000
   },
   {
    "FRCS_REG_NO": 686,
@@ -8372,7 +8378,7 @@
    "FRCS_REG_NO": 5453,
    "FRCS_NM": "태백스포츠(노스페이스)",
    "FRCS_ADDR": "강원특별자치도 태백시 황지로 166-1(황지동) ",
-   "PNT_USABLE_AMT": 3775100
+   "PNT_USABLE_AMT": 3596100
   },
   {
    "FRCS_REG_NO": 187,
@@ -8432,7 +8438,7 @@
    "FRCS_REG_NO": 4423,
    "FRCS_NM": "태백축산물백화점",
    "FRCS_ADDR": "강원도 태백시 태백로 688(화전동) ",
-   "PNT_USABLE_AMT": 1757953
+   "PNT_USABLE_AMT": 949673
   },
   {
    "FRCS_REG_NO": 4506,
@@ -8462,7 +8468,7 @@
    "FRCS_REG_NO": 5427,
    "FRCS_NM": "태백한우직판장",
    "FRCS_ADDR": "강원특별자치도 태백시 서황지로 68(황지동) ",
-   "PNT_USABLE_AMT": 3885000
+   "PNT_USABLE_AMT": 3760000
   },
   {
    "FRCS_REG_NO": 4600,
@@ -8522,7 +8528,7 @@
    "FRCS_REG_NO": 5449,
    "FRCS_NM": "태일상회",
    "FRCS_ADDR": "강원특별자치도 삼척시 도계읍 전두시장길 14 ",
-   "PNT_USABLE_AMT": 3830000
+   "PNT_USABLE_AMT": 3654000
   },
   {
    "FRCS_REG_NO": 679,
@@ -8684,7 +8690,7 @@
    "FRCS_REG_NO": 3770,
    "FRCS_NM": "파코메리화장품",
    "FRCS_ADDR": "강원도 태백시 먹거리길 89 ",
-   "PNT_USABLE_AMT": 3720000
+   "PNT_USABLE_AMT": 3220000
   },
   {
    "FRCS_REG_NO": 4740,
@@ -8930,7 +8936,7 @@
    "FRCS_REG_NO": 4364,
    "FRCS_NM": "하늘아래정육점",
    "FRCS_ADDR": "강원도 태백시 태백로 934(황지동) ",
-   "PNT_USABLE_AMT": 4000000
+   "PNT_USABLE_AMT": 3750000
   },
   {
    "FRCS_REG_NO": 3970,
@@ -8942,7 +8948,7 @@
    "FRCS_REG_NO": 5507,
    "FRCS_NM": "하모니마트 태백점",
    "FRCS_ADDR": "강원특별자치도 태백시 황지로 263(황지동) ",
-   "PNT_USABLE_AMT": 1867940
+   "PNT_USABLE_AMT": 1760740
   },
   {
    "FRCS_REG_NO": 2218,
@@ -9110,7 +9116,7 @@
    "FRCS_REG_NO": 5483,
    "FRCS_NM": "한얼광고기획",
    "FRCS_ADDR": "강원특별자치도 태백시 상장남길 63(황지동) ",
-   "PNT_USABLE_AMT": 3700000
+   "PNT_USABLE_AMT": 3250000
   },
   {
    "FRCS_REG_NO": 3702,
@@ -9290,7 +9296,7 @@
    "FRCS_REG_NO": 5436,
    "FRCS_NM": "해브굿",
    "FRCS_ADDR": "강원특별자치도 정선군 사북읍 사북중앙로 28-7 영진빌딩",
-   "PNT_USABLE_AMT": 3080000
+   "PNT_USABLE_AMT": 2480000
   },
   {
    "FRCS_REG_NO": 2854,
@@ -9482,13 +9488,13 @@
    "FRCS_REG_NO": 5484,
    "FRCS_NM": "현대상사",
    "FRCS_ADDR": "강원특별자치도 삼척시 도계읍 전두시장길 32 ",
-   "PNT_USABLE_AMT": 3830000
+   "PNT_USABLE_AMT": 3640000
   },
   {
    "FRCS_REG_NO": 5500,
    "FRCS_NM": "현대상회",
    "FRCS_ADDR": "강원특별자치도 삼척시 도계읍 전두시장길 29-1 ",
-   "PNT_USABLE_AMT": 3800000
+   "PNT_USABLE_AMT": 3580000
   },
   {
    "FRCS_REG_NO": 3662,
@@ -9794,7 +9800,7 @@
    "FRCS_REG_NO": 5404,
    "FRCS_NM": "황실사우나 이발소",
    "FRCS_ADDR": "강원특별자치도 정선군 사북읍 파랑새길 20(사북선명 오피스텔) 황실사우나",
-   "PNT_USABLE_AMT": 3881500
+   "PNT_USABLE_AMT": 3854500
   },
   {
    "FRCS_REG_NO": 5434,
@@ -9860,7 +9866,7 @@
    "FRCS_REG_NO": 5348,
    "FRCS_NM": "회만이 횟집",
    "FRCS_ADDR": "강원특별자치도 정선군 사북읍 사북3길 13 ",
-   "PNT_USABLE_AMT": 3048000
+   "PNT_USABLE_AMT": 2776000
   },
   {
    "FRCS_REG_NO": 5064,

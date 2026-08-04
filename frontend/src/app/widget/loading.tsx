@@ -14,7 +14,7 @@ export default function WidgetLoading() {
 
       <div className="mx-auto w-full max-w-[390px] bg-visitor-bg shadow-card-hover sm:rounded-[28px] sm:ring-1 sm:ring-black/5">
         <header className="bg-gradient-to-br from-visitor-accent to-[#0e4a25] px-5 py-6 text-white sm:rounded-t-[28px]">
-          <p className="text-xs font-semibold uppercase tracking-[0.14em] text-white/85">
+          <p className="text-xs font-semibold uppercase tracking-[0.14em] text-white/90">
             강원랜드 지역상생
           </p>
           <h1 className="mt-1.5 text-[22px] font-bold leading-8">지역별 하이원포인트 가맹점</h1>

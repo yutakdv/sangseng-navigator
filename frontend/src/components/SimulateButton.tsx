@@ -1,10 +1,10 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { type ReactNode, useState, useTransition } from "react";
 import { simulateAction } from "@/app/actions";
 import { AssumptionBadge, AssumptionNote } from "@/components/Badge";
+import { DeltaValue } from "@/components/DeltaValue";
 import { Icon } from "@/components/Icon";
-import { range } from "@/lib/format";
 import type { Simulation } from "@/types";
 
 /**
@@ -51,7 +51,7 @@ export function SimulateButton({ cardId }: { cardId: string }) {
         onClick={run}
         disabled={working}
         aria-busy={working}
-        className="inline-flex items-center gap-2 rounded-xl bg-admin-primary px-4 py-2.5 text-sm font-bold text-white shadow-[0_6px_18px_-6px_rgb(79_70_229)] transition-colors hover:bg-admin-primary-strong disabled:cursor-not-allowed disabled:opacity-50"
+        className="inline-flex min-h-10 items-center gap-2 rounded-lg bg-admin-primary px-4 py-2 text-sm font-bold text-white transition-colors hover:bg-admin-primary-strong disabled:cursor-not-allowed disabled:opacity-50"
       >
         <Icon name="sparkle" size={16} strokeWidth={2} />
         {working ? "계산 중…" : result ? "다시 계산" : "이 후보가 가맹 전환하면?"}
@@ -73,7 +73,7 @@ export function SimulateButton({ cardId }: { cardId: string }) {
             <AssumptionBadge />
           </div>
 
-          <div className="mt-3 grid grid-cols-1 gap-2.5 sm:grid-cols-3">
+          <div className="mt-3 grid grid-cols-1 gap-2.5 sm:grid-cols-2 lg:grid-cols-4">
             {/* 지수는 소수 1자리 고정 — 정수로 반올림하면 같은 응답의 delta_pp와 어긋난다 (05 §2) */}
             <Metric
               label="현재 지역 소비 집중도"
@@ -87,13 +87,45 @@ export function SimulateButton({ cardId }: { cardId: string }) {
             />
             <Metric
               label="변화폭"
-              value={range(result.delta_pp)}
-              sub="양수 = 집중도 하락 = 개선"
+              value={
+                <DeltaValue
+                  value={result.delta_pp}
+                  direction="down"
+                  unit="%p"
+                  variant="text"
+                  className="font-bold"
+                />
+              }
+              sub="집중도 감소 예상"
+            />
+            <Metric
+              label="예상 월 사용건수"
+              value={
+                result.expected_monthly_range?.length
+                  ? `${Math.round(result.expected_monthly_range[0]).toLocaleString("ko-KR")}~${Math.round(result.expected_monthly_range[result.expected_monthly_range.length - 1]).toLocaleString("ko-KR")}`
+                  : Math.round(result.expected_monthly_count).toLocaleString("ko-KR")
+              }
+              unit="건"
+              sub={result.expected_monthly_range?.length ? "관측 분위수 범위" : `${result.base_month} 기준 추정`}
             />
           </div>
 
           <p className="mt-3 break-keep text-[15px] leading-7 text-admin-text">
             {result.narrative}
+          </p>
+          <div
+            className={`mt-3 rounded-lg px-3.5 py-3 text-xs leading-5 ring-1 ring-inset ${
+              result.effect_assessment === "개선"
+                ? "bg-state-good-bg text-state-good ring-state-good-line"
+                : "bg-state-warn-bg text-state-warn ring-state-warn-line"
+            }`}
+          >
+            <p className="font-bold">의사결정 해석 · {result.effect_assessment}</p>
+            <p className="mt-1 break-keep">{result.decision_note}</p>
+          </div>
+          <p className="mt-2 break-keep text-[11px] leading-5 text-admin-text-muted">
+            추정 근거: {result.estimate_basis}
+            {result.uncertainty_method ? ` · 불확실성 범위: ${result.uncertainty_method}` : ""}
           </p>
           <AssumptionNote className="mt-2" />
         </div>
@@ -109,7 +141,7 @@ function Metric({
   sub,
 }: {
   label: string;
-  value: string;
+  value: ReactNode;
   unit?: string;
   sub?: string;
 }) {

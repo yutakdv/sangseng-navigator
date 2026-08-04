@@ -7,16 +7,20 @@ if not os.environ.get("AWS_LAMBDA_FUNCTION_NAME"):      # 로컬에서만 .env �
     from dotenv import load_dotenv
     load_dotenv(Path(__file__).parents[2] / ".env")
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
 from mangum import Mangum
 
-from app.routes import cards, dashboard, kpi, widget
+from app import security
+from app.routes import cards, dashboard, kpi, progress, widget
 
-# 배포 URL 확정 후 09 문서 §5에서 좁힌다 — 코드 수정 없이 SAM 파라미터(환경변수)만 바꾸면 되게
-# 쉼표 구분 목록으로 받는다. 미설정·빈 값이면 지금까지와 같은 전체 허용("*").
-ALLOWED_ORIGINS = [o.strip() for o in os.environ.get("ALLOWED_ORIGINS", "*").split(",") if o.strip()] or ["*"]
+# 배포 환경에서 미설정 CORS가 전체 허용으로 열리지 않게 한다. 로컬만 명시적인 localhost 기본값을
+# 쓰고, Lambda는 SAM 파라미터로 전달된 오리진만 허용한다.
+_origin_default = "" if os.environ.get("AWS_LAMBDA_FUNCTION_NAME") else "http://localhost:3100,http://127.0.0.1:3100"
+ALLOWED_ORIGINS = [o.strip() for o in os.environ.get("ALLOWED_ORIGINS", _origin_default).split(",") if o.strip()]
+if "*" in ALLOWED_ORIGINS:
+    raise RuntimeError("ALLOWED_ORIGINS='*' is not allowed; configure explicit frontend origins")
 
 # 로깅: Lambda·로컬 양쪽에서 app 로거(LLM 실패 경고 등)가 보이도록 최소 설정만 한다.
 LOG_LEVEL = os.environ.get("LOG_LEVEL", "INFO")
@@ -33,8 +37,26 @@ app = FastAPI(title="상생 나침반 API")
 # 미들웨어 순서 주의: Starlette는 **나중에 add한 것이 바깥**이다. CORS가 바깥이어야
 # 에러 응답(예외 처리 결과)에도 CORS 헤더가 붙으므로 GZip을 먼저, CORS를 나중에 add한다.
 app.add_middleware(GZipMiddleware, minimum_size=1000)   # /api/candidates 285KB → gzip 44KB (실측)
-app.add_middleware(CORSMiddleware, allow_origins=ALLOWED_ORIGINS, allow_methods=["*"], allow_headers=["*"])
-for r in (dashboard.router, cards.router, widget.router, kpi.router):
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=ALLOWED_ORIGINS,
+    allow_methods=["GET", "POST", "OPTIONS"],
+    allow_headers=["Authorization", "Content-Type", "X-Request-ID"],
+)
+
+
+@app.middleware("http")
+async def disable_api_cache(request: Request, call_next):
+    """상태 변경 직후 dashboard/KPI/widget API가 브라우저·프록시에 남지 않게 한다."""
+    response = await call_next(request)
+    if request.url.path.startswith("/api/"):
+        response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
+        response.headers["Pragma"] = "no-cache"
+        response.headers["Expires"] = "0"
+    return response
+
+
+for r in (dashboard.router, cards.router, progress.router, widget.router, kpi.router):
     app.include_router(r, prefix="/api")
 
 
@@ -55,6 +77,7 @@ def health():
         except (FileNotFoundError, json.JSONDecodeError):
             datasets[name] = False
     return {"ok": True,
+            "demo_read_only": security.demo_read_only(),
             "data_loaded": all(datasets[n] for n in REQUIRED_DATASETS),
             "datasets": datasets}
 

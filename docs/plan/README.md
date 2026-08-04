@@ -12,7 +12,7 @@
 API Gateway HTTP API)가 JSON 서빙 + Action Card 생성/승인(DynamoDB) + LLM 호출 →
 Next.js(Vercel)가 화면 렌더. FE는 API 계약 기반 mock으로 BE와 독립 개발 후 env 하나로 실 API 전환.
 
-**Tech Stack:** Next.js 16(App Router)+TS+Tailwind 3+Recharts+MapLibre GL(OpenFreeMap 타일, 키 불필요) /
+**Tech Stack:** Next.js 16(App Router)+TS+Tailwind 3+Recharts+MapLibre GL(OpenFreeMap 타일)+Kakao Maps JS(방문객 위젯) /
 Python 3.12+FastAPI+Mangum / pandas+PublicDataReader+Kakao REST 지오코딩(VWorld 폴백) /
 DynamoDB(온디맨드) / OpenAI 또는 Claude(어댑터) / 배포: Vercel(FE) + AWS SAM→Lambda+API Gateway(BE)
 
@@ -59,6 +59,7 @@ DynamoDB(온디맨드) / OpenAI 또는 Claude(어댑터) / 배포: Vercel(FE) + 
 | 13 | [13-design-guide.md](13-design-guide.md) | 목업(image-1/2) 기반 디자인 가이드 — FE 화면 작업 전 필수 |
 | 14 | [14-execution-plan.md](14-execution-plan.md) | **잔여 개발 실행 런북 (T0~T18)** — 매 태스크 시작 전 여기서 절차 확인. Docker 테스트·AWS 최종 배포 전환 반영 |
 | 15 | [15-plan-review.md](15-plan-review.md) | **개발 착수 전 최종 검토 결과 (2026-08-03)** — 착수 첫 커밋 수정분(배포 블로커 2건)·태스크별 계약 선수정 추적 (§8 시점표) |
+| 16 | [16-product-and-production-roadmap.md](16-product-and-production-roadmap.md) | **서비스 존재 이유·실사용자 관점 점검·실운영 전환 우선순위** — 데모 이후 제품 판단의 기준 |
 
 ## Phase 게이트 요약 (상세: 10 문서)
 

@@ -12,7 +12,7 @@ from datetime import datetime, timedelta
 
 from app import dataload, db, llm, prompts
 from app.clock import KST
-from app.services import season
+from app.services import season, workflow
 
 log = logging.getLogger(__name__)
 
@@ -24,9 +24,22 @@ INCENTIVE_SOURCES = ["하이원포인트 사용현황"]
 # "추가 적립·추가 지급"으로 쓰면 발행액 증가(도박 유인) 논란을 자초한다. 적립이 아니라
 # **사용 단계**의 리워드임이 제목에서부터 드러나게 한다 (수치·시나리오 구조는 그대로).
 INCENTIVE_TITLE = "하이원포인트 지역 결제 페이백 (전 지역 공통 — 발행액 증액 없음)"
-BLOCKED = ("추진중", "완료")            # A-1 프롬프트 규칙 — 중복 제안 금지 대상 progress
+# 같은 지역×업종에 아직 끝나지 않은 업무가 있으면 새 카드를 만들지 않는다.
+# 프롬프트의 최소 금지 상태(추진중/완료)보다 운영 규칙을 넓혀, 승인 대기·검토중·보류가
+# 별도 카드로 복제되는 문제를 막는다. 반려된 카드는 _target_state에서 "없음"으로 돌아온다.
+ACTIVE_TARGET_STATES = (
+    "승인 대기",
+    "검토중",
+    "후보 접촉·검토 시작",
+    "적격성 확인",
+    "가맹 심사",
+    "추진중",
+    "보류",
+    "완료",
+)
 LLM_TIMEOUT = 12                       # 1회 재시도 포함 최악 24s < Lambda 30s (07 의존성·09 타임아웃)
 RECENT_WINDOW_DAYS = 365               # A-1 프롬프트의 "최근 4분기" — AI 입력 ④·⑤ 집계 창
+GENERATION_DEDUPE_SECONDS = 60          # 버튼 재전송·네트워크 재시도 중복 생성 방지 창
 
 # 3/5/7% 고정 골격 — delta_pp는 실측 없는 팀 설정 가정(탄력성) (05 문서 §2)
 SCENARIOS = [
@@ -60,7 +73,7 @@ CARD_AI_SCHEMA = {
 
 
 class NoAvailableCandidate(Exception):
-    """전 후보가 추진중/완료라 새로 제안할 대상이 없음 — A-1 중복 제안 금지의 결론.
+    """전 후보에 활성 업무가 있어 새로 제안할 대상이 없음 — 중복 제안 금지의 결론.
 
     LLM 장애가 아니라 정상적인 도메인 신호라서 fallback 대상이 아니다 (라우트가 409로 변환).
     """
@@ -99,7 +112,7 @@ def _is_recent(card: dict, cutoff: datetime) -> bool:
         return False
 
 
-def _build_inputs(cands: list, cards: list) -> dict:
+def _build_inputs(cands: list, cards: list, selected_target: dict) -> dict:
     """AI 입력 ①~⑥ 조립 — user 메시지로 JSON 직렬화된다 (07 문서 B4 표)."""
     cutoff = datetime.now(KST) - timedelta(days=RECENT_WINDOW_DAYS)   # ④·⑤는 "최근 4분기"만 (A-1)
     adopted: dict[str, int] = {}
@@ -122,64 +135,57 @@ def _build_inputs(cands: list, cards: list) -> dict:
              "Score": c["score"], "업종공백도": c["gap"], "관광동선근접도": c["proximity"],
              "기존가맹포화도": c["saturation"],
              "반경500m_동일업종_하이원_가맹점": c["nearby_merchants"],
-             "반경500m_전체_상가": c["nearby_stores"],
+             "반경500m_동일업종_상가": c.get("nearby_same_category_stores"),
+             "반경500m_전체_상가(참고)": c["nearby_stores"],
              # 근접도는 직선거리 기반이라 산악 지형에서 실제 접근성과 역전된다 — AI가 그 역전을
              # 근거로 지적할 수 있게 병기한다(05 §1). 순위 재정렬 용도가 아니다.
              "거점에서_도로_소요시간_분": c.get("road_minutes"),
              "거점에서_도로_거리_km": c.get("road_distance_km")} for c in cands],
-        "2_후보별_현재_추진_상태": [
+        "2_서버가_확정한_제안_대상": {
+            "타깃": f"{selected_target['eup']} {selected_target['category']}",
+            "선택_규칙": "활성 업무가 없는 후보 중 정량 Score 최상위",
+            "Score": selected_target["score"],
+            "정량_순위": selected_target["rank"],
+        },
+        "3_후보별_현재_추진_상태": [
             {"후보": f"{c['eup']} {c['category']}", "추진 상태": _target_state(c, cards)}
             for c in cands],
-        "3_계절성_신호": season.season_signal(),
-        "4_최근_지역별_채택_이력": adopted,
-        "5_최근_정책_이력(반려)": rejected,
-        "6_지역경제_위험_신호(참고용_진단_지표)": risk,
-        "작성_지침": ("ai_rank_target에는 조정 후 1순위 타깃을 '지역 업종'(예: 영월군 소매점) "
-                   "형식으로 적을 것. "
-                   # 시스템 프롬프트(A-1)는 발표 공개용 원문이라 수정하지 않는다. 프롬프트가 열거한
-                   # 4종(검토중/추진중/보류/완료) 밖의 값이 입력 2에 실제로 나오므로 여기서 설명한다.
-                   "입력 2의 '추진 상태' 값은 없음/승인 대기/검토중/추진중/보류/완료 중 하나이며, "
+        "4_계절성_신호": season.season_signal(),
+        "5_최근_지역별_채택_이력": adopted,
+        "6_최근_정책_이력(반려)": rejected,
+        "7_지역경제_위험_신호(참고용_진단_지표)": risk,
+        "작성_지침": (f"ai_rank_target에는 서버 확정 타깃 '{selected_target['eup']} "
+                   f"{selected_target['category']}'을 그대로 적을 것. 후보를 바꾸지 말 것. "
+                   "입력 3의 '추진 상태' 값은 없음/승인 대기/검토중/추진중/보류/완료 중 하나이며, "
                    "'없음'은 해당 타깃에 아직 카드가 없다는 뜻, '승인 대기'는 아직 결정되지 않은 "
                    "pending 카드가 있다는 뜻이다. "
-                   "추진 상태가 추진중/완료인 후보는 1순위로 제안하지 말고, "
-                   "그런 후보 때문에 제외·조정이 있었다면 해당 추진 상태('추진중' 등)를 reasons에 "
-                   "명시할 것. 입력 1의 수치에 없는 사실은 지어내지 말 것. "
+                   "서버가 활성 상태 후보를 이미 제외했으므로 이를 다시 선택하지 말 것. "
+                   "입력 1의 수치에 없는 사실은 지어내지 말 것. "
                    "관광동선근접도는 직선거리 기반이고 도로 소요시간은 공개 라우팅 API 추정치이므로, "
                    "둘이 어긋나면 거리 수치를 단정하지 말고 '직선으로는 가깝지만 차로는 더 걸린다' "
                    "처럼 소요시간 비교로 서술할 것. Score 순위 자체는 변경 불가 기준선이다"),
     }
 
 
-def _match_candidate(cands: list, text: str) -> dict | None:
-    """LLM의 ai_rank_target 문자열 → 후보 매칭 ('지역 업종' 우선, 상호명·id 보조)."""
-    for c in cands:
-        if c["eup"] in text and c["category"] in text:
-            return c
-    for c in cands:
-        if (c.get("name") and c["name"] in text) or c.get("id", "") in text:
-            return c
-    return None
-
-
 def _available(cands: list, cards: list) -> list:
-    """추진중/완료가 아닌 후보 목록 (Score 순위 유지)."""
-    return [c for c in cands if _target_state(c, cards) not in BLOCKED]
+    """동일 타깃의 활성 업무가 없는 후보 목록 (Score 순위 유지)."""
+    return [c for c in cands if _target_state(c, cards) not in ACTIVE_TARGET_STATES]
 
 
 def _first_available(cands: list, cards: list) -> dict:
-    """추진중/완료가 아닌 최상위 후보 — LLM이 금지 타깃·미매칭 문자열을 내면 이걸로 보정.
+    """활성 업무가 없는 정량 최상위 후보.
 
-    전 후보가 추진중/완료면 `cands[0]`으로 물러서지 않고 예외를 낸다 — 후보가 5개뿐이라
-    실제로 도달 가능하고, 물러서면 A-1의 "추진중/완료 중복 제안 금지"를 어긴 카드가 저장된다.
+    전 후보가 활성 업무 상태면 `cands[0]`으로 물러서지 않고 예외를 낸다. 후보가 5개뿐이라
+    실제로 도달 가능하고, 물러서면 동일 대상의 중복 업무 카드가 저장된다.
     """
     available = _available(cands, cards)
     if not available:
-        raise NoAvailableCandidate("모든 후보가 추진중/완료 상태라 새로 제안할 후보가 없습니다")
+        raise NoAvailableCandidate("모든 후보에 승인 대기 또는 진행 중인 업무가 있어 새로 제안할 후보가 없습니다")
     return available[0]
 
 
 def _fallback_ai(cands: list, cards: list) -> dict:
-    """LLM 최종 실패 시 규칙 기반 fallback (07 B3) — 추진중/완료를 건너뛴 최상위 후보 제안."""
+    """LLM 최종 실패 시 규칙 기반 fallback — 활성 업무가 없는 최상위 후보 제안."""
     top = _first_available(cands, cards)
     skipped = [c for c in cands if c["rank"] < top["rank"]]
     reasons = [f"Score {c['rank']}위 {c['eup']} {c['category']}은(는) 추진 상태={_target_state(c, cards)}로 중복 제안 대상에서 제외"
@@ -197,6 +203,84 @@ def _fallback_ai(cands: list, cards: list) -> dict:
         "risks": ["신규 가맹점 초기 실적 저조 가능성", "가맹 협상이 분기 내 완료되지 않을 가능성"],
         "expected_effect": f"{top['eup']} {top['category']} 공백 해소로 지역 소비 접점 확대 예상",
         "confidence": "중",
+    }
+
+
+def _road_text(cand: dict) -> str:
+    """후보 비교에 쓰는 도로 소요시간 — 원본 값이 없으면 단정하지 않는다."""
+    minutes = cand.get("road_minutes")
+    return "도로 소요시간 미산출" if minutes is None else f"도로 소요시간 약 {minutes:.1f}분"
+
+
+def _grounded_ai(cands: list, target: dict, out: dict, cards: list,
+                 explanation_source: str) -> dict:
+    """LLM 자유서술을 구조화된 사실로 다시 접지한다.
+
+    LLM은 비정량 리스크 문구 생성에만 관여한다. 화면에 표시하는 후보명·Score·순위·
+    추진 상태·도로 시간은 모두 candidates/cards의 정본 값으로 재생성해, "0.57이 0.67보다 높다"
+    같은 문장-표 자기모순이 저장되지 않게 한다.
+    """
+    baseline = cands[0]
+    alternative = baseline if target["rank"] != baseline["rank"] else next(
+        (c for c in cands if c["rank"] != target["rank"]), target
+    )
+    if target["rank"] == baseline["rank"]:
+        comparison = (
+            f"정량 1위 {target['eup']} {target['category']}(Score {target['score']})를 서버 제안 대상으로 "
+            f"유지했습니다. 차순위 {alternative['eup']} {alternative['category']}(Score "
+            f"{alternative['score']})와 비교했으며, {target['eup']} {target['category']}의 "
+            f"{_road_text(target)}을 함께 확인해야 합니다."
+        )
+    else:
+        gap = round(baseline["score"] - target["score"], 2)
+        skipped = [
+            f"{c['eup']} {c['category']}({_target_state(c, cards)})"
+            for c in cands if c["rank"] < target["rank"]
+        ]
+        comparison = (
+            f"정량 상위 후보 {', '.join(skipped)}는 활성 업무가 있어 중복 제안에서 제외했습니다. "
+            f"따라서 가용 후보 중 최고점인 정량 {target['rank']}위 {target['eup']} "
+            f"{target['category']}(Score {target['score']})를 서버가 선택했습니다. 정량 1위 "
+            f"{baseline['eup']} {baseline['category']}(Score {baseline['score']})보다 Score가 {gap} "
+            "낮으므로 기존 업무 종료 여부와 함께 검토해야 합니다."
+        )
+
+    reasons = [
+        f"정량 기준: Score {target['score']} · {target['rank']}위",
+        (f"상권 기준: 업종공백도 {target['gap']} · 반경 500m 내 동일 업종 하이원포인트 "
+         f"가맹점 {target['nearby_merchants']}곳 / 동일 업종 상가 "
+         f"{target.get('nearby_same_category_stores', '미산출')}곳"),
+        f"이동 기준: 동선근접도 {target['proximity']}는 직선거리 기반 · {_road_text(target)}",
+        "대상은 서버의 정량 규칙이 선택했고 AI는 비정량 리스크 문구 생성에만 사용했습니다",
+    ]
+    risks = [r.strip() for r in out.get("risks", []) if isinstance(r, str) and r.strip()]
+    required_risks = [
+        "가맹 신청은 사업자 의사에 달려 있어 후보 접촉 후에도 계약이 성사되지 않을 가능성",
+        "영업 상태·가맹 자격·관광객 이용 적합성은 승인 전 별도 확인 필요",
+    ]
+    for risk in required_risks:
+        if risk not in risks:
+            risks.append(risk)
+
+    return {
+        "adjusted": target["rank"] != 1,
+        "comparison": comparison,
+        "reasons": reasons,
+        "risks": risks,
+        "expected_effect": _ensure_assumption(
+            f"{target['eup']} {target['category']} 후보의 가맹 전환 효과는 카드 상세의 반사실 "
+            "시뮬레이션과 사업자 적격성 확인 후 판단해야 합니다"
+        ),
+        "grounding": {
+            "status": "verified",
+            "numeric_status": "verified",
+            "narrative_status": ("ai_generated_unverified" if explanation_source == "llm"
+                                 else "rule_based"),
+            "selection_method": "deterministic_highest_available_score",
+            "explanation_source": explanation_source,
+            "source": "structured",
+            "checks": ["target", "score", "rank", "progress", "road_time"],
+        },
     }
 
 
@@ -220,6 +304,25 @@ def _find_pending(cards: list, card_type: str, eup: str | None = None,
     return None
 
 
+def _recent_generated(cards: list, card_type: str) -> dict | None:
+    """직전 60초 안에 알고리즘이 만든 pending 카드가 있으면 재전송 결과로 재사용한다."""
+    now = datetime.now(KST)
+    matches = []
+    for card in cards:
+        generation = card.get("generation") or {}
+        if (card.get("type") != card_type or card.get("status") != "pending"
+                or generation.get("source") != "algorithm"):
+            continue
+        try:
+            created = datetime.fromisoformat(card.get("created_at") or "")
+            age = (now - created).total_seconds()
+        except (ValueError, TypeError):
+            continue
+        if 0 <= age <= GENERATION_DEDUPE_SECONDS:
+            matches.append(card)
+    return max(matches, key=lambda card: card.get("created_at") or "") if matches else None
+
+
 def generate_card(card_type: str) -> tuple[dict, bool]:
     """POST /api/cards/generate 본체 — (card, created) 반환. created=False면 기존 pending 카드.
 
@@ -232,67 +335,80 @@ def generate_card(card_type: str) -> tuple[dict, bool]:
 
 
 def _generate_expansion(cards: list) -> tuple[dict, bool]:
+    recent = _recent_generated(cards, "EXPANSION")
+    if recent is not None:
+        return recent, False
     cands = _ranked_candidates()
     # LLM 호출 **전**에 후보 가용성부터 본다 — NoAvailableCandidate가 아래 except에 잡혀
     # fallback으로 흘러가면 안 되기 때문(그러면 금지 타깃 카드가 만들어진다).
     available = _available(cands, cards)
     if not available:
-        raise NoAvailableCandidate("모든 후보가 추진중/완료 상태라 새로 제안할 후보가 없습니다")
-    # 가용 후보 **전원**이 이미 pending EXPANSION 카드를 갖고 있으면 어떤 LLM 응답이 와도
-    # 아래 중복 가드(05 §8)에 걸려 새 카드가 안 나온다 → 12초짜리 호출이 순수 낭비라 건너뛴다.
-    # 이 조건에서만 건너뛰는 이유: "최상위 후보에 pending이 있으면 즉시 반환"으로 넓히면 05 §8의
-    # 타깃별 가드가 "pending EXPANSION은 동시에 1장"으로 좁아져, 시드에 pending 카드(AC-002)가
-    # 있는 상태에서 데모의 실시간 생성 버튼이 옛 카드만 돌려준다 (11 §1 파손).
-    pendings = [_find_pending(cards, "EXPANSION", c["eup"], c["category"]) for c in available]
-    if all(pendings):
-        return pendings[0], False
+        raise NoAvailableCandidate("모든 후보에 승인 대기 또는 진행 중인 업무가 있어 새로 제안할 후보가 없습니다")
+    # 대상 선택은 LLM에 맡기지 않는다. 동일 입력·상태에서는 항상 같은 후보가 선택된다.
+    target = available[0]
+    explanation_source = "llm"
     try:
         out = llm.generate_json(prompts.CARD_SYSTEM_PROMPT,
-                                json.dumps(_build_inputs(cands, cards), ensure_ascii=False),
+                                json.dumps(_build_inputs(cands, cards, target), ensure_ascii=False),
                                 CARD_AI_SCHEMA, schema_name="action_card", timeout=LLM_TIMEOUT)
     except Exception:
         # 심사 기간에 키 만료·쿼터 초과를 알아챌 유일한 흔적 (감사 ⑤ — 이전엔 조용히 삼켰다)
         log.warning("EXPANSION 카드 AI 설명 생성 실패 — 규칙 기반 fallback으로 진행합니다", exc_info=True)
         out = _fallback_ai(cands, cards)
-    target = _match_candidate(cands, str(out.get("ai_rank_target", "")))
-    if target is None or _target_state(target, cards) in BLOCKED:
-        # 금지 타깃·미매칭 보정 — 타깃만 바꾸면 LLM 원문 사유가 다른 후보를 가리키는
-        # "타깃-사유 불일치" 카드가 저장된다(감사 가능성 위반). 텍스트까지 통째 교체.
-        out = _fallback_ai(cands, cards)
-        target = _first_available(cands, cards)
+        explanation_source = "rule_fallback"
 
     existing = _find_pending(cards, "EXPANSION", target["eup"], target["category"])
     if existing:                                        # 05 §8 — 기존 카드 200 반환 (버튼 연타 대비)
         return existing, False
 
-    risks = [r for r in out.get("risks", []) if isinstance(r, str) and r.strip()]
-    reasons = [r for r in out.get("reasons", []) if isinstance(r, str) and r.strip()]
+    grounded = _grounded_ai(cands, target, out, cards, explanation_source)
     now = db.now_iso()
     card = {
         "id": db.next_card_id("AC-"),
         "type": "EXPANSION", "status": "pending", "progress": None,
+        "generation": {"source": "algorithm", "dedupe_window_seconds": GENERATION_DEDUPE_SECONDS},
         "title": f"{target['eup']} {target['category']} 업종 가맹점 확충",
         "target": {"eup": target["eup"], "category": target["category"]},
         "score_rank": target["rank"],
-        "ai_rank": 1,                                   # 생성 카드 = AI 조정 후 1순위 제안
-        "confidence": out.get("confidence") if out.get("confidence") in ("상", "중", "하") else "중",
+        "ai_rank": 1,                                   # 이전 API 호환: 최종 제안 목록 내 순위
+        "selection_rank": 1,
+        # 표본 신뢰도가 낮거나 도로 접근성이 미산출이면 보수적으로 낮춘다. LLM 자기평가는 쓰지 않는다.
+        "confidence": ("중" if target.get("gap_confidence", 0) >= 0.8
+                       and target.get("road_minutes") is not None else "하"),
         "ai": {
             # 표시 일관성: 조정 여부 = (원 Score 순위 ≠ 1) — LLM 출력과 어긋나면 순위 쪽이 정본
             "adjusted": target["rank"] != 1,
-            "comparison": out.get("comparison", ""),
-            "reasons": reasons or ["규칙 기반 제안 — 상세 사유 생성 실패"],
-            "risks": risks or ["신규 가맹점 초기 실적 저조 가능성"],    # A-1 규칙 — 리스크 ≥1
-            "expected_effect": _ensure_assumption(out.get("expected_effect", "")),
+            "comparison": grounded["comparison"],
+            "reasons": grounded["reasons"],
+            "risks": grounded["risks"],
+            "expected_effect": grounded["expected_effect"],
+            "grounding": grounded["grounding"],
             "original_ranking": [                        # 정량 순위 상시 병기 (절대 규칙 5)
                 {"rank": c["rank"], "candidate": f"{c['eup']} {c['category']}", "score": c["score"]}
                 for c in cands],
         },
         "scenarios": None,
+        "candidate_verification": {
+            "status": "unverified",
+            "checks": [
+                {"key": label, "label": label, "status": "unverified"}
+                for label in workflow.REQUIRED_ELIGIBILITY_CHECKS
+            ],
+            "note": "후보 접촉·검토 시작은 가맹 확정이 아닙니다. 필수 적격성 확인 후 별도 가맹 심사를 거칩니다",
+        },
+        "operations": {
+            "owner": None,
+            "target_date": None,
+            "expected_cost": None,
+            "contact_result": None,
+            "ineligible_reason": None,
+            "actual_outcome": None,
+        },
         "sources": EXPANSION_SOURCES,
         "created_at": now, "decided_at": None,
         "events": [{"at": now, "action": "generated"}],
     }
-    db.put_card(card)
+    db.create_card(card)
     return card, True
 
 
@@ -364,5 +480,5 @@ def _generate_incentive(cards: list) -> tuple[dict, bool]:
         "created_at": now, "decided_at": None,
         "events": [{"at": now, "action": "generated"}],
     }
-    db.put_card(card)
+    db.create_card(card)
     return card, True

@@ -4,33 +4,50 @@
       "id": "AC-001",
       "type": "EXPANSION",
       "status": "approved",
-      "progress": "추진중",
-      "title": "영월군 카페 업종 가맹점 확충",
-      "target": { "eup": "영월군", "category": "카페" },
-      "score_rank": 5,
+      "progress": "후보 접촉·검토 시작",
+      "title": "영월군 음식점 업종 가맹점 확충",
+      "target": { "eup": "영월군", "category": "음식점" },
+      "score_rank": 1,
       "ai_rank": 1,
+      "selection_rank": 1,
       "confidence": "중",
       "ai": {
-        "adjusted": true,
-        "comparison": "1순위(조정) 영월군 카페 문갤러리: Score 5위(0.47)지만 영월군 내 카페 하이원포인트 가맹점이 2곳뿐이고 최근 3개월 카페 업종 사용 실적이 0건 — 가맹 공백이 실적 공백으로 이어진 상태라 확충 시 방문객 체감 개선이 가장 빠를 것으로 예상. 2순위(Score 1위) 영월군 숙박업 동빈네민박&캠핑장(0.67): 업종공백도는 같으나 숙박업 특성상 가맹 협상·시설 확인에 시간이 걸릴 가능성.",
+        "adjusted": false,
+        "comparison": "정량 1위 영월군 음식점(Score 0.5)을 서버 제안 대상으로 유지했습니다. 차순위 영월군 소매점(Score 0.49)과 비교했으며, 영월군 음식점의 도로 소요시간 약 35.2분을 함께 확인해야 합니다.",
         "reasons": [
-          "영월군 내 카페 하이원포인트 가맹점 2곳 — 방문객 체감 공백이 큰 업종",
-          "최근 3개월 영월군 카페 업종 하이원포인트 사용 실적 0건 — 가맹 공백이 실적 공백으로 이어진 상태",
-          "문갤러리 반경 500m 내 동일 업종 하이원 가맹점 0곳(업종공백도 1.0), 여름 성수기(휴가철·워터월드) 유동인구 흡수 가능성"
+          "정량 기준: Score 0.5 · 1위",
+          "상권 기준: 업종공백도 0.83 · 반경 500m 내 동일 업종 하이원포인트 가맹점 0곳 / 동일 업종 상가 4곳",
+          "이동 기준: 동선근접도 0.68은 직선거리 기반 · 도로 소요시간 약 35.2분",
+          "대상은 서버의 정량 규칙이 선택했고 AI는 비정량 리스크 문구 생성에만 사용했습니다"
         ],
         "risks": [
           "신규 가맹점 초기 실적 저조 가능성",
-          "Score 상위 후보(숙박·소매) 대비 정량 점수가 낮아 효과가 제한적일 가능성"
+          "가맹 신청은 사업자 의사에 달려 있어 후보 접촉 후에도 계약이 성사되지 않을 가능성",
+          "영업 상태·가맹 자격·관광객 이용 적합성은 승인 전 별도 확인 필요"
         ],
-        "expected_effect": "영월군 카페 공백 해소로 방문객 소비 접점 확대 예상 (가정 기반 전망이며 실제와 다를 수 있음)",
+        "expected_effect": "영월군 음식점 후보의 가맹 전환 효과는 카드 상세의 반사실 시뮬레이션과 사업자 적격성 확인 후 판단해야 합니다 (가정 기반 전망이며 실제와 다를 수 있음)",
+        "grounding": { "status": "verified", "numeric_status": "verified", "narrative_status": "rule_based", "selection_method": "deterministic_highest_available_score", "explanation_source": "rule_seed", "source": "structured", "checks": ["target", "score", "rank", "progress", "road_time"] },
         "original_ranking": [
-          { "rank": 1, "candidate": "영월군 숙박업", "score": 0.67 },
-          { "rank": 2, "candidate": "영월군 음식점", "score": 0.57 },
-          { "rank": 3, "candidate": "영월군 편의점", "score": 0.56 },
-          { "rank": 4, "candidate": "영월군 소매점", "score": 0.56 },
-          { "rank": 5, "candidate": "영월군 카페", "score": 0.47 }
+          { "rank": 1, "candidate": "영월군 음식점", "score": 0.5 },
+          { "rank": 2, "candidate": "영월군 소매점", "score": 0.49 },
+          { "rank": 3, "candidate": "영월군 숙박업", "score": 0.48 },
+          { "rank": 4, "candidate": "삼척시 편의점", "score": 0.45 },
+          { "rank": 5, "candidate": "삼척시 카페", "score": 0.42 }
         ]
       },
+      "candidate_verification": {
+        "status": "unverified",
+        "checks": [
+          { "key": "business_status", "label": "영업 상태", "status": "unverified" },
+          { "key": "membership_eligibility", "label": "가맹 자격", "status": "unverified" },
+          { "key": "participation_intent", "label": "사업자 참여 의향", "status": "unverified" },
+          { "key": "visitor_fit", "label": "관광객 이용 적합성", "status": "unverified" },
+          { "key": "settlement_integration", "label": "정산 연동 가능성", "status": "unverified" }
+        ],
+        "note": "후보 접촉·검토 시작은 가맹 확정이 아닙니다. 필수 적격성 확인 후 별도 가맹 심사를 거칩니다"
+      },
+      "operations": { "owner": null, "target_date": null, "expected_cost": null, "contact_result": null, "ineligible_reason": null, "actual_outcome": null },
+      "version": 1,
       "scenarios": null,
       "sources": ["하이원포인트 사용현황", "가맹점 상세정보", "소진공 상가정보"],
       "created_at": "2026-08-02T12:00:00+09:00",
@@ -38,7 +55,7 @@
       "events": [
         { "at": "2026-08-02T12:00:00+09:00", "action": "generated" },
         { "at": "2026-08-03T00:00:00+09:00", "action": "approved" },
-        { "at": "2026-08-03T12:00:00+09:00", "action": "progress:추진중" }
+        { "at": "2026-08-03T12:00:00+09:00", "action": "progress:후보 접촉·검토 시작" }
       ]
     },
     {
@@ -46,34 +63,50 @@
       "type": "EXPANSION",
       "status": "pending",
       "progress": null,
-      "title": "영월군 음식점 업종 가맹점 확충",
-      "target": { "eup": "영월군", "category": "음식점" },
+      "title": "영월군 소매점 업종 가맹점 확충",
+      "target": { "eup": "영월군", "category": "소매점" },
       "score_rank": 2,
       "ai_rank": 1,
-      "confidence": "상",
+      "selection_rank": 1,
+      "confidence": "하",
       "ai": {
         "adjusted": true,
-        "comparison": "1순위(조정) 영월군 음식점 동원각(상동읍 구래리): Score 2위(0.57). Score 1위 숙박업 후보는 거점에서 직선 5.6km로 가장 가깝지만 차로는 50분대가 걸리고, 동원각은 직선 7.6km로 더 먼데도 차로 30분대라 실제 접근성이 앞선다 — 직선거리 기반 근접도가 산악 지형에서 역전되는 구간. 여름 성수기(휴가철·워터월드)가 진행 중이라 분기 내 착수 확실성이 관건인 점도 음식점 쪽에 유리할 것으로 예상. 2순위(Score 1위) 영월군 숙박업 동빈네민박&캠핑장(0.67): 업종공백도는 같으나 숙박업 특성상 가맹 협상·시설 확인 소요가 길 가능성이 있어 성수기 내 효과 확인이 어려울 수 있음.",
+        "comparison": "정량 상위 후보 영월군 음식점(후보 접촉·검토 시작)은 활성 업무가 있어 중복 제안에서 제외했습니다. 따라서 가용 후보 중 최고점인 정량 2위 영월군 소매점(Score 0.49)을 서버가 선택했습니다. 동일 업종 상가 표본이 2곳으로 작아 담당자 확인이 필요합니다.",
         "reasons": [
-          "실제 접근성 역전 — Score 1위 숙박업 후보는 직선 5.6km(근접도 1.00)로 가장 가깝지만 차로는 50분대인 반면, 동원각은 직선 7.6km(근접도 0.71)로 밀렸는데 차로는 30분대다. 정량 Score는 직선거리 기준이라 이 역전을 반영하지 못한다",
-          "여름 성수기(계절성 신호) 내 착수 확실성 — 음식점은 성수기 수요에 즉시 대응 가능할 것으로 예상되는 반면 숙박업은 가맹 협상·시설 확인 소요가 길 가능성",
-          "이미 추진중인 영월군 카페 확충 카드(문갤러리·산솔면 녹전리)와 업종·지점이 겹치지 않아 중복 착수 위험이 없고, 카페(녹전리)·음식점(상동읍 구래리)으로 영월군 내 소비 접점을 서로 다른 생활권에 넓히는 조합",
-          "동원각 반경 500m 내 동일 업종 하이원 가맹점 0곳(업종공백도 1.0) — 영월군 소비 전환의 공백 지점"
+          "정량 기준: Score 0.49 · 2위",
+          "상권 기준: 업종공백도 0.75 · 반경 500m 내 동일 업종 하이원포인트 가맹점 0곳 / 동일 업종 상가 2곳",
+          "이동 기준: 동선근접도 0.71은 직선거리 기반 · 도로 소요시간 약 35.9분",
+          "대상은 서버의 정량 규칙이 선택했고 AI는 비정량 리스크 문구 생성에만 사용했습니다"
         ],
         "risks": [
           "신규 가맹점 초기 실적 저조 가능성",
           "가맹 신청은 사업자 의사에 달려 있어(상시모집·개인사업자 대상) 접촉해도 분기 내 계약이 성사되지 않을 가능성",
-          "도로 소요시간은 공개 라우팅 API 추정치로 비포장·임도 구간이 포함될 수 있어, 절대 수치가 아니라 후보 간 상대 비교로만 해석해야 함(계절·기상 영향도 미반영)"
+          "동일 업종 상가 표본이 2곳뿐이라 업종공백도 불확실성이 큼",
+          "영업 상태·가맹 자격·관광객 이용 적합성은 승인 전 별도 확인 필요"
         ],
-        "expected_effect": "지역 소비 집중도 약 0.1%p 내외 개선 예상 — 규모는 작지만 영월군 방향 소비 전환의 시작점 (가정 기반 전망이며 실제와 다를 수 있음)",
+        "expected_effect": "영월군 소매점 후보의 가맹 전환 효과는 카드 상세의 반사실 시뮬레이션과 사업자 적격성 확인 후 판단해야 합니다 (가정 기반 전망이며 실제와 다를 수 있음)",
+        "grounding": { "status": "verified", "numeric_status": "verified", "narrative_status": "rule_based", "selection_method": "deterministic_highest_available_score", "explanation_source": "rule_seed", "source": "structured", "checks": ["target", "score", "rank", "progress", "road_time"] },
         "original_ranking": [
-          { "rank": 1, "candidate": "영월군 숙박업", "score": 0.67 },
-          { "rank": 2, "candidate": "영월군 음식점", "score": 0.57 },
-          { "rank": 3, "candidate": "영월군 편의점", "score": 0.56 },
-          { "rank": 4, "candidate": "영월군 소매점", "score": 0.56 },
-          { "rank": 5, "candidate": "영월군 카페", "score": 0.47 }
+          { "rank": 1, "candidate": "영월군 음식점", "score": 0.5 },
+          { "rank": 2, "candidate": "영월군 소매점", "score": 0.49 },
+          { "rank": 3, "candidate": "영월군 숙박업", "score": 0.48 },
+          { "rank": 4, "candidate": "삼척시 편의점", "score": 0.45 },
+          { "rank": 5, "candidate": "삼척시 카페", "score": 0.42 }
         ]
       },
+      "candidate_verification": {
+        "status": "unverified",
+        "checks": [
+          { "key": "business_status", "label": "영업 상태", "status": "unverified" },
+          { "key": "membership_eligibility", "label": "가맹 자격", "status": "unverified" },
+          { "key": "participation_intent", "label": "사업자 참여 의향", "status": "unverified" },
+          { "key": "visitor_fit", "label": "관광객 이용 적합성", "status": "unverified" },
+          { "key": "settlement_integration", "label": "정산 연동 가능성", "status": "unverified" }
+        ],
+        "note": "후보 접촉·검토 시작은 가맹 확정이 아닙니다. 필수 적격성 확인 후 별도 가맹 심사를 거칩니다"
+      },
+      "operations": { "owner": null, "target_date": null, "expected_cost": null, "contact_result": null, "ineligible_reason": null, "actual_outcome": null },
+      "version": 0,
       "scenarios": null,
       "sources": ["하이원포인트 사용현황", "가맹점 상세정보", "소진공 상가정보"],
       "created_at": "2026-08-04T09:00:00+09:00",

@@ -61,6 +61,10 @@ export const ASSUMPTION_NOTE = "가정 기반 전망이며 실제와 다를 수 
 export const SOURCE_NOTE =
   "데이터: 공공데이터포털(강원랜드·소상공인시장진흥공단)·국세청 | 지도: © OpenStreetMap contributors, OpenFreeMap";
 
+/** 방문객 위젯은 Kakao 지도 JS를 사용하므로 관리자 화면과 지도 출처를 분리한다. */
+export const VISITOR_SOURCE_NOTE =
+  "데이터: 공공데이터포털(강원랜드·소상공인시장진흥공단)·국세청 | 지도: © Kakao Maps";
+
 /** 삼척시 = 시 전역이 아니라 하이원포인트 지역가맹 대상지역인 도계읍 (05 §1) */
 export const REGION_TOOLTIP: Partial<Record<Region, string>> = {
   삼척시: "삼척시 도계읍 (하이원포인트 지역가맹 대상지역)",

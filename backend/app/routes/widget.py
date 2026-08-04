@@ -1,5 +1,6 @@
 """B6: 방문객 위젯 추천 — merchants.json + 완료 카드 반영 (05 문서 §4, 07 문서 B6)."""
 import math
+from urllib.parse import quote
 
 from fastapi import APIRouter, HTTPException
 
@@ -8,10 +9,11 @@ from app import dataload, db
 router = APIRouter()
 # pipeline/common.py ANCHOR 복제본 (Lambda 번들에 pipeline 모듈이 없어 import 금지)
 ANCHOR = {"lat": 37.21164, "lng": 128.82168}
-LIMIT = 3                                             # 상위 3곳 (07 문서 B6)
+DEFAULT_LIMIT = 12                                    # 첫 화면은 충분히 비교 가능한 12곳
+MAX_LIMIT = 120                                        # 전체 1,678건을 한 번에 보내지 않는 안전선
 DONE = "완료"
 EXPANSION_BADGE = "이번 분기 확충 업종"
-POLICY_NOTE = "이번 분기 확충이 완료된 업종을 우선 추천합니다"
+POLICY_NOTE = "완료된 확충 업종 우선 · 그 외 하이원리조트 거점 직선거리 기준"
 
 
 def _haversine_km(lat1: float, lng1: float, lat2: float, lng2: float) -> float:
@@ -46,13 +48,22 @@ def _payback(cards: list) -> dict | None:
     """`완료`된 INCENTIVE 카드의 selected_rate → 페이백 배지. 없으면 None (05 문서 §4).
 
     페이백은 전 지역 공통 적용이라 추천 항목 전체에 동일하게 붙는다.
-    완료 카드가 여럿이면 가장 최근에 결정된 카드의 rate를 쓴다.
+    완료 카드가 여럿이면 가장 최근에 **완료된** 카드의 rate를 쓴다.
     """
     done = [c for c in cards if c.get("type") == "INCENTIVE" and c.get("progress") == DONE
             and c.get("selected_rate")]
     if not done:
         return None
-    rate = max(done, key=lambda c: c.get("decided_at") or "")["selected_rate"]
+    def completion_time(card: dict) -> str:
+        if card.get("completed_at"):
+            return card["completed_at"]
+        completed_events = [
+            event.get("at") or "" for event in card.get("events", [])
+            if event.get("action") == f"progress:{DONE}"
+        ]
+        return max(completed_events, default=card.get("decided_at") or "")
+
+    rate = max(done, key=completion_time)["selected_rate"]
     return {"rate": rate, "label": f"지금 여기서 쓰면 {rate}% 페이백"}
 
 
@@ -67,8 +78,8 @@ def _blurbs(picked: list) -> list:
 
 
 @router.get("/widget/recommend")
-def recommend(region: str | None = None, category: str | None = None):
-    """(region, category) 필터 → 완료 카드 매칭 가맹점 우선 정렬 → 상위 3곳 + 문구 (05 문서 §4)."""
+def recommend(region: str | None = None, category: str | None = None, limit: int = DEFAULT_LIMIT):
+    """필터 결과를 우선순위로 정렬해 반환한다. limit을 늘리면 목록을 더 볼 수 있다."""
     try:
         merchants = dataload.load("merchants")
     except FileNotFoundError as exc:
@@ -83,8 +94,14 @@ def recommend(region: str | None = None, category: str | None = None):
     # 원본 순서(상호명순)로 두면 필터 없이 부를 때 방문객 동선과 무관한 가맹점이 먼저 나왔다.
     # 거리 값은 응답에도 blurb 프롬프트에도 싣지 않는다 — 05 §1 캐비엇("거점에서 가장 가깝다고
     # 단정하지 않는다")과 충돌하므로 정렬 근거로만 쓰고 LLM이 근접성을 주장할 수 없게 한다.
-    rows.sort(key=lambda m: (0 if (m.get("eup"), m.get("category")) in new_targets else 1, _anchor_km(m)))
-    picked = [(m, (m.get("eup"), m.get("category")) in new_targets) for m in rows[:LIMIT]]
+    rows.sort(key=lambda m: (
+        0 if (m.get("eup"), m.get("category")) in new_targets else 1,
+        _anchor_km(m),
+        str(m.get("name") or ""),
+        str(m.get("address") or ""),
+    ))
+    visible_limit = max(1, min(MAX_LIMIT, limit))
+    picked = [(m, (m.get("eup"), m.get("category")) in new_targets) for m in rows[:visible_limit]]
     blurbs = _blurbs(picked) if picked else []
     return {
         "recommendations": [
@@ -95,11 +112,15 @@ def recommend(region: str | None = None, category: str | None = None):
                 "lat": m["lat"],
                 "lng": m["lng"],
                 "badge": EXPANSION_BADGE if is_new else None,
-                "directions_url": f"https://map.kakao.com/link/to/{m['name']},{m['lat']},{m['lng']}",
+                "directions_url": (
+                    f"https://map.kakao.com/link/to/{quote(str(m['name']), safe='')},{m['lat']},{m['lng']}"
+                    if m.get("lat") is not None and m.get("lng") is not None else None
+                ),
                 "payback": payback,
                 "blurb": blurbs[i],
             }
             for i, (m, is_new) in enumerate(picked)
         ],
         "policy_note": POLICY_NOTE,
+        "total": len(rows),
     }

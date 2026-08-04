@@ -1,12 +1,12 @@
 # 로컬 통합 테스트 환경 — `docker compose up -d` 하나로 DynamoDB + BE + FE 가 전부 뜬다.
 # (개발 중 AWS 배포 금지 — 테스트는 전부 여기서, docs/plan/14 문서 머리말)
 #
-#   docker compose up -d          # 전체 기동 → FE http://localhost:3000, BE http://localhost:8000
+#   docker compose up -d          # 전체 기동 → FE http://localhost:3100, BE http://localhost:8000
 #   docker compose logs -f        # 로그
 #   docker compose down           # 정리
 #
 # 오버라이드 (레포 루트 .env 또는 셸 환경변수):
-#   FRONTEND_PORT=3100            # 호스트 3000 번이 다른 프로젝트에 잡혀 있을 때
+#   FRONTEND_PORT=3100            # 배포·검증 기준 호스트 포트
 #   FRONTEND_API_BASE=            # 빈 값으로 두면 FE 가 mock 모드 (BE 없이 화면만 볼 때)
 services:
   dynamodb:
@@ -23,6 +23,7 @@ services:
     environment:
       DYNAMO_ENDPOINT: http://dynamodb:8000
       CARDS_TABLE: sangseng-cards
+      PROGRESS_RECORDS_TABLE: sangseng-progress-records
       AWS_ACCESS_KEY_ID: local
       AWS_SECRET_ACCESS_KEY: local
       AWS_DEFAULT_REGION: ap-northeast-2
@@ -43,6 +44,8 @@ services:
     environment:
       DYNAMO_ENDPOINT: http://dynamodb:8000
       CARDS_TABLE: sangseng-cards
+      PROGRESS_RECORDS_TABLE: sangseng-progress-records
+      MUTATION_API_TOKEN: "${MUTATION_API_TOKEN:-local-dev-token}"
       AWS_ACCESS_KEY_ID: local          # DynamoDB Local은 자격증명 "형식"만 요구
       AWS_SECRET_ACCESS_KEY: local
       AWS_DEFAULT_REGION: ap-northeast-2
@@ -54,16 +57,17 @@ services:
 
   frontend:
     build: ./frontend
-    ports: ["${FRONTEND_PORT:-3000}:3000"]
+    ports: ["${FRONTEND_PORT:-3100}:3000"]
     environment:
       # 기본값은 실 BE 연동이다. 페이지가 서버 컴포넌트라 fetch 가 **컨테이너 안에서** 일어나므로
       # 컨테이너 네트워크 주소를 쓴다 — http://localhost:8000 을 넣으면 ECONNREFUSED 가 난다.
       # (컨테이너 밖 `npm run dev` 는 frontend/.env.local 에 http://localhost:8000)
       # FRONTEND_API_BASE= 로 비우면 mock 모드(frontend/src/mocks/) — BE 없이 화면만 볼 때.
       NEXT_PUBLIC_API_BASE: "${FRONTEND_API_BASE-http://backend:8000}"
-      # 허브 히어로의 지역 진단 지도 (선택). 비우면 배치 개념도로 폴백한다.
+      API_MUTATION_TOKEN: "${MUTATION_API_TOKEN:-local-dev-token}"
+      # 방문객 위젯의 Kakao 지도 (선택). 키가 없거나 도메인이 미등록이면 지도형 fallback을 보인다.
       # ⚠ KAKAO_REST_API_KEY(지오코딩용)와 다른 **JavaScript 키**이고, Kakao 앱의
-      #   [플랫폼]>[Web]에 이 컨테이너가 열리는 주소(기본 http://localhost:3000)를 등록해야 뜬다.
+      #   [플랫폼]>[Web]에 이 컨테이너가 열리는 주소(기본 http://localhost:3100)를 등록해야 뜬다.
       NEXT_PUBLIC_KAKAO_MAP_KEY: "${NEXT_PUBLIC_KAKAO_MAP_KEY-}"
       WATCHPACK_POLLING: "true"                   # 바인드 마운트에서 파일 변경 감지(HMR)
     volumes:

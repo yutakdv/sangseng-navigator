@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { AssumptionNote } from "@/components/Badge";
+import { DeltaValue } from "@/components/DeltaValue";
 import { Icon } from "@/components/Icon";
-import { range } from "@/lib/format";
 import type { Card, Scenario } from "@/types";
 
 /**
@@ -57,7 +57,7 @@ export function ScenarioLadder({
         </div>
         <Link
           href="/incentive"
-          className="inline-flex shrink-0 items-center gap-1.5 rounded-xl bg-admin-primary px-4 py-2.5 text-sm font-bold text-white shadow-[0_8px_20px_-8px_rgb(79_70_229)] transition-colors hover:bg-admin-primary-strong"
+          className="inline-flex min-h-10 shrink-0 items-center gap-1.5 rounded-lg bg-admin-primary px-4 py-2 text-sm font-bold text-white transition-colors hover:bg-admin-primary-strong"
         >
           시나리오 비교하고 승인하기
           <Icon name="arrowRight" size={16} strokeWidth={2} />
@@ -121,15 +121,20 @@ function ScenarioCard({
 
       <div className="mt-4 border-t border-admin-border pt-3.5">
         <p className="text-[11px] font-semibold text-admin-text-muted">지역 전환율 개선폭</p>
-        <p className="mt-1 text-[19px] font-bold leading-6 tabular-nums text-admin-primary">
-          +{range(scenario.delta_pp)}
+        <p className="mt-1">
+          <DeltaValue
+            value={scenario.delta_pp}
+            unit="%p"
+            variant="text"
+            className="text-[19px] font-bold leading-6"
+          />
         </p>
 
         {/* 공유 축 위의 범위 막대 — 단정 값이 아니라 구간이라는 사실이 형태로 읽힌다 */}
         <div className="relative mt-2.5 h-2 overflow-hidden rounded-full bg-admin-surface-sunken">
           <span
             style={{ left: `${left}%`, width: `${width}%`, animationDelay: `${delay + 260}ms` }}
-            className="absolute inset-y-0 origin-left animate-grow rounded-full bg-gradient-to-r from-admin-primary/70 to-admin-primary"
+            className="absolute inset-y-0 origin-left animate-grow rounded-full bg-admin-primary"
           />
         </div>
 

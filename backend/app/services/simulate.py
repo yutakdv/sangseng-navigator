@@ -3,6 +3,7 @@
 usage_monthly.json 최신 월의 6개 지역 분포에 타깃 (읍×업종) 예상 월 건수(가정치)를 더해
 지역 소비 집중도(0~100 지수)를 재계산한다. 모든 결과는 가정 기반 전망이다.
 """
+import math
 
 # pipeline/common.py REGIONS 복제본 (Lambda 번들에 pipeline 모듈이 없어 import 금지)
 REGIONS = ["고한읍", "사북읍", "정선군", "태백시", "영월군", "삼척시"]
@@ -76,6 +77,57 @@ def _avg_monthly(rows: list, recent: list, eups: list, category: str | None = No
     return total / len(recent)
 
 
+def _monthly_per_merchant_samples(
+    usage: dict, merchants: list, eup: str, category: str
+) -> tuple[list[float], int]:
+    """최근 월별 가맹점당 건수 표본과 폴백 단계를 반환한다.
+
+    정적인 가맹점 수를 각 월의 실제 건수에 적용한다. 표본 평균은 기존 예상 건수와 같지만,
+    월별 변동을 보존하므로 임의의 ±30% 대신 관측 기반 사분위 범위를 만들 수 있다.
+    """
+    recent = _recent_months(usage)
+    rows = usage["usage"]
+    n1 = sum(1 for m in merchants if m.get("eup") == eup and m.get("category") == category)
+    n2 = sum(1 for m in merchants if m.get("category") == category)
+
+    if n1 > 0:
+        eups, selected_category, denominator, step = [eup], category, n1, 1
+    elif n2 > 0:
+        eups, selected_category, denominator, step = REGIONS, category, n2, 2
+    else:
+        if not merchants:
+            raise ValueError("가맹점 데이터가 비어 있어 예상 건수를 계산할 수 없습니다")
+        eups, selected_category, denominator, step = REGIONS, None, len(merchants), 3
+
+    samples = []
+    for month in recent:
+        total = 0
+        for row in rows:
+            if row["month"] != month:
+                continue
+            if (selected_category is not None
+                    and HIGHONE_TO_DISPLAY.get(row["category"], "기타") != selected_category):
+                continue
+            total += sum(row.get(region, 0) for region in eups)
+        samples.append(total / denominator)
+    return samples, step
+
+
+def _percentile(values: list[float], quantile: float) -> float:
+    """작은 표본에도 재현 가능한 선형 보간 분위수 (0<=quantile<=1)."""
+    if not values:
+        raise ValueError("분위수 계산 표본이 비어 있습니다")
+    if not 0 <= quantile <= 1:
+        raise ValueError("quantile은 0과 1 사이여야 합니다")
+    ordered = sorted(values)
+    position = (len(ordered) - 1) * quantile
+    lower, upper = math.floor(position), math.ceil(position)
+    if lower == upper:
+        return ordered[lower]
+    fraction = position - lower
+    return ordered[lower] * (1 - fraction) + ordered[upper] * fraction
+
+
 def expected_monthly_count(usage: dict, merchants: list, eup: str, category: str) -> tuple[float, int]:
     """타깃 (읍×업종) 신규 가맹점 1곳의 예상 월 건수(가정치)와 사용된 폴백 단계를 반환.
 
@@ -87,15 +139,8 @@ def expected_monthly_count(usage: dict, merchants: list, eup: str, category: str
 
     merchants가 비어 있지 않음(3단계 분모>0)은 호출부(라우트 503 가드)가 보장한다.
     """
-    recent = _recent_months(usage)       # "최근 3개월" = 기준월(base_month)을 끝으로 (06 문서 공통 원칙 3)
-    rows = usage["usage"]
-    n1 = sum(1 for m in merchants if m.get("eup") == eup and m.get("category") == category)
-    if n1 > 0:
-        return _avg_monthly(rows, recent, [eup], category) / n1, 1
-    n2 = sum(1 for m in merchants if m.get("category") == category)
-    if n2 > 0:
-        return _avg_monthly(rows, recent, REGIONS, category) / n2, 2
-    return _avg_monthly(rows, recent, REGIONS) / len(merchants), 3
+    samples, step = _monthly_per_merchant_samples(usage, merchants, eup, category)
+    return sum(samples) / len(samples), step
 
 
 def _round_pp(x: float) -> float:
@@ -112,8 +157,8 @@ def simulate_expansion(usage: dict, merchants: list, eup: str, category: str) ->
     """반사실 재계산 — 05 §2 simulate 응답 수치의 원천.
 
     기준월 지역 분포에서 타깃 읍 건수에 예상 월 건수를 더해 지수를 재계산한다.
-    delta_pp는 예상 건수 ×0.7/×1.3 두 시나리오의 개선폭(current−projected) 범위,
-    낮은 값 먼저. 클램핑하지 않는다 (T12 브리프 — 상식 범위 밖이면 그대로 노출).
+    delta_pp는 최근 3개월의 월별 가맹점당 건수 25·75 분위수를 적용한 개선폭
+    (current−projected) 범위다. 데이터 변동을 쓰므로 임의의 ±30% 가정은 사용하지 않는다.
 
     집계 대상 6개 지역 밖의 eup은 조용히 delta 0을 내지 않고 `ValueError` (라우트가 400으로 변환)
     — 지수 분포에 더할 자리가 없어 "효과 없음"과 구분되지 않기 때문.
@@ -127,7 +172,10 @@ def simulate_expansion(usage: dict, merchants: list, eup: str, category: str) ->
             for r in REGIONS:
                 dist[r] += row.get(r, 0)
     current = concentration_index([dist[r] for r in REGIONS])
-    expected, step = expected_monthly_count(usage, merchants, eup, category)
+    samples, step = _monthly_per_merchant_samples(usage, merchants, eup, category)
+    expected = sum(samples) / len(samples)
+    expected_low = _percentile(samples, 0.25)
+    expected_high = _percentile(samples, 0.75)
 
     def projected(mult: float) -> float:
         return concentration_index(
@@ -139,11 +187,15 @@ def simulate_expansion(usage: dict, merchants: list, eup: str, category: str) ->
         # delta_pp(0.0~0.1%p)와 10배 어긋난 문장이 만들어진다 (05 §2).
         "current_index": _round_pp(current),
         "projected_index": _round_pp(projected(1.0)),
-        "delta_pp": sorted(_round_pp(current - projected(m)) for m in (0.7, 1.3)),
+        "delta_pp": sorted(_round_pp(current - concentration_index(
+            [dist[r] + count if r == eup else dist[r] for r in REGIONS]
+        )) for count in (expected_low, expected_high)),
         # 이하는 API 응답에 싣지 않는 내부 값 — LLM narrative 입력·검증 보고용
         "eup": eup,
         "category": category,
         "expected_monthly_count": round(expected, 1),
+        "expected_monthly_range": [round(expected_low, 1), round(expected_high, 1)],
+        "uncertainty_method": "최근 3개월 월별 가맹점당 건수 25~75 분위수",
         "fallback_step": step,
         "base_month": latest,
     }

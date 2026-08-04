@@ -1,5 +1,5 @@
 {
-  "updated_at": "2026-08-04",
+  "updated_at": "2026-08-05",
   "period_note": "하이원포인트 사용현황 최신 제공분(2025-12) 기준",
   "conversion": {
     "headline_rate": 20.5,
@@ -135,55 +135,55 @@
     ]
   },
   "category_dispersion": {
-    "index": 78,
+    "index": 87,
     "monthly": [
       {
         "month": "2025-01",
-        "index": 77
+        "index": 87
       },
       {
         "month": "2025-02",
-        "index": 78
+        "index": 88
       },
       {
         "month": "2025-03",
-        "index": 78
+        "index": 88
       },
       {
         "month": "2025-04",
-        "index": 78
+        "index": 88
       },
       {
         "month": "2025-05",
-        "index": 78
+        "index": 88
       },
       {
         "month": "2025-06",
-        "index": 78
+        "index": 87
       },
       {
         "month": "2025-07",
-        "index": 78
+        "index": 87
       },
       {
         "month": "2025-08",
-        "index": 78
+        "index": 87
       },
       {
         "month": "2025-09",
-        "index": 78
+        "index": 88
       },
       {
         "month": "2025-10",
-        "index": 78
+        "index": 88
       },
       {
         "month": "2025-11",
-        "index": 78
+        "index": 87
       },
       {
         "month": "2025-12",
-        "index": 78
+        "index": 87
       }
     ]
   },
@@ -365,5 +365,6 @@
     "mom_pct": -1.8,
     "qoq_pp": 1.1
   },
-  "ai_stability": 80
+  "ranking_stability": 16,
+  "ai_stability": 16
 }

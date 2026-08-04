@@ -14,7 +14,18 @@
 import { revalidatePath } from "next/cache";
 import { api } from "@/lib/api";
 import { ApiError } from "@/lib/errors";
-import type { Card, CardProgress, CardStatus, CardType, PaybackRate, Simulation } from "@/types";
+import { isDemoReadOnly } from "@/lib/runtime";
+import type {
+  Card,
+  CardProgress,
+  CardStatus,
+  CardType,
+  CreateProgressRecordResponse,
+  EligibilityCheck,
+  PaybackRate,
+  ProgressRecordInput,
+  Simulation,
+} from "@/types";
 
 export type ActionResult<T> = { ok: true; data: T } | { ok: false; status: number; detail: string };
 
@@ -32,12 +43,19 @@ function revalidateAll(): void {
   revalidatePath("/", "layout");
 }
 
+const readOnlyFailure = (): ActionResult<never> => ({
+  ok: false,
+  status: 403,
+  detail: "공개 데모는 읽기 전용입니다. 운영 권한이 연결된 환경에서 변경해 주세요.",
+});
+
 /** 승인/반려/보류 — INCENTIVE 승인에는 rate(3|5|7) 필수 (05 §2). AI 제안이 확정되는 유일한 지점 */
 export async function decideAction(
   id: string,
   decision: CardStatus,
   rate?: PaybackRate,
 ): Promise<ActionResult<Card>> {
+  if (isDemoReadOnly) return readOnlyFailure();
   try {
     const { card } = await api.decide(id, decision, rate);
     revalidateAll();
@@ -52,8 +70,39 @@ export async function progressAction(
   id: string,
   progress: CardProgress,
 ): Promise<ActionResult<Card>> {
+  if (isDemoReadOnly) return readOnlyFailure();
   try {
     const { card } = await api.progress(id, progress);
+    revalidateAll();
+    return { ok: true, data: card };
+  } catch (error) {
+    return toFail(error);
+  }
+}
+
+/** 상태 선택만이 아닌 추진 메모·목표·실측값을 함께 남기는 경과 기록. */
+export async function createProgressRecordAction(
+  id: string,
+  input: ProgressRecordInput,
+): Promise<ActionResult<CreateProgressRecordResponse>> {
+  if (isDemoReadOnly) return readOnlyFailure();
+  try {
+    const result = await api.createProgressRecord(id, input);
+    revalidateAll();
+    return { ok: true, data: result };
+  } catch (error) {
+    return toFail(error);
+  }
+}
+
+/** 가맹점 후보 필수 적격성 5개 항목 기록 — 가맹 확정과는 별개다. */
+export async function verificationAction(
+  id: string,
+  checks: EligibilityCheck[],
+): Promise<ActionResult<Card>> {
+  if (isDemoReadOnly) return readOnlyFailure();
+  try {
+    const { card } = await api.verification(id, checks);
     revalidateAll();
     return { ok: true, data: card };
   } catch (error) {
@@ -69,6 +118,7 @@ export async function progressAction(
 export async function generateAction(
   type: CardType,
 ): Promise<ActionResult<{ card: Card; created: boolean }>> {
+  if (isDemoReadOnly) return readOnlyFailure();
   try {
     const result = await api.generate(type);
     revalidateAll();

@@ -121,7 +121,7 @@ def main() -> None:
     print(f"  기본 가중치 Top3: {' / '.join(base_labels)}")
     print(f"  Top3 안정 비율 {out['top3_stable_ratio']:.2%} ({matched}/{len(detail)} 조합) "
           f"· 순위까지 동일 {ordered / len(detail):.2%} ({ordered}/{len(detail)}) "
-          f"→ 대시보드 ai_stability = {round(out['top3_stable_ratio'] * 100)}")
+          f"→ 대시보드 ranking_stability = {round(out['top3_stable_ratio'] * 100)}")
     for v1 in V1_GRID:
         rows = [d for d in detail if d["weights"]["v1"] == v1]
         hit = sum(1 for d in rows if d["match"])

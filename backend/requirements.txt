@@ -1,8 +1,8 @@
 # Lambda 번들에 실리는 런타임 의존성만 (07 의존성 원칙). uvicorn은 Lambda에서 안 쓰므로 제외 —
 # 로컬 실행용은 requirements-dev.txt, Docker 이미지용은 Dockerfile에서 따로 설치한다.
-fastapi
-mangum
-boto3
-python-dotenv
-openai
-anthropic
+fastapi==0.141.1
+mangum==0.21.0
+boto3==1.43.62
+python-dotenv==1.2.2
+openai==2.52.0
+anthropic==0.120.2

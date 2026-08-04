@@ -15,10 +15,18 @@ CANDIDATE_DIRS = [
 ]
 
 
-@functools.lru_cache(maxsize=None)
+@functools.lru_cache(maxsize=32)
+def _load_versioned(path: str, mtime_ns: int, size: int) -> dict | list:
+    """파일 버전별 JSON 파싱 캐시. mtime/size는 캐시 키이며 본문에서는 사용할 필요가 없다."""
+    del mtime_ns, size
+    return json.loads(Path(path).read_text(encoding="utf-8"))
+
+
 def load(name: str) -> dict | list:      # candidates·merchants·risk_signal 은 최상위가 list다
+    """최신 산출물을 읽는다. 실행 중 파이프라인이 파일을 갱신해도 서버 재시작이 필요 없다."""
     for d in CANDIDATE_DIRS:
         p = d / f"{name}.json"
         if p.exists():
-            return json.loads(p.read_text(encoding="utf-8"))
+            stat = p.stat()
+            return _load_versioned(str(p), stat.st_mtime_ns, stat.st_size)
     raise FileNotFoundError(name)

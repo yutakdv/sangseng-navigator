@@ -35,6 +35,10 @@ def generate_json(system: str, user: str, schema: dict, schema_name: str = "resu
     지연 상한이 중요한 호출부(위젯 blurb)만 attempts=1 로 재시도를 끄고 fallback 으로 넘긴다.
     """
     provider = os.environ.get("LLM_PROVIDER", "openai")
+    if provider not in {"openai", "anthropic"}:
+        # 오타를 OpenAI로 조용히 처리하면 배포 환경에서 의도하지 않은 provider·키를 사용한다.
+        # 호출부는 LLMError를 받아 규칙 기반 fallback으로 전환하므로 사용자 흐름은 끊기지 않는다.
+        raise LLMError(f"Unsupported LLM_PROVIDER: {provider}")
     model = (os.environ.get("ANTHROPIC_MODEL", "claude-sonnet-5") if provider == "anthropic"
              else os.environ.get("OPENAI_MODEL", "gpt-4o-mini"))
     attempts = max(1, attempts)     # 0 이하면 아래 raise last_exc 가 None을 raise 하므로 최소 1회는 돈다

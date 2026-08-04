@@ -2,10 +2,10 @@
 
 import { useId, useState, useTransition } from "react";
 import { progressAction } from "@/app/actions";
-import type { CardProgress } from "@/types";
+import { EXPANSION_PROGRESS, INCENTIVE_PROGRESS } from "@/lib/cardWorkflow";
+import { isDemoReadOnly } from "@/lib/runtime";
+import type { CardProgress, CardType } from "@/types";
 
-/** 4단계 고정 — 05 §2. 승인 시 자동으로 `검토중`에서 시작한다 */
-const OPTIONS: CardProgress[] = ["검토중", "추진중", "보류", "완료"];
 
 /**
  * 승인 카드의 추진 상태 셀렉트 (docs/plan/08 F8).
@@ -20,16 +20,23 @@ const OPTIONS: CardProgress[] = ["검토중", "추진중", "보류", "완료"];
 export function ProgressSelect({
   cardId,
   progress,
+  cardType,
+  verificationStatus = "unverified",
   disabled = false,
 }: {
   cardId: string;
   /** 승인 시 자동으로 `검토중`이 붙지만 계약상 null이 가능하다 — null이면 `검토중`으로 본다 (05 §2) */
   progress: CardProgress | null;
+  cardType: CardType;
+  verificationStatus?: "unverified" | "verified" | "ineligible";
   disabled?: boolean;
   /** 서버 컴포넌트에서 함수를 props로 넘길 수 없다 — 갱신은 액션의 revalidate가 맡는다 */
   onDone?: never;
 }) {
-  const server: CardProgress = progress ?? "검토중";
+  const server: CardProgress =
+    cardType === "EXPANSION" && progress === "검토중"
+      ? "후보 접촉·검토 시작"
+      : progress ?? (cardType === "EXPANSION" ? "후보 접촉·검토 시작" : "검토중");
   const [value, setValue] = useState<CardProgress>(server);
   const [synced, setSynced] = useState<CardProgress>(server);
   const [pending, startTransition] = useTransition();
@@ -45,6 +52,8 @@ export function ProgressSelect({
   }
 
   const working = busy || pending;
+  const options = cardType === "EXPANSION" ? EXPANSION_PROGRESS : INCENTIVE_PROGRESS;
+  const verificationLocked = cardType === "EXPANSION" && verificationStatus !== "verified";
 
   const change = (next: CardProgress) => {
     if (next === value) return;
@@ -78,7 +87,7 @@ export function ProgressSelect({
       <select
         id={id}
         value={value}
-        disabled={disabled || working}
+        disabled={disabled || isDemoReadOnly || working}
         aria-busy={working}
         // 보이는 라벨은 카드마다 "추진 상태"로 같아서, 스크린리더로는 여러 셀렉트가 구분되지 않는다.
         // 카드 id를 붙여 어느 카드의 상태인지 읽히게 한다 (13 §4 접근성).
@@ -86,12 +95,22 @@ export function ProgressSelect({
         onChange={(e) => change(e.target.value as CardProgress)}
         className="mt-1.5 w-full rounded-lg border border-admin-border bg-admin-surface px-3 py-2 text-sm font-medium text-admin-text shadow-card transition-colors hover:border-admin-primary/50 focus:border-admin-primary focus:outline-none focus:ring-2 focus:ring-admin-primary/25 disabled:cursor-not-allowed disabled:opacity-50"
       >
-        {OPTIONS.map((o) => (
-          <option key={o} value={o}>
+        {options.map((o) => (
+          <option
+            key={o}
+            value={o}
+            disabled={verificationLocked && ["적격성 확인", "가맹 심사", "추진중", "완료"].includes(o)}
+          >
             {o}
           </option>
         ))}
       </select>
+
+      {verificationLocked ? (
+        <p className="u-note mt-1.5">필수 적격성 5개 항목 확인 전에는 가맹 심사·추진·완료를 선택할 수 없습니다.</p>
+      ) : null}
+
+      {isDemoReadOnly ? <p className="u-note mt-1.5">공개 데모 읽기 전용</p> : null}
 
       {working ? <p className="u-note mt-1.5">변경 중…</p> : null}
 

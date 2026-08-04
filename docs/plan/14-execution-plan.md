@@ -300,7 +300,7 @@ _table = boto3.resource("dynamodb", **_kw).Table(os.environ.get("CARDS_TABLE") o
 
 - [ ] Step 2: `.env`에 배포 파라미터 2종을 넣고 `cd infra && ./deploy-backend.sh` → Outputs의
       `ApiUrl`·`CardsTable` 기록
-      - `ALLOWED_ORIGINS=https://<project>.vercel.app,http://localhost:3000` — 앱 CORS 허용 도메인.
+      - `ALLOWED_ORIGINS=https://<project>.vercel.app,http://localhost:3100` — 앱 CORS 허용 도메인.
         Vercel 도메인은 F1 머지 직후 첫 Deploy에서 이미 확정돼 있다(T15). 비우면 `*` 유지 (09 §5)
       - `RESERVED_CONCURRENCY` — 생략하면 template Default **5**가 적용된다(무인증 공개 URL의
         LLM 호출 남용 상한, 09 §5.5). 동시성 한도 부족으로 배포가 실패하면 `-1`로 재시도
