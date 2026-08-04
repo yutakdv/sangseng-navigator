@@ -72,7 +72,7 @@ export function ProgressSelect({
 
   return (
     <div className="min-w-0">
-      <label htmlFor={id} className="block text-[11px] font-medium text-admin-text-muted">
+      <label htmlFor={id} className="block text-xs font-semibold text-admin-text-muted">
         추진 상태
       </label>
       <select
@@ -84,7 +84,7 @@ export function ProgressSelect({
         // 카드 id를 붙여 어느 카드의 상태인지 읽히게 한다 (13 §4 접근성).
         aria-label={`${cardId} 추진 상태`}
         onChange={(e) => change(e.target.value as CardProgress)}
-        className="mt-1 w-full rounded-lg border border-black/10 bg-admin-surface px-2.5 py-1.5 text-sm text-admin-text transition-colors hover:border-admin-primary/40 focus:border-admin-primary focus:outline-none focus:ring-2 focus:ring-admin-primary/20 disabled:cursor-not-allowed disabled:opacity-50"
+        className="mt-1.5 w-full rounded-lg border border-admin-border bg-admin-surface px-3 py-2 text-sm font-medium text-admin-text shadow-card transition-colors hover:border-admin-primary/50 focus:border-admin-primary focus:outline-none focus:ring-2 focus:ring-admin-primary/25 disabled:cursor-not-allowed disabled:opacity-50"
       >
         {OPTIONS.map((o) => (
           <option key={o} value={o}>
@@ -93,10 +93,13 @@ export function ProgressSelect({
         ))}
       </select>
 
-      {working ? <p className="mt-1 text-[11px] text-admin-text-muted">변경 중…</p> : null}
+      {working ? <p className="u-note mt-1.5">변경 중…</p> : null}
 
       {error ? (
-        <p role="alert" className="mt-1 break-keep text-[11px] leading-4 text-state-bad">
+        <p
+          role="alert"
+          className="mt-1.5 break-keep rounded-lg bg-state-bad-bg px-2 py-1.5 text-xs leading-5 text-state-bad"
+        >
           {error}
         </p>
       ) : null}

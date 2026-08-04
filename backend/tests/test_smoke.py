@@ -73,7 +73,7 @@ client = TestClient(app)
 # ── 05 문서가 고정한 계약 문구·값 (바뀌면 FE와 어긋난다) ──
 ASSUMPTION_NOTE = "가정 기반 전망이며 실제와 다를 수 있음"
 INCENTIVE_ASSUMPTION_NOTE = "페이백률-전환율 관계는 실측 데이터가 없어 팀 설정 가정(탄력성)에 기반한 전망"
-POLICY_NOTE = "확충 완료된 신규 가맹점을 우선 추천합니다"
+POLICY_NOTE = "이번 분기 확충이 완료된 업종을 우선 추천합니다"
 EXPANSION_SOURCES = ["하이원포인트 사용현황", "가맹점 상세정보", "소진공 상가정보"]
 SCENARIO_RATES = [3, 5, 7]
 MANDATORY_INCENTIVE_RISKS = ["예산", "약관", "미구현"]
@@ -677,7 +677,7 @@ def test_widget_promotes_completed_targets_and_payback(fake_llm):
     assert before["policy_note"] == POLICY_NOTE
     assert len(before["recommendations"]) == 3
     assert all(r["badge"] is None and r["payback"] is None for r in before["recommendations"])
-    assert [r["blurb"] for r in before["recommendations"]] == [f"{FAKE_BLURB} {i}" for i in (1, 2, 3)]
+    assert all(r["blurb"] == f"영월군의 {r['category']} 하이원포인트 가맹점이에요" for r in before["recommendations"])
 
     client.post("/api/cards/AC-001/progress", json={"progress": "완료"})     # 영월군 × 카페
     client.post("/api/cards/INC-001/decision", json={"decision": "approved", "selected_rate": 5})
@@ -687,37 +687,30 @@ def test_widget_promotes_completed_targets_and_payback(fake_llm):
     recs = after["recommendations"]
     assert [r["name"] for r in recs] != [r["name"] for r in before["recommendations"]]
     assert [r["category"] for r in recs[:2]] == ["카페", "카페"]
-    assert [r["badge"] for r in recs[:2]] == ["신규", "신규"]
+    assert [r["badge"] for r in recs[:2]] == ["이번 분기 확충 업종", "이번 분기 확충 업종"]
     assert all(r["payback"] == {"rate": 5, "label": "지금 여기서 쓰면 5% 페이백"} for r in recs)
-    assert all({"name", "category", "address", "lat", "lng"} <= set(r) for r in recs)
-    assert fake_llm.calls == ["blurbs", "blurbs"]
-    assert fake_llm.attempts == [1, 1]      # 위젯만 재시도 끔 — 최악 지연 5초 (timeout 5s × 1회)
+    assert all({"name", "category", "address", "lat", "lng", "directions_url"} <= set(r) for r in recs)
+    assert all(r["directions_url"].startswith("https://map.kakao.com/link/to/") for r in recs)
 
 
-def test_widget_blurb_falls_back_when_llm_fails(monkeypatch):
-    def boom(*args, **kwargs):
-        raise RuntimeError("llm down")
-
-    monkeypatch.setattr(llm, "generate_json", boom)
+def test_widget_blurb_is_deterministic_and_neutral(fake_llm):
     recs = client.get("/api/widget/recommend",
                       params={"region": "영월군", "category": "카페"}).json()["recommendations"]
     assert recs and all("영월군" in r["blurb"] and "카페" in r["blurb"] for r in recs)
+    assert all("새로 생긴" not in r["blurb"] and "맛" not in r["blurb"] for r in recs)
 
 
-def test_widget_fills_missing_blurbs(fake_llm):
-    """LLM이 요청 수보다 적게 돌려줘도 부족분만 규칙 기반 문구로 채운다 (widget._blurbs)."""
-    fake_llm.blurbs = ["하나만"]
+def test_widget_blurbs_are_always_source_based(fake_llm):
     recs = client.get("/api/widget/recommend", params={"region": "영월군"}).json()["recommendations"]
 
     assert len(recs) == 3
-    assert recs[0]["blurb"] == "하나만"
-    assert all(r["blurb"] == f"영월군의 {r['category']} 하이원포인트 가맹점이에요" for r in recs[1:])
+    assert all(r["blurb"] == f"영월군의 {r['category']} 하이원포인트 가맹점이에요" for r in recs)
 
 
 def test_widget_returns_empty_for_unknown_region(fake_llm):
     body = client.get("/api/widget/recommend", params={"region": "없는읍"}).json()
     assert body == {"recommendations": [], "policy_note": POLICY_NOTE}
-    assert fake_llm.calls == []                                   # 결과 0건이면 LLM 호출도 없다
+    assert body["recommendations"] == []
 
 
 # ── 8. LLM 어댑터 (실호출 없이 어댑터 자체를 검증) ───────────────────────

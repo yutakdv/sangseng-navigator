@@ -7,6 +7,7 @@
 기준월은 하드코딩하지 않고 데이터 최신 월(`base_month`)로 잡는다 (06 공통 원칙 3).
 전환율은 분자(사용현황)와 분모(입장객)가 겹치는 월만 사용한다 (06 공통 원칙 4).
 """
+import calendar
 import json
 from datetime import date
 
@@ -91,8 +92,14 @@ def main():
             display_total[display_of_highone(category)] += count
 
     prev_month = months[-2]
+    def days_in_month(month: str) -> int:
+        year, month_num = (int(part) for part in month.split("-"))
+        return calendar.monthrange(year, month_num)[1]
+
+    base_daily = uses_by_month[base_month] / days_in_month(base_month)
+    prev_daily = uses_by_month[prev_month] / days_in_month(prev_month)
     growth = {
-        "mom_pct": round((uses_by_month[base_month] - uses_by_month[prev_month]) / uses_by_month[prev_month] * 100, 1),
+        "mom_pct": round((base_daily - prev_daily) / prev_daily * 100, 1),
         "qoq_pp": (
             round(
                 quarter_rate(conv_months[-3:], uses_by_month, visitors)

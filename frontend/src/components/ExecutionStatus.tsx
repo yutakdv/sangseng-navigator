@@ -1,0 +1,166 @@
+import Link from "next/link";
+import { Icon, type IconName } from "@/components/Icon";
+import { ProgressChip } from "@/components/StatusChip";
+import { dash, ratioPct } from "@/lib/format";
+import type { Card, CardProgress, Kpi } from "@/types";
+
+/**
+ * 실행 현황 + 정책 성과 (docs/plan/13 §3 — 목업 image-1의 "정책 성과 요약").
+ *
+ * 목업의 "정책 효과 기여도 0.71"은 효과 귀속(대조군) 방법론이 없어 산출 불가라 13 §2-8이
+ * **지역 균형지수**로 대체하도록 정했다. "기여도"라는 단어는 쓰지 않는다.
+ * 목업의 금액 지표(경제적 파급효과)도 금액 필드가 없어 자리를 만들지 않고, 대신 상태값으로
+ * 계산되는 **실행 전환율**을 넣는다 — 전부 Action Card 상태에서 나오는 값이라 승인·상태 변경이
+ * 일어나면 즉시 바뀐다 (05 §3).
+ */
+const STAGES: CardProgress[] = ["검토중", "추진중", "보류", "완료"];
+
+export function ExecutionStatus({
+  approved,
+  kpi,
+  className = "",
+}: {
+  approved: Card[];
+  kpi: Kpi;
+  className?: string;
+}) {
+  const count = (p: CardProgress) => approved.filter((c) => (c.progress ?? "검토중") === p).length;
+  const total = approved.length;
+
+  return (
+    <section
+      style={{ animationDelay: "80ms" }}
+      className={`u-float animate-rise flex flex-col ${className}`}
+      aria-label="실행 현황과 정책 성과"
+    >
+      <div className="flex flex-wrap items-start gap-x-4 gap-y-2 p-5 pb-4 2xl:p-6 2xl:pb-4">
+        <div className="flex min-w-0 flex-1 items-start gap-3">
+          <span className="mt-px flex h-8 w-8 shrink-0 items-center justify-center rounded-[10px] bg-admin-surface-sunken text-admin-text-muted">
+            <Icon name="report" size={17} />
+          </span>
+          <div className="min-w-0">
+            <h3 className="u-panel-title">실행 현황 · 정책 성과</h3>
+            <p className="mt-1.5 break-keep text-[13px] leading-[1.65] text-admin-text-muted">
+              승인한 카드가 지금 어느 단계에 있는지, 그리고 의사결정이 얼마나 쌓였는지입니다.
+            </p>
+          </div>
+        </div>
+      </div>
+
+      <div className="min-w-0 px-5 2xl:px-6">
+        {/* ── 추진 단계 ────────────────────────────────────────── */}
+        {total === 0 ? (
+          <p className="rounded-2xl bg-admin-surface-sunken px-4 py-5 text-center text-[13px] leading-6 text-admin-text-muted">
+            승인된 카드가 아직 없습니다. 카드를 승인하면 여기에 추진 단계가 쌓입니다.
+          </p>
+        ) : (
+          <>
+            <div
+              aria-hidden
+              className="flex h-2.5 gap-1 overflow-hidden rounded-full bg-admin-surface-sunken"
+            >
+              {STAGES.map((s, i) => {
+                const n = count(s);
+                if (!n) return null;
+                return (
+                  <span
+                    key={s}
+                    style={{ width: `${(n / total) * 100}%`, animationDelay: `${160 + i * 90}ms` }}
+                    className={`origin-left animate-grow rounded-full ${STAGE_BAR[s]}`}
+                  />
+                );
+              })}
+            </div>
+            <ul className="mt-3 flex flex-wrap gap-x-4 gap-y-2">
+              {STAGES.map((s) => (
+                <li key={s} className="flex items-center gap-1.5">
+                  <ProgressChip progress={s} />
+                  <span className="text-[13px] font-bold tabular-nums text-admin-text">
+                    {count(s)}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          </>
+        )}
+
+        {/* ── 성과 지표 ────────────────────────────────────────── */}
+        <dl className="mt-5 grid grid-cols-2 gap-x-4 gap-y-4 border-t border-admin-border pt-5">
+          <Stat
+            icon="check"
+            label="채택률"
+            value={ratioPct(kpi.adoption_rate)}
+            note={`승인 ${kpi.counts.approved} / 전체 ${kpi.counts.total}장`}
+          />
+          <Stat
+            icon="trend"
+            label="실행 전환율"
+            value={ratioPct(kpi.execution_rate)}
+            note="승인 카드 중 추진중·완료 비중"
+          />
+          <Stat
+            icon="clock"
+            label="평균 의사결정 소요"
+            value={dash(kpi.avg_approval_hours)}
+            unit={kpi.avg_approval_hours === null ? undefined : "시간"}
+            note="승인·반려·보류까지 걸린 시간"
+          />
+          <Stat
+            icon="scale"
+            label="지역 균형지수"
+            value={dash(kpi.regional_balance_index)}
+            unit={kpi.regional_balance_index === null ? undefined : "/ 100"}
+            note="승인 카드가 여러 지역에 고루 쌓일수록 상승"
+          />
+        </dl>
+      </div>
+
+      <div className="mt-5 border-t border-admin-border px-5 py-4 2xl:px-6">
+        <Link
+          href="/tracking"
+          className="inline-flex w-full items-center justify-center gap-1.5 rounded-xl bg-admin-surface px-4 py-2.5 text-sm font-bold text-admin-primary ring-1 ring-inset ring-admin-primary-line transition-colors hover:bg-admin-primary-soft"
+        >
+          추진 상태 기록하기
+          <Icon name="arrowRight" size={15} strokeWidth={2} />
+        </Link>
+      </div>
+    </section>
+  );
+}
+
+const STAGE_BAR: Record<CardProgress, string> = {
+  검토중: "bg-state-notice",
+  추진중: "bg-admin-primary",
+  보류: "bg-state-warn",
+  완료: "bg-state-good",
+};
+
+function Stat({
+  icon,
+  label,
+  value,
+  unit,
+  note,
+}: {
+  icon: IconName;
+  label: string;
+  value: string;
+  unit?: string;
+  note: string;
+}) {
+  return (
+    <div className="min-w-0">
+      <dt className="flex items-center gap-1.5 text-[12px] font-semibold text-admin-text-muted">
+        <Icon name={icon} size={13} />
+        <span className="min-w-0 break-keep">{label}</span>
+      </dt>
+      <dd className="mt-1 flex items-baseline gap-1">
+        <span className="text-[22px] font-bold leading-7 tracking-[-0.02em] tabular-nums text-admin-text">
+          {value}
+        </span>
+        {unit ? <span className="text-[11px] font-semibold text-admin-text-muted">{unit}</span> : null}
+      </dd>
+      <p className="mt-0.5 break-keep text-[11px] leading-4 text-admin-text-muted">{note}</p>
+    </div>
+  );
+}

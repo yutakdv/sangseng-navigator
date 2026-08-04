@@ -19,7 +19,11 @@
 - [ ] `npx create-next-app@latest frontend` (App Router, TS, Tailwind, src 디렉토리)
 - [ ] 배포는 **Vercel 네이티브**이므로 정적 export 설정 불필요 — 동적 라우트 `/cards/[id]` 그대로 사용
 - [ ] 설치: `recharts`, `maplibre-gl` (지도는 `"use client"` 컴포넌트 + `next/dynamic`(ssr:false)로 로드,
-      `maplibre-gl/dist/maplibre-gl.css` import 필수 — Leaflet·Kakao 지도는 사용하지 않는다, 사유는 02 문서 "지도 결정")
+      `maplibre-gl/dist/maplibre-gl.css` import 필수 — Leaflet은 사용하지 않는다, 사유는 02 문서 "지도 결정")
+- [ ] 지도 스택은 화면마다 다르다 (02 문서 "지도 결정"):
+      **카드 상세 `/cards/[id]`의 500m 반경 지도 = MapLibre + OpenFreeMap**(데모 필수, 키 불필요),
+      **허브 히어로의 지역 진단 = `RegionTileMap` 지역 배치 개념도**(외부 SDK·키 없이 진단 서사만 표시),
+      실제 위치 탐색이 필요한 카드 상세는 MapLibre를 사용한다.
 - [ ] 데이터 접근 계층:
 
 ```ts
@@ -170,7 +174,7 @@ riskSignal: (): Promise<RiskSignal[]> => get("/api/risk-signal", () => riskSigna
 
 - [ ] 승인된 카드 목록 + 4단계 상태(검토중/추진중/보류/완료) 변경 UI (드롭다운 or 칸반 열)
 - [ ] 상태 변경 → `POST /progress` → KPI 실행 전환율 갱신 확인
-- [ ] **검증:** 완료로 변경 → 위젯 새로고침 시 신규 배지 등장 (전체 루프 완주)
+- [ ] **검증:** 완료로 변경 → 위젯 새로고침 시 `이번 분기 확충 업종` 배지 등장 (전체 루프 완주)
 
 ## Task F9: 실 API 전환 + 마감 (Phase 5)
 

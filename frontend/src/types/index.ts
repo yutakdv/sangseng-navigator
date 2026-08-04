@@ -174,8 +174,9 @@ export interface Recommendation {
   address: string;
   lat: number;
   lng: number;
-  /** 완료된 EXPANSION 카드의 (읍×업종)과 매칭될 때만 "신규" */
-  badge: "신규" | null;
+  /** 완료된 EXPANSION 카드의 (읍×업종)과 매칭될 때만 표시 */
+  badge: "이번 분기 확충 업종" | null;
+  directions_url: string;
   /** 완료된 INCENTIVE 카드가 있을 때만 — rate는 그 카드의 selected_rate */
   payback: { rate: PaybackRate; label: string } | null;
   blurb: string;

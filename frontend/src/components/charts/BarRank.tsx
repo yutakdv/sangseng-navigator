@@ -1,7 +1,7 @@
 "use client";
 
 import { Bar, BarChart, Cell, LabelList, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
-import { PRIMARY } from "@/lib/constants";
+import { CHART, PRIMARY } from "@/lib/constants";
 
 /**
  * 가로 막대 (지역별 사용 건수·읍 랭킹 등) — docs/plan/13 §5.
@@ -22,25 +22,25 @@ export function BarRank({
   return (
     <div className="min-w-0" style={{ height }}>
       <ResponsiveContainer width="100%" height="100%">
-        <BarChart data={data} layout="vertical" margin={{ top: 4, right: 56, bottom: 4, left: 8 }}>
+        <BarChart data={data} layout="vertical" margin={{ top: 4, right: 68, bottom: 4, left: 8 }}>
           <XAxis type="number" hide />
           <YAxis
             type="category"
             dataKey="label"
-            tick={{ fontSize: 12, fill: "#1e1b39" }}
+            tick={{ fontSize: 13, fill: "#181534", fontWeight: 500 }}
             tickLine={false}
             axisLine={false}
-            width={64}
+            width={70}
           />
           <Tooltip
-            cursor={{ fill: "rgba(79,70,229,0.06)" }}
+            cursor={{ fill: CHART.cursor }}
             formatter={(v, _n, p) => [
               `${Number(v).toLocaleString("ko-KR")}${unit}${p?.payload?.note ? ` (${p.payload.note})` : ""}`,
               "",
             ]}
-            contentStyle={{ fontSize: 12, borderRadius: 8, border: "1px solid #e5e7eb" }}
+            contentStyle={CHART.tooltip}
           />
-          <Bar dataKey="value" radius={[0, 4, 4, 0]} isAnimationActive={false} barSize={18}>
+          <Bar dataKey="value" radius={[0, 5, 5, 0]} isAnimationActive={false} barSize={20}>
             {data.map((d) => (
               <Cell key={d.label} fill={colors?.[d.label] ?? PRIMARY} />
             ))}
@@ -48,7 +48,7 @@ export function BarRank({
               dataKey="value"
               position="right"
               formatter={(v: number) => `${v.toLocaleString("ko-KR")}${unit}`}
-              style={{ fontSize: 11, fill: "#6b7280" }}
+              style={CHART.label}
             />
           </Bar>
         </BarChart>
