@@ -25,6 +25,7 @@ import type {
   Simulation,
   WidgetResponse,
 } from "@/types";
+import { ApiError } from "@/lib/errors";
 import dashboardMock from "@/mocks/dashboard.json";
 import candidatesMock from "@/mocks/candidates.json";
 import riskSignalMock from "@/mocks/risk_signal.json";
@@ -36,22 +37,52 @@ const BASE = process.env.NEXT_PUBLIC_API_BASE;
 /** 실 API 모드인지 — 화면에서 "mock 데이터" 고지를 띄울 때 쓴다 */
 export const isMockMode = !BASE;
 
+/**
+ * 비2xx → `ApiError(status, detail)`. 에러 본문은 계약상 `{"detail": "메시지"}`다 (05 머리말).
+ * 상태코드를 살려 던져야 호출부가 **409(제안할 신규 후보 없음·잘못된 상태 전이)를 구분**해
+ * 에러가 아닌 안내로 표시할 수 있다 (08 F3).
+ */
+async function fail(res: Response, path: string): Promise<never> {
+  let detail = `${path}: ${res.status}`; // 파싱 실패 시 상태코드 문구
+  try {
+    const body: unknown = await res.json();
+    const parsed = (body as { detail?: unknown } | null)?.detail;
+    if (typeof parsed === "string" && parsed.trim()) detail = parsed;
+  } catch {
+    // JSON이 아닌 에러 본문(게이트웨이 HTML 등) — 위 기본 문구를 그대로 쓴다
+  }
+  throw new ApiError(res.status, detail);
+}
+
 async function get<T>(path: string, mock: () => T): Promise<T> {
   if (!BASE) return mock(); // mock 모드
   const res = await fetch(`${BASE}${path}`, { cache: "no-store" });
-  if (!res.ok) throw new Error(`${path}: ${res.status}`);
+  if (!res.ok) await fail(res, path);
   return res.json();
 }
 
 async function post<T>(path: string, body: unknown, mock: () => T): Promise<T> {
+  return (await postWithStatus(path, body, () => ({ data: mock(), status: 200 }))).data;
+}
+
+/**
+ * `post`와 같지만 **상태코드까지** 돌려준다. generate 전용 —
+ * 05 §8이 신규 생성 201과 중복 가드로 기존 카드를 돌려주는 200을 구분하는데,
+ * 본문만 보면 둘이 같아서 화면이 "새로 만들었다"고 단정하거나 반대로 늘 얼버무리게 된다.
+ */
+async function postWithStatus<T>(
+  path: string,
+  body: unknown,
+  mock: () => { data: T; status: number },
+): Promise<{ data: T; status: number }> {
   if (!BASE) return mock(); // mock 모드: mock/store.ts가 로컬 상태를 갱신하고 그 결과를 돌려준다
   const res = await fetch(`${BASE}${path}`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body ?? {}),
   });
-  if (!res.ok) throw new Error(`${path}: ${res.status}`);
-  return res.json();
+  if (!res.ok) await fail(res, path);
+  return { data: (await res.json()) as T, status: res.status };
 }
 
 const qs = (params: Record<string, string | undefined>): string => {
@@ -76,8 +107,26 @@ export const api = {
   card: (id: string): Promise<{ card: Card | undefined }> =>
     get(`/api/cards/${id}`, () => ({ card: store.getCard(id) })),
 
-  generate: (type: CardType, mockCard: Card): Promise<{ card: Card }> =>
-    post("/api/cards/generate", { type }, () => ({ card: store.addCard(mockCard) })),
+  /**
+   * "이번 분기 카드 생성" — mock 모드도 `store.generateCard(type)`가 후보·중복 가드를 보고 만든다.
+   * 목업 카드를 호출부가 넘기던 구조를 걷어냈다: 화면마다 목업을 복제하면 서사가 갈라진다.
+   * 가용 후보가 전부 추진중/완료면 양쪽 모드 모두 409를 던진다 (05 §8).
+   *
+   * `created`는 **신규 생성(201)인지 중복 가드로 기존 카드를 받은 것(200)인지**다. 실호출에서
+   * 두 경우가 모두 나오는 것을 확인했고(LLM이 pending 타깃을 고르면 200), 화면이 이를 구분해야
+   * 데모 2-b("카드가 하나 늘어남")에서 사실과 다른 말을 하지 않는다 (11 §1).
+   */
+  generate: async (type: CardType): Promise<{ card: Card; created: boolean }> => {
+    const { data, status } = await postWithStatus<{ card: Card }>(
+      "/api/cards/generate",
+      { type },
+      () => {
+        const { card, created } = store.generateCard(type);
+        return { data: { card }, status: created ? 201 : 200 };
+      },
+    );
+    return { card: data.card, created: status === 201 };
+  },
 
   /** INCENTIVE를 approved 할 때는 selectedRate(3|5|7) 필수 (05 §2·§8) */
   decide: (id: string, decision: CardStatus, selectedRate?: PaybackRate): Promise<{ card: Card }> =>
