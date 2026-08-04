@@ -134,8 +134,11 @@ def simulate_expansion(usage: dict, merchants: list, eup: str, category: str) ->
             [dist[r] + expected * mult if r == eup else dist[r] for r in REGIONS])
 
     return {
-        "current_index": round(current),
-        "projected_index": round(projected(1.0)),
+        # 지수는 **소수 1자리** — delta_pp와 단위를 맞춘다. 정수로 반올림하면 원시 집중도가
+        # 42.53처럼 경계에 걸릴 때 0.05%p 변화가 "43 → 42"(1포인트)로 보여, 같은 응답의
+        # delta_pp(0.0~0.1%p)와 10배 어긋난 문장이 만들어진다 (05 §2).
+        "current_index": _round_pp(current),
+        "projected_index": _round_pp(projected(1.0)),
         "delta_pp": sorted(_round_pp(current - projected(m)) for m in (0.7, 1.3)),
         # 이하는 API 응답에 싣지 않는 내부 값 — LLM narrative 입력·검증 보고용
         "eup": eup,

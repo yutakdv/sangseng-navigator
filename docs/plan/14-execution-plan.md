@@ -310,8 +310,10 @@ _table = boto3.resource("dynamodb", **_kw).Table(os.environ.get("CARDS_TABLE") o
       `datasets` 5종이 전부 `true`인지까지 확인(번들 복사 누락 조기 발견, 05 §5) + dashboard·cards 스모크
 - [ ] Step 5: Vercel — 프로젝트 [Settings] > [Environment Variables]에 `NEXT_PUBLIC_API_BASE=$ApiUrl` (Production+Preview) → **Production 재배포** → 배포 URL 기록 (04 §6; Import·첫 Deploy는 F1 머지 직후 완료됨 — 15 §7)
 - [ ] Step 6: 배포 URL에서 11 §1 리허설 ×10 (Safari·휴대폰 실기기 포함), 09 §5 CORS 검증
-      (앱 쪽은 Step 2에서 이미 좁혀졌으므로 게이트웨이 `CorsConfiguration`을 함께 좁힐지 판단)·
-      §5.5 워밍 룰(선택)
+      (`AllowedOrigins` 파라미터 하나가 게이트웨이·앱 두 층을 함께 좁힌다 — API Gateway가 Lambda의
+      CORS 헤더를 덮으므로 게이트웨이 값이 실제 효력이다. `get-api`로 실값 확인)·§5.5 워밍 룰(선택)
+- [ ] Step 6-1: 실 DDB에서 INCENTIVE 카드 승인 왕복 1회 후 `scenarios[].delta_pp`가 `[1.0, 2.0]`
+      float로 남는지 확인 (DynamoDB Local에서만 검증된 동작 — `backend/app/db.py` `_clean` 주석)
 - **Gate:** 01 성공 기준 전항 + 12 §6 체크리스트 전항
 
 ### T18. 제출·심사 운영

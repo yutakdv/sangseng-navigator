@@ -6,6 +6,10 @@
 > **의존성 원칙:** `backend/requirements.txt`는 `fastapi, mangum, boto3, python-dotenv,
 > openai, anthropic`만. **pandas·numpy 금지** — 백엔드는 JSON을 읽고 사칙연산만 하면 되고,
 > 무거운 패키지는 Lambda 번들 크기·콜드스타트를 악화시킨다 (계산은 파이프라인 소관).
+> `uvicorn`·`pytest`·`httpx2`는 **`requirements-dev.txt`** 쪽이다 — Lambda는 Mangum 핸들러라
+> uvicorn이 필요 없다. 그래서 로컬에서 `uvicorn app.main:app`이나 `pytest`를 돌리려면
+> `.venv/bin/pip install -r backend/requirements-dev.txt`를 **한 번은 해야 한다**
+> (Docker는 Dockerfile이 uvicorn을 따로 설치하므로 무관).
 
 ## Task B1: FastAPI 스캐폴딩 + 정적 데이터 서빙
 
@@ -46,7 +50,7 @@ OPTIONAL_DATASETS = ("risk_signal",)
 app = FastAPI(title="상생 나침반 API")
 # 미들웨어 순서 주의: Starlette는 **나중에 add한 것이 바깥**이다. CORS가 바깥이어야
 # 에러 응답(예외 처리 결과)에도 CORS 헤더가 붙으므로 GZip을 먼저, CORS를 나중에 add한다.
-app.add_middleware(GZipMiddleware, minimum_size=1000)   # /api/candidates 299KB → gzip 44KB (실측)
+app.add_middleware(GZipMiddleware, minimum_size=1000)   # /api/candidates 285KB → gzip 44KB (실측)
 app.add_middleware(CORSMiddleware, allow_origins=ALLOWED_ORIGINS, allow_methods=["*"], allow_headers=["*"])
 for r in (dashboard.router, cards.router, widget.router, kpi.router):
     app.include_router(r, prefix="/api")
@@ -104,7 +108,7 @@ def load(name: str) -> dict | list:      # candidates·merchants·risk_signal �
 - `health`가 산출물 5종을 개별 보고(`datasets`)하고 `data_loaded`는 **필수 4종 AND** (05 §5)
 - CORS `allow_origins`를 **`ALLOWED_ORIGINS` 환경변수**로 받음 — 배포 후 코드 수정 없이 SAM 파라미터만
   바꿔 좁히기 위함 (09 §5)
-- **GZip 미들웨어 추가**(`minimum_size=1000`) — `/api/candidates` 299KB → 44KB(실측).
+- **GZip 미들웨어 추가**(`minimum_size=1000`) — `/api/candidates` 285KB → 44KB(실측).
   CORS가 바깥이어야 에러 응답에도 CORS 헤더가 붙으므로 GZip을 먼저 add한다
 - `logging` 최소 설정 — Lambda(CloudWatch)뿐 아니라 로컬/Docker에서도 `app` 로거(LLM 실패 경고)가 보이게
 
@@ -401,6 +405,13 @@ CARD_AI_SCHEMA = {
       `progress=완료`인 EXPANSION 카드 타깃과 매칭되는 가맹점 `badge:"신규"` + 우선 정렬 →
       상위 3곳 + LLM blurb (실패 시 규칙 기반 문구) → INCENTIVE 완료 카드 있으면 `payback` 부여
       (`rate` = 그 카드의 `selected_rate`)
+- [ ] **정렬 근거 2단계**(05 §4): ① `신규` 배지 먼저 ② 그다음 거점(`ANCHOR`) 직선거리 오름차순.
+      좌표 없는 가맹점은 맨 뒤. **거리 값은 응답에도 blurb 프롬프트에도 싣지 않는다** —
+      05 §1 캐비엇("거점에서 가장 가깝다고 단정하지 않는다")을 지키려고 정렬 근거로만 쓴다.
+      `ANCHOR` 좌표는 `pipeline/common.py`의 복제본이다(Lambda 번들에 pipeline 모듈이 없어 import 불가 —
+      `services/simulate.py`의 `REGIONS`·`HIGHONE_TO_DISPLAY`와 같은 이유·같은 취급)
+- [ ] blurb 생성 payload의 `작성 지침`에 "상호명에서 취급 품목·맛을 유추하지 말 것"을 넣는다 —
+      A-4 프롬프트 원문은 그대로 두고(발표 공개용), 실호출에서 나온 메뉴 유추 문구를 여기서 막는다
 - [ ] **검증:** 완료 카드 만들기 전/후로 추천 순서가 바뀌는지 curl로 확인 (데모 핵심 동선)
 
 ## Task B7: 로컬 통합 테스트
