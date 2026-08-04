@@ -148,12 +148,18 @@ export default async function WidgetPage({ searchParams }: { searchParams: Promi
         </div>
       </div>
 
-      <p className="mx-auto mt-4 hidden max-w-[390px] px-2 text-center text-[11px] text-slate-500 sm:block">
-        방문객이 보는 화면입니다 · 담당자 화면은{" "}
-        <Link href="/dashboard" className="underline">
-          지역 소비 분석
+      {/* 위젯에는 담당자 사이드바가 없다(13 §3) — 그래서 돌아갈 길이 이 줄뿐이다.
+          모바일에서 숨기면 심사위원이 휴대폰으로 위젯에 들어온 순간 막다른 길이 되고,
+          데모 7→8단계(위젯 → 인센티브)도 한 번에 못 넘어간다 (11 §1) */}
+      <p className="mx-auto mt-4 max-w-[390px] px-2 text-center text-[11px] leading-5 text-slate-500">
+        방문객이 보는 화면입니다 · 담당자 화면{" "}
+        <Link href="/" className="underline">
+          Action Card 허브
         </Link>
-        에서
+        {" · "}
+        <Link href="/incentive" className="underline">
+          인센티브 정책
+        </Link>
       </p>
     </div>
   );
