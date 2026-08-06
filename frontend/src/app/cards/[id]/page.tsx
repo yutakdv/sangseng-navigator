@@ -99,7 +99,7 @@ export default async function CardDetailPage({ params }: { params: Promise<{ id:
     note: `${e.rank}위`,
   }));
   const eupColors = Object.fromEntries(
-    (cand.eup_ranking ?? []).map((e) => [e.eup, e.eup === target?.eup ? PRIMARY : "#c7d2fe"]),
+    (cand.eup_ranking ?? []).map((e) => [e.eup, e.eup === target?.eup ? PRIMARY : "#D6CEF8"]),
   );
 
   return (
@@ -113,7 +113,7 @@ export default async function CardDetailPage({ params }: { params: Promise<{ id:
           제안 목록으로
         </Link>
 
-        <nav aria-label="카드 검토 순서" className="rounded-panel border border-admin-border bg-admin-surface p-2 shadow-card">
+        <nav aria-label="카드 검토 순서" className="rounded-panel bg-admin-surface p-2 shadow-card">
           <ol className="grid grid-cols-2 gap-1 sm:grid-cols-4">
             <ReviewStep
               href={isExpansion ? "#diagnosis" : "#evidence"}
@@ -295,7 +295,7 @@ export default async function CardDetailPage({ params }: { params: Promise<{ id:
           id="evidence"
           icon="sparkle"
           title="추천 근거와 리스크 설명"
-          desc="서버가 활성 업무가 없는 후보 중 정량 Score 최상위를 결정론적으로 선택합니다. AI는 비정량 리스크 설명만 보조하며, 숫자·순위·상태는 정본 데이터로 다시 검증합니다."
+          desc="서버가 진행 중인 업무가 없는 후보 중 정량 Score 최상위를 결정론적으로 선택합니다. AI는 비정량 리스크 설명만 보조하며, 숫자·순위·상태는 정본 데이터로 다시 검증합니다."
         >
           <div className="flex flex-col gap-4">
             <Block title="후보 비교">
@@ -358,7 +358,7 @@ export default async function CardDetailPage({ params }: { params: Promise<{ id:
           <Section
             icon="scale"
             title="원 Score 순위 (정량 기준)"
-            desc="2단계 후보 스코어의 원래 순위입니다. 활성 업무로 제외된 상위 후보와 최종 가용 후보 선택을 함께 보여 줍니다."
+            desc="2단계 후보 스코어의 원래 순위입니다. 진행 중인 업무로 제외된 상위 후보와 최종 선택 가능한 후보를 함께 보여 줍니다."
           >
             <OriginalRankingTable
               rows={card.ai.original_ranking}

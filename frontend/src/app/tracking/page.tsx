@@ -18,7 +18,7 @@ export const metadata: Metadata = { title: "추진 경과 리포트 · 상생 �
 // 상태를 바꾸면 KPI·완료 안내가 곧바로 달라져야 한다 (데모 6→7단계) — 캐시하지 않는다
 export const dynamic = "force-dynamic";
 
-/** 가맹점 확충 Work Item의 실제 의미 순서. 인센티브의 `검토중`은 별도 행에서 그대로 보인다. */
+/** 가맹점 확충 업무 항목의 실제 의미 순서. 인센티브의 `검토중`은 별도 행에서 그대로 보인다. */
 const STAGES: CardProgress[] = [
   "후보 접촉·검토 시작",
   "적격성 확인",
@@ -74,7 +74,7 @@ export default async function TrackingPage() {
 
         <Section
           icon="cards"
-          title={`진행 Work Item ${rows.length}건`}
+          title={`진행 중인 업무 항목 ${rows.length}건`}
           desc="확충 카드는 후보 접촉·검토 시작 → 적격성 확인 → 가맹 심사 → 추진중 → 완료 순서로 기록합니다. 필수 적격성 5개 항목 확인 전에는 가맹 심사·추진·완료로 이동할 수 없습니다."
         >
           {rows.length === 0 ? (

@@ -78,7 +78,7 @@ export function PolicyOutcomeGuide({ card, headlineRate }: { card: Card; headlin
                 ? selectedRate
                   ? `${selectedRate}% 페이백률이 고정됩니다.`
                   : "3·5·7% 중 하나를 고른 뒤 승인합니다."
-                : "후보 접촉·검토 Work Item이 시작되며 가맹은 확정되지 않습니다."}
+                : "후보 접촉·검토 업무 항목이 시작되며 가맹은 확정되지 않습니다."}
             </p>
           </li>
           <li className="rounded-card bg-admin-surface p-3">

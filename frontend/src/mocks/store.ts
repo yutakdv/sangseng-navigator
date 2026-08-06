@@ -300,7 +300,7 @@ export const addCard = (card: Card): Card => {
 
 /* ── 카드 생성 (05 §2·§8 / backend/app/services/cardgen.py와 동일 규칙) ────── */
 
-/** 동일 지역×업종의 활성 Work Item — 백엔드 `cardgen.ACTIVE_TARGET_STATES`와 동일 */
+/** 동일 지역×업종의 진행 중인 업무 항목 — 백엔드 `cardgen.ACTIVE_TARGET_STATES`와 동일 */
 const BLOCKED = [
   "승인 대기",
   "검토중",
@@ -419,7 +419,7 @@ const generateExpansion = (): GeneratedCard => {
     ),
     `${candidateLabel(top)} ${top.name} — 업종공백도 ${top.gap.toFixed(2)}, 반경 500m 내 동일 업종 하이원포인트 가맹점 ${top.nearby_merchants}곳 / 동일 업종 상가 ${top.nearby_same_category_stores}곳`,
     `동선근접도 ${top.proximity.toFixed(2)}(직선거리 기반) / ${roadPhrase(top)}`,
-    "활성 업무가 없는 후보 중 정량 Score 최상위를 결정론적으로 선택하고 설명만 구조화 데이터로 다시 검증합니다",
+    "진행 중인 업무가 없는 후보 중 정량 Score 최상위를 결정론적으로 선택하고 설명만 구조화 데이터로 다시 검증합니다",
   ];
 
   const risks = [
