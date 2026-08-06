@@ -10,6 +10,8 @@
  * `variant`가 둘인 이유: 허브만 본문 폭이 1600px이고 상단이 인사말 + 지표 타일 4장 + 히어로
  * 8/4 분할이다. 하나로 합치면 어느 한쪽에서 스켈레톤→실화면 전환 때 가로 폭이 한 번 튄다.
  */
+import Image from "next/image";
+
 const BAR = "animate-pulse rounded-md bg-black/[0.06]";
 
 export function PageSkeleton({ variant = "page" }: { variant?: "hub" | "page" }) {
@@ -20,23 +22,19 @@ export function PageSkeleton({ variant = "page" }: { variant?: "hub" | "page" })
       <span className="sr-only">화면을 불러오는 중입니다</span>
 
       {/* 사이드바 — 실제 폭(lg:w-[228px])과 같게 두어 본문 시작점이 움직이지 않게 한다 */}
-      <aside className="bg-gradient-to-b from-admin-sidebar to-admin-sidebar-deep lg:min-h-screen lg:w-[228px] lg:shrink-0">
+      <aside className="border-b border-admin-border bg-admin-sidebar-surface lg:min-h-screen lg:w-[228px] lg:shrink-0 lg:border-b-0 lg:border-r-[0.5px]">
+        {/* 로고는 자리표시가 아니라 실제 이미지를 쓴다 — 스켈레톤→실화면 전환에서 브랜드가 깜빡이지 않는다 */}
         <div className="hidden px-5 pb-2 pt-6 lg:block">
-          <div className="flex items-center gap-2.5">
-            <span className="h-9 w-9 shrink-0 rounded-xl bg-admin-primary" />
-            <span>
-              <span className="block text-[17px] font-bold leading-5 text-white">상생 나침반</span>
-              <span className="mt-0.5 block text-[11px] leading-4 text-white/50">
-                강원랜드 지역상생 의사결정 지원
-              </span>
-            </span>
-          </div>
+          <Image src="/brand/sangseng-navigator-lockup.png" alt="" width={180} height={35} priority />
+          <span className="mt-2 block text-xs leading-4 text-admin-text-soft">
+            강원랜드 지역상생 의사결정 지원
+          </span>
         </div>
         <div className="flex gap-2 px-3 py-3 lg:flex-col lg:gap-1 lg:px-3 lg:py-4">
           {Array.from({ length: 6 }).map((_, i) => (
             <span
               key={i}
-              className="h-9 w-24 shrink-0 animate-pulse rounded-lg bg-white/10 lg:w-full"
+              className="h-9 w-24 shrink-0 animate-pulse rounded-lg bg-lavender-100 lg:w-full"
             />
           ))}
         </div>
@@ -64,8 +62,8 @@ export function PageSkeleton({ variant = "page" }: { variant?: "hub" | "page" })
                   key={i}
                   className={
                     hub
-                      ? "rounded-panel bg-admin-surface p-5 shadow-float ring-1 ring-inset ring-admin-border/70"
-                      : "rounded-card border border-admin-border bg-admin-surface p-4 shadow-card"
+                      ? "rounded-panel bg-admin-surface p-5 shadow-float"
+                      : "rounded-card bg-admin-surface p-4 shadow-card"
                   }
                   style={{ minHeight: hub ? 228 : 140 }}
                 >
@@ -105,7 +103,7 @@ export function PageSkeleton({ variant = "page" }: { variant?: "hub" | "page" })
               [240, 220].map((h, i) => (
                 <div
                   key={i}
-                  className="rounded-card border border-admin-border bg-admin-surface p-5 shadow-card"
+                  className="rounded-card bg-admin-surface p-5 shadow-card"
                   style={{ minHeight: h }}
                 >
                   <div className={`${BAR} h-5 w-52`} />
