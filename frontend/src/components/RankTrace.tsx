@@ -2,7 +2,7 @@ import { Icon } from "@/components/Icon";
 import type { Card } from "@/types";
 
 /**
- * `정량 Score N위 → 가용 후보 선택 M위` 병기 — 활성 업무 중복 제외를 숨기지 않는다.
+ * `정량 Score N위 → 선택 가능한 후보 M위` 병기 — 진행 중인 업무 중복 제외를 숨기지 않는다.
  *
  * 허브 목록·트래킹·카드 상세 세 곳에서 같은 표기를 쓰는데, 세 곳 모두 회색 알약 안에 12px
  * 한 줄로 눌려 있어서 심사에서 가장 중요한 "감사 가능성" 장치가 화면에서 가장 안 보였다.
@@ -37,7 +37,7 @@ export function RankTrace({ card, size = "sm" }: { card: Card; size?: "sm" | "md
         className={adjusted ? "text-admin-primary" : "text-admin-text-muted"}
       />
       <RankBox
-        label="가용 후보 선택"
+        label="선택 가능한 후보"
         rank={selectionRank}
         md={md}
         tone={adjusted ? "text-admin-primary" : "text-admin-text"}
@@ -50,7 +50,7 @@ export function RankTrace({ card, size = "sm" }: { card: Card; size?: "sm" | "md
         }`}
       >
         {adjusted ? <Icon name="workflow" size={12} strokeWidth={2} /> : null}
-        {adjusted ? "활성 업무 제외 후 선택" : "정량 1순위 선택"}
+        {adjusted ? "진행 중인 건 제외하고 선택" : "정량 1순위 선택"}
       </span>
     </div>
   );

@@ -24,7 +24,7 @@ import { CHART, PRIMARY, REGION_COLORS } from "@/lib/constants";
  * 고정 지역색으로 올린다. 그러면 6색 스파게티가 되지 않으면서도 "이 지역의 흐름"을 즉시
  * 추적할 수 있다. 키보드 포커스도 같은 동작을 한다.
  */
-const MUTED = "#c3cad9";
+const MUTED = "#C9C7D4";
 
 export function RegionTrend({
   data,
@@ -79,7 +79,7 @@ export function RegionTrend({
                     ? PRIMARY
                     : (REGION_COLORS[r] ?? PRIMARY)
                   : highlightedRegion
-                    ? "#dce2ec"
+                    ? "#E7E5EE"
                     : MUTED;
                 return (
                   <Line

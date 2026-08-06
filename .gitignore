@@ -29,6 +29,11 @@ backend/app/data/
 .idea/
 .vscode/
 
+# 개인 에이전트 스킬 (npx skills — 로컬 전용, 공유 안 함)
+.agents/
+.claude/
+skills-lock.json
+
 # 제출 서류 원본 — 개인정보(연락처) 포함, Public 레포에 커밋 금지 (docs/plan/12 §4)
 기획서_V.I.B.E.pdf
 MVP_상생나침반_개정판.pdf

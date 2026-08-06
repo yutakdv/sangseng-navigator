@@ -1,210 +1,118 @@
 import Link from "next/link";
-import { ProxyBadge } from "@/components/Badge";
-import { CardItem } from "@/components/CardItem";
-import { DecisionActions } from "@/components/DecisionActions";
 import { ExecutionStatus } from "@/components/ExecutionStatus";
-import { ActHeading, Panel, PanelLink } from "@/components/Panel";
+import { Icon } from "@/components/Icon";
+import { Act, Panel, PanelLink } from "@/components/Panel";
 import { PolicyFlow } from "@/components/PolicyFlow";
-import { PolicyOutcomeGuide } from "@/components/PolicyOutcomeGuide";
-import { ScenarioLadder } from "@/components/ScenarioLadder";
-import { CategoryShareBars } from "@/components/CategoryShareBars";
-import { RegionTrend } from "@/components/charts/RegionTrend";
-import { REGIONS } from "@/lib/constants";
+import { StatusChip } from "@/components/StatusChip";
 import type { DashboardView } from "@/lib/dashboardView";
 import type { Card } from "@/types";
 
+/**
+ * 허브 3층 — 결과 모니터링.
+ *
+ * 처리 대상(결정 대기·실행 관리·완료)은 전부 2층 우측 작업 열로 올라갔다. 여기 남은 것은
+ * 행동이 아니라 관찰이다: **언제 무슨 결정을 했나 하는 이력**과 승인 이후의 단계 분포·성과
+ * 표본, 그리고 진단에서 방문객 화면까지의 전체 연결.
+ *
+ * 결정 이력은 우측 작업 열과 카드가 겹치므로(승인 카드는 실행 관리 블록에도 있다)
+ * 풀 카드가 아니라 **한 줄 이력**으로 압축했다 — 여기서 중요한 것은 카드의 내용이 아니라
+ * "언제 어떤 결정이 내려졌나"라서, 시각과 결정 종류가 주인공이 되는 편이 성격에 맞는다.
+ */
 export function DashboardDetailSections({ view }: { view: DashboardView }) {
-  const {
-    dashboard,
-    kpi,
-    hero,
-    heroRegion,
-    regionTrend,
-    latestByRegion,
-    latestMonth,
-    regionInsight,
-    ranking,
-    rest,
-    decided,
-    approved,
-    incentive,
-    candidates,
-  } = view;
-  const targetCategory = hero?.target?.category ?? null;
-  const category = (dashboard.category_share ?? []).find((row) => row.category === targetCategory);
-  const categoryInsight = category
-    ? `${category.category}은 전체 사용의 ${Math.round(category.share * 100)}%입니다. AI 제안 업종의 실제 사용 규모를 함께 확인하세요.`
-    : "업종별 사용 비중을 비교해 제안 대상의 현재 규모를 확인합니다.";
+  const { dashboard, kpi, decided, approved, candidates } = view;
 
   return (
-    <div className="flex flex-col gap-6 pb-4">
-      <ActHeading
-        step="02 · 근거"
-        question="이 제안을 뒷받침하는 신호"
-        title="근거를 좁혀 봅니다"
-        action={<PanelLink href="/dashboard">분석 전체 보기</PanelLink>}
-      />
-      <div className="grid grid-cols-4 gap-4 sm:grid-cols-8 xl:grid-cols-12">
-        <Panel
-          className="col-span-4 sm:col-span-8 xl:col-span-8"
-          icon="trend"
-          title="지역별 월 사용 건수 추이"
-          desc="색상과 함께 최신 월 순위·건수 텍스트를 제공합니다."
-          insight={regionInsight}
-        >
-          {regionTrend.length ? (
-            <RegionTrend
-              data={regionTrend}
-              regions={REGIONS}
-              targetRegion={heroRegion}
-              latestByRegion={latestByRegion}
-              latestMonth={latestMonth}
-            />
-          ) : (
-            <EmptyState>표시할 월별 데이터가 없습니다.</EmptyState>
-          )}
-        </Panel>
-
-        <Panel
-          className="col-span-4 sm:col-span-8 xl:col-span-4"
-          icon="scatter"
-          title="업종·정량 순위 비교"
-          desc="제안 업종의 사용 비중과 원 Score 순위를 함께 봅니다."
-          insight={categoryInsight}
-        >
-          <CategoryShareBars data={dashboard.category_share ?? []} targetCategory={targetCategory} />
-          <div className="mt-4 border-t border-admin-border pt-4">
-            <p className="text-xs font-bold text-admin-text-muted">원 정량 Score 상위</p>
-            <ol className="mt-2 divide-y divide-admin-border border-y border-admin-border">
-              {ranking.slice(0, 3).map((row) => (
-                <li key={row.eup} className="flex items-center justify-between gap-3 py-2 text-[13px]">
-                  <span className="font-medium text-admin-text">{row.rank}. {row.eup}</span>
-                  <span className="tabular-nums text-admin-text-muted">Score {row.score.toFixed(2)}</span>
-                </li>
-              ))}
-            </ol>
-          </div>
-        </Panel>
-      </div>
-
-      {incentive ? (
-        <>
-          <ActHeading
-            step="03 · 전망"
-            question="결정하면 무엇이 달라지는가"
-            title="정책 옵션을 나란히 봅니다"
-            action={<PanelLink href="/incentive">인센티브 정책 보기</PanelLink>}
-          />
-          <Panel
-            icon="layers"
-            title="지역 결제 페이백 3 · 5 · 7% 비교"
-            badge={dashboard.conversion.is_proxy ? <ProxyBadge note={dashboard.conversion.proxy_note} /> : null}
-            desc="실측 결과가 아니라 팀 설정 가정에 기반한 전망이며, 예상 효과와 실제 효과를 분리합니다."
-            insight={scenarioInsight(incentive)}
-          >
-            <ScenarioLadder card={incentive} headlineRate={dashboard.conversion.headline_rate} />
-            <PolicyOutcomeGuide card={incentive} headlineRate={dashboard.conversion.headline_rate} />
-          </Panel>
-        </>
-      ) : null}
-
-      <ActHeading
-        step="04 · 실행"
-        question="담당자가 지금 이어갈 일"
-        title="결정 큐를 실행으로 넘깁니다"
-        action={<PanelLink href="/tracking">정책 카드 관리</PanelLink>}
-      />
-      <div className="grid grid-cols-4 gap-4 sm:grid-cols-8 xl:grid-cols-12">
-        <div className="col-span-4 flex min-w-0 flex-col gap-4 sm:col-span-8 xl:col-span-8">
-          <Panel
-            id="decision-queue"
-            icon="cards"
-            title={`나머지 결정 대기 ${rest.length}건`}
-            desc="최우선 제안은 위 결정 준비 패널에서 처리합니다. 확충 카드의 담당자 결정은 가맹 확정이 아니라 후보 접촉·검토 시작입니다."
-          >
-            {rest.length ? (
-              <ul className="flex flex-col gap-3">
-                {rest.map((card) => (
-                  <li key={card.id}>
-                    <CardItem card={card}>
-                      {card.type === "INCENTIVE" ? (
-                        <Link href="/incentive" className="text-[13px] font-semibold text-admin-primary hover:underline">
-                          페이백률 비교·결정 →
-                        </Link>
-                      ) : (
-                        <DecisionActions cardId={card.id} cardType={card.type} />
-                      )}
-                    </CardItem>
-                  </li>
-                ))}
-              </ul>
-            ) : (
-              <EmptyState>추가 결정 대기 카드가 없습니다.</EmptyState>
-            )}
-          </Panel>
-
-          {decided.length ? (
+    <Act
+      no="02"
+      phase="점검"
+      question="방금 통과시킨 것과 그 이후"
+      title="결정 이후를 지켜봅니다"
+      action={<PanelLink href="/tracking">정책 카드 관리</PanelLink>}
+      last
+    >
+      <div className="flex flex-col gap-4 pb-4">
+        <div className="grid grid-cols-4 gap-4 sm:grid-cols-8 xl:grid-cols-12">
+          <div className="col-span-4 flex min-w-0 flex-col gap-4 sm:col-span-8 xl:col-span-8">
             <Panel
+              id="recent-decisions"
               icon="check"
-              title={`최근 결정 ${decided.length}건`}
-              desc="결정 이후에는 적격성·가맹 심사·추진 상태를 별도로 기록합니다."
+              title={`결정 이력 ${decided.length}건`}
+              desc="승인·반려·보류로 결정이 끝난 카드입니다. 결정 이후의 적격성·심사·추진 상태는 위 실행 관리에서 기록합니다."
+              flush
             >
-              <ul className="flex flex-col gap-3">
-                {decided.map((card) => (
-                  <li key={card.id}>
-                    <CardItem card={card}>
-                      <span className="text-xs tabular-nums text-admin-text-muted">결정 {stamp(card.decided_at)}</span>
-                    </CardItem>
-                  </li>
-                ))}
-              </ul>
+              {decided.length ? (
+                <ul className="border-t border-admin-border">
+                  {decided.map((card) => (
+                    <HistoryRow key={card.id} card={card} />
+                  ))}
+                </ul>
+              ) : (
+                <div className="border-t border-admin-border px-5 py-6">
+                  <p className="break-keep text-sm font-semibold text-admin-text">아직 결정된 카드가 없습니다</p>
+                  <p className="mt-1 break-keep text-xs leading-5 text-admin-text-muted">
+                    위 결정 대기 블록에서 승인·반려·보류하면 여기에 기록이 쌓입니다.
+                  </p>
+                </div>
+              )}
             </Panel>
-          ) : null}
+          </div>
+
+          <ExecutionStatus
+            approved={approved}
+            kpi={kpi}
+            className="col-span-4 sm:col-span-8 xl:col-span-4 xl:sticky xl:top-6 xl:self-start"
+          />
         </div>
 
-        <ExecutionStatus
-          approved={approved}
-          kpi={kpi}
-          className="col-span-4 sm:col-span-8 xl:col-span-4 xl:sticky xl:top-6 xl:self-start"
-        />
+        <Panel
+          icon="workflow"
+          title="진단에서 방문객 반영까지"
+          desc="AI는 후보 비교와 근거까지만 담당하고, 담당자가 검토·적격성·가맹 심사·실행을 기록합니다."
+          action={<PanelLink href="/widget">방문객 반영 확인</PanelLink>}
+        >
+          <PolicyFlow
+            counts={{
+              cards: kpi.counts.total,
+              pending: kpi.counts.pending,
+              approved: kpi.counts.approved,
+              inProgress: approved.filter((card) => card.progress === "추진중").length,
+              done: kpi.counts.done,
+            }}
+          />
+          <p className="u-note mt-4 border-t border-admin-border pt-3">
+            후보 데이터 {candidates.candidates.length}건 · 데이터 기준 {dashboard.period_note} · 실제 성과는 완료 후
+            운영 기록에 별도로 입력합니다.
+          </p>
+        </Panel>
       </div>
-
-      <Panel
-        icon="workflow"
-        title="진단에서 방문객 반영까지"
-        desc="AI는 후보 비교와 근거까지만 담당하고, 담당자가 검토·적격성·가맹 심사·실행을 기록합니다."
-      >
-        <PolicyFlow
-          counts={{
-            cards: kpi.counts.total,
-            pending: kpi.counts.pending,
-            approved: kpi.counts.approved,
-            inProgress: approved.filter((card) => card.progress === "추진중").length,
-            done: kpi.counts.done,
-          }}
-        />
-        <p className="u-note mt-4 border-t border-admin-border pt-3">
-          후보 데이터 {candidates.candidates.length}건 · 데이터 기준 {dashboard.period_note} · 실제 성과는 완료 후 운영 기록에 별도로 입력합니다.
-        </p>
-      </Panel>
-    </div>
+    </Act>
   );
 }
 
-function EmptyState({ children }: { children: React.ReactNode }) {
+/** 한 줄 이력 — 시각과 결정 종류가 주인공이고 카드 내용은 식별에 필요한 만큼만 */
+function HistoryRow({ card }: { card: Card }) {
+  const target = card.target ? `${card.target.eup} · ${card.target.category}` : "전 지역 공통";
+
   return (
-    <div className="flex min-h-32 items-center justify-center border border-dashed border-admin-border bg-admin-surface-sunken px-4 text-center text-sm text-admin-text-muted">
-      {children}
-    </div>
+    <li className="border-b border-admin-border last:border-b-0">
+      <Link
+        href={`/proposals/${card.id}`}
+        className="group flex flex-wrap items-center gap-x-3 gap-y-1.5 px-5 py-3 transition-colors hover:bg-lavender-50/60"
+      >
+        <span className="text-xs tabular-nums text-admin-text-muted">{stamp(card.decided_at)}</span>
+        <StatusChip status={card.status} />
+        <span className="text-[13px] font-bold tabular-nums text-admin-text">{card.id}</span>
+        <span className="min-w-0 break-keep text-[13px] text-admin-text-soft group-hover:text-admin-primary">
+          {target}
+        </span>
+        <Icon
+          name="chevronRight"
+          size={14}
+          className="ml-auto shrink-0 text-admin-text-muted group-hover:text-admin-primary"
+        />
+      </Link>
+    </li>
   );
-}
-
-function scenarioInsight(card: Card): string | undefined {
-  const scenarios = card.scenarios ?? [];
-  if (scenarios.length < 2) return undefined;
-  const low = scenarios[0];
-  const high = scenarios.at(-1)!;
-  return `${low.rate}%의 예상 개선폭 ${low.delta_pp[0].toFixed(1)}~${low.delta_pp.at(-1)?.toFixed(1)}%p부터 ${high.rate}%의 ${high.delta_pp[0].toFixed(1)}~${high.delta_pp.at(-1)?.toFixed(1)}%p까지이며 재원 부담도 함께 커집니다.`;
 }
 
 const stamp = (iso: string | null): string =>

@@ -26,7 +26,7 @@ export function BriefingPanel({ card, className = "" }: { card: Card; className?
       className={`u-float animate-rise flex flex-col overflow-hidden ${className}`}
       aria-label="AI 정책 브리핑"
     >
-      <header className="flex flex-wrap items-center gap-x-3 gap-y-2 border-b border-admin-border bg-gradient-to-r from-admin-primary-soft to-admin-surface px-5 py-4 2xl:px-6">
+      <header className="flex flex-wrap items-center gap-x-3 gap-y-2 border-b border-admin-border bg-admin-primary-soft px-5 py-4 2xl:px-6">
         <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-admin-primary text-white shadow-[0_6px_16px_-6px_rgb(79_70_229)]">
           <Icon name="sparkle" size={18} strokeWidth={2} />
         </span>

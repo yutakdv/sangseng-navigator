@@ -27,7 +27,7 @@ export function BarRank({
           <YAxis
             type="category"
             dataKey="label"
-            tick={{ fontSize: 13, fill: "#181534", fontWeight: 500 }}
+            tick={{ fontSize: 13, fill: "#2B2833", fontWeight: 500 }}
             tickLine={false}
             axisLine={false}
             width={70}

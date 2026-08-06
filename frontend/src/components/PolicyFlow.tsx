@@ -84,7 +84,9 @@ export function PolicyFlow({
           <Link
             href={s.href}
             style={{ animationDelay: `${i * 60}ms` }}
-            className="animate-fade-up flex h-full min-w-0 flex-col border border-admin-border bg-admin-surface p-4 transition-colors hover:border-admin-primary-line"
+            /* 이 카드는 흰 패널 **안에** 놓인다 — 부모가 이미 흰 면이라 테두리를 지우면서
+               표면을 한 단 올릴 수가 없다. 그래서 대비 방향을 뒤집어 낮은 면(sunken)을 쓴다 */
+            className="animate-fade-up flex h-full min-w-0 flex-col bg-admin-surface-sunken p-4 transition-colors hover:bg-lavender-50"
           >
             <span className="flex items-center gap-2">
               <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-[10px] bg-admin-surface text-admin-primary shadow-card">

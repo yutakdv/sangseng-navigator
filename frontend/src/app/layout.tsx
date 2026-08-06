@@ -51,7 +51,8 @@ export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
   // 13 §8: 모바일은 "깨지지 않음"이 기준이다 — 확대 제한을 걸지 않아야 표·지도를 키워 볼 수 있다
-  themeColor: "#12372f",
+  // 모바일에서 화면 최상단은 사이드바가 가로 스트립으로 접힌 자리다 — 그 면 색과 맞춘다
+  themeColor: "#FAFAFA",
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

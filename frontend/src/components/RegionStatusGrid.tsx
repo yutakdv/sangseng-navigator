@@ -1,6 +1,6 @@
 import { DeltaValue } from "@/components/DeltaValue";
 import { Icon } from "@/components/Icon";
-import { REGION_COLORS, REGION_TOOLTIP, REGIONS } from "@/lib/constants";
+import { REGION_TOOLTIP, REGIONS } from "@/lib/constants";
 import { monthLabel, num } from "@/lib/format";
 import type { Dashboard, EupScore, Region } from "@/types";
 
@@ -46,19 +46,29 @@ export function RegionStatusGrid({
         const isTarget = region === targetRegion;
         const isSelected = selectedRegions.includes(region) && !isTarget;
 
+        // 지역마다 다른 색 띠를 상단에 두지 않는다 — 그 색은 아무것도 인코딩하지 않았고,
+        // 여섯 색이 시끄러워 정작 의미 있는 신호인 `진단 대상` 라벤더 배지를 덮었다.
+        // 지역 구분은 지역명·진단 순위·수치가 이미 하고 있다 (13 §4 "색은 신호일 때만").
+        //
+        // 이 카드는 **흰 패널 안에** 놓이는데, 다른 카드처럼 면을 한 단 낮춰(surface-sunken)
+        // 구분할 수가 없다. 두 가지가 막는다:
+        //   ① 낮은 면(#F5F4F8)과 강조색 lavender-50(#F6F4FE)의 명도차가 0.6%p라 진단 대상이 묻힌다
+        //   ② 강조를 lavender-100까지 올리면 카드 안 11px 보조문이 4.15:1로 AA 미달이 된다
+        // 그래서 여기서만 1px 실선을 남긴다 — 배경 대비가 일할 수 없는 자리에서는 선이 맡는다
+        // (입력·버튼에 테두리를 남겨 둔 것과 같은 기준).
+        //
+        // 진단 대상은 옅은 라벤더 면 + 라벤더 실선 두 겹으로, 흰 카드 넷 사이에서 즉시 읽히게 한다.
         return (
           <article
             key={region}
-            className={`relative overflow-hidden rounded-2xl bg-admin-surface p-4 shadow-card ring-1 ring-inset ${
-              isTarget ? "ring-admin-primary" : "ring-admin-border"
+            className={`rounded-2xl p-4 shadow-card ring-1 ring-inset ${
+              isTarget
+                ? "bg-lavender-50 ring-2 ring-admin-primary"
+                : isSelected
+                  ? "bg-lavender-50 ring-admin-primary"
+                  : "bg-admin-surface ring-admin-border"
             }`}
           >
-            <span
-              aria-hidden
-              className="absolute inset-x-0 top-0 h-1"
-              style={{ backgroundColor: REGION_COLORS[region] }}
-            />
-
             <div className="flex items-start justify-between gap-3">
               <div className="min-w-0">
                 <div className="flex items-center gap-1.5">

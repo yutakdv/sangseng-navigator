@@ -5,6 +5,7 @@ import { Footer } from "@/components/Footer";
 import { SideNav } from "@/components/SideNav";
 import type { Dashboard } from "@/types";
 import { dataFreshness } from "@/lib/dataFreshness";
+import { operator, operatorInitial } from "@/lib/operator";
 
 /**
  * 담당자 화면 공통 레이아웃 (docs/plan/08 F2 · 13 §3).
@@ -38,46 +39,44 @@ export function AdminShell({
       >
         본문 바로가기
       </a>
-      <aside className="relative overflow-hidden border-b border-white/10 bg-admin-sidebar lg:fixed lg:inset-y-0 lg:left-0 lg:z-40 lg:flex lg:h-dvh lg:w-[272px] lg:flex-col lg:border-b-0 lg:border-r">
-        <div aria-hidden className="pointer-events-none absolute -right-24 -top-24 h-72 w-72 rounded-full bg-white/[0.05] blur-3xl" />
-        <div className="relative flex items-center justify-between border-b border-white/10 px-4 py-3 lg:hidden">
-          <Link href="/" className="flex items-center gap-2.5 text-sm font-bold text-white">
-            <span className="flex h-9 w-9 items-center justify-center overflow-hidden rounded-xl bg-[#f2a86f] shadow-lg shadow-black/10">
-              <Image src="/brand/sangseng-navigator-mark.svg" alt="" width={36} height={36} priority />
-            </span>
-            상생 나침반
+      {/* 사이드바 면은 `admin.sidebar-surface` 한 토큰에서만 온다.
+          본문과 붙어 보이지 않도록 우측에 0.5px 실선을 더한다 (13 §3) */}
+      <aside className="relative border-b border-admin-border bg-admin-sidebar-surface lg:fixed lg:inset-y-0 lg:left-0 lg:z-40 lg:flex lg:h-dvh lg:w-[272px] lg:flex-col lg:border-b-0 lg:border-r-[0.5px]">
+        {/* 조합형 로고(마크 + "상생 나침반")라 옆에 브랜드명을 또 쓰지 않는다.
+            라벤더 칩도 걷어냈다 — 로고 마크가 자체 인디고를 갖고 있어 칩 위에 얹으면 색이 부딪힌다.
+            원본 비율 720×140 = 36:7을 유지해야 글자가 눌리지 않는다 */}
+        <div className="relative flex items-center justify-between border-b border-admin-border px-4 py-3 lg:hidden">
+          <Link href="/" className="flex items-center">
+            <Image src="/brand/sangseng-navigator-lockup.png" alt="상생 나침반" width={180} height={35} priority />
           </Link>
-          <span className="rounded-full bg-white/10 px-2.5 py-1 text-[10px] font-semibold tracking-wide text-white/70">DECISION OS</span>
+          <span className="rounded-full bg-lavender-100 px-2.5 py-1 text-xs font-semibold tracking-wide text-lavender-700">
+            DECISION OS
+          </span>
         </div>
 
         <div className="relative hidden px-6 pb-5 pt-7 lg:block">
-          <Link href="/" className="flex items-center gap-3">
-            <span className="flex h-11 w-11 shrink-0 items-center justify-center overflow-hidden rounded-2xl bg-[#f2a86f] shadow-lg shadow-black/10">
-              <Image src="/brand/sangseng-navigator-mark.svg" alt="상생 나침반" width={44} height={44} priority />
-            </span>
-            <span className="min-w-0">
-              <span className="block text-[18px] font-bold tracking-[-0.02em] text-white">상생 나침반</span>
-              <span className="mt-0.5 block text-[11px] leading-4 text-white/50">지역상생 Decision OS</span>
-            </span>
+          <Link href="/" className="inline-block">
+            <Image src="/brand/sangseng-navigator-lockup.png" alt="상생 나침반" width={216} height={42} priority />
           </Link>
-          <p className="mt-6 max-w-[210px] text-xs leading-5 text-white/60">
-            데이터에서 실행까지, 담당자의 판단이 끊기지 않도록 연결합니다.
-          </p>
         </div>
 
         <div className="relative lg:flex lg:min-h-0 lg:flex-1 lg:flex-col">
           <SideNav />
         </div>
 
-        <div className="relative hidden px-5 pb-5 pt-3 lg:block">
-          <div className="rounded-2xl border border-white/10 bg-white/[0.06] p-3.5">
-            <div className="flex items-center gap-3">
-              <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-white/10 text-xs font-bold text-white">김</span>
-              <span className="min-w-0 text-[11px] leading-4 text-white/60">
-                <span className="block font-semibold text-white/90">지역상생팀 김담당</span>
-                오늘 결정 대기 항목 확인
+        {/* 하단 계정 칸 — shrink-0으로 고정해 메뉴가 길어져도 잘리지 않는다 */}
+        <div className="relative hidden shrink-0 px-4 pb-4 pt-3 lg:block">
+          {/* 사이드바 면보다 반 단 낮은 틴트 + 보더 — 계정 칸을 별개 블록으로 눌러 묶는다 */}
+          <div className="flex items-center gap-3 rounded-xl border border-admin-border bg-admin-surface-sunken px-3 py-3">
+            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-lavender-100 text-[13px] font-bold text-lavender-700">
+              {operatorInitial}
+            </span>
+            <span className="min-w-0 text-xs leading-4 text-admin-text-soft">
+              <span className="block truncate font-semibold text-admin-text">
+                {operator.team} {operator.name}
               </span>
-            </div>
+              오늘 결정 대기 항목 확인
+            </span>
           </div>
         </div>
       </aside>

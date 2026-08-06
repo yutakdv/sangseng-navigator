@@ -7,26 +7,29 @@ import { Icon, type IconName } from "@/components/Icon";
 
 /**
  * 사이드바 — 담당자가 먼저 고르는 두 흐름(정책 의사결정 · 지역 소비 분석)만 상위에 둔다.
- * 정책 카드 관리와 인센티브, 가맹점·성과·데이터 관리는 각 흐름 안의 하위 진입점이다.
  *
- * 데모 동선(허브 → 카드 상세 → 트래킹 → 위젯 → 인센티브, 11 §1)이 **사이드바 클릭 1회**로
- * 이어져야 하므로 방문객 위젯도 하단 별도 묶음으로 싣는다 — 위젯 자체는 그린 테마 단독 화면이라
- * 담당자 메뉴와 구분선으로 나눈다 (13 §3의 "사이드바 없음"은 위젯 화면 안쪽 이야기다).
+ * 7라운드에서 다크 남보라를 걷고 lavender-50 위로 옮겼다. 히어로·본문이 이미 밝은 면이라
+ * 사이드바만 어두우면 화면이 두 덩어리로 갈렸다.
  *
- * 하위 메뉴는 들여써서 독립 업무 영역처럼 보이지 않게 하고, 상위 메뉴는 흐름의 시작점으로 남긴다.
+ * **정렬 규칙은 `NavItem` 한 곳에만 있다.** 예전에는 "추진 기록 입력"만 들여쓰기(`child`)로
+ * 밀려 있어 세로로 훑을 때 아이콘 열이 끊겼는데, 하위 관계는 부제 문장이 이미 말하고 있어
+ * 들여쓰기를 걷어냈다. 지금은 모든 항목이 예외 없이 같은 x에서 시작한다 —
+ * 아이콘 20px·간격 12px·좌우 패딩 12px이 항목마다 동일하다.
+ *
+ * 데모 동선(허브 → 카드 상세 → 트래킹 → 위젯 → 인센티브, 11 §1)이 사이드바 클릭 1회로
+ * 이어져야 하므로 방문객 위젯도 싣되, 대상이 다른 화면이라 구분선 아래로 떼어 놓는다.
  */
 type Item = {
   label: string;
   icon: IconName;
   href?: string;
   note: string;
-  step?: string;
   /** 활성 판정. 없으면 href와 정확히 같은 경로일 때만 활성 */
   match?: (pathname: string) => boolean;
-  /** 모바일 가로 스트립에서는 감춘다 — 디밍 항목은 데스크톱 목업 재현용이라 좁은 화면에선 방해만 된다 */
+  /** 모바일 가로 스트립에서는 감춘다 — 좁은 화면에선 자리만 먹는 보조 진입점이다 */
   desktopOnly?: boolean;
-  /** 상위 분석 화면 안에서 쓰는 보조 기능 */
-  child?: boolean;
+  /** 이 화면 안에서만 쓰는 하위 작업. 연결선으로 부모와 묶어 그린다 */
+  children?: Item[];
 };
 
 /** 순서가 아니라 담당자가 찾는 업무 객체로 묶는다. 실제 단계는 카드 안에서만 안내한다. */
@@ -39,7 +42,7 @@ const GROUPS: { title: string; items: Item[] }[] = [
         icon: "compass",
         href: "/",
         note: "결정 대기 제안과 오늘 할 일",
-        match: (p) => p === "/" || p.startsWith("/cards/"),
+        match: (p) => p === "/" || p.startsWith("/proposals/") || p.startsWith("/cards/"),
       },
       {
         label: "추진 경과 리포트",
@@ -47,14 +50,15 @@ const GROUPS: { title: string; items: Item[] }[] = [
         href: "/tracking",
         note: "진행률·정체·실제 성과 확인",
         match: (p) => p === "/tracking",
-      },
-      {
-        label: "추진 기록 입력",
-        icon: "workflow",
-        href: "/tracking/new",
-        note: "경과 메모·다음 행동·실측값 입력",
-        match: (p) => p === "/tracking/new",
-        child: true,
+        children: [
+          {
+            label: "추진 기록 입력",
+            icon: "workflow",
+            href: "/tracking/new",
+            note: "경과 메모·다음 행동·실측값 입력",
+            match: (p) => p === "/tracking/new",
+          },
+        ],
       },
       {
         label: "인센티브 정책",
@@ -97,15 +101,34 @@ const VISITOR: Item = {
   label: "방문객 위젯",
   icon: "phone",
   href: "/widget",
-  note: "방문객이 보는 가맹점 추천 화면 (별도 테마)",
+  note: "방문객이 보는 가맹점 추천 화면",
   match: (p) => p === "/widget",
 };
 
+/**
+ * 항목 하나의 골격 — 모든 항목이 이 문자열 하나를 공유한다. 여기 없는 여백·정렬은
+ * 어떤 항목에도 붙이지 않는다 (그래야 세로로 훑을 때 아이콘 열이 자로 잰 듯 맞는다).
+ */
 const ITEM =
-  "group relative flex min-h-11 items-center gap-3 whitespace-nowrap rounded-xl px-3 py-2.5 text-[13px] transition-all lg:w-full lg:whitespace-normal lg:text-sm";
+  "group flex min-h-11 shrink-0 items-center gap-3 whitespace-nowrap rounded-lg px-3 py-2.5 text-[13px] transition-colors lg:w-full lg:items-start lg:whitespace-normal lg:text-sm";
+
+/** 부모·하위를 한 줄로 편 목록 — 하위 항목도 활성 판정 대상이다 */
+const flatten = (items: Item[]): Item[] =>
+  items.flatMap((item) => [item, ...flatten(item.children ?? [])]);
+
+/**
+ * 현재 경로에 해당하는 항목은 **정확히 하나**여야 한다 — 처음 일치한 것만 활성으로 본다.
+ * 하위가 활성일 때 부모까지 함께 켜지 않는다: 어디에 속한 화면인지는 연결선이 이미 말한다.
+ */
+function activeLabelFor(pathname: string): string | null {
+  const all = [...flatten(GROUPS.flatMap((group) => group.items)), VISITOR];
+  const hit = all.find((item) => (item.match ? item.match(pathname) : item.href === pathname));
+  return hit?.label ?? null;
+}
 
 export function SideNav() {
   const pathname = usePathname();
+  const activeLabel = activeLabelFor(pathname);
 
   // 다른 경로의 긴 섹션으로 이동할 때는 해시가 먼저 적용되고 본문이 나중에 수화될 수 있다.
   // 대상이 생길 때까지 짧게 재시도해 사이드바 메뉴가 URL만 바꾸고 멈추지 않게 한다.
@@ -142,27 +165,74 @@ export function SideNav() {
     <div className="flex min-h-0 flex-1 flex-col">
       <nav
         aria-label="주 메뉴"
-        className="flex gap-1.5 overflow-x-auto px-3 py-2 lg:min-h-0 lg:flex-1 lg:flex-col lg:gap-1 lg:overflow-y-auto lg:px-4 lg:py-2"
+        className="flex gap-1.5 overflow-x-auto px-3 py-2 lg:min-h-0 lg:flex-1 lg:flex-col lg:gap-1 lg:overflow-y-auto lg:px-4 lg:py-1"
       >
         {GROUPS.map((group) => (
           <div key={group.title} className="contents lg:block">
-            {/* 묶음 라벨은 데스크톱에서만 — 모바일 가로 스트립에서는 자리를 먹기만 한다 */}
-            <p className="mb-2 mt-5 hidden px-3 text-[10px] font-bold uppercase tracking-[0.18em] text-white/50 lg:block">
+            {/* 묶음 라벨은 데스크톱에서만 — 모바일 가로 스트립에서는 자리를 먹기만 한다.
+                그룹 간 간격(mt-6)을 항목 간 간격(gap-1)보다 크게 둬 묶음이 형태로 읽히게 한다 */}
+            <p className="mb-1.5 mt-6 hidden px-3 text-xs font-semibold uppercase tracking-[0.14em] text-admin-text-soft first:mt-2 lg:block">
               {group.title}
             </p>
-            {group.items.map((item) => (
-              <NavItem key={item.label} item={item} pathname={pathname} />
-            ))}
+            <div className="contents lg:flex lg:flex-col lg:gap-1">
+              {group.items.map((item) => (
+                <NavBranch key={item.label} item={item} activeLabel={activeLabel} />
+              ))}
+            </div>
           </div>
         ))}
 
-        <span aria-hidden="true" className="mx-1 h-6 w-px shrink-0 self-center bg-white/15 lg:hidden" />
-        <span className="lg:hidden"><NavItem item={VISITOR} pathname={pathname} visitor /></span>
+        <span aria-hidden="true" className="mx-1 h-6 w-px shrink-0 self-center bg-admin-border lg:hidden" />
+        <span className="lg:hidden">
+          <NavItem item={VISITOR} active={VISITOR.label === activeLabel} visitor />
+        </span>
       </nav>
 
-      {/* 데스크톱에서는 방문객 진입을 스크롤 메뉴와 분리한다. 홍보 이미지와 겹치지 않고 항상 보인다. */}
-      <div className="hidden shrink-0 border-t border-white/10 px-4 py-3 lg:block">
-        <NavItem item={VISITOR} pathname={pathname} visitor />
+      {/* 방문객 위젯은 대상이 다른 화면이라 담당자 메뉴와 선으로 가른다 (작업 3) */}
+      <div className="hidden shrink-0 border-t border-admin-border px-4 py-3 lg:block">
+        <NavItem item={VISITOR} active={VISITOR.label === activeLabel} visitor />
+      </div>
+    </div>
+  );
+}
+
+/**
+ * 항목 하나와 그 하위 묶음 — **맥락 기반 노출**.
+ *
+ * 하위는 그 작업 영역 안에 있을 때만 나타난다: 부모나 하위 중 하나가 현재 화면이면 펼치고,
+ * 그 밖에서는 부모만 남긴다. 접기/펴기 버튼을 달지 않은 이유는 하위가 부모 하나에 한 개뿐이라
+ * 아끼는 것이 한 행인데, 행 하나가 이동과 펼침 두 가지 클릭 대상을 겸하게 되는 비용이 더
+ * 크기 때문이다. 하위가 현재 화면일 때는 어차피 펼쳐야 하므로, 토글이 실제로 감춰 주는
+ * 경우는 "그 영역 밖에 있을 때"뿐이고 그건 이 규칙이 클릭 0회로 해 준다.
+ *
+ * 감춰도 진입로는 끊기지 않는다 — `/tracking` 화면이 `/tracking/new`로 여러 곳에서 링크한다.
+ *
+ * 하위는 임의로 밀어 놓지 않는다: **부모 아이콘 중심(x=22px)에서 내려오는 세로 연결선**에
+ * 걸어 둔다. 들여쓰기만 주면 정렬이 어긋난 것처럼 보이지만, 선이 있으면 "이 화면에 속한
+ * 작업"으로 읽힌다. 항목 자체의 여백·아이콘 규격은 여전히 `ITEM` 한 곳에서 온다.
+ *
+ * 모바일 가로 스트립에서는 `contents`로 상자를 지워 평평한 한 줄로 되돌린다.
+ */
+function NavBranch({ item, activeLabel }: { item: Item; activeLabel: string | null }) {
+  const kids = item.children ?? [];
+  const self = <NavItem item={item} active={item.label === activeLabel} />;
+  if (!kids.length) return self;
+
+  // 이 작업 영역 안인가 — 부모가 현재 화면이거나, 하위 중 하나가 현재 화면일 때
+  const inArea = item.label === activeLabel || kids.some((child) => child.label === activeLabel);
+  if (!inArea) return self;
+
+  return (
+    <div className="contents lg:flex lg:flex-col lg:gap-1">
+      {self}
+      <div
+        role="group"
+        aria-label={`${item.label} 하위 작업`}
+        className="contents lg:ml-[22px] lg:flex lg:flex-col lg:gap-1 lg:border-l lg:border-lavender-200 lg:pl-1"
+      >
+        {kids.map((child) => (
+          <NavItem key={child.label} item={child} active={child.label === activeLabel} />
+        ))}
       </div>
     </div>
   );
@@ -170,11 +240,12 @@ export function SideNav() {
 
 function NavItem({
   item,
-  pathname,
+  active,
   visitor = false,
 }: {
   item: Item;
-  pathname: string;
+  /** 상위에서 계산해 내려준다 — 항목이 스스로 판정하면 동시에 여러 개가 켜질 수 있다 */
+  active: boolean;
   visitor?: boolean;
 }) {
   const hidden = item.desktopOnly ? "hidden lg:flex" : "";
@@ -184,38 +255,43 @@ function NavItem({
       <span
         title={item.note}
         aria-disabled="true"
-        className={`${ITEM} ${hidden} cursor-not-allowed text-white/50`}
+        className={`${ITEM} ${hidden} cursor-not-allowed text-admin-text-muted`}
       >
-        <Icon name={item.icon} size={17} />
+        <Icon name={item.icon} size={20} className="shrink-0" />
         <span className="min-w-0 flex-1">{item.label}</span>
-        <span className="rounded-full bg-white/[0.07] px-1.5 py-0.5 text-[10px] font-medium text-white/50">
+        <span className="rounded-full bg-admin-surface px-1.5 py-0.5 text-xs font-medium text-admin-text-muted">
           로드맵
         </span>
       </span>
     );
   }
 
-  const active = item.match ? item.match(pathname) : item.href === pathname;
-  const className = `${ITEM} ${hidden} ${item.child ? "lg:ml-3 lg:w-[calc(100%-0.75rem)]" : ""} ${
+  // 활성은 배경 틴트 + 굵기 + aria-current 세 겹으로 알린다 — 색 하나에 기대지 않는다 (13 §4)
+  const className = `${ITEM} ${hidden} ${
     active
-      ? "bg-white/[0.13] font-semibold text-white shadow-sm ring-1 ring-inset ring-white/10"
-      : "text-white/80 hover:bg-white/[0.07] hover:text-white"
+      ? "bg-lavender-100 font-semibold text-lavender-700"
+      : "text-admin-text hover:bg-lavender-100/50"
   }`;
+
   const body = (
     <>
-      {/* 활성 표시는 배경색 + 왼쪽 표시줄 둘 다 — 색만으로 전달하지 않는다 (13 §4) */}
-      <span className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg ${active ? "bg-[#f2a86f] text-admin-sidebar-deep" : "bg-white/[0.07] text-white/70"}`}>
-        <Icon name={item.icon} size={16} />
-      </span>
+      <Icon
+        name={item.icon}
+        size={20}
+        className={`shrink-0 lg:mt-px ${active ? "text-lavender-700" : "text-admin-text-soft"}`}
+      />
       <span className="min-w-0 flex-1">
-        <span className="flex items-center gap-2">
-          <span>{item.label}</span>
-          {item.step ? <span className="hidden text-[9px] font-bold tracking-widest text-white/50 lg:inline">{item.step}</span> : null}
+        <span className="block leading-5">{item.label}</span>
+        <span
+          className={`mt-0.5 hidden line-clamp-1 text-xs font-normal leading-4 lg:block ${
+            active ? "text-lavender-700/75" : "text-admin-text-soft"
+          }`}
+        >
+          {item.note}
         </span>
-        <span className="mt-0.5 hidden line-clamp-1 text-[10px] font-normal leading-4 text-white/60 lg:block">{item.note}</span>
       </span>
       {visitor ? (
-        <span className="rounded-full bg-visitor-primary-soft px-1.5 py-0.5 text-[10px] font-semibold text-visitor-primary">
+        <span className="shrink-0 self-center rounded-full bg-visitor-primary-soft px-1.5 py-0.5 text-xs font-semibold text-visitor-primary">
           방문객
         </span>
       ) : null}

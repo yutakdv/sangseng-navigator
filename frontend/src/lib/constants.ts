@@ -7,11 +7,12 @@ export const REGIONS: Region[] = ["고한읍", "사북읍", "정선군", "태백
 export const CATEGORIES: DisplayCategory[] = ["카페", "음식점", "편의점", "숙박업", "소매점", "기타"];
 
 /**
- * 카테고리 팔레트 (13 §5 — 검증 완료, 임의 변경 금지).
+ * 카테고리 팔레트 (13 §5).
  * 색은 **항목에 고정**한다 — 필터로 항목 수가 바뀌어도 남은 항목 색을 재배열하지 않는다.
+ * 슬롯 1은 브랜드 정합을 위해 lavender-500으로 교체 — 13 §5의 색각 분리 재검증 필요(직접 라벨 병행으로 완화).
  */
 export const CATEGORY_COLORS: Record<string, string> = {
-  카페: "#4f46e5",
+  카페: "#8B7BF0", // lavender-500 (브랜드)
   음식점: "#eb6834",
   편의점: "#1baf7a",
   숙박업: "#eda100",
@@ -24,8 +25,12 @@ export const REGION_COLORS: Record<string, string> = Object.fromEntries(
   REGIONS.map((r, i) => [r, Object.values(CATEGORY_COLORS)[i]]),
 );
 
-/** 단일 시리즈 차트(전환율 추이·지역별 막대)는 팔레트 대신 이 단색 (13 §5) */
-export const PRIMARY = "#4f46e5";
+/** 단일 시리즈 차트(전환율 추이·지역별 막대)는 팔레트 대신 이 단색 (13 §5) — lavender-500 */
+export const PRIMARY = "#8B7BF0";
+
+/** 차트 보조 계열 — lavender-400 / 300 (주 계열보다 연하게) */
+export const PRIMARY_SOFT = "#A695F3";
+export const PRIMARY_FAINT = "#C4B8F5";
 
 /**
  * 차트 공통 시각 토큰 (13 §5).
@@ -34,18 +39,18 @@ export const PRIMARY = "#4f46e5";
  * 축 라벨은 11px에서 12px로 올렸다(화면 최소 크기 기준, 13 §6).
  */
 export const CHART = {
-  tick: { fontSize: 12, fill: "#626b82" },
+  tick: { fontSize: 12, fill: "#6E6C7A" },
   /** 값 라벨(막대 끝 숫자) — 축보다 진하게 */
-  label: { fontSize: 12, fill: "#454c63", fontWeight: 600 },
-  grid: "#e2e7f0",
+  label: { fontSize: 12, fill: "#55525F", fontWeight: 600 },
+  grid: "#E7E5EE",
   tooltip: {
     fontSize: 13,
     borderRadius: 10,
-    border: "1px solid #e2e7f0",
-    boxShadow: "0 10px 28px -10px rgb(24 21 52 / 0.3)",
+    border: "1px solid #E7E5EE",
+    boxShadow: "0 10px 28px -10px rgb(30 24 64 / 0.3)",
     padding: "8px 12px",
   },
-  cursor: "rgba(79,70,229,0.07)",
+  cursor: "rgba(139,123,240,0.08)",
 } as const;
 
 /** 거점 — pipeline/common.py ANCHOR. 라벨은 이 문자열 그대로 쓴다("정문" 표기 폐기, 13 §9) */

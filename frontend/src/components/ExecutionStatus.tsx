@@ -35,25 +35,23 @@ export function ExecutionStatus({
   const count = (p: CardProgress) => approved.filter((card) => normalizedProgress(card) === p).length;
   const total = approved.length;
   const quality = sampleQuality(kpi.counts.decided);
-  const sampleNote = quality === "demo" ? "데모 표본" : quality === "limited" ? "표본 부족" : null;
+  const sampleNote = quality === "demo" ? "예시 데이터" : quality === "limited" ? "표본 부족" : null;
 
   return (
     <section
       style={{ animationDelay: "80ms" }}
-      className={`u-float animate-rise flex flex-col ${className}`}
+      className={`animate-rise flex min-w-0 flex-col overflow-hidden rounded-card bg-admin-surface shadow-card ${className}`}
       aria-label="실행 현황과 정책 성과"
     >
       <div className="flex flex-wrap items-start gap-x-4 gap-y-2 p-5 pb-4 2xl:p-6 2xl:pb-4">
-        <div className="flex min-w-0 flex-1 items-start gap-3">
-          <span className="mt-px flex h-8 w-8 shrink-0 items-center justify-center rounded-[10px] bg-admin-surface-sunken text-admin-text-muted">
-            <Icon name="report" size={17} />
-          </span>
-          <div className="min-w-0">
+        <div className="min-w-0 flex-1">
+          <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+            <Icon name="report" size={16} className="shrink-0 text-admin-primary" />
             <h3 className="u-panel-title">실행 현황 · 정책 성과</h3>
-            <p className="mt-1.5 break-keep text-[13px] leading-[1.65] text-admin-text-muted">
-              담당자가 검토를 시작한 Work Item의 단계와 의사결정 표본을 함께 봅니다.
-            </p>
           </div>
+          <p className="mt-1.5 break-keep text-[13px] leading-[1.65] text-admin-text-muted">
+            담당자가 검토를 시작한 업무 항목의 단계와 의사결정 표본을 함께 봅니다.
+          </p>
         </div>
       </div>
 

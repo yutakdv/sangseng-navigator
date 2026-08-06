@@ -2,14 +2,18 @@ import type { ReactNode } from "react";
 import { Icon, type IconName } from "@/components/Icon";
 
 /**
- * 허브 전용 패널 (docs/plan/13 §6).
+ * 허브 전용 패널 (docs/plan/13 §6 · 17 §3.1 — T2 근거면).
  *
- * `Section`(다른 담당자 화면용)과 갈라 둔 이유는 **구성 요소가 하나 더 있기 때문**이다:
- * 허브의 카드는 전부 "제목 → 한 줄 설명 → 시각화 → 핵심 판독(insight) → 다음 행동(action)"
- * 다섯 자리를 채운다. 판독 문장이 없으면 담당자가 차트를 보고 스스로 해석해야 하는데,
- * 이 화면의 목적은 시각화가 아니라 **의사결정 근거 제공**이라 그 해석까지가 화면의 몫이다.
+ * 패널은 **바깥 테두리를 두르지 않는다.** 경계는 배경(#FAFAFB)과 표면(#FFFFFF)의 밝기 차 +
+ * `shadow-card`(거의 안 보이는 1px 접촉면)로만 만든다. 선이 사라진 만큼 화면이 부드러워지고,
+ * 위계는 그림자의 세기가 진다 — T1(좌측 미리보기)만 `shadow-lift`로 확실히 떠 있고
+ * 근거·목록 패널은 종이 한 장 얹힌 정도에 머문다.
  *
- * `insight`는 지어낸 코멘트가 아니라 **화면에 이미 실린 값을 문장으로 옮긴 것**만 넣는다.
+ * 카드 **안쪽** 구분선(헤더 아래·insight 위)은 그대로 둔다. 정보 영역을 나누는 역할이라
+ * 바깥 테두리와 목적이 다르다.
+ *
+ * 다섯 자리 구성(제목 → 한 줄 설명 → 시각화 → 핵심 판독 insight → 다음 행동 action)은
+ * 그대로다. `insight`는 지어낸 코멘트가 아니라 **화면에 이미 실린 값을 문장으로 옮긴 것**만 넣는다.
  */
 export function Panel({
   id,
@@ -42,26 +46,20 @@ export function Panel({
     <section
       id={id}
       style={{ animationDelay: `${delay}ms` }}
-      className={`u-float u-float-hover animate-rise flex flex-col ${className}`}
+      className={`animate-rise flex min-w-0 flex-col overflow-hidden rounded-card bg-admin-surface shadow-card ${className}`}
     >
       <div className="flex flex-wrap items-start gap-x-4 gap-y-2.5 p-5 pb-4 2xl:p-6 2xl:pb-4">
-        <div className="flex min-w-0 flex-1 basis-56 items-start gap-3">
-          {icon ? (
-            <span className="mt-px flex h-8 w-8 shrink-0 items-center justify-center rounded-[10px] bg-admin-surface-sunken text-admin-text-muted">
-              <Icon name={icon} size={17} />
-            </span>
-          ) : null}
-          <div className="min-w-0">
-            <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
-              <h3 className="u-panel-title">{title}</h3>
-              {badge}
-            </div>
-            {desc ? (
-              <p className="mt-1.5 max-w-2xl break-keep text-[13px] leading-[1.65] text-admin-text-muted">
-                {desc}
-              </p>
-            ) : null}
+        <div className="min-w-0 flex-1 basis-56">
+          <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+            {icon ? <Icon name={icon} size={16} className="shrink-0 text-admin-primary" /> : null}
+            <h3 className="u-panel-title">{title}</h3>
+            {badge}
           </div>
+          {desc ? (
+            <p className="mt-1.5 max-w-2xl break-keep text-[13px] leading-[1.65] text-admin-text-muted">
+              {desc}
+            </p>
+          ) : null}
         </div>
         {action ? <div className="ml-auto shrink-0 pt-0.5">{action}</div> : null}
       </div>
@@ -69,13 +67,13 @@ export function Panel({
       <div className={`min-w-0 flex-1 ${flush ? "" : "px-5 2xl:px-6"}`}>{children}</div>
 
       {insight ? (
-        <div className="mt-5 border-t border-admin-border bg-admin-surface-sunken/70 px-5 py-3.5 2xl:px-6">
+        <div className="mt-5 border-t border-admin-border bg-lavender-50/70 px-5 py-3.5 2xl:px-6">
           <p className="flex items-start gap-2 break-keep text-[13px] font-medium leading-[1.6] text-admin-text-soft">
             <Icon
               name="bolt"
               size={14}
               strokeWidth={2}
-              className="mt-0.5 text-admin-primary"
+              className="mt-0.5 shrink-0 text-admin-primary"
             />
             <span>{insight}</span>
           </p>
@@ -88,36 +86,68 @@ export function Panel({
 }
 
 /**
- * 화면을 다섯 막으로 가르는 편집형 제목.
+ * 결재선 막(act) — 허브의 서명 요소.
  *
- * 허브는 패널이 열 장 가까이 세로로 쌓이는 화면이라, 스크롤 도중 "지금 보는 게 진단인지
- * 근거인지 결정인지"가 매번 다시 읽혀야 한다. 막 번호(①~⑤)와 질문형 부제를 함께 달아
- * 담당자의 업무 순서(무슨 일 → 어디가 → 왜 → 어떻게 되나 → 무엇을 할까)와 1:1로 맞춘다.
+ * 담당자의 업무는 실제로 순차다: 결정(01) → 근거(02) → 전망(03) → 실행(04).
+ * 막 번호 사각(라벤더 500 — 화면의 유일한 채움색)과 그 아래로 이어지는 세로 괘선이
+ * 이 순서를 결재 문서의 결재선처럼 화면 왼쪽에 그린다. 스크롤 어느 위치에서든
+ * "지금 몇 번째 단계를 보고 있는가"가 선의 위치로 읽힌다.
+ *
+ * 세로선은 다음 막의 마커 위까지 내려가 겹치고(-bottom-10), 뒤에 그려지는 다음 마커가
+ * 불투명하게 덮어 한 줄로 이어져 보인다. 마지막 막은 `last`로 선을 끊는다.
+ * 640px 미만에서는 선·들여쓰기를 접고 마커만 남긴다.
  */
-export function ActHeading({
-  step,
-  title,
+export function Act({
+  no,
+  phase,
   question,
+  title,
   action,
+  last = false,
+  children,
 }: {
-  step: string;
-  title: string;
+  /** 막 번호 — "01"처럼 두 자리 문자열 */
+  no: string;
+  /** 막 이름 한 단어 — 결정·근거·전망·실행 */
+  phase: string;
   /** 이 막이 답하는 질문 — 담당자 업무 순서와 같은 문장 */
   question: string;
+  title: string;
   action?: ReactNode;
+  last?: boolean;
+  children: ReactNode;
 }) {
   return (
-    <div className="flex flex-wrap items-end justify-between gap-x-6 gap-y-2 pt-3">
-      <div className="min-w-0">
-        <p className="u-overline flex items-center gap-2">
-          <span className="tabular-nums">{step}</span>
-          <span aria-hidden className="h-px w-6 bg-admin-primary/40" />
-          {question}
-        </p>
-        <h2 className="u-section-title mt-1.5">{title}</h2>
-      </div>
-      {action ? <div className="shrink-0 pb-1">{action}</div> : null}
-    </div>
+    <section aria-label={`${no} ${phase}`} className="relative">
+      {!last ? (
+        <span
+          aria-hidden
+          className="absolute -bottom-10 left-[17px] top-11 hidden w-px bg-lavender-200 sm:block"
+        />
+      ) : null}
+      <header className="flex flex-wrap items-end justify-between gap-x-6 gap-y-2">
+        <div className="flex min-w-0 items-center gap-3.5">
+          <span
+            aria-hidden
+            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[10px] bg-admin-primary text-[15px] font-bold tabular-nums text-white"
+          >
+            {no}
+          </span>
+          <div className="min-w-0">
+            <p className="flex items-center gap-2 text-xs font-bold text-lavender-600">
+              <span className="tracking-[0.08em]">{phase}</span>
+              <span aria-hidden className="h-px w-5 bg-lavender-300" />
+              <span className="min-w-0 break-keep font-semibold">{question}</span>
+            </p>
+            <h2 className="mt-0.5 break-keep text-[19px] font-bold leading-7 tracking-[-0.02em] text-admin-text sm:text-[22px] sm:leading-8">
+              {title}
+            </h2>
+          </div>
+        </div>
+        {action ? <div className="shrink-0 pb-1">{action}</div> : null}
+      </header>
+      <div className="mt-5 min-w-0 sm:pl-[50px]">{children}</div>
+    </section>
   );
 }
 

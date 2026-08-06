@@ -13,7 +13,7 @@ import Link from "next/link";
 export default function NotFound() {
   return (
     <main className="flex min-h-screen items-center justify-center bg-admin-bg px-5 py-10">
-      <div className="w-full max-w-lg rounded-card border border-admin-border bg-admin-surface p-6 shadow-card sm:p-7">
+      <div className="w-full max-w-lg rounded-card bg-admin-surface p-6 shadow-card sm:p-7">
         <p className="text-xs font-semibold uppercase tracking-[0.14em] text-admin-primary">
           상생 나침반
         </p>

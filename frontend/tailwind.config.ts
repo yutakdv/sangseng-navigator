@@ -1,30 +1,55 @@
 import type { Config } from "tailwindcss";
 
-// 컬러 토큰 정본: docs/plan/13-design-guide.md §4
-// 담당자 화면은 인디고, 방문객 화면은 그린으로 역할을 구분한다. 따뜻한 배경·표면은 유지하되
-// 내비게이션과 행동 색은 인디고로 되돌려 같은 서비스 안의 두 사용자 역할이 섞이지 않게 한다.
+// 컬러 토큰 정본: docs/plan/13-design-guide.md §4 (2026-08 라벤더 개편)
+// 담당자 화면은 라벤더, 방문객 화면은 그린으로 역할을 구분한다.
+// 채움·강조는 lavender-500 하나로 통일하고, 상태색(그린/레드/앰버)과는 절대 섞지 않는다.
 const config: Config = {
   content: ["./src/**/*.{ts,tsx}"],
   theme: {
     extend: {
       colors: {
+        /** 담당자·AI·브랜드 영역 전용 팔레트 — 상태 신호(state.*)에는 쓰지 않는다 */
+        lavender: {
+          50: "#F6F4FE",
+          100: "#E9E4FB",
+          200: "#D6CEF8",
+          300: "#C4B8F5",
+          400: "#A695F3",
+          500: "#8B7BF0",
+          600: "#7361DC",
+          700: "#5B4BC4",
+          800: "#443597",
+          900: "#2E2560",
+          950: "#1E1840",
+        },
         admin: {
-          sidebar: "#17113b",
-          "sidebar-deep": "#0f0a2b",
-          "sidebar-active": "#37306f",
-          primary: "#5146d8",
-          "primary-strong": "#4338ca",
-          "primary-soft": "#eef0ff",
-          "primary-line": "#c7d2fe",
-          bg: "#f4f1e9",
-          surface: "#fffdf8",
-          /** 카드 **안쪽**의 낮은 면 (빈 상태·표 헤더·인라인 칩 배경) */
-          "surface-sunken": "#f0ece2",
-          /** 카드·표 구분선 — black/5보다 선명하되 딱딱하지 않은 값 */
-          border: "#ded8ca",
-          text: "#242039",
-          "text-soft": "#4f4b63",
-          "text-muted": "#6b6879",
+          // 기존 admin.* 이름은 유지하고 값만 라벤더 스케일로 리매핑 — 사용처 전체가 자동 통일된다
+          sidebar: "#2E2560", // lavender-900
+          "sidebar-deep": "#1E1840", // lavender-950
+          "sidebar-active": "#443597", // lavender-800
+          primary: "#8B7BF0", // lavender-500 — 모든 채움·강조
+          "primary-strong": "#7361DC", // lavender-600 — hover
+          "primary-soft": "#F6F4FE", // lavender-50 — AI 제안 카드·틴트 배경
+          "primary-line": "#D6CEF8", // lavender-200 — 틴트 면의 보더
+          /**
+           * 사이드바 면 — 중립 오프화이트. 사이드바 배경은 이 토큰 한 곳에서만 정의한다
+           * (AdminShell·PageSkeleton).
+           *
+           * ⚠ 본문(`admin.bg` #FAFAFB)과 명도가 거의 같다(0.3%p). 좌측이 영역으로 읽히는 것은
+           *   사실상 우측 0.5px 보더(`admin.border`)와 본문에 깔린 흰 카드들의 대비가 맡는다.
+           *   배경으로도 단을 주려면 이 값을 더 낮춰야 하고, 그때는 그 위에 얹은 회색 글자
+           *   대비(부제·그룹 제목)를 다시 재야 한다.
+           */
+          "sidebar-surface": "#FAFAFA",
+          bg: "#FAFAFB",
+          surface: "#FFFFFF",
+          /** 카드 **안쪽**의 낮은 면 (빈 상태·표 헤더·인라인 칩·insight 배경) */
+          "surface-sunken": "#F5F4F8",
+          /** 카드·표 구분선 — 보라기가 살짝 도는 쿨 그레이 */
+          border: "#E7E5EE",
+          text: "#2B2833",
+          "text-soft": "#55525F",
+          "text-muted": "#6E6C7A",
         },
         visitor: {
           primary: "#166534",
@@ -43,6 +68,10 @@ const config: Config = {
           bad: "#52525b",
           "bad-bg": "#f4f4f5",
           "bad-line": "#d4d4d8",
+          /** 반려(거부) 전용 레드 — trend.up과 값이 같지만 의미가 다르므로 토큰을 분리한다 */
+          danger: "#b91c1c",
+          "danger-bg": "#fef2f2",
+          "danger-line": "#fecaca",
           notice: "#475569",
           "notice-bg": "#eef1f6",
           "notice-line": "#cbd5e1",
@@ -61,7 +90,7 @@ const config: Config = {
         },
       },
       fontFamily: {
-        sans: ["-apple-system", "BlinkMacSystemFont", "SF Pro Display", "SF Pro Text", "Pretendard", "sans-serif"],
+        sans: ["Pretendard", "-apple-system", "BlinkMacSystemFont", "SF Pro Display", "SF Pro Text", "sans-serif"],
       },
       borderRadius: {
         card: "16px",
@@ -70,19 +99,24 @@ const config: Config = {
         hero: "28px",
       },
       boxShadow: {
-        // 13 §6의 "은은한 단층"을 유지하되, 배경과 표면의 밝기 차가 작은 화면에서도 카드 경계가
-        // 읽히도록 넓게 퍼지는 두 번째 레이어를 더했다
-        card: "0 8px 24px rgb(23 17 59 / 0.06)",
-        "card-hover": "0 14px 36px rgb(23 17 59 / 0.10)",
+        /**
+         * 카드 기본 그림자 — **바깥 테두리를 대신하는 최소 단서**다.
+         *
+         * 카드는 테두리를 두르지 않고 배경(#FAFAFB)과 표면(#FFFFFF)의 밝기 차 + 이 그림자로만
+         * 구분된다. 그래서 값이 거의 안 보일 만큼 옅다: 접촉면(1px)과 아주 짧은 확산(3px)
+         * 두 층뿐이고 넓게 퍼지지 않는다. 공공 신뢰 톤에서 그림자는 장식이 아니라 경계다.
+         */
+        card: "0 1px 3px rgb(30 24 64 / 0.04), 0 1px 2px rgb(30 24 64 / 0.03)",
+        "card-hover": "0 2px 8px rgb(30 24 64 / 0.07), 0 1px 3px rgb(30 24 64 / 0.04)",
         /**
          * 허브(경영 요약 화면) 전용 3단 그림자. 테두리를 거의 지우고 그림자만으로 카드를 띄우려면
          * 접촉면(1px)·근접 확산(12px)·환경광(40px) 세 층이 있어야 면이 종이처럼 읽힌다.
          * 한 층짜리 `shadow-card`로는 큰 카드가 배경에 붙어 보인다.
          */
-        float: "0 12px 32px rgb(23 17 59 / 0.07)",
-        lift: "0 18px 45px rgb(23 17 59 / 0.11)",
+        float: "0 12px 32px rgb(30 24 64 / 0.07)",
+        lift: "0 18px 45px rgb(30 24 64 / 0.11)",
         /** 히어로(이번 분기 핵심 제안)만 쓰는 인디고 톤 그림자 */
-        hero: "0 24px 64px rgb(23 17 59 / 0.14)",
+        hero: "0 24px 64px rgb(30 24 64 / 0.14)",
         /** 스티키 헤더가 본문 위로 지나갈 때의 경계 */
         header: "0 1px 0 rgb(24 24 27 / 0.06)",
       },

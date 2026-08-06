@@ -268,7 +268,7 @@ export function ProgressRecordForm({
 
   return (
     <form onSubmit={submit} className="flex flex-col gap-5" aria-busy={working}>
-      <section className="rounded-panel border border-admin-border bg-admin-surface p-4 shadow-card sm:p-5">
+      <section className="rounded-panel bg-admin-surface p-4 shadow-card sm:p-5">
         <div className="flex items-start gap-3">
           <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-admin-primary-soft text-admin-primary ring-1 ring-inset ring-admin-primary-line">
             <Icon name="workflow" size={17} />
@@ -326,7 +326,7 @@ export function ProgressRecordForm({
         ) : null}
       </section>
 
-      <section className="rounded-panel border border-admin-border bg-admin-surface p-4 shadow-card sm:p-5">
+      <section className="rounded-panel bg-admin-surface p-4 shadow-card sm:p-5">
         <h2 className="u-h2">경과와 다음 행동</h2>
         <p className="mt-1 text-[13px] leading-5 text-admin-text-muted">
           무엇을 확인했고 무엇이 막혀 있는지 남기면 다음 담당자가 같은 맥락에서 이어갈 수 있습니다.
@@ -473,7 +473,7 @@ export function ProgressRecordForm({
         </div>
       </section>
 
-      <section className="rounded-panel border border-admin-border bg-admin-surface p-4 shadow-card sm:p-5">
+      <section className="rounded-panel bg-admin-surface p-4 shadow-card sm:p-5">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
             <h2 className="u-h2">실제 관측 성과</h2>

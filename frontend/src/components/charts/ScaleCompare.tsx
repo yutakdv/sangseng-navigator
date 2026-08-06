@@ -26,7 +26,7 @@ import { CHART, PRIMARY } from "@/lib/constants";
 const MUTED = "#94a3b8";
 
 const legendText = (value: string) => (
-  <span style={{ color: "#454c63", fontWeight: 500 }}>{value}</span>
+  <span style={{ color: "#55525F", fontWeight: 500 }}>{value}</span>
 );
 
 export function ScaleCompare({
