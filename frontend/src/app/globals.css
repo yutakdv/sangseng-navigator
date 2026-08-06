@@ -14,13 +14,12 @@
 
   body {
     @apply bg-admin-bg text-admin-text antialiased;
-    overflow-x: hidden;
-    font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", "Pretendard", sans-serif;
+    /* body에는 overflow-x를 걸지 않는다 — 한쪽 축만 hidden이면 다른 축이 auto로 계산돼
+       body가 스크롤 컨테이너가 되고, 그 안의 `position: sticky`가 전부 죽는다
+       (허브 상태 바·표 헤더). 가로 스크롤 차단은 위 html 규칙만으로 충분하다 */
+    font-family: "Pretendard", -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", sans-serif;
     font-feature-settings: "tnum" 0;
-    background-image:
-      radial-gradient(circle at 78% 0%, rgb(225 239 231 / 0.72), transparent 27rem),
-      radial-gradient(circle at 15% 78%, rgb(248 218 192 / 0.30), transparent 24rem);
-    background-attachment: fixed;
+    /* 배경은 단색 — 공공 신뢰 톤에서 장식 그라데이션은 쓰지 않는다 */
   }
 
   /* KPI 값·표 숫자는 자릿수 흔들림 방지 (13 §6) */
@@ -133,7 +132,7 @@
 
   /** 본문 패널 공통 표면 */
   .u-panel {
-    @apply min-w-0 rounded-panel border border-admin-border bg-admin-surface shadow-card;
+    @apply min-w-0 rounded-panel bg-admin-surface shadow-card;
   }
 
   /**
@@ -141,7 +140,7 @@
    * 테두리를 완전히 없애면 고대비 모드·인쇄에서 카드 경계가 사라지므로 아주 옅은 링만 남긴다.
    */
   .u-float {
-    @apply min-w-0 overflow-hidden rounded-panel border border-admin-border bg-admin-surface shadow-float;
+    @apply min-w-0 overflow-hidden rounded-panel bg-admin-surface shadow-float;
   }
   .u-float-hover {
     @apply transition-all duration-200 hover:-translate-y-0.5 hover:border-admin-primary-line hover:shadow-lift;

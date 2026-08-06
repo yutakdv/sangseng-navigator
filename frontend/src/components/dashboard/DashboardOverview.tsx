@@ -1,321 +1,367 @@
 import Link from "next/link";
-import { AssumptionBadge, ProxyBadge } from "@/components/Badge";
-import { CardTypeTabs } from "@/components/CardTypeTabs";
-import { DeltaValue } from "@/components/DeltaValue";
+import { AssumptionBadge } from "@/components/Badge";
 import { GenerateCardButton } from "@/components/GenerateCardButton";
-import { Icon, type IconName } from "@/components/Icon";
-import { WorkflowChip } from "@/components/StatusChip";
-import { dataFreshness } from "@/lib/dataFreshness";
-import { sampleQuality } from "@/lib/cardWorkflow";
+import { Icon } from "@/components/Icon";
+import { Act, PanelLink } from "@/components/Panel";
+import { QuarterDiagnostics } from "@/components/dashboard/QuarterDiagnostics";
+import { StatusBar } from "@/components/dashboard/StatusBar";
+import { WorkQueue } from "@/components/dashboard/WorkQueue";
+import { ProposalSummary } from "@/components/proposals/ProposalSummary";
 import { isMockMode } from "@/lib/api";
-import { num, ratioPct } from "@/lib/format";
+import { sampleQuality } from "@/lib/cardWorkflow";
+import { dataFreshness } from "@/lib/dataFreshness";
+import { operatorGreeting } from "@/lib/operator";
 import type { Card, CardType, Dashboard, EupScore, Kpi } from "@/types";
 
-type PendingCounts = { all: number; EXPANSION: number; INCENTIVE: number };
+type StatusCounts = { waiting: number; running: number; done: number; held: number; rejected: number };
 
+/**
+ * 허브 상단 — "판단하고 움직이는" 두 층.
+ *
+ *   1층  얇은 sticky 상태 바 + 접이식 분기 진단        ← 몇 건 남았나에 계속 답한다
+ *   2층  좌 60% 미리보기 / 우 40% 작업 목록 3단계      ← 마스터-디테일
+ *   3층  결정 이력 · 실행 현황 (`children`으로 받는다)   ← 모니터링
+ *
+ * **2층이 마스터-디테일이다.** 우측 목록의 줄을 누르면 페이지가 바뀌는 게 아니라 좌측
+ * 미리보기가 그 카드로 갈린다(`?selected=`). 담당자가 대기 건을 나란히 비교하는 것이 이
+ * 화면의 목적이라, 상세로 들어갔다 나오는 왕복을 없앴다. 상세로 가는 길은 좌측 카드의
+ * "근거·전망 검토하기" 버튼 하나뿐이다.
+ *
+ * 3층을 `children`으로 받는 이유는 레이아웃 때문이다: `position: sticky`는 부모 박스 안에서만
+ * 붙어 있으므로, 상태 바가 페이지 끝까지 따라오려면 1·2·3층이 **한 섹션 안**에 있어야 한다.
+ */
 export function DashboardOverview({
   dashboard,
   kpi,
-  hero,
+  selected,
+  heroId,
+  queue,
+  inProgress,
+  completed,
   ranking,
+  regionInsight,
+  scoreTopLine,
   activeType,
   generateType,
-  pendingCounts,
-  guidedCardId,
+  statusCounts,
+  children,
 }: {
   dashboard: Dashboard;
   kpi: Kpi;
-  hero?: Card;
+  /** 지금 좌측에 뜬 카드 — `?selected=`가 없으면 오늘 검토 1순위 */
+  selected?: Card;
+  /** 오늘 검토 1순위 카드 id — 선택과 무관하게 목록에서 배지로 표시한다 */
+  heroId?: string;
+  /** 대기 중 카드 전체 — 결정 블록이 그리는 목록이자 statusCounts.waiting의 근거 */
+  queue: Card[];
+  /** 승인 후 완료 전 — 실행 관리 블록이자 statusCounts.running의 근거 */
+  inProgress: Card[];
+  /** 완료 — 방문객 화면에 반영되는 카드이자 statusCounts.done의 근거 */
+  completed: Card[];
   ranking: EupScore[];
+  /** 선택된 카드 기준 판독 문장 — 허브에서는 이 한 줄이 차트를 대신한다 */
+  regionInsight: string;
+  /** 원 정량 Score 상위 3곳 한 줄 요약 (절대 규칙 5의 텍스트 병기) */
+  scoreTopLine: string;
   activeType: CardType | null;
   generateType: CardType;
-  pendingCounts: PendingCounts;
-  guidedCardId?: string;
+  statusCounts: StatusCounts;
+  /** 3층(결정 이력·실행 현황) — sticky 상태 바의 부모 박스를 페이지 전체로 넓히기 위해 여기서 받는다 */
+  children?: React.ReactNode;
 }) {
   const totalUses = (dashboard.region_share ?? []).reduce((sum, row) => sum + row.count, 0);
-  const largestUsage = [...(dashboard.region_share ?? [])].sort((a, b) => b.count - a.count)[0];
-  const targetRank = hero?.target ? ranking.find((row) => row.eup === hero.target?.eup) : undefined;
-  const targetShare = hero?.target
-    ? dashboard.region_share.find((row) => row.region === hero.target?.eup)
-    : undefined;
   const freshness = dataFreshness(dashboard.period_note);
   const quality = sampleQuality(kpi.counts.decided);
-  const qualityLabel = quality === "demo" ? "데모 표본" : quality === "limited" ? "표본 보강 필요" : "운영 표본";
+  const qualityLabel = quality === "demo" ? "예시 데이터" : quality === "limited" ? "표본 보강 필요" : "운영 표본";
+  const filterNote =
+    activeType === "EXPANSION"
+      ? "가맹점 확충 카드만 보고 있습니다."
+      : activeType === "INCENTIVE"
+        ? "페이백 인센티브 카드만 보고 있습니다."
+        : "확충·인센티브 카드 모두.";
+
+  /** 줄을 눌렀을 때 갈아 끼울 쿼리 — 종류 필터가 걸려 있으면 함께 보존한다 */
+  const hrefFor = (cardId: string) => {
+    const params = new URLSearchParams();
+    if (activeType) params.set("type", activeType);
+    params.set("selected", cardId);
+    return `/?${params.toString()}`;
+  };
+
+  const isLead = selected?.id === heroId;
+  const isExpansion = selected?.type === "EXPANSION";
 
   return (
-    <section aria-labelledby="dashboard-title" className="flex flex-col gap-5">
-      <header className="relative overflow-hidden rounded-hero bg-admin-sidebar px-5 py-5 text-white shadow-hero sm:px-7 sm:py-6 xl:px-8">
-        <div aria-hidden className="absolute -right-20 -top-32 h-96 w-96 rounded-full bg-[#f2a86f]/20 blur-3xl" />
-        <div aria-hidden className="absolute bottom-0 right-8 hidden h-40 w-64 rounded-t-full border border-white/10 bg-white/[0.035] lg:block" />
-        <div className="relative flex flex-col gap-5 xl:flex-row xl:items-center xl:justify-between">
+    <section aria-labelledby="dashboard-title" className="flex flex-col gap-6">
+      {/* ── 문서 머리말 — 관보식 상단 괘선 + 발행 정보 ── */}
+      <header className="border-t-2 border-lavender-950">
+        <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1.5 border-b border-admin-border py-3">
+          <p className="flex flex-wrap items-baseline gap-x-2.5 gap-y-0.5 text-xs font-bold text-admin-text">
+            상생 나침반
+            <span className="font-semibold text-admin-text-muted">분기 지역상생 의사결정 브리프</span>
+          </p>
+          <p className="flex flex-wrap items-center gap-2 text-xs font-semibold text-admin-text-muted">
+            <span className="tabular-nums">기준 {dashboard.period_note}</span>
+            <span className="rounded-full border border-lavender-200 bg-lavender-50 px-2.5 py-0.5 font-bold text-lavender-700">
+              {isMockMode ? "데모 운영" : "실시간 운영"}
+            </span>
+          </p>
+        </div>
+
+        <div className="flex flex-col gap-5 pt-6 xl:flex-row xl:items-end xl:justify-between">
           <div className="max-w-3xl">
-            <div className="flex flex-wrap items-center gap-2">
-              <span className="rounded-full bg-[#f2a86f] px-3 py-1 text-[10px] font-extrabold tracking-[0.16em] text-admin-sidebar-deep">
-                POLICY COMPASS
-              </span>
-              <span className="rounded-full border border-white/15 bg-white/[0.07] px-3 py-1 text-[10px] font-semibold text-white/70">
-                {isMockMode ? "데모 운영" : "실시간 운영"}
-              </span>
-            </div>
-            <h1 id="dashboard-title" className="mt-3 break-keep text-[27px] font-bold leading-tight tracking-[-0.04em] sm:text-[34px] xl:text-[38px]">
-              근거를 확인하고, 오늘의 결정을 이어가세요.
+            {/* 인사 줄과 본문 줄은 크기·굵기·색이 같은 한 덩어리의 제목이라 h1 안에 함께 둔다 */}
+            <h1
+              id="dashboard-title"
+              className="break-keep text-[27px] font-bold leading-[1.25] tracking-[-0.035em] text-lavender-950 sm:text-[32px] xl:text-[36px]"
+            >
+              <span className="block">{operatorGreeting}</span>
+              오늘 결정할 사안을 확인합니다
             </h1>
-            <p className="mt-2 max-w-2xl break-keep text-sm leading-6 text-white/70 sm:text-[15px]">
-              AI 제안은 결론이 아닙니다. 정량 순위·지도·예상 효과를 상세에서 확인한 뒤 결정하고 실행으로 넘깁니다.
+            <p className="mt-2.5 max-w-2xl break-keep text-sm leading-7 text-admin-text-soft sm:text-[15px]">
+              AI 제안은 결론이 아닙니다. 근거와 예상 효과를 상세에서 확인한 뒤 결정하고 실행으로 넘깁니다.
             </p>
           </div>
 
-          <div className="flex flex-col items-start gap-3 sm:flex-row sm:items-center xl:flex-col xl:items-end">
-            <CardTypeTabs active={activeType} pendingCounts={pendingCounts} />
+          <div className="flex flex-col items-start gap-3 xl:shrink-0 xl:items-end">
             <GenerateCardButton
               type={generateType}
               label={generateType === "INCENTIVE" ? "실시간 인센티브 제안 생성" : "실시간 확충 제안 생성"}
             />
-            <p className="text-[11px] text-white/60">대표 사례와 별도로 현재 데이터에서 새 제안을 만듭니다.</p>
+            <p className="text-xs text-admin-text-muted">대표 사례와 별도로 현재 데이터에서 새 제안을 만듭니다.</p>
           </div>
         </div>
       </header>
 
-      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4" aria-label="핵심 KPI">
-        <KpiCell
-          icon="trend"
-          label="지역 전환 신호"
-          value={`${dashboard.conversion.headline_rate.toFixed(1)}%`}
-          delta={
-            <DeltaValue
-              value={dashboard.growth?.qoq_pp}
-              unit="%p"
-              note="전분기 대비"
-            />
-          }
-          note="지역 사용 건수 ÷ 입장 연인원"
-          badge={dashboard.conversion.is_proxy ? <ProxyBadge note={dashboard.conversion.proxy_note} /> : null}
-        />
-        <KpiCell
-          icon="target"
-          label="소비 집중도"
-          value={`${num(dashboard.concentration.index)}`}
-          unit="/ 100"
-          delta={`${dashboard.concentration.grade} · ${largestUsage?.region ?? "지역 없음"}`}
-          note={largestUsage ? `최대 비중 ${Math.round(largestUsage.share * 100)}%` : "비교 데이터 없음"}
-        />
-        <KpiCell
-          icon="receipt"
-          label="지역 사용"
-          value={num(totalUses)}
-          unit="건"
-          delta={
-            <DeltaValue
-              value={dashboard.growth?.mom_pct}
-              unit="%"
-              note="전월 대비"
-            />
-          }
-          note="공개 최신 기간 누적"
-        />
-        <KpiCell
-          icon="check"
-          label="정책 채택률"
-          value={ratioPct(kpi.adoption_rate)}
-          delta={`승인 ${kpi.counts.approved} / 결정 ${kpi.counts.decided}`}
-          note={`실행 전환 ${ratioPct(kpi.execution_rate)}`}
-        />
-      </div>
+      {/* ── 1층 — 얇은 sticky 상태 바 + 접이식 분기 진단 ── */}
+      <StatusBar
+        waiting={statusCounts.waiting}
+        running={statusCounts.running}
+        done={statusCounts.done}
+        held={statusCounts.held}
+        rejected={statusCounts.rejected}
+        diagnostics={<QuarterDiagnostics dashboard={dashboard} kpi={kpi} totalUses={totalUses} />}
+      />
 
-      <div className="grid grid-cols-1 gap-4 xl:grid-cols-12">
-        <article className="relative overflow-hidden rounded-hero border border-admin-primary-line bg-admin-primary-soft p-5 shadow-float sm:p-7 xl:col-span-8">
-          <div aria-hidden className="absolute -bottom-24 -right-16 h-72 w-72 rounded-full border-[44px] border-white/30" />
-          {hero ? (
-            <div className="relative">
-              <div className="flex flex-wrap items-center justify-between gap-3">
-                <div className="flex flex-wrap items-center gap-2">
-                <span className="rounded-full bg-admin-primary px-3 py-1 text-[10px] font-bold tracking-[0.12em] text-white">오늘 검토 1순위</span>
-                  <WorkflowChip card={hero} />
-                </div>
-                <span className="text-xs font-semibold tabular-nums text-admin-text-muted">{hero.id}</span>
-              </div>
+      {/* ── 2층 — 좌 60% 미리보기 / 우 40% 작업 목록 ── */}
+      {/* #proposal — PolicyFlow의 "제안 검토" 스텝이 돌아오는 앵커 */}
+      <div id="proposal" className="scroll-mt-24">
+        <Act no="01" phase="결정" question="오늘 무엇을 처리하는가" title="최우선 제안과 대기 목록">
+          <div className="grid grid-cols-1 gap-4 lg:grid-cols-5">
+            {/* self-start — 우측 목록이 3블록으로 길어져도 이 카드가 늘어나 빈 면이 생기지 않게 한다 */}
+            <article
+              aria-live="polite"
+              className="relative min-w-0 overflow-hidden rounded-panel bg-admin-surface shadow-lift lg:col-span-3 lg:self-start"
+            >
+              {selected ? (
+                <div className="p-5 sm:p-7">
+                  <ProposalSummary
+                    card={selected}
+                    ranking={ranking}
+                    dashboard={dashboard}
+                    leadBadge={
+                      isLead ? (
+                        <span className="rounded-md bg-admin-primary px-2.5 py-1 text-xs font-bold text-white">
+                          오늘 검토 1순위
+                        </span>
+                      ) : (
+                        <span className="rounded-md border border-lavender-200 bg-lavender-50 px-2.5 py-1 text-xs font-bold text-lavender-700">
+                          선택한 제안
+                        </span>
+                      )
+                    }
+                  />
 
-              <p className="mt-6 text-xs font-bold text-admin-primary">{hero.type === "EXPANSION" ? "가맹점 확충 제안" : "인센티브 정책 제안"}</p>
-              <h2 className="mt-2 max-w-3xl break-keep text-[26px] font-bold leading-[1.28] tracking-[-0.035em] text-admin-text sm:text-[34px]">
-                {hero.title}
-              </h2>
-              <p className="mt-3 max-w-3xl break-keep text-sm leading-7 text-admin-text-soft">
-                {hero.ai.comparison}
-              </p>
+                  {/* 근거 미리보기 — 지역·업종 판독은 대상 지점이 있는 확충 카드에만 뜻이 있다.
+                      인센티브는 위 시나리오 요약이 그 역할을 한다 */}
+                  {isExpansion ? (
+                    <div className="mt-5 border-t border-lavender-100 pt-4">
+                      <p className="text-xs font-bold text-admin-text-muted">근거 미리보기 · 차트와 지도는 상세에서</p>
+                      <ul className="mt-2 space-y-1.5">
+                        <li className="flex items-start gap-2 break-keep text-[13px] leading-6 text-admin-text-soft">
+                          <Icon name="bolt" size={14} strokeWidth={2} className="mt-1 shrink-0 text-admin-primary" />
+                          <span>{regionInsight}</span>
+                        </li>
+                        <li className="flex items-start gap-2 break-keep text-[13px] leading-6 text-admin-text-soft">
+                          <Icon name="scatter" size={14} strokeWidth={2} className="mt-1 shrink-0 text-admin-primary" />
+                          <span>
+                            원 Score 상위:{" "}
+                            <span className="font-semibold tabular-nums text-admin-text">
+                              {scoreTopLine || "산출 전"}
+                            </span>
+                          </span>
+                        </li>
+                      </ul>
+                    </div>
+                  ) : null}
 
-              <div className="mt-6 grid grid-cols-1 gap-2 sm:grid-cols-3">
-                <MiniFact label="지역 근거" value={targetRank ? `${targetRank.eup} 진단 ${targetRank.rank}위` : "6개 지역 공통"} />
-                <MiniFact label="현재 비중" value={targetShare ? `${Math.round(targetShare.share * 100)}% · ${num(targetShare.count)}건` : "정량 비교 필요"} />
-                <MiniFact
-                  label="추천 순위 안정도"
-                  value={
-                    (dashboard.ranking_stability ?? dashboard.ai_stability) === null ||
-                    (dashboard.ranking_stability ?? dashboard.ai_stability) === undefined
-                      ? "산출 전"
-                      : `${dashboard.ranking_stability ?? dashboard.ai_stability}%`
-                  }
-                />
-              </div>
-
-              <div className="mt-6 grid gap-5 border-t border-admin-primary-line pt-5 lg:grid-cols-2">
-                <DecisionList title="판단 근거" icon="check" items={hero.ai.reasons.slice(0, 2)} />
-                <DecisionList title="확인할 리스크" icon="warn" items={hero.ai.risks.slice(0, 2)} />
-              </div>
-
-              <div className="mt-6 flex flex-wrap items-center justify-between gap-4 rounded-2xl bg-admin-surface/80 p-4 ring-1 ring-inset ring-admin-primary-line">
-                <div className="min-w-0 flex-1 basis-80">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <p className="text-xs font-bold text-admin-text-muted">상세에서 확인할 내용</p>
-                    <AssumptionBadge />
+                  <div className="mt-6 flex flex-wrap items-center justify-between gap-4 border-t border-lavender-100 pt-5">
+                    <div className="min-w-0 flex-1 basis-64">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <p className="text-xs font-bold text-admin-text-muted">상세에서 확인할 내용</p>
+                        <AssumptionBadge />
+                      </div>
+                      <p className="mt-1 break-keep text-sm font-semibold leading-6 text-admin-text">
+                        {isExpansion
+                          ? "근거 차트 → 원 Score 순위 → 전망 시나리오 → 담당자 결정"
+                          : "근거 차트 → 3·5·7% 시나리오 비교 → 담당자 결정"}
+                      </p>
+                    </div>
+                    {/* 상세로 가는 유일한 경로 */}
+                    <Link
+                      href={`/proposals/${selected.id}`}
+                      className="inline-flex min-h-11 items-center gap-2 rounded-xl bg-admin-primary px-5 py-2.5 text-sm font-bold text-white transition-colors hover:bg-admin-primary-strong"
+                    >
+                      근거·전망 검토하기
+                      <Icon name="arrowRight" size={15} />
+                    </Link>
                   </div>
-                  <p className="mt-1 break-keep text-sm font-semibold leading-6 text-admin-text">
-                    원 Score 순위 → 반경 500m 지도 → 전환 시뮬레이션 → 담당자 결정
+                </div>
+              ) : (
+                <div className="flex min-h-[340px] flex-col items-center justify-center p-6 text-center">
+                  <span className="flex h-14 w-14 items-center justify-center rounded-2xl bg-admin-primary text-white">
+                    <Icon name="sparkle" size={24} />
+                  </span>
+                  <h2 className="mt-5 text-2xl font-bold tracking-[-0.02em] text-lavender-950">
+                    결정 대기 제안이 없습니다
+                  </h2>
+                  <p className="mt-2 max-w-md text-sm leading-6 text-admin-text-muted">
+                    새 제안을 만들면 근거, 리스크, 예상 변화가 한 장에 정리됩니다.
                   </p>
                 </div>
-                {hero.type === "INCENTIVE" ? (
-                  <Link href="/incentive" className="inline-flex min-h-11 items-center gap-2 rounded-xl bg-admin-primary px-5 py-2.5 text-sm font-bold text-white hover:bg-admin-primary-strong">
-                    옵션 비교하기 <Icon name="arrowRight" size={15} />
-                  </Link>
-                ) : (
-                  <Link href={`/cards/${hero.id}#diagnosis`} className="inline-flex min-h-11 items-center gap-2 rounded-xl bg-admin-primary px-5 py-2.5 text-sm font-bold text-white hover:bg-admin-primary-strong">
-                    근거·지도 검토하기 <Icon name="arrowRight" size={15} />
-                  </Link>
-                )}
-              </div>
-            </div>
-          ) : (
-            <div className="relative flex min-h-[420px] flex-col items-center justify-center text-center">
-              <span className="flex h-14 w-14 items-center justify-center rounded-2xl bg-admin-primary text-white"><Icon name="sparkle" size={24} /></span>
-              <h2 className="mt-5 text-2xl font-bold text-admin-text">결정 대기 제안이 없습니다</h2>
-              <p className="mt-2 max-w-md text-sm leading-6 text-admin-text-muted">새 제안을 만들면 근거, 리스크, 예상 변화가 한 장에 정리됩니다.</p>
-            </div>
-          )}
-        </article>
+              )}
+            </article>
 
-        <aside id="decision-panel" className="flex flex-col gap-4 xl:col-span-4" aria-label="오늘의 업무와 데이터 상태">
-          <section className="rounded-panel border border-admin-border bg-admin-surface p-5 shadow-card sm:p-6">
-            <div className="flex items-center justify-between gap-3">
-              <div>
-                <p className="text-[10px] font-bold tracking-[0.14em] text-admin-primary">TODAY&apos;S QUEUE</p>
-                <h2 className="mt-1 text-lg font-bold text-admin-text">오늘 이어갈 업무</h2>
-              </div>
-              <span className="rounded-full bg-[#fff0e6] px-2.5 py-1 text-[10px] font-bold text-state-warn">{qualityLabel}</span>
-            </div>
-            <div className="mt-5 space-y-2.5">
-              <TaskLink href={hero ? `/cards/${hero.id}${hero.type === "EXPANSION" ? "#diagnosis" : "#evidence"}` : "/"} icon="check" label={`결정 대기 ${pendingCounts.all}건`} note="진단·근거·지도·시뮬레이션 검토" />
-              <TaskLink href="/tracking" icon="workflow" label={`실행 관리 ${kpi.counts.approved}건`} note="적격성·심사·추진 상태 기록" />
-              <TaskLink href="/widget" icon="phone" label="방문객 반영 확인" note="완료된 정책만 추천·혜택에 노출" />
-            </div>
-            {guidedCardId ? (
-              <Link href={`/cards/${guidedCardId}#diagnosis`} className="mt-4 flex items-center justify-between rounded-xl border border-admin-primary-line bg-admin-primary-soft px-3.5 py-3 text-xs font-bold text-admin-primary hover:bg-white">
-                <span>
-                  <span className="block text-[10px] font-semibold text-admin-text-muted">대표 업무 흐름</span>
-                  조정 사례 {guidedCardId} 검토하기
-                </span>
-                <Icon name="arrowRight" size={15} />
-              </Link>
-            ) : null}
-          </section>
+            {/* 우측 작업 목록 — 결정 → 실행 → 완료. 각 블록의 줄 수 = 상단 띠의 같은 이름 숫자 */}
+            <div className="flex min-w-0 flex-col gap-4 lg:col-span-2">
+              <WorkQueue
+                id="decision-queue"
+                title="결정 대기"
+                cards={queue}
+                leadId={heroId}
+                selectedId={selected?.id}
+                hrefFor={hrefFor}
+                /* 이 목록만 왼쪽 세로 강조 바를 끈다 — 연보라 배경과 우측 체크로 선택이 충분히 읽힌다.
+                   실행 관리·완료 목록은 기본값(바 있음)을 그대로 쓴다 */
+                accentBar={false}
+                badge={
+                  <span className="rounded-full bg-state-warn-bg px-2.5 py-1 text-xs font-bold text-state-warn">
+                    {qualityLabel}
+                  </span>
+                }
+                /* 종류 필터를 최상단에서 걷어냈으므로, `?type=` 딥링크로 들어온 담당자가
+                   필터에 갇히지 않도록 해제 경로를 대기 목록 헤더에 둔다 */
+                action={
+                  activeType ? (
+                    <Link
+                      href="/"
+                      className="inline-flex items-center gap-1 rounded-lg px-2 py-1 text-[13px] font-semibold text-admin-primary transition-colors hover:bg-admin-primary-soft"
+                    >
+                      <Icon name="cards" size={14} strokeWidth={2} />
+                      전체 카드 보기
+                    </Link>
+                  ) : undefined
+                }
+                desc={`${filterNote} 줄을 누르면 왼쪽에서 미리볼 수 있습니다.`}
+                empty={{
+                  title: "결정 대기 카드가 없습니다",
+                  body: "위에서 새 제안을 생성하면 이 블록에 쌓입니다.",
+                }}
+              />
 
-          <section className="rounded-panel border border-admin-border bg-admin-surface p-5 shadow-card sm:p-6">
-            <div className="flex items-center gap-3">
-              <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-admin-primary-soft text-admin-primary"><Icon name="database" size={18} /></span>
-              <div>
-                <p className="text-[10px] font-bold tracking-[0.14em] text-admin-primary">SOURCE STATUS</p>
-                <h2 className="text-base font-bold text-admin-text">데이터 원천</h2>
-              </div>
+              <WorkQueue
+                id="work-queue"
+                title="실행 관리"
+                cards={inProgress}
+                selectedId={selected?.id}
+                hrefFor={hrefFor}
+                action={<PanelLink href="/tracking">추진 상태 기록</PanelLink>}
+                desc="승인 후 완료 전 카드입니다. 줄을 누르면 왼쪽에서 미리볼 수 있습니다."
+                empty={{
+                  title: "실행 중인 카드가 없습니다",
+                  body: "결정 대기 카드를 승인하면 여기로 넘어옵니다.",
+                }}
+              />
+
+              <WorkQueue
+                id="done-queue"
+                title="이번 분기 완료"
+                cards={completed}
+                selectedId={selected?.id}
+                hrefFor={hrefFor}
+                action={<PanelLink href="/widget">방문객 화면에서 확인</PanelLink>}
+                desc="완료된 정책만 방문객 추천·혜택 화면에 노출됩니다."
+                empty={{
+                  title: "아직 완료된 정책이 없습니다",
+                  body: (
+                    <>
+                      방문객 화면에는 거리순 추천만 노출됩니다.{" "}
+                      <Link href="/widget" className="font-semibold text-admin-primary hover:underline">
+                        지금 상태 확인하기 →
+                      </Link>
+                    </>
+                  ),
+                }}
+              />
+
+              <section className="rounded-card bg-admin-surface shadow-card">
+                <div className="flex items-center gap-2 border-b border-admin-border px-5 py-4">
+                  <Icon name="database" size={16} className="text-admin-primary" />
+                  <h2 className="text-[15px] font-bold text-admin-text">데이터 원천</h2>
+                </div>
+                <div className="divide-y divide-admin-border px-5">
+                  <SourceRow
+                    label="하이원포인트 사용"
+                    value={freshness.label}
+                    href="https://www.data.go.kr/data/15106402/fileData.do"
+                  />
+                  <SourceRow
+                    label="하이원포인트 가맹점"
+                    value="실시간 API 갱신"
+                    href="https://www.data.go.kr/data/15133571/openapi.do"
+                  />
+                  <SourceRow label="상권 후보 원천" value="기준월 · 2026.06" />
+                </div>
+                {/* 산출 시각·지역 소비 분석 링크는 상단 진단 블록이 이미 싣는다 — 여기서 반복하지 않는다 */}
+              </section>
             </div>
-            <div className="mt-4 divide-y divide-admin-border border-y border-admin-border">
-              <SourceRow label="하이원포인트 사용" value={freshness.label} href="https://www.data.go.kr/data/15106402/fileData.do" />
-              <SourceRow label="하이원포인트 가맹점" value="실시간 API 갱신" href="https://www.data.go.kr/data/15133571/openapi.do" />
-              <SourceRow label="상권 후보 원천" value="기준월 · 2026.06" />
-            </div>
-            <p className="mt-3 text-[11px] leading-5 text-admin-text-muted">산출 {dashboard.updated_at} · 상세 출처와 원본 후보는 지역 소비 분석에서 확인합니다.</p>
-          </section>
-        </aside>
+          </div>
+        </Act>
       </div>
 
-      {hero ? (
-        <Link href={`/cards/${hero.id}${hero.type === "EXPANSION" ? "#diagnosis" : "#evidence"}`} className="fixed inset-x-3 bottom-3 z-40 flex min-h-12 items-center justify-between rounded-2xl bg-admin-sidebar px-4 text-sm font-bold text-white shadow-hero md:hidden">
-          <span className="text-white/60">다음 단계</span>
-          <span>근거·지도 검토하기 →</span>
+      {/* ── 3층 — 결정 이력·실행 현황 (page.tsx가 넘긴다) ── */}
+      {children}
+
+      {selected ? (
+        <Link
+          href={`/proposals/${selected.id}`}
+          className="fixed inset-x-3 bottom-3 z-40 flex min-h-12 items-center justify-between rounded-2xl bg-admin-primary px-4 text-sm font-bold text-white shadow-hero md:hidden"
+        >
+          <span className="text-white/70">다음 단계</span>
+          <span>근거·전망 검토하기 →</span>
         </Link>
       ) : null}
     </section>
   );
 }
 
-function KpiCell({
-  icon,
-  label,
-  value,
-  unit,
-  delta,
-  note,
-  badge,
-}: {
-  icon: IconName;
-  label: string;
-  value: string;
-  unit?: string;
-  delta: React.ReactNode;
-  note: string;
-  badge?: React.ReactNode;
-}) {
-  return (
-    <article className="min-w-0 rounded-panel border border-admin-border bg-admin-surface p-4 shadow-card sm:p-5">
-      <div className="flex min-h-8 items-start justify-between gap-2">
-        <p className="text-xs font-semibold text-admin-text-muted">{label}</p>
-        <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-admin-primary-soft text-admin-primary"><Icon name={icon} size={15} /></span>
-      </div>
-      <div className="mt-4 flex min-w-0 items-baseline gap-1.5">
-        <p className="truncate text-[28px] font-bold leading-none tracking-[-0.04em] tabular-nums text-admin-text sm:text-[32px]">{value}</p>
-        {unit ? <span className="text-xs font-bold text-admin-text-muted">{unit}</span> : null}
-      </div>
-      <p className="mt-4 text-xs font-bold text-admin-text">{delta}</p>
-      <div className="mt-1 flex min-h-5 flex-wrap items-center gap-1.5 text-[11px] leading-5 text-admin-text-muted">
-        <span>{note}</span>{badge}
-      </div>
-    </article>
-  );
-}
-
-function MiniFact({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="rounded-2xl bg-admin-surface/75 px-4 py-3 ring-1 ring-inset ring-admin-primary-line">
-      <p className="text-[10px] font-bold tracking-wide text-admin-text-muted">{label}</p>
-      <p className="mt-1 text-sm font-bold text-admin-text">{value}</p>
-    </div>
-  );
-}
-
-function DecisionList({ title, icon, items }: { title: string; icon: "check" | "warn"; items: string[] }) {
-  return (
-    <section>
-      <h3 className="flex items-center gap-2 text-xs font-bold text-admin-text"><Icon name={icon} size={15} />{title}</h3>
-      <ul className="mt-3 space-y-2">
-        {items.map((item, index) => <li key={`${title}-${index}`} className="line-clamp-2 break-keep text-[13px] leading-6 text-admin-text-soft">{item}</li>)}
-      </ul>
-    </section>
-  );
-}
-
-function TaskLink({ href, icon, label, note }: { href: string; icon: IconName; label: string; note: string }) {
-  return (
-    <Link href={href} className="group flex items-center gap-3 rounded-xl bg-admin-surface-sunken/70 px-3 py-3 hover:bg-admin-primary-soft">
-      <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-admin-surface text-admin-primary ring-1 ring-inset ring-admin-border group-hover:border-admin-primary-line">
-        <Icon name={icon} size={15} />
-      </span>
-      <span className="min-w-0 flex-1"><span className="block text-[13px] font-bold text-admin-text">{label}</span><span className="mt-0.5 block text-[11px] leading-4 text-admin-text-muted">{note}</span></span>
-      <Icon name="chevronRight" size={14} className="text-admin-text-muted group-hover:text-admin-primary" />
-    </Link>
-  );
-}
-
 function SourceRow({ label, value, href }: { label: string; value: string; href?: string }) {
-  const body = <><span className="text-xs text-admin-text-muted">{label}</span><span className="ml-auto text-right text-xs font-bold text-admin-text">{value}</span>{href ? <Icon name="arrowUpRight" size={13} className="text-admin-primary" /> : null}</>;
+  const body = (
+    <>
+      <span className="text-xs text-admin-text-muted">{label}</span>
+      <span className="ml-auto text-right text-xs font-bold text-admin-text">{value}</span>
+      {href ? <Icon name="arrowUpRight" size={13} className="text-admin-primary" /> : null}
+    </>
+  );
   return href ? (
-    <a href={href} target="_blank" rel="noreferrer" className="flex min-h-11 items-center gap-2 py-2 hover:text-admin-primary">{body}</a>
+    <a
+      href={href}
+      target="_blank"
+      rel="noreferrer"
+      className="flex min-h-11 items-center gap-2 py-2 hover:text-admin-primary"
+    >
+      {body}
+    </a>
   ) : (
     <div className="flex min-h-11 items-center gap-2 py-2">{body}</div>
   );

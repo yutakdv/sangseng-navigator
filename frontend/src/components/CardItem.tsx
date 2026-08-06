@@ -25,7 +25,7 @@ export function CardItem({ card, children }: { card: Card; children?: ReactNode 
   const nextAction = getNextAction(card);
 
   return (
-    <article className="u-panel transition-shadow hover:shadow-card-hover">
+    <article className="u-panel relative transition-shadow hover:shadow-card-hover">
       <div className="flex flex-col gap-3 p-4 sm:p-5">
         <div className="flex min-w-0 items-start gap-3">
           {/* 종류 아이콘 — 공급 측(확충)/수요 측(인센티브)을 한 눈에 가른다. 의미는 아래 라벨이 진다 */}
@@ -50,8 +50,11 @@ export function CardItem({ card, children }: { card: Card; children?: ReactNode 
               <WorkflowChip card={card} />
             </div>
 
+            {/* 카드 면 전체 클릭 → 상세 (stretched link). 버튼·토글은 relative z-10으로 위에 둔다 */}
             <h3 className="mt-1.5 break-keep text-base font-bold leading-6 text-admin-text">
-              {card.title}
+              <Link href={`/proposals/${card.id}`} className="after:absolute after:inset-0 after:content-['']">
+                {card.title}
+              </Link>
             </h3>
 
             <dl className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1.5 text-[13px]">
@@ -88,7 +91,11 @@ export function CardItem({ card, children }: { card: Card; children?: ReactNode 
           <span className="text-[11px] font-medium text-current/70">{nextAction.detail}</span>
         </div>
 
-        {showRank ? <RankTrace card={card} /> : null}
+        {showRank ? (
+          <div className="relative z-10">
+            <RankTrace card={card} />
+          </div>
+        ) : null}
 
         {card.ai.comparison ? (
           <div className="rounded-xl bg-admin-surface-sunken p-3">
@@ -111,12 +118,12 @@ export function CardItem({ card, children }: { card: Card; children?: ReactNode 
         ) : null}
       </div>
 
-      <div className="flex flex-wrap items-center gap-x-3 gap-y-2 border-t border-admin-border px-4 py-3 sm:items-center sm:px-5">
+      <div className="relative z-10 flex flex-wrap items-center gap-x-3 gap-y-2 border-t border-admin-border px-4 py-3 sm:items-center sm:px-5">
         <Link
-          href={`/cards/${card.id}`}
+          href={`/proposals/${card.id}`}
           className="inline-flex items-center gap-1 text-[13px] font-semibold text-admin-primary underline-offset-4 hover:underline"
         >
-          제안 근거 전문 보기
+          상세에서 보기
           <Icon name="arrowRight" size={14} strokeWidth={2} />
         </Link>
         {children ? <div className="w-full sm:ml-auto sm:w-auto">{children}</div> : null}

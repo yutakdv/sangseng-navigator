@@ -84,7 +84,7 @@ export function GenerateCardButton({
         onClick={run}
         disabled={working || isDemoReadOnly}
         aria-busy={working}
-        className="inline-flex min-h-10 items-center gap-2 rounded-lg bg-admin-primary px-4 py-2 text-sm font-bold text-white transition-colors hover:bg-admin-primary-strong disabled:cursor-not-allowed disabled:opacity-70"
+        className="inline-flex min-h-10 items-center gap-2 rounded-lg bg-admin-primary px-4 py-2 text-sm font-bold text-white transition-colors hover:bg-admin-primary-strong disabled:cursor-not-allowed disabled:opacity-60"
       >
         {working ? (
           <>
