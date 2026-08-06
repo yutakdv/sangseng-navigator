@@ -71,7 +71,7 @@ export function MockOutcomeReport({ card, dashboard }: { card: Card; dashboard: 
         <div>
           <div className="flex flex-wrap items-center gap-2">
             <h2 id={`mock-report-${card.id}`} className="text-base font-bold text-admin-text">정책 성과 리포트</h2>
-            <span className="rounded-full bg-[#fff0e6] px-2.5 py-1 text-[10px] font-bold text-state-warn ring-1 ring-inset ring-state-warn-line">
+            <span className="rounded-full bg-state-warn-bg px-2.5 py-1 text-[10px] font-bold text-state-warn ring-1 ring-inset ring-state-warn-line">
               목 데이터 · 실제 성과 아님
             </span>
           </div>
@@ -110,7 +110,7 @@ function OutcomeMetric({ metric }: { metric: Metric }) {
       : "bg-admin-surface-sunken text-admin-text-muted ring-admin-border";
 
   return (
-    <article className="rounded-card border border-admin-border bg-admin-surface p-4">
+    <article className="rounded-card bg-admin-surface p-4 shadow-card">
       <div className="flex items-start justify-between gap-3">
         <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-admin-primary-soft text-admin-primary">
           <Icon name={metric.icon} size={17} />

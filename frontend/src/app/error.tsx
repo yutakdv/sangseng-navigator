@@ -32,7 +32,7 @@ export default function Error({
 
   return (
     <main className="flex min-h-screen items-center justify-center bg-admin-bg px-5 py-10">
-      <div className="w-full max-w-lg rounded-card border border-admin-border bg-admin-surface p-6 shadow-card sm:p-7">
+      <div className="w-full max-w-lg rounded-card bg-admin-surface p-6 shadow-card sm:p-7">
         <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-state-warn-bg text-state-warn ring-1 ring-inset ring-state-warn-line">
           <svg
             width="22"
