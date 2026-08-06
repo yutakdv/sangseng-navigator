@@ -66,7 +66,7 @@ export function RegionTileMap({
     <div className="min-w-0">
       <div
         aria-label="지역별 소비 진단 3D 맵"
-        className="relative overflow-hidden rounded-[26px] bg-[radial-gradient(circle_at_52%_34%,#ffffff_0%,#edf1ff_47%,#dce9f5_100%)] p-3.5 ring-1 ring-inset ring-white/80 sm:p-4"
+        className="relative overflow-hidden rounded-[26px] bg-admin-surface-sunken p-3.5 ring-1 ring-inset ring-white/80 sm:p-4"
       >
         {target ? (
           <span className="absolute right-3 top-3 z-10 inline-flex items-center gap-1.5 rounded-full bg-admin-primary px-2.5 py-1 text-[11px] font-bold text-white shadow-[0_5px_14px_-6px_rgb(67_56_202)] sm:right-4 sm:top-4">
@@ -134,7 +134,7 @@ export function RegionTileMap({
                 <polygon
                   points={piece.points}
                   fill={scoreColor(t, isTarget)}
-                  stroke={isTarget ? "#312e81" : "rgba(255,255,255,.92)"}
+                  stroke={isTarget ? "#443597" : "rgba(255,255,255,.92)"}
                   strokeWidth={isTarget ? 3 : 2}
                   strokeLinejoin="round"
                 />
@@ -142,7 +142,7 @@ export function RegionTileMap({
                   <polygon
                     points={piece.points}
                     fill="none"
-                    stroke="#4f46e5"
+                    stroke="#8B7BF0"
                     strokeDasharray="5 5"
                     strokeWidth="2"
                     strokeLinejoin="round"

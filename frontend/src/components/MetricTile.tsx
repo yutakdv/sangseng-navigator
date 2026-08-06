@@ -81,7 +81,7 @@ export function MetricTile({
         style={{ animationDelay: `${delay}ms` }}
         className={`group animate-rise relative min-w-0 overflow-hidden rounded-2xl px-4 py-3.5 shadow-card ring-1 ring-inset transition-shadow hover:shadow-card-hover sm:px-4.5 ${
           accent
-            ? "bg-gradient-to-br from-admin-primary-soft via-admin-surface to-admin-surface ring-admin-primary-line"
+            ? "bg-admin-primary-soft ring-admin-primary-line"
             : "bg-admin-surface ring-admin-border"
         }`}
       >
@@ -144,7 +144,7 @@ export function MetricTile({
       style={{ animationDelay: `${delay}ms` }}
       className={`group animate-rise u-float-hover relative flex min-w-0 flex-col overflow-hidden rounded-panel shadow-float ring-1 ring-inset ${
         accent
-          ? "bg-gradient-to-b from-admin-primary-soft via-admin-surface to-admin-surface ring-admin-primary-line"
+          ? "bg-admin-primary-soft ring-admin-primary-line"
           : "bg-admin-surface ring-admin-border/70"
       }`}
     >

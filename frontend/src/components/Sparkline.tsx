@@ -21,7 +21,7 @@ export function Sparkline({
    * ⚠ 한글·공백이 들어가면 `url(#지역 전환율)`이 파싱되지 않아 fill이 검정으로 떨어진다.
    */
   id,
-  color = "#4f46e5",
+  color = "#8B7BF0",
   height = 40,
   /** 면 채움 없이 선만 (밝은 배경 위 보조 표기용) */
   bare = false,

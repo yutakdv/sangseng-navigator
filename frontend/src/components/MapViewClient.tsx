@@ -22,7 +22,7 @@ const STYLE_URL = "https://tiles.openfreemap.org/styles/liberty";
 /** 지도 높이 — `MapView.tsx`의 로딩 자리표시자와 **같이** 바꿔야 레이아웃이 튀지 않는다 (13 §8) */
 const MAP_BOX = "h-[240px] w-full overflow-hidden rounded-lg bg-admin-bg sm:h-[380px]";
 
-const ANCHOR_COLOR = "#171139"; // admin.sidebar — 거점
+const ANCHOR_COLOR = "#1E1840"; // admin.sidebar-deep (lavender-950) — 거점
 const OTHER_CANDIDATE_COLOR = "#9ca3af"; // 같은 읍의 다른 후보
 const FALLBACK_DOT = "#6b7280"; // 표시 6분류에 없는 값이 들어올 때
 /** 이 시간 안에 타일이 안 뜨면 "표로 보라"는 안내를 띄운다 — 심사위원이 고장으로 오인하지 않게 */

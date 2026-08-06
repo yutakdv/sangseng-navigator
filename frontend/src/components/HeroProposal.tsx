@@ -33,12 +33,8 @@ export function HeroProposal({
   return (
     <section
       aria-label="이번 분기 핵심 제안"
-      className="animate-rise relative isolate overflow-hidden rounded-[28px] bg-gradient-to-br from-[#eef0ff] via-[#f8f9ff] to-admin-surface shadow-float ring-1 ring-inset ring-admin-primary-line lg:col-span-8"
+      className="animate-rise relative isolate overflow-hidden rounded-[28px] bg-lavender-50 shadow-float ring-1 ring-inset ring-lavender-100 lg:col-span-8"
     >
-      <div
-        aria-hidden
-        className="pointer-events-none absolute -right-24 -top-32 -z-10 h-96 w-96 rounded-full bg-admin-primary/10 blur-3xl"
-      />
 
       <div className="grid grid-cols-1 gap-6 p-5 sm:p-7 2xl:p-8 lg:grid-cols-12 lg:gap-7">
         <div className="flex min-w-0 flex-col lg:col-span-5">

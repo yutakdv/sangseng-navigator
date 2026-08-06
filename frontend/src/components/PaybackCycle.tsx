@@ -13,8 +13,8 @@ import type { PaybackRate } from "@/types";
  */
 const W = 252; // 노드 박스 크기
 const H = 112;
-const MUTED = "#626b82";
-const TEXT = "#181534";
+const MUTED = "#6E6C7A";
+const TEXT = "#2B2833";
 const LINE = "#94a3b8";
 
 export function PaybackCycle({ rate = null }: { rate?: PaybackRate | null }) {
@@ -142,8 +142,8 @@ function CycleNode({
         width={W}
         height={H}
         rx={14}
-        fill={accent ? "#eef2ff" : "#f4f6fb"}
-        stroke={accent ? PRIMARY : "#e2e7f0"}
+        fill={accent ? "#F6F4FE" : "#F5F4F8"}
+        stroke={accent ? PRIMARY : "#E7E5EE"}
         strokeWidth={accent ? 1.75 : 1.25}
       />
       <text x={x + 18} y={y + 34} fontSize="16" fontWeight="700" fill={accent ? PRIMARY : TEXT}>
