@@ -14,7 +14,13 @@ import { LineTrend } from "@/components/charts/LineTrend";
 import { ScaleCompare } from "@/components/charts/ScaleCompare";
 import { api } from "@/lib/api";
 import { REGIONS, REGION_TOOLTIP } from "@/lib/constants";
-import { dash, monthLabel, num, pct, ratioPct } from "@/lib/format";
+import { dash, monthLabel, num, pct, ratioPct, signed } from "@/lib/format";
+import {
+  regionCategoryShare,
+  regionMonthlyTrend,
+  topCategoryShifts,
+  USAGE_REGION_FOOTNOTE,
+} from "@/lib/regionAnalysis";
 
 export const metadata: Metadata = { title: "지역 소비 분석 · 상생 나침반" };
 
@@ -41,11 +47,12 @@ export default async function DashboardPage({
     : null;
   const demo = sp.demo === "merchant" || sp.demo === "report" || sp.demo === "data" ? sp.demo : null;
 
-  const [d, kpi, cand, risk] = await Promise.all([
+  const [d, kpi, cand, risk, usageLedger] = await Promise.all([
     api.dashboard(),
     api.kpi(),
     api.candidates(),
     api.riskSignal(),
+    api.usageMonthly(),
   ]);
 
   // 음수/0·빈 배열 방어 (F5 검증 항목) — 데이터가 없으면 차트 대신 안내 문구를 낸다
@@ -75,6 +82,17 @@ export default async function DashboardPage({
   const totalUses = (d.region_share ?? []).reduce((a, b) => a + b.count, 0);
   const eupRanking = cand.eup_ranking ?? [];
 
+  // 지역 드릴다운 파생값 — 지역을 선택했을 때만 계산·렌더한다 (원장은 서버에서만 읽는다)
+  const ledgerRows = usageLedger.usage ?? [];
+  const ledgerMonths = usageLedger.months ?? [];
+  const regionDonut = selectedRegion ? regionCategoryShare(ledgerRows, selectedRegion) : [];
+  const regionTrend = selectedRegion ? regionMonthlyTrend(ledgerRows, ledgerMonths, selectedRegion) : [];
+  const regionShifts = selectedRegion ? topCategoryShifts(ledgerRows, ledgerMonths, selectedRegion) : [];
+  const shiftWindow =
+    ledgerMonths.length >= 6
+      ? `${monthLabel(ledgerMonths[ledgerMonths.length - 3])}~${monthLabel(ledgerMonths[ledgerMonths.length - 1])} 합을 ${monthLabel(ledgerMonths[ledgerMonths.length - 6])}~${monthLabel(ledgerMonths[ledgerMonths.length - 4])} 합과 비교`
+      : null;
+
   return (
     <AdminShell dashboard={d}>
       <div className="mx-auto flex max-w-6xl flex-col gap-6">
@@ -95,8 +113,8 @@ export default async function DashboardPage({
           <p className="mt-2 flex items-center gap-1.5 text-xs text-admin-text-muted" aria-live="polite">
             <Icon name="info" size={13} />
             {selectedRegion
-              ? `${selectedRegion}의 지역별 소비 지표를 보고 있습니다. 추이·업종·정책 운영 KPI는 전체 기준입니다.`
-              : "전체 지역을 보고 있습니다. 지역을 고르면 해당 지역의 누적 사용·최근 월·진단 상태를 좁혀 볼 수 있습니다."}
+              ? `${selectedRegion}의 지역별 소비 지표를 보고 있습니다. 아래 상세 분석에 이 지역의 업종 구성·월별 추이·상위 업종이 나옵니다. 정책 운영 KPI는 전체 기준입니다.`
+              : "전체 지역을 보고 있습니다. 지역을 고르면 해당 지역의 업종 구성·월별 추이·상위 업종까지 좁혀 볼 수 있습니다."}
           </p>
         </section>
 
@@ -250,6 +268,88 @@ export default async function DashboardPage({
             )}
           </Section>
         </div>
+
+        {/* ── 지역 드릴다운 (지역 선택 시) ─────────────────────── */}
+        {selectedRegion ? (
+          <>
+            <GroupHeading note="지역×업종×월 원장에서 집계 — 원 업종 분류 기준">
+              {selectedRegion} 상세 분석
+            </GroupHeading>
+            <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+              <Section
+                icon="scatter"
+                title={`${selectedRegion} 업종 구성`}
+                desc="전 기간 누적 사용 건수를 표시 6분류로 집계했다."
+              >
+                {regionDonut.length ? (
+                  <CategoryDonut data={regionDonut} height={240} />
+                ) : (
+                  <EmptyChart />
+                )}
+              </Section>
+              <Section
+                icon="trend"
+                title={`${selectedRegion} 월별 사용 추이`}
+                desc="월별 하이원포인트 사용 건수 합계."
+              >
+                {regionTrend.some((p) => p.value > 0) ? (
+                  <LineTrend data={regionTrend} unit="건" />
+                ) : (
+                  <EmptyChart />
+                )}
+              </Section>
+            </div>
+            <Section
+              icon="report"
+              title={`${selectedRegion} 상위 업종 상세`}
+              desc={`누적 사용 건수 상위 업종을 원 업종 분류 그대로 보여준다.${shiftWindow ? ` 증감은 ${shiftWindow}한 값이다.` : ""}`}
+            >
+              {regionShifts.length ? (
+                <>
+                  <div className="u-scroll-x">
+                    <table className="u-table min-w-[520px]">
+                      <thead>
+                        <tr>
+                          <th scope="col">업종</th>
+                          <th scope="col" className="text-right">누적 사용</th>
+                          <th scope="col" className="text-right">지역 내 비중</th>
+                          <th scope="col" className="text-right">최근 3개월</th>
+                          <th scope="col" className="text-right">직전 대비</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {regionShifts.map((s) => (
+                          <tr key={s.category}>
+                            <td className="font-medium">{s.category}</td>
+                            <td className="text-right tabular-nums">{num(s.count)}건</td>
+                            <td className="text-right tabular-nums text-admin-text-muted">
+                              {Math.round(s.share * 100)}%
+                            </td>
+                            <td className="text-right tabular-nums text-admin-text-muted">
+                              {num(s.recent)}건
+                            </td>
+                            <td className="text-right font-semibold tabular-nums">
+                              {s.changePct === null ? (
+                                <span className="font-normal text-admin-text-muted">비교 불가</span>
+                              ) : (
+                                signed(s.changePct, "%", 0)
+                              )}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                  <p className="u-note mt-3 border-t border-admin-border pt-2.5">
+                    {USAGE_REGION_FOOTNOTE}
+                  </p>
+                </>
+              ) : (
+                <EmptyChart />
+              )}
+            </Section>
+          </>
+        ) : null}
 
         <Section
           icon="map"
