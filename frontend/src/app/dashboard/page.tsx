@@ -119,9 +119,12 @@ export default async function DashboardPage({
 
         {/* ── 진단 지표 ─────────────────────────────────────────── */}
         <GroupHeading note="원천 데이터에서 바로 계산한 값">진단 지표</GroupHeading>
+        {/* alignDivider: 증감 배지가 있는 카드(전환율·사용 건수)와 없는 카드(집중도·분산도)가
+            한 행에 섞여 있어, 구분선을 하단 정렬로 통일한다 — 이 4장에만 적용 */}
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
           <KpiCard
             accent
+            alignDivider
             icon="trend"
             label="지역 전환율"
             badge={d.conversion.is_proxy ? <ProxyBadge note={d.conversion.proxy_note} /> : null}
@@ -134,6 +137,7 @@ export default async function DashboardPage({
             sub="지역 사용 건수 ÷ 입장 연인원(교대 합산) — 비율이 아니라 연인원 1인당 건수"
           />
           <KpiCard
+            alignDivider
             icon="target"
             label="지역 소비 집중도"
             badge={<GradeChip grade={d.concentration.grade} />}
@@ -142,6 +146,7 @@ export default async function DashboardPage({
             sub="값이 높을수록 특정 지역에 소비가 몰려 있음"
           />
           <KpiCard
+            alignDivider
             icon="receipt"
             label="하이원포인트 지역 사용 건수"
             value={num(totalUses)}
@@ -154,6 +159,7 @@ export default async function DashboardPage({
             sub="전 기간 누적 · 전월 대비 일평균 사용 건수"
           />
           <KpiCard
+            alignDivider
             icon="scatter"
             label="업종별 소비 분산도"
             value={num(d.category_dispersion?.index)}
