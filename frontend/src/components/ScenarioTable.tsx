@@ -5,7 +5,7 @@ import { useState } from "react";
 import { AssumptionNote } from "@/components/Badge";
 import { DeltaValue } from "@/components/DeltaValue";
 import { DecisionActions } from "@/components/DecisionActions";
-import { PaybackImpactPanel } from "@/components/PaybackImpactPanel";
+import { PaybackImpactPanel, scenarioHi } from "@/components/PaybackImpactPanel";
 import type { CardStatus, PaybackRate, Scenario } from "@/types";
 
 /**
@@ -26,9 +26,6 @@ const DECIDED_LABEL: Record<CardStatus, string> = {
   held: "보류",
 };
 
-/** delta_pp = [낮은 값, 높은 값] — 막대 길이는 높은 값 기준 (05 §2) */
-const hiOf = (s: Scenario): number => s.delta_pp[s.delta_pp.length - 1] ?? 0;
-
 export function ScenarioTable({
   cardId,
   scenarios,
@@ -37,6 +34,7 @@ export function ScenarioTable({
   assumptionNote,
   avgVisitors = null,
   visitorsBasis = "",
+  proxyNote,
 }: {
   cardId: string;
   scenarios: Scenario[];
@@ -47,8 +45,10 @@ export function ScenarioTable({
   assumptionNote?: string;
   /** 최근 3개월 평균 입장 연인원(교대 합산) — 주면 재원 부담 대비 효과 패널을 그린다 */
   avgVisitors?: number | null;
-  /** 평균의 근거 기간 라벨 (예: "2025-10~12") */
+  /** 평균의 근거 기간 라벨 (예: "2025-10~2025-12") */
   visitorsBasis?: string;
+  /** 근사 지표 배지 툴팁 문구 — 패널로 그대로 내려간다 (절대 규칙 2) */
+  proxyNote?: string;
 }) {
   const editable = status === "pending";
   const [choice, setChoice] = useState<PaybackRate | null>(selectedRate);
@@ -56,7 +56,7 @@ export function ScenarioTable({
   // 결정된 카드는 읽기 전용 — 담당자가 고른 rate만 체크된 채로 남는다
   const checked = editable ? choice : selectedRate;
   // 크기 인코딩 막대는 단색 + 값 직접 표기 (13 §5). 0으로 나누지 않도록 하한을 둔다
-  const maxHi = Math.max(...scenarios.map(hiOf), 0.1);
+  const maxHi = Math.max(...scenarios.map(scenarioHi), 0.1);
 
   return (
     <div>
@@ -125,7 +125,7 @@ export function ScenarioTable({
                     <span className="mt-1.5 flex h-2 w-full min-w-[80px] max-w-[160px] overflow-hidden rounded-full bg-admin-surface-sunken ring-1 ring-inset ring-admin-border">
                       <span
                         className="block h-full rounded-full bg-admin-primary"
-                        style={{ width: `${Math.min(100, (hiOf(s) / maxHi) * 100)}%` }}
+                        style={{ width: `${Math.min(100, (scenarioHi(s) / maxHi) * 100)}%` }}
                       />
                     </span>
                   </td>
@@ -144,6 +144,7 @@ export function ScenarioTable({
           activeRate={checked ?? null}
           avgVisitors={avgVisitors}
           visitorsBasis={visitorsBasis}
+          proxyNote={proxyNote}
         />
       ) : null}
 

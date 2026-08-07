@@ -15,9 +15,12 @@ const METRICS: { key: ProgressMetricKey; label: string; unit: string; digits: nu
 export function ProgressRecordTimeline({
   records,
   cardId,
+  hasMore = false,
 }: {
   records: ProgressRecord[];
   cardId: string;
+  /** 서버 페이지네이션으로 잘린 이전 기록이 더 있는지(next_cursor 존재) — "첫 관측" 오표기 방지 */
+  hasMore?: boolean;
 }) {
   if (!records.length) {
     return (
@@ -40,22 +43,19 @@ export function ProgressRecordTimeline({
     );
   }
 
-  // 기록별 "직전 대비" 변화 표기용 — 각 기록보다 이른 기록에서 같은 지표의 최신 값을 미리 찾아 둔다
-  const ordered = [...records].sort((a, b) => Date.parse(b.recorded_at) - Date.parse(a.recorded_at));
+  // 기록별 "직전 대비" 변화 표기용. records는 서버가 최신순(동시각은 record_id 타이브레이커)으로
+  // 정렬해 준 배열이다 — 여기서 다시 정렬하면 동시각 기록에서 서버와 다른 이웃을 골라
+  // 델타 부호가 뒤집힐 수 있어 받은 순서를 그대로 쓴다. 오래된 것부터 한 번 훑으며
+  // "그 시점까지의 마지막 관측값" 스냅샷을 기록마다 남긴다 (O(기록 수 × 지표 수)).
   const previousMetrics = new Map<string, Partial<Record<ProgressMetricKey, number>>>();
-  ordered.forEach((record, i) => {
-    const prev: Partial<Record<ProgressMetricKey, number>> = {};
+  const lastSeen: Partial<Record<ProgressMetricKey, number>> = {};
+  for (let i = records.length - 1; i >= 0; i--) {
+    previousMetrics.set(records[i].record_id, { ...lastSeen });
     for (const { key } of METRICS) {
-      for (let j = i + 1; j < ordered.length; j++) {
-        const value = ordered[j].metrics?.[key];
-        if (value !== undefined && value !== null) {
-          prev[key] = value;
-          break;
-        }
-      }
+      const value = records[i].metrics?.[key];
+      if (value !== undefined && value !== null) lastSeen[key] = value;
     }
-    previousMetrics.set(record.record_id, prev);
-  });
+  }
 
   return (
     <ol className="relative flex flex-col gap-4 before:absolute before:bottom-5 before:left-[11px] before:top-5 before:w-px before:bg-admin-border sm:before:left-[15px]">
@@ -152,7 +152,10 @@ export function ProgressRecordTimeline({
                           </dd>
                           <dd className="mt-1 text-[10px] leading-4">
                             {prev === undefined ? (
-                              <span className="text-admin-text-muted">첫 관측</span>
+                              // 더 이전 페이지가 있으면 이 페이지의 첫 값일 뿐, 최초 관측이라 단정할 수 없다
+                              <span className="text-admin-text-muted">
+                                {hasMore ? "표시 범위 첫 값" : "첫 관측"}
+                              </span>
                             ) : value === prev ? (
                               <span className="text-admin-text-muted">직전과 동일</span>
                             ) : (

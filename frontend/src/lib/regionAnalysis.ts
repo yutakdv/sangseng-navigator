@@ -85,8 +85,20 @@ export interface CategoryShift {
   share: number;
   recent: number;
   previous: number;
-  /** 최근 3개월 합의 직전 3개월 대비 증감률(%). 직전 합이 0이면 비교 불가라 null */
+  /** 최근 3개월 합의 직전 3개월 대비 증감률(%). 비교 창이 안 만들어지면 null */
   changePct: number | null;
+}
+
+/**
+ * 증감 비교 창의 화면 라벨 — topCategoryShifts와 같은 slice 정의를 쓴다.
+ * 원장이 6개월 미만이면 직전 창이 최근 창보다 짧아져 비교 자체가 성립하지 않는다 → null
+ * (이때 topCategoryShifts의 changePct도 전부 null이 된다).
+ */
+export function shiftWindowLabel(months: string[]): string | null {
+  if (months.length < 6) return null;
+  const recent = months.slice(-3);
+  const previous = months.slice(-6, -3);
+  return `${monthLabel(recent[0])}~${monthLabel(recent[2])} 합을 ${monthLabel(previous[0])}~${monthLabel(previous[2])} 합과 비교`;
 }
 
 /** 선택 지역의 누적 상위 업종(원 18종)과 최근 3개월 증감 — 상세 표 입력 형식 */
@@ -96,6 +108,8 @@ export function topCategoryShifts(
   region: Region,
   limit = 8,
 ): CategoryShift[] {
+  // 6개월 미만이면 직전 3개월 창이 1~2개월로 쪼그라들어 증감률이 부풀려진다 — 비교하지 않는다
+  const comparable = months.length >= 6;
   const recentMonths = new Set(months.slice(-3));
   const previousMonths = new Set(months.slice(-6, -3));
   const acc = new Map<string, { count: number; recent: number; previous: number }>();
@@ -118,6 +132,6 @@ export function topCategoryShifts(
       share: total ? v.count / total : 0,
       recent: v.recent,
       previous: v.previous,
-      changePct: v.previous > 0 ? ((v.recent - v.previous) / v.previous) * 100 : null,
+      changePct: comparable && v.previous > 0 ? ((v.recent - v.previous) / v.previous) * 100 : null,
     }));
 }

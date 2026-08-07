@@ -18,6 +18,7 @@ import { dash, monthLabel, num, pct, ratioPct, signed } from "@/lib/format";
 import {
   regionCategoryShare,
   regionMonthlyTrend,
+  shiftWindowLabel,
   topCategoryShifts,
   USAGE_REGION_FOOTNOTE,
 } from "@/lib/regionAnalysis";
@@ -88,10 +89,8 @@ export default async function DashboardPage({
   const regionDonut = selectedRegion ? regionCategoryShare(ledgerRows, selectedRegion) : [];
   const regionTrend = selectedRegion ? regionMonthlyTrend(ledgerRows, ledgerMonths, selectedRegion) : [];
   const regionShifts = selectedRegion ? topCategoryShifts(ledgerRows, ledgerMonths, selectedRegion) : [];
-  const shiftWindow =
-    ledgerMonths.length >= 6
-      ? `${monthLabel(ledgerMonths[ledgerMonths.length - 3])}~${monthLabel(ledgerMonths[ledgerMonths.length - 1])} 합을 ${monthLabel(ledgerMonths[ledgerMonths.length - 6])}~${monthLabel(ledgerMonths[ledgerMonths.length - 4])} 합과 비교`
-      : null;
+  // 라벨과 계산이 같은 창 정의를 쓰도록 regionAnalysis가 한 곳에서 만든다 (6개월 미만이면 null)
+  const shiftWindow = shiftWindowLabel(ledgerMonths);
 
   return (
     <AdminShell dashboard={d}>
@@ -113,7 +112,7 @@ export default async function DashboardPage({
           <p className="mt-2 flex items-center gap-1.5 text-xs text-admin-text-muted" aria-live="polite">
             <Icon name="info" size={13} />
             {selectedRegion
-              ? `${selectedRegion}의 지역별 소비 지표를 보고 있습니다. 아래 상세 분석에 이 지역의 업종 구성·월별 추이·상위 업종이 나옵니다. 정책 운영 KPI는 전체 기준입니다.`
+              ? `${selectedRegion}의 지역별 소비 지표를 보고 있습니다. 아래 상세 분석에 이 지역의 업종 구성·월별 추이·상위 업종이 나옵니다. 상단 진단 지표·추이·업종별 사용 비중·정책 운영 KPI는 전체 지역 기준입니다.`
               : "전체 지역을 보고 있습니다. 지역을 고르면 해당 지역의 업종 구성·월별 추이·상위 업종까지 좁혀 볼 수 있습니다."}
           </p>
         </section>
@@ -323,7 +322,7 @@ export default async function DashboardPage({
                             <td className="font-medium">{s.category}</td>
                             <td className="text-right tabular-nums">{num(s.count)}건</td>
                             <td className="text-right tabular-nums text-admin-text-muted">
-                              {Math.round(s.share * 100)}%
+                              {ratioPct(s.share)}
                             </td>
                             <td className="text-right tabular-nums text-admin-text-muted">
                               {num(s.recent)}건
@@ -332,7 +331,8 @@ export default async function DashboardPage({
                               {s.changePct === null ? (
                                 <span className="font-normal text-admin-text-muted">비교 불가</span>
                               ) : (
-                                signed(s.changePct, "%", 0)
+                                // 0자리 반올림이면 ±0.x%가 "▲0%"로 찍혀 화살표와 크기가 모순된다
+                                signed(s.changePct, "%", 1)
                               )}
                             </td>
                           </tr>

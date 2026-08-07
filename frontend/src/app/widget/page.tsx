@@ -7,7 +7,7 @@ import { KakaoMapView } from "@/components/KakaoMapView";
 import { WidgetLiveRefresh } from "@/components/WidgetLiveRefresh";
 import { api } from "@/lib/api";
 import { CATEGORIES, REGIONS, REGION_TOOLTIP, VISITOR_SOURCE_NOTE } from "@/lib/constants";
-import type { Recommendation } from "@/types";
+import type { Card, Recommendation } from "@/types";
 
 export const metadata: Metadata = { title: "가맹점 찾기 · 상생 나침반" };
 
@@ -55,22 +55,45 @@ export default async function WidgetPage({ searchParams }: { searchParams: Promi
   const current: Search = { region, category, limit: sp.limit ? String(listLimit) : undefined, live };
   const filters: Search = { region, category, live };
 
-  const [{ recommendations, policy_note, total }, dashboard, cand] = await Promise.all([
+  const [{ recommendations, policy_note, total }, dashboard, cand, incentiveRes] = await Promise.all([
     api.widget(region, category, listLimit),
     api.dashboard(),
-    // 필터 칩의 가맹점 수 표기용 — merchants는 candidates 응답에 함께 실려 온다 (05 §1)
-    api.candidates(),
+    // 필터 칩의 가맹점 수 표기용 — merchants는 candidates 응답에 함께 실려 온다 (05 §1).
+    // 칩 숫자는 장식이라, 이 엔드포인트가 503이어도 방문객 위젯 자체는 떠야 한다.
+    api.candidates().catch(() => null),
+    // 페이백 배너용 — 필터로 추천이 0건이어도 시행 중인 정책은 알려야 하므로 카드에서 직접 읽는다
+    api.cards({ type: "INCENTIVE" }).catch(() => ({ cards: [] as Card[] })),
   ]);
 
-  const merchants = cand.merchants ?? [];
-  // 칩의 숫자는 "그 칩을 눌렀을 때 볼 목록"의 크기여야 한다 — 반대편 활성 필터를 반영해 센다
-  const regionCount = (r?: string): number =>
-    merchants.filter((m) => (!r || m.eup === r) && (!category || m.category === category)).length;
-  const categoryCount = (c?: string): number =>
-    merchants.filter((m) => (!c || m.category === c) && (!region || m.eup === region)).length;
+  // 칩의 숫자는 "그 칩을 눌렀을 때 볼 목록"의 크기 — 반대편 활성 필터를 반영해야 한다.
+  // 1,679개 배열을 칩(14개)마다 재스캔하지 않도록 한 번 훑어 (지역|업종) 조합 카운트를 만든다.
+  const merchants = cand?.merchants ?? [];
+  const pairCount = new Map<string, number>();
+  for (const m of merchants) {
+    for (const key of ["|", `${m.eup}|`, `|${m.category}`, `${m.eup}|${m.category}`]) {
+      pairCount.set(key, (pairCount.get(key) ?? 0) + 1);
+    }
+  }
+  const countMerchants = (r?: string, c?: string): number =>
+    pairCount.get(`${r ?? ""}|${c ?? ""}`) ?? 0;
+  // candidates를 못 받았으면 countOf를 아예 내리지 않는다 — 칩이 전부 0으로 보이는 오표기 방지
+  const countOfRegion = merchants.length ? (v?: string) => countMerchants(v, category) : undefined;
+  const countOfCategory = merchants.length ? (v?: string) => countMerchants(region, v) : undefined;
 
-  // 페이백은 전 지역 공통이라 추천 항목 전체에 같은 값이 붙는다 — 목록 반복 대신 상단 배너로 올린다
-  const payback = recommendations.find((r) => r.payback)?.payback ?? null;
+  /**
+   * 페이백 배너 — 우선 추천 항목이 실어 온 값을 쓰고(서버 라벨이 정본), 필터 결과가 0건이라
+   * 추천이 비었을 때는 카드 상태에서 같은 조건(완료된 INCENTIVE + selected_rate,
+   * store.payback()·backend widget.py와 동일)으로 복원한다. 페이백은 전 지역 공통이라
+   * 어떤 필터에서도 시행 사실 자체는 보여야 한다.
+   */
+  const donePayback = incentiveRes.cards
+    .filter((c) => c.progress === "완료" && c.selected_rate)
+    .sort((a, b) => (b.decided_at ?? "").localeCompare(a.decided_at ?? ""))[0];
+  const payback =
+    recommendations.find((r) => r.payback)?.payback ??
+    (donePayback?.selected_rate
+      ? { rate: donePayback.selected_rate, label: `지금 여기서 쓰면 ${donePayback.selected_rate}% 페이백` }
+      : null);
   const fresh = recommendations.filter((r) => r.badge);
   const others = recommendations.filter((r) => !r.badge);
 
@@ -99,7 +122,9 @@ export default async function WidgetPage({ searchParams }: { searchParams: Promi
 
         {/* 시행 중인 페이백은 전 항목 공통 — 목록을 스크롤하기 전에 상단에서 먼저 알린다 (카드 배지는 유지) */}
         {payback ? (
-          <div className="mx-5 mt-5 flex items-start gap-3 rounded-2xl bg-visitor-primary-soft px-4 py-3.5 ring-1 ring-inset ring-visitor-primary/20 motion-safe:animate-pop sm:mx-8">
+          <div
+            className={`mx-5 mt-5 flex items-start gap-3 rounded-2xl bg-visitor-primary-soft px-4 py-3.5 ring-1 ring-inset ring-visitor-primary/20 sm:mx-8 ${live ? "motion-safe:animate-pop" : ""}`}
+          >
             <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-visitor-primary text-white">
               <Icon name="gift" size={17} strokeWidth={2} />
             </span>
@@ -129,17 +154,17 @@ export default async function WidgetPage({ searchParams }: { searchParams: Promi
               label="관심 지역"
               options={REGIONS}
               selected={region}
-              makeHref={(v) => href({ region: v }, { category, live })}
+              makeHref={(v) => href({ region: v }, filters)}
               titleOf={(v) => REGION_TOOLTIP[v as keyof typeof REGION_TOOLTIP]}
-              countOf={regionCount}
+              countOf={countOfRegion}
               className="mt-6"
             />
             <Filter
               label="업종"
               options={CATEGORIES}
               selected={category}
-              makeHref={(v) => href({ category: v }, { region, live })}
-              countOf={categoryCount}
+              makeHref={(v) => href({ category: v }, filters)}
+              countOf={countOfCategory}
               className="mt-4"
             />
           </div>
@@ -167,7 +192,7 @@ export default async function WidgetPage({ searchParams }: { searchParams: Promi
                 다른 지역·업종을 선택해 보세요
               </p>
               <Link
-                href={href({}, { live })}
+                href={href({ region: undefined, category: undefined }, filters)}
                 className="mt-4 inline-flex items-center gap-1.5 rounded-full bg-visitor-primary px-4 py-2 text-[13px] font-semibold text-white"
               >
                 조건 초기화
@@ -187,7 +212,7 @@ export default async function WidgetPage({ searchParams }: { searchParams: Promi
                   </p>
                   <ul className="mt-3 grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
                     {fresh.map((r) => (
-                      <MerchantCard key={`${r.name}-${r.address}`} r={r} />
+                      <MerchantCard key={`${r.name}-${r.address}`} r={r} pop={Boolean(live)} />
                     ))}
                   </ul>
                 </section>
@@ -195,7 +220,7 @@ export default async function WidgetPage({ searchParams }: { searchParams: Promi
               {others.length ? (
                 <ul className={`grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3 ${fresh.length ? "mt-5 border-t border-slate-200 pt-5" : "mt-4"}`}>
                   {others.map((r) => (
-                    <MerchantCard key={`${r.name}-${r.address}`} r={r} />
+                    <MerchantCard key={`${r.name}-${r.address}`} r={r} pop={Boolean(live)} />
                   ))}
                 </ul>
               ) : null}
@@ -321,8 +346,8 @@ function Filter({
   );
 }
 
-/** 추천 가맹점 카드 한 장 — 확충 섹션과 전체 목록이 같은 마크업을 쓴다 */
-function MerchantCard({ r }: { r: Recommendation }) {
+/** 추천 가맹점 카드 한 장 — 확충 섹션과 전체 목록이 같은 마크업을 쓴다. pop은 라이브 미리보기 전용 */
+function MerchantCard({ r, pop = false }: { r: Recommendation; pop?: boolean }) {
   return (
     <li className="rounded-2xl border border-slate-200/80 bg-white p-3.5 shadow-card">
       <div className="flex gap-3">
@@ -332,7 +357,7 @@ function MerchantCard({ r }: { r: Recommendation }) {
             <span className="min-w-0 truncate text-[15px] font-bold text-admin-text">
               {r.name}
             </span>
-            {r.badge ? <NewBadge label={r.badge} /> : null}
+            {r.badge ? <NewBadge label={r.badge} pop={pop} /> : null}
           </div>
           <p className="mt-0.5 text-xs font-medium text-admin-text-muted">
             {r.category}
@@ -357,7 +382,7 @@ function MerchantCard({ r }: { r: Recommendation }) {
               <Icon name="check" size={12} strokeWidth={2} />
               하이원포인트 사용 가능
             </span>
-            {r.payback ? <PaybackBadge label={r.payback.label} /> : null}
+            {r.payback ? <PaybackBadge label={r.payback.label} pop={pop} /> : null}
           </div>
         </div>
       </div>

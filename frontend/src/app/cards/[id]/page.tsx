@@ -264,7 +264,11 @@ export default async function CardDetailPage({ params }: { params: Promise<{ id:
               </Link>
             }
           >
-            <ProgressRecordTimeline records={progressResult.records} cardId={card.id} />
+            <ProgressRecordTimeline
+              records={progressResult.records}
+              cardId={card.id}
+              hasMore={Boolean(progressResult.next_cursor)}
+            />
             {progressResult.next_cursor ? (
               <p className="u-note mt-3 border-t border-admin-border pt-3">
                 최신 50건을 표시했습니다. 이전 기록은 추후 페이지네이션으로 이어서 확인할 수 있습니다.

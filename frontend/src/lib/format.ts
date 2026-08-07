@@ -20,7 +20,3 @@ export const signTone = (v: number | null | undefined): "good" | "bad" | "flat" 
 
 /** "2025-01" → "1월" (12개월 축 라벨) */
 export const monthLabel = (month: string): string => `${Number(month.slice(5, 7))}월`;
-
-/** delta_pp [0.0, 0.1] → "0.0~0.1%p" (05 §2 — 단정 대신 범위) */
-export const range = (v: number[] | null | undefined, unit = "%p", digits = 1): string =>
-  !v || v.length === 0 ? "—" : `${v[0].toFixed(digits)}~${v[v.length - 1].toFixed(digits)}${unit}`;

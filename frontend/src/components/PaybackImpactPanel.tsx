@@ -1,5 +1,4 @@
-import { AssumptionNote } from "@/components/Badge";
-import { DeltaValue } from "@/components/DeltaValue";
+import { AssumptionNote, ProxyBadge } from "@/components/Badge";
 import { Icon } from "@/components/Icon";
 import { num } from "@/lib/format";
 import type { PaybackRate, Scenario } from "@/types";
@@ -16,31 +15,42 @@ import type { PaybackRate, Scenario } from "@/types";
  *
  * ScenarioTable(클라이언트) 안에서 렌더되므로 라디오 선택(activeRate)을 실시간 강조한다.
  */
-const loOf = (s: Scenario): number => s.delta_pp[0] ?? 0;
-const hiOf = (s: Scenario): number => s.delta_pp[s.delta_pp.length - 1] ?? 0;
+
+/** delta_pp = [낮은 값, 높은 값] (05 §2) — ScenarioTable도 이 헬퍼를 쓴다(사본 금지) */
+export const scenarioLo = (s: Scenario): number => s.delta_pp[0] ?? 0;
+export const scenarioHi = (s: Scenario): number => s.delta_pp[s.delta_pp.length - 1] ?? 0;
 
 export function PaybackImpactPanel({
   scenarios,
   activeRate,
   avgVisitors,
   visitorsBasis,
+  proxyNote,
 }: {
   scenarios: Scenario[];
   /** 표에서 현재 선택(또는 확정)된 페이백률 — 해당 시나리오를 강조한다 */
   activeRate: PaybackRate | null;
   /** 최근 3개월 평균 입장 연인원(교대 합산) — 0 이하면 패널을 그리지 않는다 */
   avgVisitors: number;
-  /** 평균의 근거 기간 라벨 (예: "2025-10~12") */
+  /** 평균의 근거 기간 라벨 (예: "2025-10~2025-12") */
   visitorsBasis: string;
+  /** dashboard.conversion.proxy_note — 근사 지표 배지 툴팁으로 그대로 노출 (절대 규칙 2) */
+  proxyNote?: string;
 }) {
   if (!scenarios.length || !(avgVisitors > 0)) return null;
-  const maxExtra = Math.max(...scenarios.map((s) => (avgVisitors * hiOf(s)) / 100), 1);
+  const extraOf = (s: Scenario): [number, number] => [
+    (avgVisitors * scenarioLo(s)) / 100,
+    (avgVisitors * scenarioHi(s)) / 100,
+  ];
+  const maxExtra = Math.max(...scenarios.map((s) => extraOf(s)[1]), 1);
 
   return (
     <div className="mt-4 rounded-xl border border-admin-border bg-admin-surface p-4">
-      <h4 className="flex items-center gap-1.5 text-[13px] font-bold text-admin-text">
+      <h4 className="flex flex-wrap items-center gap-1.5 text-[13px] font-bold text-admin-text">
         <Icon name="scale" size={15} className="text-admin-primary" />
         재원 부담 대비 효과 전망
+        {/* 전환율 개선폭을 건수로 환산한 값이라, 이 블록만 따로 읽혀도 근사 지표임이 보여야 한다 */}
+        <ProxyBadge note={proxyNote} />
       </h4>
       <p className="u-note mt-1">
         효과는 개선폭을 월 사용 건수로 환산한 값이고, 부담은 지역 결제액 100원당 리워드
@@ -50,8 +60,7 @@ export function PaybackImpactPanel({
       <ul className="mt-3 grid grid-cols-1 gap-2.5 sm:grid-cols-3">
         {scenarios.map((s) => {
           const on = activeRate === s.rate;
-          const extraLo = Math.round((avgVisitors * loOf(s)) / 100);
-          const extraHi = Math.round((avgVisitors * hiOf(s)) / 100);
+          const [extraLo, extraHi] = extraOf(s);
           return (
             <li
               key={s.rate}
@@ -74,31 +83,27 @@ export function PaybackImpactPanel({
                 예상 추가 지역 사용
               </p>
               <p className="mt-0.5 text-[13px] font-bold tabular-nums text-admin-text">
-                +{num(extraLo)}~{num(extraHi)}건<span className="font-medium text-admin-text-muted">/월</span>
+                +{num(Math.round(extraLo))}~{num(Math.round(extraHi))}건
+                <span className="font-medium text-admin-text-muted">/월</span>
               </p>
-              {/* 범위 막대: 옅은 막대 = 상한, 진한 막대 = 하한 (단색 + 값 병기, 13 §5) */}
+              {/* 범위 막대: 진한 구간 = 하한, 옅은 구간 = 하한~상한 (단색 + 값 병기, 13 §5) */}
               <span className="mt-1.5 flex h-2 w-full overflow-hidden rounded-full bg-admin-surface ring-1 ring-inset ring-admin-border">
                 <span
                   className="block h-full rounded-l-full bg-admin-primary"
-                  style={{ width: `${Math.min(100, ((avgVisitors * loOf(s)) / 100 / maxExtra) * 100)}%` }}
+                  style={{ width: `${Math.min(100, (extraLo / maxExtra) * 100)}%` }}
                 />
                 <span
                   className="block h-full rounded-r-full bg-admin-primary/35"
-                  style={{
-                    width: `${Math.min(100, ((avgVisitors * (hiOf(s) - loOf(s))) / 100 / maxExtra) * 100)}%`,
-                  }}
+                  style={{ width: `${Math.min(100, ((extraHi - extraLo) / maxExtra) * 100)}%` }}
                 />
               </span>
 
               <div className="mt-2.5 flex flex-wrap items-center gap-1 border-t border-admin-border pt-2 text-[11px] text-admin-text-muted">
                 <span>페이백 1%당 개선폭</span>
-                <DeltaValue
-                  value={[loOf(s) / s.rate, hiOf(s) / s.rate]}
-                  unit="%p"
-                  digits={2}
-                  variant="text"
-                  className="font-semibold"
-                />
+                {/* 증감이 아니라 비율 그 자체 — DeltaValue(▲·증가 낭독·추세색)를 쓰면 오독된다 */}
+                <span className="font-semibold tabular-nums text-admin-text">
+                  {(scenarioLo(s) / s.rate).toFixed(2)}~{(scenarioHi(s) / s.rate).toFixed(2)}%p
+                </span>
               </div>
               <p className="mt-1 text-[11px] leading-4 text-admin-text-muted">
                 지역 결제액 100원당 {s.rate}원 리워드 지급

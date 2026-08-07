@@ -34,9 +34,15 @@ export function composeEvidence(
   const targetRegion = card?.target?.eup ?? null;
   const targetLatest = latestByRegion.find((row) => row.region === targetRegion);
   const topLatest = latestByRegion[0];
+  const targetRank = latestByRegion.findIndex((row) => row.region === targetRegion) + 1;
   const regionInsight =
     targetLatest && topLatest && targetLatest.value > 0
-      ? `${latestMonth} ${targetLatest.region} ${num(targetLatest.value)}건 · 6개 지역 중 ${latestByRegion.findIndex((row) => row.region === targetRegion) + 1}위 · 1위 ${topLatest.region}의 약 ${Math.round(topLatest.value / targetLatest.value)}분의 1`
+      ? // 타깃이 곧 1위면 "1위 사북읍의 약 1분의 1" 같은 자기 비교 문장이 되므로 비율 절은 뺀다
+        `${latestMonth} ${targetLatest.region} ${num(targetLatest.value)}건 · 6개 지역 중 ${targetRank}위${
+          targetRank > 1
+            ? ` · 1위 ${topLatest.region}의 약 ${Math.round(topLatest.value / targetLatest.value)}분의 1`
+            : ""
+        }`
       : latestByRegion.length
         ? `${latestMonth} 1위 ${topLatest.region} ${num(topLatest.value)}건 · 최하위 ${latestByRegion.at(-1)?.region} ${num(latestByRegion.at(-1)?.value ?? 0)}건`
         : "월별 지역 데이터가 없습니다";
@@ -73,22 +79,11 @@ export function composeDashboardView(
   kpi: Kpi,
   activeType: CardType | null,
 ) {
-  const pendingAll = cards.filter((card) => card.status === "pending");
-  /** 종류별 대기 건수 — 종류 필터(CardTypeTabs)가 대기 목록 헤더로 돌아올 때 쓴다 */
-  const pendingCounts = {
-    all: pendingAll.length,
-    EXPANSION: pendingAll.filter((card) => card.type === "EXPANSION").length,
-    INCENTIVE: pendingAll.filter((card) => card.type === "INCENTIVE").length,
-  };
   const visible = activeType ? cards.filter((card) => card.type === activeType) : cards;
   const pending = visible.filter((card) => card.status === "pending").sort(byPendingOrder);
   const decided = visible.filter((card) => card.status !== "pending").sort(byDecidedDesc);
   const approved = cards.filter((card) => card.status === "approved");
-  const [hero, ...rest] = pending;
-  const incentive =
-    visible.find((card) => card.type === "INCENTIVE" && card.status === "pending" && card.scenarios?.length) ??
-    visible.find((card) => card.type === "INCENTIVE" && card.scenarios?.length) ??
-    null;
+  const [hero] = pending;
 
   /**
    * 허브 우측 작업 열의 세 단계 — 결정 → 실행 → 완료.
@@ -115,18 +110,13 @@ export function composeDashboardView(
     rejected: visible.filter((card) => card.status === "rejected").length,
   };
 
-  // 허브의 근거 미리보기는 최우선 제안(hero) 기준으로 판독한다
-  const evidence = composeEvidence(dashboard, candidates, hero);
-  const shares = Object.fromEntries((dashboard.region_share ?? []).map((row) => [row.region, row.share]));
-  const counts = Object.fromEntries((dashboard.region_share ?? []).map((row) => [row.region, row.count]));
-
+  // 근거 판독(composeEvidence)은 여기서 만들지 않는다 — 허브(app/page.tsx)가 "선택된 카드"
+  // 기준으로 직접 호출한다. hero 기준으로 미리 만들어 두면 선택 카드와 판독 문장이 갈라진다.
   return {
     dashboard,
     candidates,
     kpi,
-    activeType,
     generateType: activeType ?? ("EXPANSION" as const),
-    pendingCounts,
     statusCounts,
     pending,
     inProgress,
@@ -134,16 +124,5 @@ export function composeDashboardView(
     decided,
     approved,
     hero,
-    rest,
-    incentive,
-    heroRegion: evidence.targetRegion,
-    regionTrend: evidence.regionTrend,
-    latestMonth: evidence.latestMonth,
-    latestByRegion: evidence.latestByRegion,
-    regionInsight: evidence.regionInsight,
-    scoreTopLine: evidence.scoreTopLine,
-    ranking: evidence.ranking,
-    shares,
-    counts,
   };
 }

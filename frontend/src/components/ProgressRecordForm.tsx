@@ -19,11 +19,13 @@ import type {
 const FIELD =
   "mt-1.5 w-full rounded-xl border border-admin-border bg-admin-surface px-3 py-2.5 text-sm text-admin-text shadow-card transition-colors placeholder:text-admin-text-muted/70 hover:border-admin-primary/45 focus:border-admin-primary focus:outline-none focus:ring-2 focus:ring-admin-primary/20 disabled:cursor-not-allowed disabled:opacity-55";
 
+/** digits는 ProgressRecordTimeline의 METRICS와 같은 값 — 저장 확인 칩과 타임라인 표기가 어긋나면 안 된다 */
 const METRIC_FIELDS: {
   key: ProgressMetricKey;
   label: string;
   unit: string;
   step: string;
+  digits: number;
   max?: number;
   hint: string;
 }[] = [
@@ -32,6 +34,7 @@ const METRIC_FIELDS: {
     label: "지역 사용 건수",
     unit: "건",
     step: "1",
+    digits: 0,
     hint: "해당 카드 대상 지역·기간의 실제 사용 건수",
   },
   {
@@ -39,6 +42,7 @@ const METRIC_FIELDS: {
     label: "지역 전환율",
     unit: "%",
     step: "0.1",
+    digits: 2,
     max: 100,
     hint: "같은 산식과 기간으로 반복 관측한 비율",
   },
@@ -47,6 +51,7 @@ const METRIC_FIELDS: {
     label: "활성 가맹점 수",
     unit: "곳",
     step: "1",
+    digits: 0,
     hint: "실제로 운영 중인 확인 가맹점 수",
   },
   {
@@ -54,6 +59,7 @@ const METRIC_FIELDS: {
     label: "지역 사용액",
     unit: "원",
     step: "1",
+    digits: 0,
     hint: "같은 범위에서 집계한 실제 사용액",
   },
   {
@@ -61,6 +67,7 @@ const METRIC_FIELDS: {
     label: "소비 집중도",
     unit: "점",
     step: "0.1",
+    digits: 2,
     max: 100,
     hint: "0~100 지수이며 낮아지면 분산이 개선된 것",
   },
@@ -268,7 +275,10 @@ export function ProgressRecordForm({
               (field) => saved.metrics?.[field.key] !== undefined && saved.metrics?.[field.key] !== null,
             ).map((field) => ({
               label: field.label,
-              text: `${Number(saved.metrics[field.key]).toLocaleString("ko-KR")}${field.unit}`,
+              text: `${Number(saved.metrics[field.key]).toLocaleString("ko-KR", {
+                minimumFractionDigits: field.digits,
+                maximumFractionDigits: field.digits,
+              })}${field.unit}`,
             })),
           });
           setNote("");

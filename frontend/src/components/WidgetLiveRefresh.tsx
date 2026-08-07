@@ -15,8 +15,32 @@ export function WidgetLiveRefresh({ intervalMs = 4000 }: { intervalMs?: number }
   const router = useRouter();
 
   useEffect(() => {
-    const timer = setInterval(() => router.refresh(), intervalMs);
-    return () => clearInterval(timer);
+    let timer: ReturnType<typeof setInterval> | null = null;
+    const start = () => {
+      if (timer === null) timer = setInterval(() => router.refresh(), intervalMs);
+    };
+    const stop = () => {
+      if (timer !== null) {
+        clearInterval(timer);
+        timer = null;
+      }
+    };
+    // 숨은 탭은 폴링을 멈춘다 — 데모 중 두 번째 탭으로 열어 두는 화면이라, 안 보는 동안
+    // 4초마다 전체 서버 렌더를 돌리면 낭비다. 다시 보이면 즉시 한 번 갱신하고 재개한다.
+    const onVisibility = () => {
+      if (document.hidden) {
+        stop();
+      } else {
+        router.refresh();
+        start();
+      }
+    };
+    if (!document.hidden) start();
+    document.addEventListener("visibilitychange", onVisibility);
+    return () => {
+      stop();
+      document.removeEventListener("visibilitychange", onVisibility);
+    };
   }, [router, intervalMs]);
 
   return (

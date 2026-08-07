@@ -26,7 +26,10 @@ export function dataFreshness(periodNote: string, now = new Date()): DataFreshne
   }
   const sourceYear = Number(match[1]);
   const sourceMonthIndex = Number(match[2]) - 1;
-  const ageMonths = Math.max(0, now.getUTCFullYear() * 12 + now.getUTCMonth() - (sourceYear * 12 + sourceMonthIndex));
+  // 이 제품의 모든 시각은 KST다 — UTC 월로 계산하면 매월 1일 00~09시(KST)에 한 달 어리게 계산돼
+  // '갱신 필요' 배너가 늦게 뜬다. +9h 이동한 시각의 UTC 필드가 곧 KST 연·월이다.
+  const kst = new Date(now.getTime() + 9 * 3_600_000);
+  const ageMonths = Math.max(0, kst.getUTCFullYear() * 12 + kst.getUTCMonth() - (sourceYear * 12 + sourceMonthIndex));
   const sourceMonth = `${match[1]}-${match[2]}`;
   const isLatestPublished = sourceMonth === LATEST_PUBLISHED_USAGE_MONTH;
   return {
