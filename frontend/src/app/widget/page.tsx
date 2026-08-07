@@ -7,6 +7,7 @@ import { KakaoMapView } from "@/components/KakaoMapView";
 import { WidgetLiveRefresh } from "@/components/WidgetLiveRefresh";
 import { api } from "@/lib/api";
 import { CATEGORIES, REGIONS, REGION_TOOLTIP, VISITOR_SOURCE_NOTE } from "@/lib/constants";
+import type { Recommendation } from "@/types";
 
 export const metadata: Metadata = { title: "가맹점 찾기 · 상생 나침반" };
 
@@ -54,10 +55,24 @@ export default async function WidgetPage({ searchParams }: { searchParams: Promi
   const current: Search = { region, category, limit: sp.limit ? String(listLimit) : undefined, live };
   const filters: Search = { region, category, live };
 
-  const [{ recommendations, policy_note, total }, dashboard] = await Promise.all([
+  const [{ recommendations, policy_note, total }, dashboard, cand] = await Promise.all([
     api.widget(region, category, listLimit),
     api.dashboard(),
+    // 필터 칩의 가맹점 수 표기용 — merchants는 candidates 응답에 함께 실려 온다 (05 §1)
+    api.candidates(),
   ]);
+
+  const merchants = cand.merchants ?? [];
+  // 칩의 숫자는 "그 칩을 눌렀을 때 볼 목록"의 크기여야 한다 — 반대편 활성 필터를 반영해 센다
+  const regionCount = (r?: string): number =>
+    merchants.filter((m) => (!r || m.eup === r) && (!category || m.category === category)).length;
+  const categoryCount = (c?: string): number =>
+    merchants.filter((m) => (!c || m.category === c) && (!region || m.eup === region)).length;
+
+  // 페이백은 전 지역 공통이라 추천 항목 전체에 같은 값이 붙는다 — 목록 반복 대신 상단 배너로 올린다
+  const payback = recommendations.find((r) => r.payback)?.payback ?? null;
+  const fresh = recommendations.filter((r) => r.badge);
+  const others = recommendations.filter((r) => !r.badge);
 
   return (
     <div className="min-h-screen bg-slate-100 py-0 sm:py-8">
@@ -82,6 +97,24 @@ export default async function WidgetPage({ searchParams }: { searchParams: Promi
           </p>
         </header>
 
+        {/* 시행 중인 페이백은 전 항목 공통 — 목록을 스크롤하기 전에 상단에서 먼저 알린다 (카드 배지는 유지) */}
+        {payback ? (
+          <div className="mx-5 mt-5 flex items-start gap-3 rounded-2xl bg-visitor-primary-soft px-4 py-3.5 ring-1 ring-inset ring-visitor-primary/20 motion-safe:animate-pop sm:mx-8">
+            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-visitor-primary text-white">
+              <Icon name="gift" size={17} strokeWidth={2} />
+            </span>
+            <div className="min-w-0">
+              <p className="break-keep text-[15px] font-bold leading-6 text-visitor-primary">
+                {payback.label}
+              </p>
+              <p className="mt-0.5 break-keep text-xs leading-5 text-admin-text-muted">
+                담당자가 승인·적용한 지역 결제 리워드예요. 이미 적립된 포인트로 아래 가맹점에서
+                결제할 때 붙는 혜택이에요.
+              </p>
+            </div>
+          </div>
+        ) : null}
+
         <div className="grid gap-6 px-5 py-5 sm:px-8 sm:py-8 lg:grid-cols-[0.72fr_1.28fr] lg:items-start">
           <div>
             <p className="text-[28px] font-bold leading-tight tracking-[-0.03em] text-emerald-950 sm:text-[34px]">
@@ -98,6 +131,7 @@ export default async function WidgetPage({ searchParams }: { searchParams: Promi
               selected={region}
               makeHref={(v) => href({ region: v }, { category, live })}
               titleOf={(v) => REGION_TOOLTIP[v as keyof typeof REGION_TOOLTIP]}
+              countOf={regionCount}
               className="mt-6"
             />
             <Filter
@@ -105,6 +139,7 @@ export default async function WidgetPage({ searchParams }: { searchParams: Promi
               options={CATEGORIES}
               selected={category}
               makeHref={(v) => href({ category: v }, { region, live })}
+              countOf={categoryCount}
               className="mt-4"
             />
           </div>
@@ -139,51 +174,32 @@ export default async function WidgetPage({ searchParams }: { searchParams: Promi
               </Link>
             </div>
           ) : (
-            <ul className="mt-4 grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
-              {recommendations.map((r) => (
-                <li
-                  key={`${r.name}-${r.address}`}
-                  className="rounded-2xl border border-slate-200/80 bg-white p-3.5 shadow-card"
-                >
-                  <div className="flex gap-3">
-                    <CategoryIcon category={r.category} />
-                    <div className="min-w-0 flex-1">
-                      <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
-                        <span className="min-w-0 truncate text-[15px] font-bold text-admin-text">
-                          {r.name}
-                        </span>
-                        {r.badge ? <NewBadge label={r.badge} /> : null}
-                      </div>
-                      <p className="mt-0.5 text-xs font-medium text-admin-text-muted">
-                        {r.category}
-                      </p>
-                      <p className="mt-1.5 break-keep text-[13px] leading-6 text-admin-text">
-                        {r.blurb}
-                      </p>
-                      <p className="mt-1.5 flex items-start gap-1.5 break-keep text-xs leading-5 text-admin-text-muted">
-                        <Icon name="pin" size={13} className="mt-0.5" />
-                        {r.address}
-                      </p>
-                      <a
-                        href={r.directions_url}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="mt-2 inline-flex min-h-11 items-center rounded-lg px-2 text-xs font-bold text-visitor-primary underline underline-offset-4"
-                      >
-                        카카오맵에서 길찾기
-                      </a>
-                      <div className="mt-2.5 flex flex-wrap items-center gap-1.5">
-                        <span className="inline-flex items-center gap-1 rounded-full bg-visitor-primary-soft px-2 py-0.5 text-xs font-semibold text-visitor-primary ring-1 ring-inset ring-visitor-primary/20">
-                          <Icon name="check" size={12} strokeWidth={2} />
-                          하이원포인트 사용 가능
-                        </span>
-                        {r.payback ? <PaybackBadge label={r.payback.label} /> : null}
-                      </div>
-                    </div>
-                  </div>
-                </li>
-              ))}
-            </ul>
+            <>
+              {/* 확충 완료 매칭 항목은 이미 정렬 최상단이다 — 섹션으로 갈라 "무엇이 새로 생겼는지"가 먼저 읽히게 한다 */}
+              {fresh.length ? (
+                <section aria-label="이번 분기 새로 확충된 업종" className="mt-4">
+                  <h3 className="flex items-center gap-1.5 text-[14px] font-bold text-state-good">
+                    <Icon name="sparkle" size={15} strokeWidth={2} />
+                    이번 분기 새로 확충된 업종
+                  </h3>
+                  <p className="mt-0.5 text-xs leading-5 text-admin-text-muted">
+                    지역상생팀이 이번 분기에 확충을 완료한 업종과 연결된 가맹점이에요.
+                  </p>
+                  <ul className="mt-3 grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
+                    {fresh.map((r) => (
+                      <MerchantCard key={`${r.name}-${r.address}`} r={r} />
+                    ))}
+                  </ul>
+                </section>
+              ) : null}
+              {others.length ? (
+                <ul className={`grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3 ${fresh.length ? "mt-5 border-t border-slate-200 pt-5" : "mt-4"}`}>
+                  {others.map((r) => (
+                    <MerchantCard key={`${r.name}-${r.address}`} r={r} />
+                  ))}
+                </ul>
+              ) : null}
+            </>
           )}
 
           {total > recommendations.length ? (
@@ -262,6 +278,7 @@ function Filter({
   selected,
   makeHref,
   titleOf,
+  countOf,
   className = "",
 }: {
   label: string;
@@ -269,28 +286,81 @@ function Filter({
   selected?: string;
   makeHref: (value?: string) => string;
   titleOf?: (value: string) => string | undefined;
+  /** 칩을 눌렀을 때 보게 될 가맹점 수 — 반대편 활성 필터가 반영된 값이어야 한다 */
+  countOf?: (value?: string) => number;
   className?: string;
 }) {
   const chip = (active: boolean) =>
-    `inline-flex min-h-[36px] items-center rounded-full px-3.5 text-[13px] transition-colors ${
+    `inline-flex min-h-[36px] items-center gap-1 rounded-full px-3.5 text-[13px] transition-colors ${
       active
         ? "bg-visitor-primary font-semibold text-white shadow-[0_4px_12px_-4px_rgb(22_101_52_/_0.7)]"
         : "bg-slate-100 font-medium text-admin-text hover:bg-slate-200"
     }`;
+  const count = (active: boolean, value?: string) =>
+    countOf ? (
+      <span className={`text-[11px] font-semibold tabular-nums ${active ? "text-white/80" : "text-admin-text-muted"}`}>
+        {countOf(value)}
+      </span>
+    ) : null;
 
   return (
     <div className={className}>
       <p className="mb-2 text-xs font-semibold text-admin-text-muted">{label}</p>
       <div className="flex flex-wrap gap-1.5">
         <Link href={makeHref(undefined)} className={chip(!selected)}>
-          전체
+          전체{count(!selected)}
         </Link>
         {options.map((o) => (
           <Link key={o} href={makeHref(o)} title={titleOf?.(o)} className={chip(selected === o)}>
             {o}
+            {count(selected === o, o)}
           </Link>
         ))}
       </div>
     </div>
+  );
+}
+
+/** 추천 가맹점 카드 한 장 — 확충 섹션과 전체 목록이 같은 마크업을 쓴다 */
+function MerchantCard({ r }: { r: Recommendation }) {
+  return (
+    <li className="rounded-2xl border border-slate-200/80 bg-white p-3.5 shadow-card">
+      <div className="flex gap-3">
+        <CategoryIcon category={r.category} />
+        <div className="min-w-0 flex-1">
+          <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+            <span className="min-w-0 truncate text-[15px] font-bold text-admin-text">
+              {r.name}
+            </span>
+            {r.badge ? <NewBadge label={r.badge} /> : null}
+          </div>
+          <p className="mt-0.5 text-xs font-medium text-admin-text-muted">
+            {r.category}
+          </p>
+          <p className="mt-1.5 break-keep text-[13px] leading-6 text-admin-text">
+            {r.blurb}
+          </p>
+          <p className="mt-1.5 flex items-start gap-1.5 break-keep text-xs leading-5 text-admin-text-muted">
+            <Icon name="pin" size={13} className="mt-0.5" />
+            {r.address}
+          </p>
+          <a
+            href={r.directions_url}
+            target="_blank"
+            rel="noreferrer"
+            className="mt-2 inline-flex min-h-11 items-center rounded-lg px-2 text-xs font-bold text-visitor-primary underline underline-offset-4"
+          >
+            카카오맵에서 길찾기
+          </a>
+          <div className="mt-2.5 flex flex-wrap items-center gap-1.5">
+            <span className="inline-flex items-center gap-1 rounded-full bg-visitor-primary-soft px-2 py-0.5 text-xs font-semibold text-visitor-primary ring-1 ring-inset ring-visitor-primary/20">
+              <Icon name="check" size={12} strokeWidth={2} />
+              하이원포인트 사용 가능
+            </span>
+            {r.payback ? <PaybackBadge label={r.payback.label} /> : null}
+          </div>
+        </div>
+      </div>
+    </li>
   );
 }
