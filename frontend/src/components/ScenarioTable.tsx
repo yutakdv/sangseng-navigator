@@ -4,6 +4,7 @@ import { useState } from "react";
 import { AssumptionNote } from "@/components/Badge";
 import { DeltaValue } from "@/components/DeltaValue";
 import { DecisionActions } from "@/components/DecisionActions";
+import { PaybackImpactPanel } from "@/components/PaybackImpactPanel";
 import type { CardStatus, PaybackRate, Scenario } from "@/types";
 
 /**
@@ -33,6 +34,8 @@ export function ScenarioTable({
   status,
   selectedRate = null,
   assumptionNote,
+  avgVisitors = null,
+  visitorsBasis = "",
 }: {
   cardId: string;
   scenarios: Scenario[];
@@ -41,6 +44,10 @@ export function ScenarioTable({
   selectedRate?: PaybackRate | null;
   /** 카드가 실어 보낸 가정 문구 — 있으면 요약 없이 그대로 노출한다 */
   assumptionNote?: string;
+  /** 최근 3개월 평균 입장 연인원(교대 합산) — 주면 재원 부담 대비 효과 패널을 그린다 */
+  avgVisitors?: number | null;
+  /** 평균의 근거 기간 라벨 (예: "2025-10~12") */
+  visitorsBasis?: string;
 }) {
   const editable = status === "pending";
   const [choice, setChoice] = useState<PaybackRate | null>(selectedRate);
@@ -128,6 +135,16 @@ export function ScenarioTable({
           </tbody>
         </table>
       </div>
+
+      {/* 라디오 선택(결정 전)·확정 rate(결정 후)를 실시간 강조하는 손익 대비 패널 */}
+      {avgVisitors ? (
+        <PaybackImpactPanel
+          scenarios={scenarios}
+          activeRate={checked ?? null}
+          avgVisitors={avgVisitors}
+          visitorsBasis={visitorsBasis}
+        />
+      ) : null}
 
       {assumptionNote ? <p className="u-note mt-3">{assumptionNote}</p> : null}
       <AssumptionNote className="mt-1.5" />
