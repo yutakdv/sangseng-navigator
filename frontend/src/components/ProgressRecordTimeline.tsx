@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { DeltaValue } from "@/components/DeltaValue";
 import { Icon } from "@/components/Icon";
 import { ProgressChip } from "@/components/StatusChip";
 import type { ProgressMetricKey, ProgressRecord } from "@/types";
@@ -38,6 +39,23 @@ export function ProgressRecordTimeline({
       </div>
     );
   }
+
+  // 기록별 "직전 대비" 변화 표기용 — 각 기록보다 이른 기록에서 같은 지표의 최신 값을 미리 찾아 둔다
+  const ordered = [...records].sort((a, b) => Date.parse(b.recorded_at) - Date.parse(a.recorded_at));
+  const previousMetrics = new Map<string, Partial<Record<ProgressMetricKey, number>>>();
+  ordered.forEach((record, i) => {
+    const prev: Partial<Record<ProgressMetricKey, number>> = {};
+    for (const { key } of METRICS) {
+      for (let j = i + 1; j < ordered.length; j++) {
+        const value = ordered[j].metrics?.[key];
+        if (value !== undefined && value !== null) {
+          prev[key] = value;
+          break;
+        }
+      }
+    }
+    previousMetrics.set(record.record_id, prev);
+  });
 
   return (
     <ol className="relative flex flex-col gap-4 before:absolute before:bottom-5 before:left-[11px] before:top-5 before:w-px before:bg-admin-border sm:before:left-[15px]">
@@ -124,17 +142,40 @@ export function ProgressRecordTimeline({
                   <p className="text-[11px] font-bold text-admin-text-muted">실제 관측 성과</p>
                   <dl className="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-5">
                     {observed.map((metric) => {
-                      const value = record.metrics[metric.key];
+                      const value = record.metrics[metric.key] as number;
+                      const prev = previousMetrics.get(record.record_id)?.[metric.key];
                       return (
                         <div key={metric.key} className="rounded-lg bg-admin-surface-sunken px-2.5 py-2">
                           <dt className="text-[10px] leading-4 text-admin-text-muted">{metric.label}</dt>
                           <dd className="mt-0.5 text-xs font-bold tabular-nums text-admin-text">
-                            {formatMetric(value as number, metric.digits)}{metric.unit}
+                            {formatMetric(value, metric.digits)}{metric.unit}
+                          </dd>
+                          <dd className="mt-1 text-[10px] leading-4">
+                            {prev === undefined ? (
+                              <span className="text-admin-text-muted">첫 관측</span>
+                            ) : value === prev ? (
+                              <span className="text-admin-text-muted">직전과 동일</span>
+                            ) : (
+                              <DeltaValue
+                                value={value - prev}
+                                unit={metric.unit}
+                                digits={metric.digits}
+                                variant="text"
+                                className="text-[10px] font-semibold"
+                                note="직전 대비"
+                              />
+                            )}
                           </dd>
                         </div>
                       );
                     })}
                   </dl>
+                  {/* 방향색은 값의 증감만 뜻한다 — 집중도는 의미가 반대라 문장으로 못 박는다 */}
+                  {observed.some((metric) => metric.key === "concentration_index") ? (
+                    <p className="mt-2 text-[10px] leading-4 text-admin-text-muted">
+                      소비 집중도는 값이 낮아질수록(▼) 분산이 개선된 것입니다.
+                    </p>
+                  ) : null}
                 </div>
               ) : null}
             </article>

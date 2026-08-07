@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useId, useState, useTransition } from "react";
 import { progressAction } from "@/app/actions";
 import { EXPANSION_PROGRESS, INCENTIVE_PROGRESS } from "@/lib/cardWorkflow";
@@ -42,6 +43,8 @@ export function ProgressSelect({
   const [pending, startTransition] = useTransition();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  /** 완료 전환 성공 직후 — 위젯 반영을 확인하러 가는 동선을 그 자리에서 보여준다 */
+  const [justCompleted, setJustCompleted] = useState(false);
   const id = useId();
 
   // 서버 값이 바뀐 순간에만 로컬 선택값을 맞춘다 — effect 없이 렌더 중 조정하는 React 표준 패턴이라
@@ -58,6 +61,7 @@ export function ProgressSelect({
   const change = (next: CardProgress) => {
     if (next === value) return;
     setError(null);
+    setJustCompleted(false);
     setValue(next);
     setBusy(true);
     // React 18의 startTransition은 async 스코프를 기다리지 않는다 — "변경 중" 표시는 busy로 따로 잡고,
@@ -69,7 +73,9 @@ export function ProgressSelect({
           if (!res.ok) {
             setValue(server);
             setError(res.detail);
+            return;
           }
+          if (next === "완료") setJustCompleted(true);
         })
         .catch(() => {
           setValue(server);
@@ -113,6 +119,15 @@ export function ProgressSelect({
       {isDemoReadOnly ? <p className="u-note mt-1.5">공개 데모 읽기 전용</p> : null}
 
       {working ? <p className="u-note mt-1.5">변경 중…</p> : null}
+
+      {justCompleted ? (
+        <p className="mt-1.5 break-keep rounded-lg bg-state-good-bg px-2 py-1.5 text-xs leading-5 text-state-good ring-1 ring-inset ring-state-good-line">
+          완료 처리되어 방문객 위젯 추천에 반영되었습니다.{" "}
+          <Link href="/widget?live=1" className="font-bold underline underline-offset-4">
+            위젯에서 확인
+          </Link>
+        </p>
+      ) : null}
 
       {error ? (
         <p

@@ -52,10 +52,14 @@ export function AssumptionNote({ className = "" }: { className?: string }) {
   );
 }
 
-/** 완료된 확충 카드의 (읍×업종)과 매칭되는 업종 — 점포 신설로 오인시키지 않는다 */
+/**
+ * 완료된 확충 카드의 (읍×업종)과 매칭되는 업종 — 점포 신설로 오인시키지 않는다.
+ * `animate-pop`은 DOM에 새로 마운트될 때만 재생된다 — 라이브 미리보기(router.refresh) 중
+ * 배지가 새로 생긴 항목만 등장 연출이 걸리고, 이미 있던 배지는 가만히 있는다.
+ */
 export function NewBadge({ label = "이번 분기 확충 업종" }: { label?: string }) {
   return (
-    <span className={`${base} bg-state-good-bg text-state-good ring-state-good-line`}>
+    <span className={`${base} bg-state-good-bg text-state-good ring-state-good-line motion-safe:animate-pop`}>
       <Icon name="sparkle" size={12} strokeWidth={2} />
       {label}
     </span>
@@ -66,7 +70,7 @@ export function NewBadge({ label = "이번 분기 확충 업종" }: { label?: st
 export function PaybackBadge({ label }: { label: string }) {
   return (
     <span
-      className={`${base} whitespace-normal bg-visitor-primary-soft text-visitor-primary ring-visitor-primary/20`}
+      className={`${base} whitespace-normal bg-visitor-primary-soft text-visitor-primary ring-visitor-primary/20 motion-safe:animate-pop`}
     >
       <Icon name="gift" size={12} strokeWidth={2} />
       {label}

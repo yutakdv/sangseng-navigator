@@ -140,12 +140,18 @@ const config: Config = {
           from: { strokeDashoffset: "1" },
           to: { strokeDashoffset: "0" },
         },
+        /** 새로 나타난 배지의 등장 강조 — 승인/완료 직후 위젯에 반영된 항목이 눈에 띄게 */
+        pop: {
+          from: { opacity: "0", transform: "scale(0.8)" },
+          to: { opacity: "1", transform: "scale(1)" },
+        },
       },
       animation: {
         "fade-up": "fade-up 0.25s ease-out both",
         rise: "rise 0.55s cubic-bezier(0.16, 1, 0.3, 1) both",
         grow: "grow 0.8s cubic-bezier(0.16, 1, 0.3, 1) both",
         draw: "draw 1.1s cubic-bezier(0.16, 1, 0.3, 1) both",
+        pop: "pop 0.4s cubic-bezier(0.16, 1, 0.3, 1) both",
       },
     },
   },

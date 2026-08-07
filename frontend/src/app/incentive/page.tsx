@@ -39,6 +39,15 @@ export default async function IncentivePage() {
   // 최신 1장 = 생성 시각 내림차순 첫 카드 (허브에서 새로 생성하면 그 카드가 이 화면의 대상이 된다)
   const card = [...cards].sort((a, b) => Date.parse(b.created_at) - Date.parse(a.created_at))[0];
 
+  // 손익 대비 패널용 — 최근 3개월 평균 입장 연인원(교대 합산). 개선폭(%p)을 월 건수로 환산하는 분모다
+  const recentMonthly = (dashboard.conversion.monthly ?? []).slice(-3);
+  const avgVisitors = recentMonthly.length
+    ? recentMonthly.reduce((a, m) => a + m.visitors, 0) / recentMonthly.length
+    : null;
+  const visitorsBasis = recentMonthly.length
+    ? `${recentMonthly[0].month}~${recentMonthly[recentMonthly.length - 1].month.slice(5)}`
+    : "";
+
   // "지역 전환율"이 보이는 모든 위치에 붙인다 (절대 규칙 2) — note는 요약 없이 그대로 노출
   const proxyBadge = dashboard.conversion.is_proxy ? (
     <ProxyBadge note={dashboard.conversion.proxy_note} />
@@ -155,6 +164,8 @@ export default async function IncentivePage() {
                   status={card.status}
                   selectedRate={card.selected_rate ?? null}
                   assumptionNote={card.assumption_note}
+                  avgVisitors={avgVisitors}
+                  visitorsBasis={visitorsBasis}
                 />
               ) : (
                 <p className="u-body text-admin-text-muted">이 카드에는 비교할 시나리오가 없습니다.</p>
