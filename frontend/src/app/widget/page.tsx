@@ -4,6 +4,7 @@ import { NewBadge, PaybackBadge } from "@/components/Badge";
 import { CategoryIcon } from "@/components/CategoryIcon";
 import { Icon } from "@/components/Icon";
 import { KakaoMapView } from "@/components/KakaoMapView";
+import { WidgetLiveRefresh } from "@/components/WidgetLiveRefresh";
 import { api } from "@/lib/api";
 import { CATEGORIES, REGIONS, REGION_TOOLTIP, VISITOR_SOURCE_NOTE } from "@/lib/constants";
 
@@ -23,7 +24,7 @@ export const dynamic = "force-dynamic";
  * 필터 칩을 11~12px에서 13px·최소 높이 36px로 올리고 카드 정보를 이름 → 업종 → 설명 →
  * 주소 → 혜택 순으로 벌려 뒀다.
  */
-type Search = { region?: string; category?: string; limit?: string };
+type Search = { region?: string; category?: string; limit?: string; live?: string };
 const DEFAULT_LIST_LIMIT = 12;
 const MAX_LIST_LIMIT = 120;
 
@@ -33,6 +34,8 @@ const href = (next: Search, current: Search): string => {
   if (merged.region) params.set("region", merged.region);
   if (merged.category) params.set("category", merged.category);
   if (merged.limit) params.set("limit", merged.limit);
+  // 라이브 미리보기(데모)는 필터를 눌러도 꺼지지 않아야 한다
+  if (merged.live) params.set("live", merged.live);
   const q = params.toString();
   return q ? `/widget?${q}` : "/widget";
 };
@@ -47,8 +50,9 @@ export default async function WidgetPage({ searchParams }: { searchParams: Promi
   const listLimit = Number.isFinite(requestedLimit)
     ? Math.max(DEFAULT_LIST_LIMIT, Math.min(MAX_LIST_LIMIT, Math.floor(requestedLimit)))
     : DEFAULT_LIST_LIMIT;
-  const current: Search = { region, category, limit: sp.limit ? String(listLimit) : undefined };
-  const filters: Search = { region, category };
+  const live = sp.live === "1" ? "1" : undefined;
+  const current: Search = { region, category, limit: sp.limit ? String(listLimit) : undefined, live };
+  const filters: Search = { region, category, live };
 
   const [{ recommendations, policy_note, total }, dashboard] = await Promise.all([
     api.widget(region, category, listLimit),
@@ -64,9 +68,12 @@ export default async function WidgetPage({ searchParams }: { searchParams: Promi
             aria-hidden
             className="pointer-events-none absolute -right-8 -top-12 h-40 w-40 rounded-full bg-white/10 blur-2xl"
           />
-          <p className="relative text-xs font-semibold uppercase tracking-[0.14em] text-white/90">
-            강원랜드 지역상생
-          </p>
+          <div className="relative flex flex-wrap items-center justify-between gap-2">
+            <p className="text-xs font-semibold uppercase tracking-[0.14em] text-white/90">
+              강원랜드 지역상생
+            </p>
+            {live ? <WidgetLiveRefresh /> : null}
+          </div>
           <h1 className="relative mt-1.5 break-keep text-[22px] font-bold leading-8">
             지역별 하이원포인트 가맹점
           </h1>
@@ -89,7 +96,7 @@ export default async function WidgetPage({ searchParams }: { searchParams: Promi
               label="관심 지역"
               options={REGIONS}
               selected={region}
-              makeHref={(v) => href({ region: v }, { category })}
+              makeHref={(v) => href({ region: v }, { category, live })}
               titleOf={(v) => REGION_TOOLTIP[v as keyof typeof REGION_TOOLTIP]}
               className="mt-6"
             />
@@ -97,7 +104,7 @@ export default async function WidgetPage({ searchParams }: { searchParams: Promi
               label="업종"
               options={CATEGORIES}
               selected={category}
-              makeHref={(v) => href({ category: v }, { region })}
+              makeHref={(v) => href({ category: v }, { region, live })}
               className="mt-4"
             />
           </div>
@@ -125,7 +132,7 @@ export default async function WidgetPage({ searchParams }: { searchParams: Promi
                 다른 지역·업종을 선택해 보세요
               </p>
               <Link
-                href="/widget"
+                href={href({}, { live })}
                 className="mt-4 inline-flex items-center gap-1.5 rounded-full bg-visitor-primary px-4 py-2 text-[13px] font-semibold text-white"
               >
                 조건 초기화
