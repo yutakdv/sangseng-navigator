@@ -187,9 +187,14 @@ def _fallback_narrative(r: dict) -> str:
 @router.post("/cards/{cid}/simulate")
 def simulate_card(
     cid: str,
-    _authorized: None = Depends(security.require_mutation_access),
+    _authorized: None = Depends(security.require_internal_access),
 ):
     """가맹 전환 시 예상 효과 — EXPANSION 반사실 재계산 + LLM 설명 (05 문서 §2, 07 문서 B5).
+
+    가드가 `require_internal_access`인 이유: 이 API는 카드 상태를 바꾸지 않는 **읽기 계산**이라
+    05 §8의 DEMO_READ_ONLY 차단 대상이 아니다. 읽기 전용 모드에서 막으면 승인 판단에 필요한
+    "가맹 전환 시 예상 효과"를 볼 수 없고, 화면에는 상태 변경도 아닌데 "읽기 전용입니다" 문구가
+    뜬다. 다만 요청마다 LLM을 호출하므로 무인증 공개는 하지 않고 Bearer 토큰은 그대로 요구한다.
 
     표시 문구에 "확보"를 쓰지 않는다 — 가맹점은 강원랜드가 지정하는 게 아니라 사업자가 신청하고
     강원랜드가 서류접수→현장실사→계약으로 심사한다 (05 §2 표현 규칙). 필드명·경로는 그대로다.

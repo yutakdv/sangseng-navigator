@@ -703,7 +703,6 @@ def test_public_demo_read_only_blocks_mutations(monkeypatch):
     mutations = [
         ("/api/cards/generate", {"type": "EXPANSION"}),
         ("/api/cards/AC-002/decision", {"decision": "held"}),
-        ("/api/cards/AC-001/simulate", {}),
         ("/api/cards/AC-001/progress", {"progress": "보류"}),
         ("/api/cards/AC-001/progress-records", {"progress": "보류", "note": "보안 확인"}),
         ("/api/cards/AC-001/verification", {"checks": []}),
@@ -712,6 +711,21 @@ def test_public_demo_read_only_blocks_mutations(monkeypatch):
         res = client.post(path, json=body)
         assert res.status_code == 403 and "읽기 전용" in res.json()["detail"]
     assert client.get("/api/cards").status_code == 200
+
+
+def test_public_demo_read_only_keeps_simulate_open(monkeypatch, fake_llm):
+    """simulate는 상태를 바꾸지 않는 읽기 계산이라 읽기 전용 모드에서도 열려 있어야 한다 (05 §8).
+
+    막으면 승인 판단 근거인 "가맹 전환 시 예상 효과"가 사라지고, 상태 변경이 아닌데도
+    "읽기 전용입니다" 문구가 화면에 뜬다. 대신 Bearer 토큰은 그대로 요구한다(LLM 호출 보호).
+    """
+    monkeypatch.setenv("DEMO_READ_ONLY", "true")
+    res = client.post("/api/cards/AC-002/simulate")
+    assert res.status_code == 200
+    assert res.json()["simulation"]["assumption_note"] == ASSUMPTION_NOTE
+
+    unauthorized = client.post("/api/cards/AC-002/simulate", headers={"Authorization": ""})
+    assert unauthorized.status_code == 401
 
 
 def test_mutations_fail_closed_without_server_token(monkeypatch):
