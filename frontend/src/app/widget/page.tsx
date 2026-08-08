@@ -4,10 +4,13 @@ import { NewBadge, PaybackBadge } from "@/components/Badge";
 import { CategoryIcon } from "@/components/CategoryIcon";
 import { Icon } from "@/components/Icon";
 import { KakaoMapView } from "@/components/KakaoMapView";
+import { TodayPick } from "@/components/TodayPick";
 import { WidgetLiveRefresh } from "@/components/WidgetLiveRefresh";
 import { api } from "@/lib/api";
 import { CATEGORIES, REGIONS, REGION_TOOLTIP, VISITOR_SOURCE_NOTE } from "@/lib/constants";
-import type { Card, Recommendation } from "@/types";
+import { kstWeekdayIndex, todayPickCopy, weekdayFact } from "@/lib/todayPick";
+import { fetchNowcast } from "@/lib/weather";
+import type { Card, DisplayCategory, Recommendation, Region } from "@/types";
 
 export const metadata: Metadata = { title: "가맹점 찾기 · 상생 나침반" };
 
@@ -55,15 +58,21 @@ export default async function WidgetPage({ searchParams }: { searchParams: Promi
   const current: Search = { region, category, limit: sp.limit ? String(listLimit) : undefined, live };
   const filters: Search = { region, category, live };
 
-  const [{ recommendations, policy_note, total }, dashboard, cand, incentiveRes] = await Promise.all([
-    api.widget(region, category, listLimit),
-    api.dashboard(),
-    // 필터 칩의 가맹점 수 표기용 — merchants는 candidates 응답에 함께 실려 온다 (05 §1).
-    // 칩 숫자는 장식이라, 이 엔드포인트가 503이어도 방문객 위젯 자체는 떠야 한다.
-    api.candidates().catch(() => null),
-    // 페이백 배너용 — 필터로 추천이 0건이어도 시행 중인 정책은 알려야 하므로 카드에서 직접 읽는다
-    api.cards({ type: "INCENTIVE" }).catch(() => ({ cards: [] as Card[] })),
-  ]);
+  const [{ recommendations, policy_note, total }, dashboard, cand, incentiveRes, usageDaily, weather] =
+    await Promise.all([
+      api.widget(region, category, listLimit),
+      api.dashboard(),
+      // 필터 칩의 가맹점 수 표기용 — merchants는 candidates 응답에 함께 실려 온다 (05 §1).
+      // 칩 숫자는 장식이라, 이 엔드포인트가 503이어도 방문객 위젯 자체는 떠야 한다.
+      api.candidates().catch(() => null),
+      // 페이백 배너용 — 필터로 추천이 0건이어도 시행 중인 정책은 알려야 하므로 카드에서 직접 읽는다
+      api.cards({ type: "INCENTIVE" }).catch(() => ({ cards: [] as Card[] })),
+      // 오늘의 추천 근거 — BE 엔드포인트가 없는 파이프라인 정적 산출물이다 (05 §6)
+      api.usageDaily(),
+      // 기상청 실황은 있으면 좋은 곁들임이다 — 실패해도 요일 문구는 그대로 나와야 한다.
+      // fetchNowcast는 던지지 않도록 구현했지만 위 candidates와 같은 방어 관용구를 맞춘다.
+      fetchNowcast(region as Region | undefined).catch(() => null),
+    ]);
 
   // 칩의 숫자는 "그 칩을 눌렀을 때 볼 목록"의 크기 — 반대편 활성 필터를 반영해야 한다.
   // 1,679개 배열을 칩(14개)마다 재스캔하지 않도록 한 번 훑어 (지역|업종) 조합 카운트를 만든다.
@@ -94,6 +103,22 @@ export default async function WidgetPage({ searchParams }: { searchParams: Promi
     (donePayback?.selected_rate
       ? { rate: donePayback.selected_rate, label: `지금 여기서 쓰면 ${donePayback.selected_rate}% 페이백` }
       : null);
+  /**
+   * 오늘의 추천 — 요일 실측이 주근거, 날씨는 상황 설명이다(추천 업종을 바꾸지 않는다).
+   * 지역이 없으면 "전체" 축으로 말하고 날씨는 거점 격자를 쓴다.
+   * 48~49행의 `region`/`category`는 `CATEGORIES.includes(...)` 가드를 거쳐도 타입이
+   * `string | undefined`다(includes가 타입 서술어가 아님) — 그래서 캐스팅한다.
+   */
+  const fact = weekdayFact(usageDaily, (region as Region) ?? "전체", kstWeekdayIndex(), {
+    // 방문객이 업종을 이미 골랐으면 그 업종 사실만 말한다 — 다른 업종을 들이밀지 않는다
+    only: category as DisplayCategory | undefined,
+    // 지름길 칩이 빈 목록으로 이어지지 않게. candidates를 못 받았으면(merchants 0) 거르지 않는다
+    isAvailable: merchants.length ? (c) => countMerchants(region, c) > 0 : undefined,
+  });
+  const todayCopy = fact ? todayPickCopy(fact, region ?? null, weather) : null;
+  // 업종이 이미 선택돼 있으면 칩이 현재 필터와 같아진다 — 그때는 칩을 내리지 않는다
+  const todayHref = fact && !category ? href({ category: fact.category }, filters) : null;
+
   const fresh = recommendations.filter((r) => r.badge);
   const others = recommendations.filter((r) => !r.badge);
 
@@ -139,6 +164,9 @@ export default async function WidgetPage({ searchParams }: { searchParams: Promi
             </div>
           </div>
         ) : null}
+
+        {/* 오늘의 추천 — 필터로 내려가기 전에 "오늘 기준"을 한 줄로 준다. 요일 사실을 못 만들면 통째로 숨긴다 */}
+        {todayCopy ? <TodayPick copy={todayCopy} chipHref={todayHref} /> : null}
 
         <div className="grid gap-6 px-5 py-5 sm:px-8 sm:py-8 lg:grid-cols-[0.72fr_1.28fr] lg:items-start">
           <div>

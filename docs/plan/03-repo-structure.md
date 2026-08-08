@@ -21,7 +21,7 @@ sangseng-navigator/
 │       │   ├── incentive/page.tsx     # ④ 인센티브 정책 카드
 │       │   ├── widget/page.tsx        # ⑤ 방문객 위젯 (모바일 뷰)
 │       │   └── tracking/page.tsx      # ⑥ 실행 상태 트래킹
-│       ├── components/                # KpiCard, Badge(근사지표/가정기반), CardItem, MapView ...
+│       ├── components/                # KpiCard, Badge(근사지표/가정기반/AI출처), ProposalSummary, MapView ...
 │       ├── lib/api.ts                 # 단일 데이터 접근 계층 (mock ↔ 실 API 전환)
 │       └── mocks/                     # data/processed 실산출 → ./scripts/sync-mocks.sh 로 생성한 뒤 커밋 (FE가 커밋)
 │                                       #   (cards/kpi/widget/simulate 등 스크립트 대상 외는 05 예시 구조 참조)

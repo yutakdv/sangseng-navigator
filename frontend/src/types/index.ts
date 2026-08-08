@@ -183,8 +183,19 @@ export interface CardOperations {
   actual_outcome: string | null;
 }
 
+/**
+ * 후보 선택 사유 코드 (05 §2) — 화면 배지 문구의 정본.
+ *
+ * `adjusted`만으로는 "정량 1순위 선택"과 "진행 중인 건 제외하고 선택" 둘 중 하나로만 갈려,
+ * 지역 배분 몫으로 고른 카드에까지 둘 중 하나가 잘못 붙는다. 값이 없는 구형 카드는 순위로
+ * 추론하되 단정할 수 없는 경우는 배지를 그리지 않는다.
+ */
+export type SelectionReason = "top_score" | "exclude_in_progress" | "region_quota";
+
 export interface CardAi {
   adjusted: boolean;
+  /** 없으면 score_rank·selection_rank로 추론 (RankTrace) */
+  selection_reason?: SelectionReason;
   comparison: string;
   reasons: string[];
   risks: string[];
@@ -193,10 +204,12 @@ export interface CardAi {
   original_ranking: { rank: number; candidate: string; score: number }[] | null;
   /** LLM 자유서술의 숫자·순위·상태를 정본 데이터로 재검증했는지 */
   grounding?: {
-    status: "verified" | "fallback";
-    numeric_status?: "verified" | "fallback";
+    /** EXPANSION은 verified, INCENTIVE는 partial(시나리오 수치만 서버 고정) (05 §2) */
+    status: "verified" | "fallback" | "partial";
+    numeric_status?: "verified" | "fallback" | "fixed_by_server";
     narrative_status?: "verified" | "fallback" | "rule_based" | "ai_generated_unverified";
     selection_method?: string;
+    /** llm | rule_fallback | rule_seed | mock_rule — 설명 출처 칩의 근거 (05 §2) */
     explanation_source?: string;
     source: "structured";
     checks: string[];
@@ -218,7 +231,7 @@ export interface Card {
   target: { eup: string; category: string } | null;
   score_rank: number | null;
   ai_rank: number | null;
-  /** 활성 업무 제외 후 가용 후보 안에서의 순위. */
+  /** 진행 중인 업무 제외 후 선택 가능한 후보 안에서의 순위. */
   selection_rank?: number | null;
   confidence: "상" | "중" | "하";
   ai: CardAi;
@@ -375,6 +388,8 @@ export interface Simulation {
   effect_assessment: "미미" | "개선" | "심화" | "혼재";
   decision_note: string;
   narrative: string;
+  /** 이 문구가 LLM 응답인지 규칙 기반인지 (05 §2). mock 모드는 mock_rule */
+  narrative_source?: "llm" | "rule_based" | "mock_rule";
   assumption_note: string;
 }
 

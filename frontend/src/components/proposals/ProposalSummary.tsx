@@ -1,8 +1,10 @@
 import Link from "next/link";
-import { AssumptionBadge, AssumptionNote } from "@/components/Badge";
+import { AssumptionBadge, AssumptionNote, NarrativeSourceChip } from "@/components/Badge";
 import { Icon } from "@/components/Icon";
 import { RankTrace } from "@/components/RankTrace";
 import { WorkflowChip } from "@/components/StatusChip";
+import { cardNarrativeSource } from "@/lib/aiSource";
+import { STABILITY_NOTE } from "@/lib/constants";
 import { num } from "@/lib/format";
 import type { Card, Dashboard, EupScore } from "@/types";
 
@@ -13,7 +15,7 @@ import type { Card, Dashboard, EupScore } from "@/types";
  * 그리고, 가운데 사실 블록만 카드 종류로 갈린다. 두 종류의 성격이 다르기 때문이다:
  *
  *   EXPANSION — 대상이 특정 (읍×업종) 지점이다. 지역 근거·현재 비중·순위 안정도 세 지표와
- *               원 정량 Score 병기(절대 규칙 5)가 판단의 핵심이다.
+ *               원 정량 순위 병기(절대 규칙 5 — 2단계 후보 스코어)가 판단의 핵심이다.
  *   INCENTIVE — 대상 지점이 없다(전 지역 공통). 대신 3·5·7% 시나리오의 예상 개선폭과
  *               재원 부담이 판단의 핵심이라, 읍×업종·지도 항목을 억지로 채우지 않는다.
  *
@@ -54,6 +56,8 @@ export function ProposalSummary({
         <div className="flex flex-wrap items-center gap-2">
           {leadBadge}
           <WorkflowChip card={card} />
+          {/* "AI 제안" 배지 옆에서 그 AI가 실제로 무엇을 썼는지 같은 줄에 밝힌다 (05 §2) */}
+          <NarrativeSourceChip kind={cardNarrativeSource(card)} />
         </div>
         <span className="text-xs font-semibold tabular-nums text-admin-text-muted">{card.id}</span>
       </div>
@@ -114,7 +118,17 @@ function ExpansionFacts({
         />
       </div>
 
-      {/* 원 Score 순위 병기 — 조정 여부와 무관하게 항상 노출 (절대 규칙 5) */}
+      {/* 추천 순위 안정도 해석 주의 — 맨 숫자만 보이면 "추천이 16%만 안정적"으로 읽힌다.
+          대시보드(app/dashboard/page.tsx)와 같은 문구를 수치가 나오는 자리와 1:1로 붙인다.
+          안정도가 없으면(P8 미실행) MiniFact가 "산출 전"을 찍으므로 각주도 그리지 않는다 */}
+      {stability !== null && stability !== undefined ? (
+        <p className="u-note mt-2 flex items-start gap-1.5">
+          <Icon name="info" size={13} strokeWidth={2} className="mt-[3px]" />
+          <span>{STABILITY_NOTE}</span>
+        </p>
+      ) : null}
+
+      {/* 원 정량 순위 병기 — 조정 여부와 무관하게 항상 노출 (절대 규칙 5) */}
       {showRank ? (
         <div className="relative z-10 mt-4">
           <RankTrace card={card} />

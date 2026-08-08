@@ -9,6 +9,9 @@ import { Icon, type IconName } from "@/components/Icon";
  * 설명에 그치지만, 건수가 붙으면 담당자가 지금 어느 단계에 병목이 있는지 바로 읽는다.
  *
  * 문구는 절대 규칙 4를 따른다: AI 단계는 "제안"까지이고, 가맹 확정은 적격성·가맹 심사 뒤에만 가능하다.
+ *
+ * 건수의 정의는 `DashboardDetailSections`가 넘긴다 — STEP4·5·6은 승인 카드를 겹치지 않게 나눈 값이라
+ * 셋을 더하면 승인 카드 총수가 된다.
  */
 type Step = {
   icon: IconName;
@@ -22,34 +25,53 @@ type Step = {
 export function PolicyFlow({
   counts,
 }: {
-  counts: { cards: number; pending: number; approved: number; inProgress: number; done: number };
+  counts: {
+    /** STEP2 — 생성된 카드 전체 */
+    cards: number;
+    /** STEP3 — 결정 대기 */
+    pending: number;
+    /** STEP4 — 승인 카드 중 **검토 시작 단계에 머문** 것 (승인 총수가 아니다) */
+    approved: number;
+    /** STEP5 — 승인 카드 중 적격성 확인·가맹 심사·추진중 */
+    inProgress: number;
+    /** STEP6 — 완료 */
+    done: number;
+  };
 }) {
+  /**
+   * 각 스텝의 링크는 **그 건수를 세는 목록의 앵커**로만 간다. 종류 필터(`?type=`)는 붙이지 않는다 —
+   * 건수는 전 종류를 세는데 링크가 확충만 남기면 "2건"을 눌렀는데 1줄만 보이는 어긋남이 생긴다.
+   * 앵커 id의 정본은 DashboardOverview(`#proposal`·`#decision-queue`·`#work-queue`)이고,
+   * WorkQueue 주석이 밝히듯 id를 바꾸면 이 링크가 조용히 끊긴다.
+   * STEP4·STEP5의 카드는 둘 다 허브 "실행 관리" 목록 안에 있어, 그 목록 설명이 두 단계 건수를
+   * 다시 한 번 나눠 적는다 — 배지 숫자와 도착지 숫자가 서로를 확인한다.
+   */
   const steps: Step[] = [
     {
       icon: "chart",
       title: "데이터 진단",
-      desc: "소비 집중도 · 지역 전환율",
+      desc: "지역 소비 집중도 · 지역 전환율",
       href: "/dashboard",
     },
     {
       icon: "sparkle",
       title: "AI 제안",
       desc: "후보 비교 후 Action Card 생성",
-      href: "/?type=EXPANSION#proposal",
+      href: "/#proposal",
       count: { value: counts.cards, unit: "장" },
     },
     {
       icon: "list",
       title: "담당자 검토",
       desc: "근거 · 리스크 · 원 순위 확인",
-      href: "/?type=EXPANSION#pending",
+      href: "/#decision-queue",
       count: { value: counts.pending, unit: "건" },
     },
     {
       icon: "check",
       title: "검토 시작",
       desc: "후보 접촉 · 아직 가맹 확정 아님",
-      href: "/?type=EXPANSION#pending",
+      href: "/#work-queue",
       count: { value: counts.approved, unit: "건" },
     },
     {

@@ -20,6 +20,18 @@ ASSUMPTION_NOTE = "가정 기반 전망이며 실제와 다를 수 있음"      
 INCENTIVE_ASSUMPTION_NOTE = "페이백률-전환율 관계는 실측 데이터가 없어 팀 설정 가정(탄력성)에 기반한 전망"
 EXPANSION_SOURCES = ["하이원포인트 사용현황", "가맹점 상세정보", "소진공 상가정보"]
 INCENTIVE_SOURCES = ["하이원포인트 사용현황"]
+# 설명 문구의 출처를 화면이 구분할 수 있게 하는 근거 문장 (05 §2 grounding.narrative_status).
+# LLM 응답을 받지 못했는데도 "AI는 …사용했습니다"를 그대로 싣는 것이 감사 지적 M1의 원인이라,
+# 출처별로 문장을 가른다 — 데이터(grounding)와 화면 문장이 같은 사실을 말해야 한다.
+# 시드 카드는 사람이 사전 검증한 문구라 또 달라서 seed_demo.SEED_NARRATIVE_NOTE 를 따로 쓴다.
+NARRATIVE_NOTE = {
+    "llm": "대상은 서버의 정량 규칙이 선택했고 AI는 비정량 리스크 문구 생성에만 사용했습니다",
+    "rule_fallback": ("대상은 서버의 정량 규칙이 선택했고, AI 응답을 받지 못해 리스크 문구까지 "
+                      "서버 규칙으로 작성했습니다"),
+}
+# INCENTIVE는 EXPANSION과 달리 비교문·근거 문장을 구조화 데이터로 재생성하지 않는다 —
+# 3/5/7% 수치만 서버 상수(SCENARIOS)로 고정되므로 grounding을 절반만 주장한다 (05 §2).
+INCENTIVE_GROUNDING_CHECKS = ["scenarios", "mandatory_risks", "assumption_note"]
 # 05 §2 페이백 설계 표현 규칙 — 하이원포인트는 게임 참여에 비례해 적립되는 콤프라
 # "추가 적립·추가 지급"으로 쓰면 발행액 증가(도박 유인) 논란을 자초한다. 적립이 아니라
 # **사용 단계**의 리워드임이 제목에서부터 드러나게 한다 (수치·시나리오 구조는 그대로).
@@ -73,7 +85,7 @@ CARD_AI_SCHEMA = {
 
 
 class NoAvailableCandidate(Exception):
-    """전 후보에 활성 업무가 있어 새로 제안할 대상이 없음 — 중복 제안 금지의 결론.
+    """전 후보에 진행 중인 업무가 있어 새로 제안할 대상이 없음 — 중복 제안 금지의 결론.
 
     LLM 장애가 아니라 정상적인 도메인 신호라서 fallback 대상이 아니다 (라우트가 409로 변환).
     """
@@ -179,7 +191,7 @@ def _build_inputs(cands: list, cards: list, selected_target: dict) -> dict:
              "거점에서_도로_거리_km": c.get("road_distance_km")} for c in cands],
         "2_서버가_확정한_제안_대상": {
             "타깃": f"{selected_target['eup']} {selected_target['category']}",
-            "선택_규칙": "활성 업무가 없는 후보 중 정량 Score 최상위",
+            "선택_규칙": "진행 중인 업무가 없는 후보 중 후보 스코어 최상위",
             "Score": selected_target["score"],
             "정량_순위": selected_target["rank"],
         },
@@ -205,14 +217,14 @@ def _build_inputs(cands: list, cards: list, selected_target: dict) -> dict:
 
 
 def _available(cands: list, cards: list) -> list:
-    """동일 타깃의 활성 업무가 없는 후보 목록 (Score 순위 유지)."""
+    """동일 타깃의 진행 중인 업무가 없는 후보 목록 (Score 순위 유지)."""
     return [c for c in cands if _target_state(c, cards) not in ACTIVE_TARGET_STATES]
 
 
 def _first_available(cands: list, cards: list) -> dict:
-    """활성 업무가 없는 정량 최상위 후보.
+    """진행 중인 업무가 없는 정량 최상위 후보.
 
-    전 후보가 활성 업무 상태면 `cands[0]`으로 물러서지 않고 예외를 낸다. 후보가 5개뿐이라
+    전 후보가 진행 중인 업무 상태면 `cands[0]`으로 물러서지 않고 예외를 낸다. 후보가 5개뿐이라
     실제로 도달 가능하고, 물러서면 동일 대상의 중복 업무 카드가 저장된다.
     """
     available = _available(cands, cards)
@@ -222,7 +234,12 @@ def _first_available(cands: list, cards: list) -> dict:
 
 
 def _fallback_ai(cands: list, cards: list) -> dict:
-    """LLM 최종 실패 시 규칙 기반 fallback — 활성 업무가 없는 최상위 후보 제안."""
+    """LLM 최종 실패 시 규칙 기반 fallback — 진행 중인 업무가 없는 최상위 후보 제안.
+
+    반환값 중 실제로 카드에 남는 것은 `risks`뿐이다 — comparison·reasons·expected_effect는
+    `_grounded_ai`가 정본 데이터로 다시 만든다. 아래 "AI 설명 생성에 실패해…" 문장도 화면에
+    도달하지 않으므로, 폴백 사실을 화면에 알리는 몫은 `NARRATIVE_NOTE["rule_fallback"]`이 진다.
+    """
     top = _first_available(cands, cards)
     skipped = [c for c in cands if c["rank"] < top["rank"]]
     reasons = [f"Score {c['rank']}위 {c['eup']} {c['category']}은(는) 추진 상태={_target_state(c, cards)}로 중복 제안 대상에서 제외"
@@ -275,8 +292,8 @@ def _grounded_ai(cands: list, target: dict, out: dict, cards: list,
             for c in cands if c["rank"] < target["rank"]
         ]
         comparison = (
-            f"정량 상위 후보 {', '.join(skipped)}는 활성 업무가 있어 중복 제안에서 제외했습니다. "
-            f"따라서 가용 후보 중 최고점인 정량 {target['rank']}위 {target['eup']} "
+            f"정량 상위 후보 {', '.join(skipped)}는 진행 중인 업무가 있어 중복 제안에서 제외했습니다. "
+            f"따라서 선택 가능한 후보 중 최고점인 정량 {target['rank']}위 {target['eup']} "
             f"{target['category']}(Score {target['score']})를 서버가 선택했습니다. 정량 1위 "
             f"{baseline['eup']} {baseline['category']}(Score {baseline['score']})보다 Score가 {gap} "
             "낮으므로 기존 업무 종료 여부와 함께 검토해야 합니다."
@@ -288,7 +305,9 @@ def _grounded_ai(cands: list, target: dict, out: dict, cards: list,
          f"가맹점 {target['nearby_merchants']}곳 / 동일 업종 상가 "
          f"{target.get('nearby_same_category_stores', '미산출')}곳"),
         f"이동 기준: 동선근접도 {target['proximity']}는 직선거리 기반 · {_road_text(target)}",
-        "대상은 서버의 정량 규칙이 선택했고 AI는 비정량 리스크 문구 생성에만 사용했습니다",
+        # 이 문장만이 화면에서 "AI가 무엇을 했는가"를 말한다 — 실제 출처와 어긋나면 안 된다.
+        # 계약 밖 값이 들어오면 AI를 주장하지 않는 쪽(rule_fallback)으로 떨어뜨린다.
+        NARRATIVE_NOTE.get(explanation_source, NARRATIVE_NOTE["rule_fallback"]),
     ]
     risks = [r.strip() for r in out.get("risks", []) if isinstance(r, str) and r.strip()]
     required_risks = [
@@ -363,7 +382,7 @@ def _recent_generated(cards: list, card_type: str) -> dict | None:
 def generate_card(card_type: str) -> tuple[dict, bool]:
     """POST /api/cards/generate 본체 — (card, created) 반환. created=False면 기존 pending 카드.
 
-    가용 후보가 하나도 없으면 `NoAvailableCandidate` (라우트가 409로 변환).
+    선택 가능한 후보가 하나도 없으면 `NoAvailableCandidate` (라우트가 409로 변환).
     """
     cards = db.list_cards()
     if card_type == "INCENTIVE":
@@ -380,6 +399,15 @@ def _generate_expansion(cards: list) -> tuple[dict, bool]:
     # fallback으로 흘러가면 안 되기 때문(그러면 금지 타깃 카드가 만들어진다).
     available = _available(cands, cards)
     if not available:
+        # 후보가 소진되는 가장 흔한 이유는 '조금 전 이 버튼이 만든 승인 대기 카드'다. 그때 409만
+        # 주면 심사위원이 두 번째로 눌렀을 때 대표 AI 기능이 "제안할 후보가 없습니다"로만 보인다.
+        # 05 §8의 '기존 카드 200 반환'을 dedupe 창(60초) 밖에서도 성립시킨다.
+        # (아래 `_find_pending`은 `_available`이 pending 타깃을 이미 걸러 내므로 도달하지 않는다 —
+        #  EXPANSION의 중복 가드는 실질적으로 이 블록이 진다.)
+        pending = [c for c in cards
+                   if c.get("type") == "EXPANSION" and c.get("status") == "pending"]
+        if pending:
+            return max(pending, key=lambda c: c.get("created_at") or ""), False
         raise NoAvailableCandidate("모든 후보에 승인 대기 또는 진행 중인 업무가 있어 새로 제안할 후보가 없습니다")
     # 대상 선택은 LLM에 맡기지 않는다. 동일 입력·상태에서는 항상 같은 후보가 선택된다.
     target = available[0]
@@ -393,10 +421,6 @@ def _generate_expansion(cards: list) -> tuple[dict, bool]:
         log.warning("EXPANSION 카드 AI 설명 생성 실패 — 규칙 기반 fallback으로 진행합니다", exc_info=True)
         out = _fallback_ai(cands, cards)
         explanation_source = "rule_fallback"
-
-    existing = _find_pending(cards, "EXPANSION", target["eup"], target["category"])
-    if existing:                                        # 05 §8 — 기존 카드 200 반환 (버튼 연타 대비)
-        return existing, False
 
     grounded = _grounded_ai(cands, target, out, cards, explanation_source)
     now = db.now_iso()
@@ -415,6 +439,10 @@ def _generate_expansion(cards: list) -> tuple[dict, bool]:
         "ai": {
             # 표시 일관성: 조정 여부 = (원 Score 순위 ≠ 1) — LLM 출력과 어긋나면 순위 쪽이 정본
             "adjusted": target["rank"] != 1,
+            # 왜 이 후보인가를 코드로 남긴다 — 화면 배지가 `adjusted`만 보고 문구를 정하면
+            # "정량 1순위 선택"/"진행 중인 건 제외"라는 두 문장 중 아무거나 붙어 실제 선택 사유와
+            # 어긋난다(절대 규칙 5의 감사 가능성). 생성 경로의 사유는 이 둘뿐이다.
+            "selection_reason": "top_score" if target["rank"] == 1 else "exclude_in_progress",
             "comparison": grounded["comparison"],
             "reasons": grounded["reasons"],
             "risks": grounded["risks"],
@@ -475,6 +503,7 @@ def _generate_incentive(cards: list) -> tuple[dict, bool]:
     if existing:
         return existing, False
 
+    explanation_source = "llm"      # EXPANSION 경로와 같은 추적 방식 (아래 except에서 뒤집힌다)
     try:
         dash = dataload.load("dashboard")
         rates = [m["rate"] for m in dash["conversion"]["monthly"]]
@@ -490,6 +519,7 @@ def _generate_incentive(cards: list) -> tuple[dict, bool]:
         # 감사 ⑤ — 로그 없이 삼키면 LLM 장애를 심사 중에 알 방법이 없다
         log.warning("INCENTIVE 카드 AI 설명 생성 실패 — 규칙 기반 fallback으로 진행합니다", exc_info=True)
         out = _incentive_fallback_ai()
+        explanation_source = "rule_fallback"
 
     risks = [r for r in out.get("risks", []) if isinstance(r, str) and r.strip()]
     for keyword, text in INCENTIVE_MANDATORY_RISKS:     # A-3 필수 리스크 3종 보장
@@ -508,6 +538,18 @@ def _generate_incentive(cards: list) -> tuple[dict, bool]:
             "reasons": [r for r in out.get("reasons", []) if isinstance(r, str) and r.strip()],
             "risks": risks,
             "expected_effect": _ensure_assumption(out.get("expected_effect", "")),
+            "grounding": {
+                # EXPANSION과 달리 status는 partial — 수치는 서버 고정이지만 비교문·근거는
+                # LLM(또는 폴백) 원문을 그대로 쓰므로 문장까지 재검증했다고 주장할 수 없다.
+                "status": "partial",
+                "numeric_status": "fixed_by_server",
+                "narrative_status": ("ai_generated_unverified" if explanation_source == "llm"
+                                     else "rule_based"),
+                "selection_method": "fixed_scenarios_3_5_7",
+                "explanation_source": explanation_source,
+                "source": "structured",
+                "checks": INCENTIVE_GROUNDING_CHECKS,
+            },
             "original_ranking": None,                   # INCENTIVE만 null (05 문서 §2)
         },
         "scenarios": SCENARIOS,

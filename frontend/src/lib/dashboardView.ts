@@ -53,7 +53,12 @@ export function composeEvidence(
   const categoryInsight = category
     ? `${category.category}은 전체 사용의 ${Math.round(category.share * 100)}%입니다. AI 제안 업종의 실제 사용 규모를 함께 확인하세요.`
     : "업종별 사용 비중을 비교해 제안 대상의 현재 규모를 확인합니다.";
-  /** 허브 미리보기용 한 줄 — 원 정량 Score 상위 3곳 (절대 규칙 5의 텍스트 병기) */
+  /**
+   * 허브 미리보기용 한 줄 — **1단계 읍·시 스코어** 상위 3곳 (절대 규칙 5의 텍스트 병기).
+   * 원천은 `candidates.eup_ranking`(영월군 0.84대)이라 카드 상세의 2단계 후보 스코어(0.49대)와
+   * 층위가 다르다. 두 값을 다 "원 Score"로 부르면 한 화면에서 같은 이름의 다른 숫자가 되므로
+   * 표시 텍스트는 "읍·시 스코어"로 고정한다 (변수명·로직은 그대로 둔다).
+   */
   const scoreTopLine = ranking
     .slice(0, 3)
     .map((row) => `${row.eup} ${row.score.toFixed(2)}`)

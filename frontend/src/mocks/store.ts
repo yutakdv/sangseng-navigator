@@ -45,6 +45,7 @@ import {
 } from "@/lib/cardWorkflow";
 import cardsSeed from "./cards.json";
 import candidatesMock from "./candidates.json";
+import progressRecordsSeed from "./progress_records.json";
 
 const DONE = "완료";
 const RUNNING: CardProgress[] = ["추진중", "완료"];
@@ -55,8 +56,16 @@ const POLICY_NOTE = "완료된 확충 업종 우선 · 그 외 하이원리조�
 /** import한 JSON 모듈을 직접 변형하지 않도록 깊은 복사 후 보관 */
 let cards: Card[] = JSON.parse(JSON.stringify(cardsSeed.cards)) as Card[];
 
-/** 실측·서술 기록은 카드와 분리해 보관한다. 초기값은 비워 두며 성과 수치를 임의로 만들지 않는다. */
-let progressRecords: ProgressRecord[] = [];
+/**
+ * 실측·서술 기록은 카드와 분리해 보관한다. 초기값은 **손으로 만들지 않고**
+ * `seed_demo.history_records()`가 실제 서비스 경로로 재생한 결과를 그대로 떠 온 것이다
+ * (`scripts/sync-mocks.sh` 대상 아님 — 카드 상태와 짝이라 cards.json과 함께 갱신한다).
+ * 이력 카드 AC-003(완료)·AC-004(정체)의 기록이라 mock 모드에서도 추진 경과 리포트가
+ * 실 API와 같은 수치를 낸다 — 비상 폴백(12 §5)에서 화면이 빈 지표 벽이 되지 않게 하려는 것이다.
+ */
+let progressRecords: ProgressRecord[] = JSON.parse(
+  JSON.stringify(progressRecordsSeed.records),
+) as ProgressRecord[];
 const progressIdempotency = new Map<string, string>();
 let progressRecordSequence = 1;
 
@@ -419,7 +428,7 @@ const generateExpansion = (): GeneratedCard => {
     ),
     `${candidateLabel(top)} ${top.name} — 업종공백도 ${top.gap.toFixed(2)}, 반경 500m 내 동일 업종 하이원포인트 가맹점 ${top.nearby_merchants}곳 / 동일 업종 상가 ${top.nearby_same_category_stores}곳`,
     `동선근접도 ${top.proximity.toFixed(2)}(직선거리 기반) / ${roadPhrase(top)}`,
-    "진행 중인 업무가 없는 후보 중 정량 Score 최상위를 결정론적으로 선택하고 설명만 구조화 데이터로 다시 검증합니다",
+    "진행 중인 업무가 없는 후보 중 후보 스코어 최상위를 결정론적으로 선택하고 설명만 구조화 데이터로 다시 검증합니다",
   ];
 
   const risks = [
@@ -443,6 +452,7 @@ const generateExpansion = (): GeneratedCard => {
     confidence: top.gap_confidence >= 0.8 && top.road_minutes !== null ? "중" : "하",
     ai: {
       adjusted: top.rank !== 1,
+      selection_reason: top.rank === 1 ? "top_score" : "exclude_in_progress",
       comparison,
       reasons,
       risks,
@@ -511,7 +521,7 @@ const generateIncentive = (): GeneratedCard => {
 
 /**
  * `POST /api/cards/generate` mock — 신규 카드 또는 중복 가드에 걸린 기존 pending 카드.
- * 가용 후보가 하나도 없으면 `ApiError(409)` (05 §8 — 정상 신호라 안내 문구로 다룬다).
+ * 선택 가능한 후보가 하나도 없으면 `ApiError(409)` (05 §8 — 정상 신호라 안내 문구로 다룬다).
  */
 export const generateCard = (type: CardType): GeneratedCard =>
   type === "INCENTIVE" ? generateIncentive() : generateExpansion();
@@ -711,7 +721,12 @@ export const deriveProgressReport = (opts: { from?: string; to?: string } = {}):
     })
     .sort((a, b) => recordTime(a) - recordTime(b) || a.record_id.localeCompare(b.record_id));
   const grouped = recordsByCard(inPeriod);
-  const approved = cards.filter((card) => card.status === "approved");
+  // 모집단은 **기간 종료일 시점에 이미 승인돼 있던 카드**다 (BE routes/progress.py `_approved_as_of`).
+  // 여기서 '현재 승인 카드 전체'를 쓰면 mock 모드와 실 API 모드가 같은 기간에 다른 미기록 건수를 낸다.
+  const approvedAsOf = (card: Card): boolean =>
+    Date.parse(card.created_at) <= period.endMs &&
+    Date.parse(card.decided_at ?? card.created_at) <= period.endMs;
+  const approved = cards.filter((card) => card.status === "approved" && approvedAsOf(card));
   const latestByCard = new Map<string, ProgressRecord>();
 
   for (const card of approved) {

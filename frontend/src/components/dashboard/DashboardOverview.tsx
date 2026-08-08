@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { AssumptionBadge } from "@/components/Badge";
+import { AssumptionBadge, ProxyBadge } from "@/components/Badge";
 import { GenerateCardButton } from "@/components/GenerateCardButton";
 import { Icon } from "@/components/Icon";
 import { Act, PanelLink } from "@/components/Panel";
@@ -8,7 +8,7 @@ import { StatusBar } from "@/components/dashboard/StatusBar";
 import { WorkQueue } from "@/components/dashboard/WorkQueue";
 import { ProposalSummary } from "@/components/proposals/ProposalSummary";
 import { isMockMode } from "@/lib/api";
-import { sampleQuality } from "@/lib/cardWorkflow";
+import { isExecutionStage, isStartStage, sampleQuality } from "@/lib/cardWorkflow";
 import { dataFreshness } from "@/lib/dataFreshness";
 import { operatorGreeting } from "@/lib/operator";
 import type { Card, CardType, Dashboard, EupScore, Kpi } from "@/types";
@@ -18,7 +18,7 @@ type StatusCounts = { waiting: number; running: number; done: number; held: numb
 /**
  * 허브 상단 — "판단하고 움직이는" 두 층.
  *
- *   1층  얇은 sticky 상태 바 + 접이식 분기 진단        ← 몇 건 남았나에 계속 답한다
+ *   1층  얇은 sticky 상태 바 + 전환율 헤드라인 + 접이식 분기 진단  ← 몇 건 남았나 + 분기 맥락 한 줄
  *   2층  좌 60% 미리보기 / 우 40% 작업 목록 3단계      ← 마스터-디테일
  *   3층  결정 이력 · 실행 현황 (`children`으로 받는다)   ← 모니터링
  *
@@ -61,7 +61,7 @@ export function DashboardOverview({
   ranking: EupScore[];
   /** 선택된 카드 기준 판독 문장 — 허브에서는 이 한 줄이 차트를 대신한다 */
   regionInsight: string;
-  /** 원 정량 Score 상위 3곳 한 줄 요약 (절대 규칙 5의 텍스트 병기) */
+  /** 읍·시 스코어 상위 3곳 한 줄 요약 (1단계 지역 진단 — 절대 규칙 5의 텍스트 병기) */
   scoreTopLine: string;
   activeType: CardType | null;
   generateType: CardType;
@@ -90,6 +90,11 @@ export function DashboardOverview({
 
   const isLead = selected?.id === heroId;
   const isExpansion = selected?.type === "EXPANSION";
+
+  // 6스텝 흐름의 STEP4(검토 시작)·STEP5(적격성·실행)가 둘 다 이 목록으로 떨어진다.
+  // 목록 설명에 같은 기준으로 나눈 건수를 적어, 스텝 배지 숫자를 도착지에서 확인할 수 있게 한다.
+  const startStageCount = inProgress.filter(isStartStage).length;
+  const executionStageCount = inProgress.filter(isExecutionStage).length;
 
   return (
     <section aria-labelledby="dashboard-title" className="flex flex-col gap-6">
@@ -140,6 +145,19 @@ export function DashboardOverview({
         done={statusCounts.done}
         held={statusCounts.held}
         rejected={statusCounts.rejected}
+        /* 전환율은 접힘 상태에서도 보여야 한다 (01 문서 "절대 자르지 않는 것" · 데모 1단계).
+           숫자와 `근사 지표` 배지는 한 inline-flex에 묶어 줄바꿈에서도 떨어지지 않게 한다 (절대 규칙 2) */
+        headline={
+          <span className="flex flex-wrap items-center gap-x-1.5 gap-y-1">
+            <span className="text-admin-text-muted">지역 전환율</span>
+            <span className="inline-flex items-center gap-x-1.5 whitespace-nowrap">
+              <span className="text-[15px] font-bold leading-none tabular-nums text-admin-text">
+                {dashboard.conversion.headline_rate.toFixed(1)}%
+              </span>
+              {dashboard.conversion.is_proxy ? <ProxyBadge note={dashboard.conversion.proxy_note} /> : null}
+            </span>
+          </span>
+        }
         diagnostics={<QuarterDiagnostics dashboard={dashboard} kpi={kpi} totalUses={totalUses} />}
       />
 
@@ -185,7 +203,7 @@ export function DashboardOverview({
                         <li className="flex items-start gap-2 break-keep text-[13px] leading-6 text-admin-text-soft">
                           <Icon name="scatter" size={14} strokeWidth={2} className="mt-1 shrink-0 text-admin-primary" />
                           <span>
-                            원 Score 상위:{" "}
+                            읍·시 스코어 상위:{" "}
                             <span className="font-semibold tabular-nums text-admin-text">
                               {scoreTopLine || "산출 전"}
                             </span>
@@ -203,7 +221,7 @@ export function DashboardOverview({
                       </div>
                       <p className="mt-1 break-keep text-sm font-semibold leading-6 text-admin-text">
                         {isExpansion
-                          ? "근거 차트 → 원 Score 순위 → 전망 시나리오 → 담당자 결정"
+                          ? "근거 차트 → 원 후보 스코어 순위 → 전망 시나리오 → 담당자 결정"
                           : "근거 차트 → 3·5·7% 시나리오 비교 → 담당자 결정"}
                       </p>
                     </div>
@@ -276,7 +294,7 @@ export function DashboardOverview({
                 selectedId={selected?.id}
                 hrefFor={hrefFor}
                 action={<PanelLink href="/tracking">추진 상태 기록</PanelLink>}
-                desc="승인 후 완료 전 카드입니다. 줄을 누르면 왼쪽에서 미리볼 수 있습니다."
+                desc={`승인 후 완료 전 카드입니다. 검토 시작 ${startStageCount}건 · 적격성·가맹 심사·추진중 ${executionStageCount}건. 줄을 누르면 왼쪽에서 미리볼 수 있습니다.`}
                 empty={{
                   title: "실행 중인 카드가 없습니다",
                   body: "결정 대기 카드를 승인하면 여기로 넘어옵니다.",

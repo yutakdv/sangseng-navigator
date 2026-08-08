@@ -138,10 +138,10 @@ export function topCategoryShifts(
 
 /* ── 일·요일 축 (usage_daily, 05 §6 — 피드백 ⑦) ─────────────────────────── */
 
-const round1 = (x: number): number => Math.round(x * 10) / 10;
+export const round1 = (x: number): number => Math.round(x * 10) / 10;
 
 /** 요일 인덱스 계약: 0=월(pandas dayofweek). 0~4 주중, 5~6 주말. */
-const isValidWeekday = (daily: UsageDaily): boolean =>
+export const isValidWeekday = (daily: UsageDaily): boolean =>
   daily.weekday_labels.length === 7 &&
   daily.weekday_days.length === 7 &&
   daily.weekday_days.every((d) => d > 0);
@@ -169,6 +169,10 @@ export function regionWeekdayAverages(
 export interface WeekdayInsight {
   maxLabel: string;
   maxAvg: number;
+  /** 최저 요일 라벨 — 전 지역 기준선에서만 채운다 */
+  minLabel?: string;
+  /** 최대 요일이 최저 요일보다 몇 % 많은가 — 전 지역 기준선에서만 채운다 */
+  maxVsMinPct?: number | null;
   weekdayAvg: number;
   weekendAvg: number;
   /** 주말 하루 평균이 주중 대비 몇 % 높은가(음수면 낮음). 주중 실적 0이면 null */
@@ -193,6 +197,38 @@ export function regionWeekdayInsight(daily: UsageDaily, region: Region): Weekday
     weekdayAvg: round1(weekdayAvg),
     weekendAvg: round1(weekendAvg),
     weekendVsWeekdayPct: weekdayAvg > 0 ? round1(((weekendAvg - weekdayAvg) / weekdayAvg) * 100) : null,
+  };
+}
+
+/**
+ * 전 지역 합계의 요일 패턴 — 지역 요일 차트 옆에 **비교 기준선**으로 병기한다.
+ *
+ * 지역별 리듬이 다르다는 주장은 기준이 함께 보일 때만 성립한다. 이 값이 없으면 발표에서
+ * "전체는 토요일이 가장 많은데"라고 말하는 근거가 화면 어디에도 없다(데모 대본 9단계).
+ * 파이프라인이 `weekday_category`에 이미 '전체' 키를 만들어 두므로 추가 데이터가 필요 없다.
+ */
+export function overallWeekdayInsight(daily: UsageDaily): WeekdayInsight | null {
+  const byCat = daily.weekday_category?.["전체"];
+  if (!byCat || !isValidWeekday(daily)) return null;
+  const totals = daily.weekday_labels.map((_, i) =>
+    CATEGORIES.reduce((sum, c) => sum + (byCat[c]?.[i] ?? 0), 0),
+  );
+  if (totals.every((t) => t === 0)) return null;
+  const sum = (xs: number[]) => xs.reduce((a, b) => a + b, 0);
+  const avgs = totals.map((t, i) => t / daily.weekday_days[i]);
+  const maxIdx = avgs.indexOf(Math.max(...avgs));
+  const minIdx = avgs.indexOf(Math.min(...avgs));
+  const weekdayAvg = sum(totals.slice(0, 5)) / sum(daily.weekday_days.slice(0, 5));
+  const weekendAvg = sum(totals.slice(5)) / sum(daily.weekday_days.slice(5));
+  return {
+    maxLabel: daily.weekday_labels[maxIdx],
+    maxAvg: round1(avgs[maxIdx]),
+    minLabel: daily.weekday_labels[minIdx],
+    maxVsMinPct: avgs[minIdx] > 0 ? round1((avgs[maxIdx] / avgs[minIdx] - 1) * 100) : null,
+    weekdayAvg: round1(weekdayAvg),
+    weekendAvg: round1(weekendAvg),
+    weekendVsWeekdayPct:
+      weekdayAvg > 0 ? round1(((weekendAvg - weekdayAvg) / weekdayAvg) * 100) : null,
   };
 }
 

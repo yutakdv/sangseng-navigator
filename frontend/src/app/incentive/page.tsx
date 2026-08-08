@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { AdminShell } from "@/components/AdminShell";
-import { AssumptionBadge, AssumptionNote, ProxyBadge } from "@/components/Badge";
+import { AssumptionBadge, AssumptionNote, NarrativeSourceChip, ProxyBadge } from "@/components/Badge";
 import { Icon } from "@/components/Icon";
 import { PageHeader } from "@/components/PageHeader";
 import { PaybackCycle } from "@/components/PaybackCycle";
@@ -10,6 +10,7 @@ import { ScenarioTable } from "@/components/ScenarioTable";
 import { Section } from "@/components/Section";
 import { ProgressChip, StatusChip } from "@/components/StatusChip";
 import { api } from "@/lib/api";
+import { cardNarrativeSource } from "@/lib/aiSource";
 
 export const metadata: Metadata = { title: "인센티브 정책 · 상생 나침반" };
 
@@ -38,6 +39,9 @@ export default async function IncentivePage() {
 
   // 최신 1장 = 생성 시각 내림차순 첫 카드 (허브에서 새로 생성하면 그 카드가 이 화면의 대상이 된다)
   const card = [...cards].sort((a, b) => Date.parse(b.created_at) - Date.parse(a.created_at))[0];
+
+  // 비교문·근거 문장을 누가 썼는지 (05 §2) — 카드가 없으면 표기할 문장 자체가 없다
+  const narrativeSource = card ? cardNarrativeSource(card) : null;
 
   // 손익 대비 패널용 — 최근 3개월 평균 입장 연인원(교대 합산). 개선폭(%p)을 월 건수로 환산하는 분모다.
   // 정확히 3개월이 안 되면 패널을 그리지 않는다 — "최근 3개월 평균"이라는 문구가 거짓이 되기 때문.
@@ -204,11 +208,18 @@ export default async function IncentivePage() {
               <PaybackCycle rate={card.selected_rate ?? null} />
             </Section>
 
-            {/* ── AI 근거 전문 ──────────────────────────────────── */}
+            {/* ── 근거 전문 ─────────────────────────────────────── */}
+            {/* 제목이 출처를 단정하지 않는다 — 시드·폴백 카드의 비교문은 AI가 쓴 문장이 아니다.
+                출처는 칩 하나가 말하고, 설명 문단은 그 값에 따라 갈린다 (05 §2) */}
             <Section
               icon="sparkle"
-              title="AI 시나리오 비교문"
-              desc="AI 출력은 제안입니다. 확정은 담당자 승인을 거치며, AI의 역할은 의사결정 근거 제공입니다."
+              title="시나리오 비교문"
+              badge={<NarrativeSourceChip kind={narrativeSource} />}
+              desc={
+                narrativeSource === "ai" || narrativeSource === "ai_partial"
+                  ? "AI 출력은 제안입니다. 확정은 담당자 승인을 거치며, AI의 역할은 의사결정 근거 제공입니다."
+                  : "이 비교문은 서버 규칙으로 작성했습니다. 확정은 담당자 승인을 거치며, 시스템의 역할은 의사결정 근거 제공입니다."
+              }
             >
               <p className="u-body">{card.ai.comparison}</p>
 
@@ -241,8 +252,8 @@ export default async function IncentivePage() {
               {/* 정량 순위 병기 원칙(절대 규칙 5)의 예외가 아니라, 병기할 순위가 없는 카드다 */}
               <p className="u-note mt-4 border-t border-admin-border pt-3">
                 이 카드는 후보 간 순위 비교가 아니라 전 지역 공통 시나리오 비교라 정량 순위 표가
-                없습니다(`original_ranking` = null, 05 §2). 순위 조정 병기는 가맹점 확충 카드에서
-                합니다. 근거 데이터: {card.sources.join(" · ")}
+                없습니다. 순위 병기는 대상 후보가 있는 가맹점 확충 카드에서 합니다. 근거 데이터:{" "}
+                {card.sources.join(" · ")}
               </p>
             </Section>
           </>
