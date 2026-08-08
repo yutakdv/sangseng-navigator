@@ -15,7 +15,6 @@ from typing import Iterable
 
 import boto3
 from boto3.dynamodb.conditions import Key
-from boto3.dynamodb.types import TypeSerializer
 from botocore.exceptions import ClientError
 
 from app import db
@@ -32,13 +31,16 @@ if os.environ.get("DYNAMO_ENDPOINT"):
 _resource = boto3.resource("dynamodb", **_kw)
 _table = _resource.Table(TABLE_NAME)
 _client = _resource.meta.client
-_serializer = TypeSerializer()
 
 
 def _serialize_map(value: dict) -> dict:
-    """Serialize a native dict for low-level TransactWriteItems."""
-    converted = db._to_ddb(value)  # noqa: SLF001 - shared Decimal conversion contract
-    return {key: _serializer.serialize(item) for key, item in converted.items()}
+    """Prepare a native dict for the resource-derived client's TransactWriteItems.
+
+    ``_resource.meta.client``에는 boto3 문서형 변환기가 붙어 있어 **네이티브 파이썬 값**을
+    받는다 — TypeSerializer로 저수준 형식({"N": "1"})까지 만들면 이중 직렬화가 되어
+    MAP으로 해석되고 ValidationException(500)이 난다. float→Decimal 변환만 하면 된다.
+    """
+    return db._to_ddb(value)  # noqa: SLF001 - shared Decimal conversion contract
 
 
 def _public(record: dict | None) -> dict | None:
