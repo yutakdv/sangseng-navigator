@@ -112,8 +112,44 @@ def _is_recent(card: dict, cutoff: datetime) -> bool:
         return False
 
 
+def _weekday_signal(target: dict) -> dict | None:
+    """AI 입력 ⑧ — 타깃 (읍×표시업종) 요일 패턴 요약 (참고용, 05 §6·설계 2026-08-08).
+
+    확충 후보는 공백 업종이라 타깃 자체 실적이 0인 경우가 기본이다(예: 영월군 숙박업) —
+    그때는 읍 전 업종 패턴으로 폴백하고 그 사실을 집계_대상 라벨에 명시한다.
+    usage_daily.json이 없으면 None — ⑦ risk_signal과 같은 실패 내성으로 생성을 막지 않는다.
+    """
+    try:
+        daily = dataload.load("usage_daily")
+    except FileNotFoundError:
+        return None
+    labels = daily.get("weekday_labels") or []
+    days = daily.get("weekday_days") or []
+    by_cat = (daily.get("weekday_category") or {}).get(target["eup"]) or {}
+    if len(labels) != 7 or len(days) != 7 or min(days, default=0) <= 0:
+        return None
+    counts = by_cat.get(target["category"]) or []
+    scope = f"{target['eup']} {target['category']}"
+    if len(counts) != 7 or sum(counts) == 0:
+        counts = [sum(c[i] for c in by_cat.values() if len(c) == 7) for i in range(7)]
+        scope = (f"{target['eup']} 전 업종 — 타깃 업종은 하이원포인트 사용 실적이 없어"
+                 " (공백 업종 = 확충 후보인 이유) 읍 전체 방문 리듬으로 대신함")
+        if sum(counts) == 0:
+            return None
+    avg = [round(c / d, 1) for c, d in zip(counts, days)]
+    weekday_avg = sum(counts[:5]) / sum(days[:5])          # 인덱스 0~4 = 월~금 (dayofweek 계약)
+    weekend_avg = sum(counts[5:]) / sum(days[5:])
+    return {
+        "집계_대상": scope,
+        "요일별_하루평균_건수": dict(zip(labels, avg)),
+        "최대_요일": labels[max(range(7), key=lambda i: avg[i])],
+        "주중_대비_주말_배율": round(weekend_avg / weekday_avg, 2) if weekday_avg else None,
+        "출처": "하이원포인트 사용현황 일 단위 집계 (2025년 365일)",
+    }
+
+
 def _build_inputs(cands: list, cards: list, selected_target: dict) -> dict:
-    """AI 입력 ①~⑥ 조립 — user 메시지로 JSON 직렬화된다 (07 문서 B4 표)."""
+    """AI 입력 ①~⑧ 조립 — user 메시지로 JSON 직렬화된다 (07 문서 B4 표 + ⑧ 요일 패턴)."""
     cutoff = datetime.now(KST) - timedelta(days=RECENT_WINDOW_DAYS)   # ④·⑤는 "최근 4분기"만 (A-1)
     adopted: dict[str, int] = {}
     for c in cards:                                     # ④ 최근 창 안 approved 카드의 target.eup 분포
@@ -154,6 +190,7 @@ def _build_inputs(cands: list, cards: list, selected_target: dict) -> dict:
         "5_최근_지역별_채택_이력": adopted,
         "6_최근_정책_이력(반려)": rejected,
         "7_지역경제_위험_신호(참고용_진단_지표)": risk,
+        **({"8_타깃_요일_패턴(참고용)": weekday} if (weekday := _weekday_signal(selected_target)) else {}),
         "작성_지침": (f"ai_rank_target에는 서버 확정 타깃 '{selected_target['eup']} "
                    f"{selected_target['category']}'을 그대로 적을 것. 후보를 바꾸지 말 것. "
                    "입력 3의 '추진 상태' 값은 없음/승인 대기/검토중/추진중/보류/완료 중 하나이며, "
