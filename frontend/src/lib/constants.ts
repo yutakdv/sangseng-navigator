@@ -59,6 +59,14 @@ export const ANCHOR = {
 /** 고지 문구 — 화면에서 문자열을 새로 쓰지 말고 이 상수를 쓴다 (절대 규칙 3, 13 §9) */
 export const ASSUMPTION_NOTE = "가정 기반 전망이며 실제와 다를 수 있음";
 
+/**
+ * 지역 전환율 근사 지표 고정 설명 (절대 규칙 2) — 파이프라인 P5가 dashboard.json에 싣는
+ * `conversion.proxy_note`와 같은 문구다. 대시보드 데이터를 받지 않는 화면(트래킹 폼·경과 리포트)이
+ * 전환율 라벨에 배지를 병기할 때 이 상수를 툴팁으로 쓴다.
+ */
+export const PROXY_NOTE =
+  "분자=지역 사용 건수, 분모=입장 연인원(교대 합산)으로 단위가 달라 비율이 아닌 근사 지표입니다. 강원랜드가 공개한 금액 기준 지역 사용 비율(2024년 28.5%)과는 다른 지표입니다.";
+
 export const SOURCE_NOTE =
   "데이터: 공공데이터포털(강원랜드·소상공인시장진흥공단)·국세청 | 지도: © OpenStreetMap contributors, OpenFreeMap";
 

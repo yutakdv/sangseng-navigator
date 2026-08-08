@@ -1,9 +1,11 @@
 import Link from "next/link";
+import { ProxyBadge } from "@/components/Badge";
 import { DeltaValue } from "@/components/DeltaValue";
 import { Icon, type IconName } from "@/components/Icon";
 import { KpiCard } from "@/components/KpiCard";
 import { Section } from "@/components/Section";
 import { ProgressChip } from "@/components/StatusChip";
+import { PROXY_NOTE } from "@/lib/constants";
 import { ratioPct } from "@/lib/format";
 import type {
   CardProgress,
@@ -238,6 +240,7 @@ export function ProgressReportDashboard({ report }: { report: ProgressReport }) 
               valueUnit={metric.valueUnit}
               digits={metric.digits}
               change={report.metric_changes[metric.key]}
+              proxy={metric.key === "conversion_rate_pct"}
             />
           ))}
         </div>
@@ -255,12 +258,14 @@ function MetricChangeCard({
   valueUnit,
   digits,
   change,
+  proxy = false,
 }: {
   label: string;
   icon: IconName;
   valueUnit: string;
   digits: number;
   change: ProgressMetricChange;
+  proxy?: boolean;
 }) {
   const verdict = improvementVerdict(change.improvement);
   return (
@@ -270,6 +275,8 @@ function MetricChangeCard({
           <Icon name={icon} size={14} />
         </span>
         <h3 className="break-keep text-[13px] font-bold text-admin-text">{label}</h3>
+        {/* 절대 규칙 2 — 지역 전환율이 보이는 모든 화면에 근사 지표 배지 병기 */}
+        {proxy ? <ProxyBadge note={PROXY_NOTE} /> : null}
       </div>
 
       {change.sample_size > 0 && change.delta !== null ? (

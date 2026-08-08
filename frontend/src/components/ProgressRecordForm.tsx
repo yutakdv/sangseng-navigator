@@ -4,8 +4,10 @@ import { useMemo, useRef, useState, useTransition } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { createProgressRecordAction } from "@/app/actions";
+import { ProxyBadge } from "@/components/Badge";
 import { Icon } from "@/components/Icon";
 import { WorkflowChip } from "@/components/StatusChip";
+import { PROXY_NOTE } from "@/lib/constants";
 import { normalizedProgress, progressOptions } from "@/lib/cardWorkflow";
 import { isDemoReadOnly } from "@/lib/runtime";
 import type {
@@ -518,6 +520,12 @@ export function ProgressRecordForm({
           {METRIC_FIELDS.map((field) => (
             <label key={field.key} className="text-[13px] font-semibold text-admin-text">
               {field.label}
+              {/* 절대 규칙 2 — 지역 전환율이 보이는 모든 화면에 근사 지표 배지 병기 */}
+              {field.key === "conversion_rate_pct" ? (
+                <span className="ml-1.5 inline-flex align-middle">
+                  <ProxyBadge note={PROXY_NOTE} />
+                </span>
+              ) : null}
               <span className="relative mt-1.5 block">
                 <input
                   type="number"
