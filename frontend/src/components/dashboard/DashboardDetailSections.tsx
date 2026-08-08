@@ -4,6 +4,7 @@ import { Icon } from "@/components/Icon";
 import { Act, Panel, PanelLink } from "@/components/Panel";
 import { PolicyFlow } from "@/components/PolicyFlow";
 import { StatusChip } from "@/components/StatusChip";
+import { isExecutionStage, isStartStage } from "@/lib/cardWorkflow";
 import type { DashboardView } from "@/lib/dashboardView";
 import type { Card } from "@/types";
 
@@ -74,8 +75,13 @@ export function DashboardDetailSections({ view }: { view: DashboardView }) {
             counts={{
               cards: kpi.counts.total,
               pending: kpi.counts.pending,
-              approved: kpi.counts.approved,
-              inProgress: approved.filter((card) => card.progress === "추진중").length,
+              /* STEP4·5·6은 승인 카드를 겹치지 않게 나눈다 — 셋을 더하면 승인 카드 총수다.
+                 예전에는 STEP4가 승인 전체를, STEP5가 `추진중`만 세어 적격성 확인·가맹 심사 카드가
+                 STEP4에 중복 집계되고 STEP5에서는 통째로 빠졌다 (lib/cardWorkflow 주석 참고).
+                 `done`만 kpi를 그대로 쓴다 — 백엔드(routes/kpi.py)도 `승인 && 완료`로 세므로
+                 정의가 같고, 프런트에서 다시 셀 이유가 없다 */
+              approved: approved.filter(isStartStage).length,
+              inProgress: approved.filter(isExecutionStage).length,
               done: kpi.counts.done,
             }}
           />

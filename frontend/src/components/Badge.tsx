@@ -1,4 +1,5 @@
 import { Icon } from "@/components/Icon";
+import { NARRATIVE_SOURCE_TEXT, type NarrativeSourceKind } from "@/lib/aiSource";
 import { ASSUMPTION_NOTE } from "@/lib/constants";
 
 /**
@@ -104,6 +105,28 @@ export function GradeChip({ grade }: { grade: string }) {
     <span className={`${base} ${tone}`} title={`지역 소비 집중도 등급 ${grade} — ${hint}`}>
       {grade === "높음" ? <Icon name="warn" size={12} strokeWidth={2} /> : null}
       {grade}
+    </span>
+  );
+}
+
+/**
+ * 설명 출처 칩 — 같은 화면의 문장이 AI가 쓴 것인지 서버 규칙이 쓴 것인지 가른다 (05 §2).
+ *
+ * LLM 장애 시에도 카드는 규칙 기반으로 생성되고(07 B3 fallback) 데모 시드 카드는 사람이
+ * 사전 검증한 문구다. 이 칩이 없으면 세 종류가 화면에서 똑같이 보여 AI의 역할이 과장된다.
+ * 색이 아니라 **라벨**이 의미를 진다 (13 §4) — 문구는 `lib/aiSource.ts`가 단일 출처다.
+ */
+export function NarrativeSourceChip({ kind }: { kind: NarrativeSourceKind | null }) {
+  if (!kind) return null;
+  const { label, note } = NARRATIVE_SOURCE_TEXT[kind];
+  const tone =
+    kind === "ai"
+      ? "bg-admin-primary-soft text-admin-primary ring-admin-primary-line"
+      : "bg-admin-surface-sunken text-admin-text-muted ring-admin-border";
+  return (
+    <span className={`${base} ${tone}`} title={note}>
+      <Icon name={kind === "ai" ? "sparkle" : "info"} size={12} strokeWidth={2} />
+      {label}
     </span>
   );
 }

@@ -174,6 +174,10 @@ Base URL: 로컬 `http://localhost:8000` / 배포 후 API Gateway URL. 경로 �
     "expected_effect": "가맹 전환 효과는 카드 상세의 반사실 시뮬레이션과 사업자 적격성 확인 후 판단해야 합니다 (가정 기반 전망이며 실제와 다를 수 있음)",
     "grounding": {
       "status": "verified",
+      "numeric_status": "verified",
+      "narrative_status": "rule_based",
+      "selection_method": "deterministic_highest_available_score",
+      "explanation_source": "llm",
       "source": "structured",
       "checks": ["target", "score", "rank", "progress", "road_time"]
     },
@@ -250,6 +254,24 @@ Base URL: 로컬 `http://localhost:8000` / 배포 후 API Gateway URL. 경로 �
   (강원랜드는 콤프 부정거래 적발 시 고객 출입정지~영구·가맹점 자격취소 5년으로 제재 중이며
   2026년 한도 상향과 함께 제재를 강화한다 — 발행액을 늘리는 설계는 제안 자체가 성립하지 않는다)
 
+### AI 설명 출처 (`ai.grounding`) — 화면 칩의 계약
+
+LLM 호출이 실패하거나 애초에 호출하지 않은 카드도 **똑같이 생성된다**. 그때 화면이 "AI가 썼다"고
+말하면 절대 규칙 4의 신뢰가 무너지므로, 설명 문구의 출처를 필드로 남기고 화면이 그대로 표시한다.
+
+| `explanation_source` | `narrative_status` | 화면 칩 | 언제 |
+|---|---|---|---|
+| `llm` | `verified` | **AI 생성 · 서버 검증됨** | LLM 응답의 수치·순위·상태를 서버가 정본으로 재검증해 통과 |
+| `rule_fallback` | `rule_based` | **규칙 기반 설명(AI 응답 없음)** | LLM 호출 실패·타임아웃·내용 가드 탈락 |
+| `rule_seed` | `rule_based` | **사전 검증 예시 문구** | 데모 시드 카드(사람이 실데이터로 검증해 고정) |
+| `mock_rule` | `rule_based` | **규칙 기반 설명(AI 응답 없음)** | FE mock 모드 |
+
+- `ai.reasons`의 출처 문장도 이 값과 **일치해야 한다**. 폴백인데 "AI는 비정량 리스크 문구 생성에만
+  사용했습니다"를 그대로 실으면 필드와 문장이 서로 다른 말을 하게 된다.
+- **INCENTIVE는 예외**: 시나리오 3/5/7%와 `delta_pp`가 서버 고정값이라
+  `status: "partial"` · `numeric_status: "fixed_by_server"` · `selection_method: "fixed_scenarios_3_5_7"`을
+  쓴다. EXPANSION용 "검증됨" 배너를 그대로 재사용하지 않는다(검증 대상 자체가 다르다).
+
 ### INCENTIVE 카드 완성 예시
 
 ```json
@@ -298,6 +320,9 @@ Base URL: 로컬 `http://localhost:8000` / 배포 후 API Gateway URL. 경로 �
 | POST | `/api/cards/{id}/verification` | EXPANSION 후보 적격성 5항목 저장 | `{"checks": [{"key": "business_status", "status": "verified"}, ...], "note": "..."}` | `{"card": Card}` |
 | POST | `/api/cards/{id}/progress` | 추진 상태 변경 (approved만 가능) | `{"progress": "후보 접촉·검토 시작"\|"적격성 확인"\|"가맹 심사"\|"추진중"\|"보류"\|"완료"}` (INCENTIVE는 기존 4단계) | `{"card": Card}` |
 | POST | `/api/cards/{id}/simulate` | 가맹 전환 시 예상 효과 (반사실 재계산+LLM) | — | 아래 |
+| POST | `/api/cards/{id}/progress-records` | 추진 기록 저장(상태 전이 + 근거 메모 + 실측 관측값). 상태 변경과 감사 기록을 한 트랜잭션으로 남긴다 | 아래 `ProgressRecord 입력` | `{"card": Card, "record": ProgressRecord, "created": true}` — 신규 201, 같은 `idempotency_key` 재전송이면 기존 기록 200 |
+| GET | `/api/cards/{id}/progress-records` | 한 카드의 추진 기록 타임라인 (최신순) | 쿼리: `limit`(1~100, 기본 50) · `cursor` | `{"records": [ProgressRecord], "next_cursor": string\|null}` |
+| GET | `/api/progress-report` | 기간 추진 경과 리포트 (관측 기록만으로 집계) | 쿼리: `from` · `to` (`YYYY-MM-DD`, KST, 양끝 포함) | 아래 `progress-report 응답` |
 
 `simulate` 응답:
 ```json
@@ -312,10 +337,16 @@ Base URL: 로컬 `http://localhost:8000` / 배포 후 API Gateway URL. 경로 �
     "effect_assessment": "미미",
     "decision_note": "집중도 개선폭이 매우 작게 추정됩니다. 승인 전에 가맹 유치 비용·사업자 참여 의향·예상 월 사용건수를 비교하고, 보류도 정상적인 선택지로 검토하세요.",
     "narrative": "사북읍 카페 업종에 신규 가맹점이 1곳 추가되어도 예상 월 이용 건수가 6개 지역 전체 규모에 견주면 작아, 지역 소비 집중도는 소수점 첫째 자리 기준으로 변화가 나타나지 않을 것으로 예상됩니다. 이는 유사 가맹점의 평균 초기 실적을 가정한 전망이며, 실제 결과는 입지·홍보 여부에 따라 달라질 수 있습니다.",
+    "narrative_source": "rule_based",
     "assumption_note": "가정 기반 전망이며 실제와 다를 수 있음"
   }
 }
 ```
+
+- `narrative_source`는 `narrative` 문구의 출처다: `llm`(LLM 응답을 검증 통과 후 사용) ·
+  `rule_based`(LLM 미호출 또는 응답이 내용 가드에 걸려 규칙 문구로 대체). **방향이 `혼재`·`미미`인
+  구간은 애초에 LLM을 호출하지 않으므로 항상 `rule_based`**다. mock 모드는 `mock_rule`.
+  화면은 이 값으로 설명 출처 칩을 띄운다 — 폴백인데 "AI가 썼다"고 말하지 않기 위한 필드다.
 
 - `expected_monthly_count`는 반사실 계산에 더한 예상 월 이용 건수, `estimate_basis`는 3단계 폴백 중
   실제 적용 근거, `base_month`는 전망의 기준월이다. FE는 효과 지수만 보여주지 말고 세 값을 함께 보여
@@ -344,6 +375,75 @@ Base URL: 로컬 `http://localhost:8000` / 배포 후 API Gateway URL. 경로 �
   - `-0.0`은 내보내지 않는다(반올림 결과가 음의 0이면 `0.0`으로 정규화 — 화면에 "-0.0%p"가 찍히는 것 방지)
   - LLM에는 **집중도 지수 두 값을 주지 않는다**(방향과 폭만 전달) — 주면 "43에서 42로 1포인트 개선"처럼
     `delta_pp`와 어긋난 문장을 쓴다. 생성된 문구가 계산 방향과 반대면(개선↔심화) 양방향 모두 규칙 기반 문구로 대체한다
+
+### 추진 기록 (`progress-records`) · 경과 리포트 (`progress-report`)
+
+카드의 `progress`만 바꾸는 `POST /api/cards/{id}/progress`는 **상태만** 남기고 근거를 남기지 않는다.
+추진 기록 API는 상태 전이·근거 메모·실측 관측값을 **하나의 감사 기록**으로 묶고, 그 기록들만으로
+경과 리포트를 만든다. 리포트의 모든 수치는 담당자가 실제로 입력한 관측값에서 나오며 추정하지 않는다.
+
+`ProgressRecord 입력` (POST body):
+```json
+{
+  "progress": "추진중",
+  "recorded_at": "2026-08-08T14:00:00+09:00",
+  "progress_pct": 80,
+  "note": "가맹 계약 체결. 포스 연동 진행",
+  "blocker": "사업자 측 포스 교체 일정 미정",
+  "next_action": "포스 교체 일정 재협의",
+  "owner": "지역상생팀",
+  "due_at": "2026-08-20",
+  "source": "담당자 입력",
+  "metrics": {"usage_count": 1362, "conversion_rate_pct": 21.4, "active_merchant_count": 33,
+              "spend_krw": null, "concentration_index": 42.1},
+  "idempotency_key": "임의 문자열(재전송 가드)"
+}
+```
+- `note`는 필수(공백 불가, 2000자 이내). 나머지는 전부 선택이며 `metrics`의 5개 키도 개별 선택이다.
+- `recorded_at`은 **시간대 오프셋 필수**. 생략하면 서버가 현재 KST를 쓴다. 카드 생성 시각보다 이르거나,
+  이미 저장된 최신 기록보다 이르거나, 현재보다 5분 이상 미래면 **400**.
+- 상태 전이 규칙은 `POST /progress`와 같다(승인 카드만·순차 전이·보류는 직전 단계로만 복귀,
+  EXPANSION은 적격성 5항목 확인 후에만 적격성 확인 이후 단계 가능). 위반은 **409**.
+- 같은 상태를 다시 기록하는 것은 **정상**이다 — 단계가 진행되지 않아도 날짜별 메모·관측값을 남겨야 한다.
+- `metrics.conversion_rate_pct`는 §1의 지역 전환율과 같은 근사 지표다 → **표시하는 모든 화면에
+  `근사 지표` 배지를 병기한다**(절대 규칙 2).
+- `metrics.spend_krw`(지역 사용액)는 원천 데이터에 금액 필드가 없어 **파이프라인이 채우지 않는다**.
+  담당자가 별도 확인한 값을 직접 입력할 때만 쓰이며, 비어 있는 것이 정상이다.
+
+`progress-report 응답` (필드 요약):
+```json
+{
+  "period": {"from": "2026-05-11", "to": "2026-08-08", "timezone": "Asia/Seoul", "days": 90},
+  "record_count": 9,
+  "recorded_card_count": 2,
+  "cards_without_records": 1,
+  "status_distribution": {"후보 접촉·검토 시작": 0, "적격성 확인": 0, "가맹 심사": 0,
+                          "검토중": 0, "추진중": 1, "보류": 0, "완료": 1},
+  "completion": {"rate": 0.5, "completed_count": 1, "sample_size": 2},
+  "average_progress_pct": {"value": 80.0, "sample_size": 2},
+  "on_time": {"rate": 1.0, "on_time_count": 1, "sample_size": 1},
+  "stale": {"threshold_days": 14, "count": 1, "items": [{"card_id": "AC-004", "title": "...",
+            "progress": "추진중", "last_recorded_at": "...", "days_since_update": 22}]},
+  "stage_durations": [{"from_progress": "가맹 심사", "to_progress": "추진중",
+                       "average_hours": 252.0, "median_hours": 252.0, "sample_size": 1}],
+  "metric_changes": {"usage_count": {"baseline_average": 791.0, "latest_average": 895.0,
+                     "delta": 104.0, "delta_unit": "count", "relative_change_pct": 13.15,
+                     "improvement": 104.0, "lower_is_better": false, "sample_size": 2}}
+}
+```
+- 기간 기본값은 **`to` = KST 오늘, `from` = `to` − 89일**(90일). 다음 세 경우는 **400**이다:
+  `from > to` · `to`가 KST 오늘보다 미래 · `(to − from)`이 366일 이상.
+  → FE가 만들 수 있는 최대 구간은 `from = to − 365일`이다.
+- `status_distribution`은 **기간 종료일까지의 카드별 최신 기록** 기준이다(기간 시작 이전 기록도 본다).
+  경과 기록이 하나도 없는 승인 카드는 분포에서 빠지고 `cards_without_records`로만 센다 —
+  화면은 이 사실을 문구로 밝혀야 헤더 건수와 칩 합계의 차이가 오해되지 않는다.
+- `completion.rate`의 분모는 승인 카드 전체가 아니라 **기록이 있는 카드 수**다.
+- `on_time`은 `due_at`과 `완료` 기록이 **둘 다** 있는 카드만 표본으로 센다.
+- `stale`은 완료되지 않은 카드 중 마지막 기록이 14일 이상 지난 것.
+- `metric_changes[].improvement`는 부호를 지표 의미에 맞춘 값이다 — `concentration_index`는
+  `lower_is_better: true`라 **감소가 개선**이며, 화면도 증감 방향과 개선 여부를 구분해 말해야 한다.
+- `sample_size: 0`이면 `baseline_average`·`delta`가 전부 `null`이다. 화면은 값을 만들지 않고
+  “—”로 두며 “기초값이 없다”는 사실을 밝힌다.
 
 ## 3. KPI
 
@@ -384,9 +484,10 @@ Base URL: 로컬 `http://localhost:8000` / 배포 후 API Gateway URL. 경로 �
     {
       "name": "OO카페", "category": "카페", "address": "정선군 사북읍 ...",
       "lat": 37.2211, "lng": 128.8123,
-      "badge": "신규",
+      "badge": "이번 분기 확충 업종",
       "payback": {"rate": 5, "label": "지금 여기서 쓰면 5% 페이백"},
-      "blurb": "사북 시장 골목의 신규 하이원포인트 가맹점이에요. 산책 후 들르기 좋아요."
+      "blurb": "사북읍 카페 · 하이원포인트 사용 가능",
+      "directions_url": "https://map.kakao.com/link/to/..."
     }
   ],
   "policy_note": "완료된 확충 업종 우선 · 그 외 하이원리조트 거점 직선거리 기준",
@@ -394,11 +495,13 @@ Base URL: 로컬 `http://localhost:8000` / 배포 후 API Gateway URL. 경로 �
 }
 ```
 
-- `badge:"신규"` = EXPANSION 카드가 `progress=완료`인 (읍×업종)과 매칭되는 가맹점 (데모: 목업 1~2건 허용)
+- `badge` = **"이번 분기 확충 업종"** (BE 상수 `EXPANSION_BADGE`). EXPANSION 카드가 `progress=완료`인
+  (읍×업종)과 매칭되는 가맹점에만 붙고, 아니면 `null`이다
 - `payback` = INCENTIVE 카드가 `완료` 상태일 때만 포함, 아니면 `null`. `rate`는 해당 카드의 `selected_rate` 값
-- `blurb` = LLM 생성 문구 (LLM 실패 시 규칙 기반 fallback 문구)
+- `blurb` = **결정론 문구**다(LLM 미사용 — 2026-08-08 확정). 실명 점포의 맛·분위기·메뉴를 추정하지
+  않기 위한 설계 결정이며, `prompts.py`의 위젯 프롬프트(A-4)는 제거했다
 - **추천 정렬 근거(BE 확정):** ① `badge:"신규"`가 붙는 가맹점 먼저 ② 그다음 거점(`ANCHOR`)까지의
-  **직선거리 오름차순**. 상위 3곳까지 반환한다. 원본 순서(상호명순)로 두면 필터 없이 호출할 때
+  **직선거리 오름차순**. `limit`은 1~120으로 클램프하며 기본 12곳이다. 원본 순서(상호명순)로 두면 필터 없이 호출할 때
   방문객 동선과 무관한 가맹점이 먼저 나오기 때문이다
   - **거리 값은 응답에 싣지 않는다**(정렬 근거로만 사용). `blurb` 생성 프롬프트에도 넣지 않는다 —
     §1 캐비엇대로 화면·문구 어디에서도 "가장 가깝다"고 단정하지 않기 위함이다.

@@ -12,10 +12,14 @@ import type { Dashboard, Kpi } from "@/types";
  * 하면 된다. 풀사이즈 지표 카드는 `/dashboard`(지역 소비 분석)의 역할이고 여기서는 한 줄씩
  * 네 개만 싣는다.
  *
- * `근사 지표` 배지는 **지역 전환 신호 옆 한 곳**에만 붙인다 (절대 규칙 2). 예전에는 토글 요약·
- * 카드 안·카드 하단에 반복돼서 무엇을 경고하는 배지인지 되레 흐려졌다. 배지를 줄인 게 아니라
- * 전환율 수치가 나오는 자리와 1:1로 맞춘 것이다 — 수치가 안 보이면 배지도 안 보이고,
- * 수치가 보이면 배지가 반드시 함께 보인다.
+ * `근사 지표` 배지는 **전환율 수치가 찍히는 자리마다 1:1로** 붙인다 (절대 규칙 2). 배지 개수를
+ * 줄이는 게 원칙이 아니라 수치와 짝을 맞추는 게 원칙이다 — 수치가 안 보이면 배지도 안 보이고,
+ * 수치가 보이면 배지가 반드시 함께 보인다. 그래서 상태 바 요약줄(StatusBar `headline`)과
+ * 이 패널의 "지역 전환율"이 각각 배지를 갖는다. 예전에 지적됐던 중복은 *같은 수치 하나에*
+ * 배지가 셋 붙어 있던 경우다.
+ *
+ * 요약줄은 값만, 이 패널은 **전분기 대비 증감까지** 싣는다 — 같은 수치를 두 번 적는 게 아니라
+ * 접힘/펼침의 정보량 차이다.
  *
  * 증감은 상태색(trend.*)을 그대로 쓴다 — lavender로 칠하지 않는다.
  */
@@ -35,14 +39,14 @@ export function QuarterDiagnostics({
         style={{ gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))" }}
       >
         <Metric
-          label="지역 전환 신호"
+          label="지역 전환율"
           badge={dashboard.conversion.is_proxy ? <ProxyBadge note={dashboard.conversion.proxy_note} /> : null}
           value={`${dashboard.conversion.headline_rate.toFixed(1)}%`}
           delta={<DeltaValue value={dashboard.growth?.qoq_pp} unit="%p" variant="text" className="text-xs" />}
           note="전분기"
         />
         <Metric
-          label="소비 집중도"
+          label="지역 소비 집중도"
           value={`${num(dashboard.concentration.index)}/100`}
           note={dashboard.concentration.grade}
         />

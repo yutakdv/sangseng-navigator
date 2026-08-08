@@ -1,0 +1,235 @@
+{
+ "records": [
+  {
+   "owner": "지역상생팀",
+   "note": "도계읍 카페 후보 접촉. 사업자 참여 의향 확인",
+   "blocker": null,
+   "progress_pct": null,
+   "previous_progress": null,
+   "created_at": "2026-08-08T19:49:32+09:00",
+   "source": "담당자 입력",
+   "card_id": "AC-004",
+   "record_id": "pr_916d01080e504518ad9fdaf3091633f4",
+   "recorded_at": "2026-06-14T19:49:32+09:00",
+   "card_snapshot": {
+    "eup": "삼척시",
+    "type": "EXPANSION",
+    "title": "삼척시 카페 업종 가맹점 확충",
+    "category": "카페"
+   },
+   "progress_changed": true,
+   "next_action": "적격성 5개 항목 확인",
+   "progress": "후보 접촉·검토 시작",
+   "due_at": null,
+   "metrics": {
+    "conversion_rate_pct": 19.8,
+    "usage_count": 402,
+    "active_merchant_count": 8,
+    "concentration_index": 43.4
+   }
+  },
+  {
+   "owner": "지역상생팀",
+   "note": "도계읍 편의점 후보 3곳 방문 접촉. 2곳이 가맹 설명 요청",
+   "blocker": null,
+   "progress_pct": null,
+   "previous_progress": null,
+   "created_at": "2026-08-08T19:49:32+09:00",
+   "source": "담당자 입력",
+   "card_id": "AC-003",
+   "record_id": "pr_0bfec762414948e68693bb0d4d1d1111",
+   "recorded_at": "2026-06-19T19:49:32+09:00",
+   "card_snapshot": {
+    "eup": "삼척시",
+    "type": "EXPANSION",
+    "title": "삼척시 편의점 업종 가맹점 확충",
+    "category": "편의점"
+   },
+   "progress_changed": true,
+   "next_action": "가맹 자격·정산 연동 확인",
+   "progress": "후보 접촉·검토 시작",
+   "due_at": null,
+   "metrics": {
+    "conversion_rate_pct": 20.1,
+    "usage_count": 1180,
+    "active_merchant_count": 31,
+    "concentration_index": 43.0
+   }
+  },
+  {
+   "owner": "지역상생팀",
+   "note": "필수 5개 항목 확인 완료",
+   "blocker": null,
+   "progress_pct": null,
+   "previous_progress": "후보 접촉·검토 시작",
+   "created_at": "2026-08-08T19:49:32+09:00",
+   "source": "담당자 입력",
+   "card_id": "AC-004",
+   "record_id": "pr_c413b70762d14bbc978c83df14e9797b",
+   "recorded_at": "2026-06-24T19:49:32+09:00",
+   "card_snapshot": {
+    "eup": "삼척시",
+    "type": "EXPANSION",
+    "title": "삼척시 카페 업종 가맹점 확충",
+    "category": "카페"
+   },
+   "progress_changed": true,
+   "next_action": "가맹 심사 접수",
+   "progress": "적격성 확인",
+   "due_at": null,
+   "metrics": {}
+  },
+  {
+   "owner": "지역상생팀",
+   "note": "필수 5개 항목 확인 완료 — 영업 상태·가맹 자격 이상 없음",
+   "blocker": null,
+   "progress_pct": null,
+   "previous_progress": "후보 접촉·검토 시작",
+   "created_at": "2026-08-08T19:49:32+09:00",
+   "source": "담당자 입력",
+   "card_id": "AC-003",
+   "record_id": "pr_f5d66956a9494e3aaa299bf61a09d567",
+   "recorded_at": "2026-06-27T19:49:32+09:00",
+   "card_snapshot": {
+    "eup": "삼척시",
+    "type": "EXPANSION",
+    "title": "삼척시 편의점 업종 가맹점 확충",
+    "category": "편의점"
+   },
+   "progress_changed": true,
+   "next_action": "가맹 심사 접수",
+   "progress": "적격성 확인",
+   "due_at": null,
+   "metrics": {
+    "usage_count": 1215
+   }
+  },
+  {
+   "owner": "지역상생팀",
+   "note": "가맹 심사 접수",
+   "blocker": null,
+   "progress_pct": null,
+   "previous_progress": "적격성 확인",
+   "created_at": "2026-08-08T19:49:32+09:00",
+   "source": "담당자 입력",
+   "card_id": "AC-004",
+   "record_id": "pr_d6c51b327ba64e5fb609d0d9c5c1652e",
+   "recorded_at": "2026-07-04T19:49:32+09:00",
+   "card_snapshot": {
+    "eup": "삼척시",
+    "type": "EXPANSION",
+    "title": "삼척시 카페 업종 가맹점 확충",
+    "category": "카페"
+   },
+   "progress_changed": true,
+   "next_action": "정산 연동 일정 협의",
+   "progress": "가맹 심사",
+   "due_at": null,
+   "metrics": {}
+  },
+  {
+   "owner": "지역상생팀",
+   "note": "가맹 심사 접수. 정산 연동 테스트 진행 중",
+   "blocker": null,
+   "progress_pct": null,
+   "previous_progress": "적격성 확인",
+   "created_at": "2026-08-08T19:49:32+09:00",
+   "source": "담당자 입력",
+   "card_id": "AC-003",
+   "record_id": "pr_750c0a0cb3b84a819615168b95187c9f",
+   "recorded_at": "2026-07-06T19:49:32+09:00",
+   "card_snapshot": {
+    "eup": "삼척시",
+    "type": "EXPANSION",
+    "title": "삼척시 편의점 업종 가맹점 확충",
+    "category": "편의점"
+   },
+   "progress_changed": true,
+   "next_action": "심사 결과 확인",
+   "progress": "가맹 심사",
+   "due_at": null,
+   "metrics": {}
+  },
+  {
+   "owner": "지역상생팀",
+   "note": "가맹 계약 체결. 포스 연동·안내물 배치 진행",
+   "blocker": null,
+   "progress_pct": 80,
+   "previous_progress": "가맹 심사",
+   "created_at": "2026-08-08T19:49:32+09:00",
+   "source": "담당자 입력",
+   "card_id": "AC-003",
+   "record_id": "pr_f2f9fae8dcff44dd822044cff692b1f7",
+   "recorded_at": "2026-07-14T19:49:32+09:00",
+   "card_snapshot": {
+    "eup": "삼척시",
+    "type": "EXPANSION",
+    "title": "삼척시 편의점 업종 가맹점 확충",
+    "category": "편의점"
+   },
+   "progress_changed": true,
+   "next_action": "오픈 후 첫 달 사용 건수 관측",
+   "progress": "추진중",
+   "due_at": "2026-07-24",
+   "metrics": {
+    "active_merchant_count": 32
+   }
+  },
+  {
+   "owner": "지역상생팀",
+   "note": "정산 연동 일정이 사업자 사정으로 미정. 재협의 필요",
+   "blocker": "사업자 측 포스 교체 일정 미정",
+   "progress_pct": 60,
+   "previous_progress": "가맹 심사",
+   "created_at": "2026-08-08T19:49:32+09:00",
+   "source": "담당자 입력",
+   "card_id": "AC-004",
+   "record_id": "pr_f7d99a0550ac4862bec299908fa53cd0",
+   "recorded_at": "2026-07-17T19:49:32+09:00",
+   "card_snapshot": {
+    "eup": "삼척시",
+    "type": "EXPANSION",
+    "title": "삼척시 카페 업종 가맹점 확충",
+    "category": "카페"
+   },
+   "progress_changed": true,
+   "next_action": "포스 교체 일정 재협의",
+   "progress": "추진중",
+   "due_at": "2026-08-15",
+   "metrics": {
+    "conversion_rate_pct": 20.2,
+    "usage_count": 428,
+    "active_merchant_count": 8,
+    "concentration_index": 43.1
+   }
+  },
+  {
+   "owner": "지역상생팀",
+   "note": "가맹점 오픈 확인. 방문객 위젯 추천 목록에 반영됨",
+   "blocker": null,
+   "progress_pct": 100,
+   "previous_progress": "추진중",
+   "created_at": "2026-08-08T19:49:32+09:00",
+   "source": "담당자 입력",
+   "card_id": "AC-003",
+   "record_id": "pr_ff6be2c2f1d84a06917fa09024950b4b",
+   "recorded_at": "2026-07-21T19:49:32+09:00",
+   "card_snapshot": {
+    "eup": "삼척시",
+    "type": "EXPANSION",
+    "title": "삼척시 편의점 업종 가맹점 확충",
+    "category": "편의점"
+   },
+   "progress_changed": true,
+   "next_action": null,
+   "progress": "완료",
+   "due_at": "2026-07-24",
+   "metrics": {
+    "conversion_rate_pct": 21.4,
+    "usage_count": 1362,
+    "active_merchant_count": 33,
+    "concentration_index": 42.1
+   }
+  }
+ ]
+}

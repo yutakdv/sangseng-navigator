@@ -2,11 +2,12 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { AdminShell } from "@/components/AdminShell";
-import { AssumptionBadge, AssumptionNote, ProxyBadge } from "@/components/Badge";
+import { AssumptionBadge, AssumptionNote, NarrativeSourceChip, ProxyBadge } from "@/components/Badge";
 import { CandidateVerification } from "@/components/CandidateVerification";
 import { DecisionActions } from "@/components/DecisionActions";
 import { DeltaValue } from "@/components/DeltaValue";
 import { Icon } from "@/components/Icon";
+import { IncentiveDecision } from "@/components/IncentiveDecision";
 import { MapView } from "@/components/MapView";
 import { OriginalRankingTable } from "@/components/OriginalRankingTable";
 import { ProgressRecordTimeline } from "@/components/ProgressRecordTimeline";
@@ -17,6 +18,7 @@ import { SimulateButton } from "@/components/SimulateButton";
 import { WorkflowChip } from "@/components/StatusChip";
 import { BarRank } from "@/components/charts/BarRank";
 import { api } from "@/lib/api";
+import { NARRATIVE_SOURCE_TEXT, cardNarrativeSource } from "@/lib/aiSource";
 import { ANCHOR, PRIMARY } from "@/lib/constants";
 import { ApiError } from "@/lib/errors";
 import type { Candidate, Card } from "@/types";
@@ -39,12 +41,19 @@ export async function generateMetadata({
  * 브라우저가 필요한 조각만 클라이언트 컴포넌트로 내려보낸다. 지도에는 **이 읍의 가맹점만**
  * 걸러서 넘긴다 — 1,678건 전체를 넘기면 그대로 RSC 페이로드가 된다.
  *
- * 화면 순서는 "AI가 무엇을 왜 제안했는가(근거 전문 → 원 Score 순위) → 어디인가(지도 → 후보 상세)
+ * 화면 순서는 "AI가 무엇을 왜 제안했는가(근거 전문 → 원 정량 순위) → 어디인가(지도 → 후보 상세)
  * → 그래서 어떤 효과인가(예상 효과) → 애초에 왜 이 지역인가(1단계 진단)"다.
  */
-export default async function CardDetailPage({ params }: { params: Promise<{ id: string }> }) {
+export default async function CardDetailPage({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ id: string }>;
+  searchParams: Promise<{ from?: string }>;
+}) {
   // Next 15+ 에서 params·searchParams 는 Promise 다 — await 없이 접근하면 런타임 에러
   const { id } = await params;
+  const { from } = await searchParams;
 
   const [dashboard, cand, card, progressResult] = await Promise.all([
     api.dashboard(),
@@ -81,6 +90,11 @@ export default async function CardDetailPage({ params }: { params: Promise<{ id:
   const targetLabel = target ? `${target.eup} ${target.category}` : null;
   const isExpansion = card.type === "EXPANSION";
 
+  // 이 카드의 설명 문구가 AI 응답인지 서버 규칙인지 (05 §2) — 화면 문장이 데이터와 다른 말을
+  // 하지 않게 하는 장치라, 배지·검증 배너·근거 Section 설명 세 곳이 이 값 하나를 공유한다
+  const narrativeSource = cardNarrativeSource(card);
+  const narrativeNote = narrativeSource ? NARRATIVE_SOURCE_TEXT[narrativeSource].note : "";
+
   /**
    * `근사 지표` 배지 — "지역 전환율"이 보이는 **모든 위치**에 붙인다 (절대 규칙 2, 13 §9).
    * INCENTIVE 카드에서만 쓴다: 이 카드의 `scenarios[].delta_pp`와 `expected_effect`가
@@ -102,15 +116,17 @@ export default async function CardDetailPage({ params }: { params: Promise<{ id:
     (cand.eup_ranking ?? []).map((e) => [e.eup, e.eup === target?.eup ? PRIMARY : "#D6CEF8"]),
   );
 
+  const back = backLink(from, card.id);
+
   return (
     <AdminShell dashboard={dashboard}>
       <div className="mx-auto flex max-w-5xl flex-col gap-5">
         <Link
-          href="/"
+          href={back.href}
           className="inline-flex w-fit items-center gap-1.5 text-[13px] font-semibold text-admin-text-muted underline-offset-4 hover:text-admin-primary hover:underline"
         >
           <Icon name="chevronRight" size={14} strokeWidth={2} className="rotate-180" />
-          제안 목록으로
+          {back.label}
         </Link>
 
         <nav aria-label="카드 검토 순서" className="rounded-panel bg-admin-surface p-2 shadow-card">
@@ -151,6 +167,8 @@ export default async function CardDetailPage({ params }: { params: Promise<{ id:
                 {isExpansion ? "가맹점 확충" : "페이백 인센티브"}
               </span>
               <WorkflowChip card={card} />
+              {/* 제목 바로 위에서 "이 카드의 설명을 누가 썼는가"를 먼저 말한다 (05 §2) */}
+              <NarrativeSourceChip kind={narrativeSource} />
             </div>
 
             <h1 className="mt-2 break-keep text-[22px] font-bold leading-8 tracking-[-0.01em] text-admin-text sm:text-[26px] sm:leading-9">
@@ -190,21 +208,42 @@ export default async function CardDetailPage({ params }: { params: Promise<{ id:
             {/* 정량 순위 병기 — 조정 여부와 무관하게 항상 노출 (절대 규칙 5) */}
             {showRank ? <RankTrace card={card} size="md" /> : null}
 
+            {/* 재검증 배너 — 무엇을 서버가 다시 만들었는지만 말한다. "누가 설명을 썼는가"는
+                같은 줄의 출처 칩이 지므로 여기서 AI의 역할을 단정하지 않는다 (05 §2).
+                INCENTIVE(status=partial)는 수치만 서버 고정이라 검증됨 톤을 쓰지 않는다 */}
             {card.ai.grounding?.status === "verified" ? (
               <p className="flex items-start gap-2 rounded-xl bg-state-good-bg px-3.5 py-3 text-xs leading-5 text-state-good ring-1 ring-inset ring-state-good-line">
                 <Icon name="check" size={14} strokeWidth={2} className="mt-0.5 shrink-0" />
-                서버가 정량 규칙으로 고른 대상과 화면의 후보명·Score·순위·추진 상태·도로 시간을
-                정본 데이터로 다시 검증했습니다. AI는 비정량 리스크 설명만 보조합니다.
+                <span>
+                  서버가 정량 규칙으로 고른 대상과 화면의 후보명·Score·순위·추진 상태·도로 시간을
+                  정본 데이터로 다시 검증했습니다. {narrativeNote}
+                </span>
+              </p>
+            ) : card.ai.grounding?.status === "partial" ? (
+              <p className="flex items-start gap-2 rounded-xl bg-admin-surface-sunken px-3.5 py-3 text-xs leading-5 text-admin-text-soft ring-1 ring-inset ring-admin-border">
+                <Icon name="info" size={14} strokeWidth={2} className="mt-0.5 shrink-0" />
+                <span>
+                  3·5·7% 시나리오 수치와 필수 리스크 3종은 서버가 고정한 값입니다. 비교문·근거
+                  문장은 확충 카드처럼 정본 데이터로 재생성하지 않으므로 검증됨으로 표기하지
+                  않습니다. 설명 문구의 출처는 제목 위 칩에 적었습니다.
+                </span>
               </p>
             ) : null}
 
             {isExpansion && card.status !== "pending" ? (
               <>
-                <CandidateVerification
-                  cardId={card.id}
-                  verification={card.candidate_verification}
-                  editable={card.status === "approved"}
-                />
+                {/* #verification — 트래킹의 "필수 적격성 5개 항목 확인"이 딥링크로 찾아오는 앵커.
+                    CandidateVerification은 클라이언트 컴포넌트라 id를 서버 쪽 래퍼에 둔다.
+                    바로 아래 #execution(추진 상태 기록)이 이어지므로, 5항목을 채운 담당자가
+                    같은 화면에서 단계 전이까지 마칠 수 있다 (데모 6단계).
+                    렌더 조건은 EXPANSION + status !== "pending" — INCENTIVE에는 이 앵커가 없다 */}
+                <div id="verification" className="scroll-mt-28">
+                  <CandidateVerification
+                    cardId={card.id}
+                    verification={card.candidate_verification}
+                    editable={card.status === "approved"}
+                  />
+                </div>
                 <OperationsSummary card={card} />
               </>
             ) : null}
@@ -284,11 +323,11 @@ export default async function CardDetailPage({ params }: { params: Promise<{ id:
             id="diagnosis"
             icon="compass"
             title="1단계 지역 진단 — 왜 이 지역인가"
-            desc="소비저조도·소비증감을 0~1로 정규화해 합산한 지역 스코어다. 후보 선정보다 한 단계 앞선 정량 근거이며, 순위는 화면에서 감추지 않는다."
+            desc="소비저조도·소비증감을 0~1로 정규화해 합산한 1단계 읍·시 스코어다. 후보 선정보다 한 단계 앞선 정량 근거이며, 순위는 화면에서 감추지 않는다."
           >
             <BarRank data={eupBars} colors={eupColors} height={200} />
             <p className="u-note mt-3 border-t border-admin-border pt-2.5">
-              제안 대상 지역 {target.eup}만 진한 색으로 표시했다. 막대 길이는 지역 스코어이며, 값이
+              제안 대상 지역 {target.eup}만 진한 색으로 표시했다. 막대 길이는 읍·시 스코어이며, 값이
               클수록 소비가 저조하거나 감소 폭이 크다는 뜻이다.
             </p>
           </Section>
@@ -299,7 +338,8 @@ export default async function CardDetailPage({ params }: { params: Promise<{ id:
           id="evidence"
           icon="sparkle"
           title="추천 근거와 리스크 설명"
-          desc="서버가 진행 중인 업무가 없는 후보 중 정량 Score 최상위를 결정론적으로 선택합니다. AI는 비정량 리스크 설명만 보조하며, 숫자·순위·상태는 정본 데이터로 다시 검증합니다."
+          badge={<NarrativeSourceChip kind={narrativeSource} />}
+          desc={`서버가 진행 중인 업무가 없는 후보 중 후보 스코어 최상위를 결정론적으로 선택하고, 숫자·순위·상태는 정본 데이터로 다시 검증합니다. ${narrativeNote}`}
         >
           <div className="flex flex-col gap-4">
             <Block title="후보 비교">
@@ -357,11 +397,11 @@ export default async function CardDetailPage({ params }: { params: Promise<{ id:
           </div>
         </Section>
 
-        {/* ── 원 Score 순위 (절대 규칙 5) ──────────────────────── */}
+        {/* ── 원 정량 순위 (절대 규칙 5) ──────────────────────── */}
         {card.ai.original_ranking?.length ? (
           <Section
             icon="scale"
-            title="원 Score 순위 (정량 기준)"
+            title="원 정량 순위 (2단계 후보 스코어 기준)"
             desc="2단계 후보 스코어의 원래 순위입니다. 진행 중인 업무로 제외된 상위 후보와 최종 선택 가능한 후보를 함께 보여 줍니다."
           >
             <OriginalRankingTable
@@ -417,7 +457,7 @@ export default async function CardDetailPage({ params }: { params: Promise<{ id:
           <Section
             icon="store"
             title="후보 상세"
-            desc="선정 지역의 업종별 대표 후보입니다. 업종공백도는 반경 500m 내 동일 업종 상가를 분모로 베이지안 보정하며, 순서는 정량 Score 순이고 도로 값으로 다시 정렬하지 않습니다."
+            desc="선정 지역의 업종별 대표 후보입니다. 업종공백도는 반경 500m 내 동일 업종 상가를 분모로 베이지안 보정하며, 순서는 후보 스코어 순이고 도로 값으로 다시 정렬하지 않습니다."
           >
             <div className="u-scroll-x">
               <table className="u-table min-w-[680px]">
@@ -593,19 +633,20 @@ export default async function CardDetailPage({ params }: { params: Promise<{ id:
                     : "확정 페이백률은 담당자가 고른 값만 저장되며, 완료 후에만 방문객 화면의 혜택 배지에 반영됩니다."}
                 </span>
               </p>
-              <DecisionActions
-                cardId={card.id}
-                cardType={card.type}
-                requireRate={card.type === "INCENTIVE"}
-                selectedRate={card.selected_rate ?? null}
-              />
+              {/* INCENTIVE 승인은 페이백률이 필수라(05 §2) 이 화면에도 요율 칩을 함께 둔다 —
+                  칩이 없던 동안 selectedRate가 영원히 null이라 승인 버튼이 눌리지 않았다 */}
+              {card.type === "INCENTIVE" ? (
+                <IncentiveDecision cardId={card.id} initialRate={card.selected_rate ?? null} />
+              ) : (
+                <DecisionActions cardId={card.id} cardType={card.type} />
+              )}
               {card.type === "INCENTIVE" ? (
                 <p className="u-note mt-2">
-                  페이백률(3·5·7%) 선택은{" "}
+                  3·5·7% 시나리오의 예상 개선폭·재원 부담 비교는{" "}
                   <Link href="/incentive" className="font-semibold text-admin-primary underline-offset-4 hover:underline">
                     인센티브 정책 화면
                   </Link>
-                  에서 합니다.
+                  에서 봅니다. 확정 페이백률은 담당자가 고른 값만 저장됩니다.
                 </p>
               ) : null}
             </div>
@@ -646,6 +687,20 @@ export default async function CardDetailPage({ params }: { params: Promise<{ id:
       </div>
     </AdminShell>
   );
+}
+
+/**
+ * 백링크 — 어디서 들어왔는지에 따라 되돌아갈 화면이 다르다.
+ *
+ * `document.referrer`는 쓰지 않는다: 서버 컴포넌트에서 읽을 수 없고, 새로고침·북마크·링크
+ * 공유에서 사라지며, 브라우저 정책에 따라 비어 오기도 한다. 대신 **진입 링크가 문맥을 실어
+ * 준다**(`?from=proposal`). 값은 화이트리스트로만 해석한다 — 임의 문자열을 그대로 href에 넣으면
+ * 외부로 튀는 링크가 만들어진다. 모르는 값·값 없음(직접 URL 진입, 심사위원 셀프 데모)은 허브로.
+ */
+function backLink(from: string | undefined, cardId: string): { href: string; label: string } {
+  if (from === "proposal") return { href: `/proposals/${cardId}`, label: "제안 검토 화면으로" };
+  if (from === "tracking") return { href: "/tracking", label: "추진 경과 리포트로" };
+  return { href: "/", label: "허브로" };
 }
 
 function ReviewStep({ href, step, label, note }: { href: string; step: string; label: string; note: string }) {

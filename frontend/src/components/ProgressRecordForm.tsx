@@ -66,7 +66,7 @@ const METRIC_FIELDS: {
   },
   {
     key: "concentration_index",
-    label: "소비 집중도",
+    label: "지역 소비 집중도",
     unit: "점",
     step: "0.1",
     digits: 2,
@@ -582,8 +582,10 @@ export function ProgressRecordForm({
           ) : null}
           {savedSummary ? (
             <p className="mt-2.5 flex flex-wrap gap-x-4 gap-y-1 text-[12px] font-semibold">
+              {/* `?from=tracking` — 이 폼은 /tracking/new에서만 쓰이므로 되돌아갈 곳이 항상 트래킹이다.
+                  path segment만 인코딩하고 쿼리는 정적 문자열이라 인코딩이 필요 없다 (11 §1 D4) */}
               <Link
-                href={`/cards/${encodeURIComponent(savedSummary.cardId)}`}
+                href={`/cards/${encodeURIComponent(savedSummary.cardId)}?from=tracking`}
                 className="text-admin-primary underline-offset-4 hover:underline"
               >
                 카드 이력에서 직전 대비 변화 보기

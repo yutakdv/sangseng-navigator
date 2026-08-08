@@ -46,7 +46,11 @@ export function Panel({
     <section
       id={id}
       style={{ animationDelay: `${delay}ms` }}
-      className={`animate-rise flex min-w-0 flex-col overflow-hidden rounded-card bg-admin-surface shadow-card ${className}`}
+      /* scroll-mt-24 — `#decision-queue`·`#work-queue`·`#recent-decisions`가 전부 이 패널의 id다.
+         허브 상단 상태 바가 sticky(top-0)라 여백 없이 스크롤하면 패널 제목이 바 뒤로 들어간다.
+         허브의 `#proposal` 래퍼가 이미 쓰는 값과 맞췄고, scroll-margin은 앵커 스크롤에만
+         작용해 레이아웃에는 영향이 없다 */
+      className={`animate-rise flex min-w-0 flex-col overflow-hidden rounded-card bg-admin-surface shadow-card scroll-mt-24 ${className}`}
     >
       <div className="flex flex-wrap items-start gap-x-4 gap-y-2.5 p-5 pb-4 2xl:p-6 2xl:pb-4">
         <div className="min-w-0 flex-1 basis-56">

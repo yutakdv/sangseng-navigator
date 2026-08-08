@@ -45,7 +45,7 @@ export function MockOutcomeReport({ card, dashboard }: { card: Card; dashboard: 
     },
     {
       icon: "target",
-      label: "소비 집중도",
+      label: "지역 소비 집중도",
       before: `${dashboard.concentration.index.toFixed(1)}점`,
       after: `${Math.max(0, dashboard.concentration.index - concentrationDrop).toFixed(1)}점`,
       change: `-${concentrationDrop.toFixed(1)}점`,

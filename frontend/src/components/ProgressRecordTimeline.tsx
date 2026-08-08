@@ -1,16 +1,11 @@
 import Link from "next/link";
+import { ProxyBadge } from "@/components/Badge";
 import { DeltaValue } from "@/components/DeltaValue";
 import { Icon } from "@/components/Icon";
 import { ProgressChip } from "@/components/StatusChip";
+import { PROXY_NOTE } from "@/lib/constants";
+import { PROGRESS_METRICS, PROXY_METRIC_KEY, formatMetric } from "@/lib/progressMetrics";
 import type { ProgressMetricKey, ProgressRecord } from "@/types";
-
-const METRICS: { key: ProgressMetricKey; label: string; unit: string; digits: number }[] = [
-  { key: "usage_count", label: "지역 사용", unit: "건", digits: 0 },
-  { key: "conversion_rate_pct", label: "지역 전환율", unit: "%", digits: 2 },
-  { key: "active_merchant_count", label: "활성 가맹점", unit: "곳", digits: 0 },
-  { key: "spend_krw", label: "지역 사용액", unit: "원", digits: 0 },
-  { key: "concentration_index", label: "소비 집중도", unit: "점", digits: 2 },
-];
 
 export function ProgressRecordTimeline({
   records,
@@ -51,7 +46,7 @@ export function ProgressRecordTimeline({
   const lastSeen: Partial<Record<ProgressMetricKey, number>> = {};
   for (let i = records.length - 1; i >= 0; i--) {
     previousMetrics.set(records[i].record_id, { ...lastSeen });
-    for (const { key } of METRICS) {
+    for (const { key } of PROGRESS_METRICS) {
       const value = records[i].metrics?.[key];
       if (value !== undefined && value !== null) lastSeen[key] = value;
     }
@@ -60,7 +55,7 @@ export function ProgressRecordTimeline({
   return (
     <ol className="relative flex flex-col gap-4 before:absolute before:bottom-5 before:left-[11px] before:top-5 before:w-px before:bg-admin-border sm:before:left-[15px]">
       {records.map((record) => {
-        const observed = METRICS.filter(({ key }) => record.metrics?.[key] !== undefined && record.metrics?.[key] !== null);
+        const observed = PROGRESS_METRICS.filter(({ key }) => record.metrics?.[key] !== undefined && record.metrics?.[key] !== null);
         const quick = record.source === "quick_status" || record.source === "빠른 상태 변경";
         return (
           <li key={record.record_id} className="relative pl-8 sm:pl-10">
@@ -139,14 +134,21 @@ export function ProgressRecordTimeline({
 
               {observed.length ? (
                 <div className="mt-3 border-t border-admin-border pt-3">
-                  <p className="text-[11px] font-bold text-admin-text-muted">실제 관측 성과</p>
+                  <div className="flex flex-wrap items-center gap-1.5">
+                    <p className="text-[11px] font-bold text-admin-text-muted">실제 관측 성과</p>
+                    {/* 절대 규칙 2 — 이 블록에 지역 전환율이 보이면 근사 지표 배지를 반드시 병기한다 */}
+                    {observed.some((metric) => metric.key === PROXY_METRIC_KEY) ? (
+                      <ProxyBadge note={PROXY_NOTE} />
+                    ) : null}
+                  </div>
                   <dl className="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-5">
                     {observed.map((metric) => {
                       const value = record.metrics[metric.key] as number;
                       const prev = previousMetrics.get(record.record_id)?.[metric.key];
                       return (
                         <div key={metric.key} className="rounded-lg bg-admin-surface-sunken px-2.5 py-2">
-                          <dt className="text-[10px] leading-4 text-admin-text-muted">{metric.label}</dt>
+                          {/* 좁은 셀이라 shortLabel — 리포트 타일의 긴 라벨과 같은 지표다 */}
+                          <dt className="text-[10px] leading-4 text-admin-text-muted">{metric.shortLabel}</dt>
                           <dd className="mt-0.5 text-xs font-bold tabular-nums text-admin-text">
                             {formatMetric(value, metric.digits)}{metric.unit}
                           </dd>
@@ -176,7 +178,7 @@ export function ProgressRecordTimeline({
                   {/* 방향색은 값의 증감만 뜻한다 — 집중도는 의미가 반대라 문장으로 못 박는다 */}
                   {observed.some((metric) => metric.key === "concentration_index") ? (
                     <p className="mt-2 text-[10px] leading-4 text-admin-text-muted">
-                      소비 집중도는 값이 낮아질수록(▼) 분산이 개선된 것입니다.
+                      지역 소비 집중도는 값이 낮아질수록(▼) 분산이 개선된 것입니다.
                     </p>
                   ) : null}
                 </div>
@@ -194,12 +196,6 @@ const sourceLabel = (source: string): string => {
   if (source === "manual") return "담당자 입력";
   return source;
 };
-
-const formatMetric = (value: number, digits: number): string =>
-  value.toLocaleString("ko-KR", {
-    minimumFractionDigits: digits,
-    maximumFractionDigits: digits,
-  });
 
 const kstDateTime = (iso: string): string => {
   const ms = new Date(iso).getTime();

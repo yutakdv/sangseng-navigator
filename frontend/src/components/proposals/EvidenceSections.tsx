@@ -10,7 +10,10 @@ import type { Card, Dashboard } from "@/types";
 
 /**
  * 상세 페이지의 근거(01)·전망(02) 막 — 허브의 02·03막을 **이동**한 것이다 (복사 아님).
- * 허브는 이 내용의 텍스트 요약(insight 문장 + 원 Score 한 줄)만 미리보기로 갖는다.
+ * 허브는 이 내용의 텍스트 요약(insight 문장 + 읍·시 스코어 한 줄)만 미리보기로 갖는다.
+ *
+ * 여기서 나가는 카드 상세 링크에는 `?from=proposal`을 붙인다 — 카드 상세의 백링크가 그 값으로
+ * "제안 검토 화면으로" 되돌아간다. 진입 문맥을 referrer에 기대면 새로고침·북마크에서 사라진다.
  *
  * 서버 컴포넌트 — 차트(RegionTrend)만 "use client"로 내려간다.
  */
@@ -42,7 +45,9 @@ export function EvidenceSections({
             desc="색상과 함께 최신 월 순위·건수 텍스트를 제공합니다."
             insight={evidence.regionInsight}
             action={
-              isExpansion ? <PanelLink href={`/cards/${card.id}#location`}>반경 500m 지도</PanelLink> : undefined
+              isExpansion ? (
+                <PanelLink href={`/cards/${card.id}?from=proposal#location`}>반경 500m 지도</PanelLink>
+              ) : undefined
             }
           >
             {evidence.regionTrend.length ? (
@@ -61,13 +66,15 @@ export function EvidenceSections({
           <Panel
             className="col-span-4 sm:col-span-8 xl:col-span-4"
             icon="scatter"
-            title="업종·정량 순위 비교"
-            desc="제안 업종의 사용 비중과 원 Score 순위를 함께 봅니다."
+            title="업종 비중 · 읍·시 스코어"
+            desc="제안 업종의 사용 비중과 1단계 읍·시 스코어 순위를 함께 봅니다."
             insight={evidence.categoryInsight}
           >
             <CategoryShareBars data={dashboard.category_share ?? []} targetCategory={evidence.targetCategory} />
+            {/* 이 순위는 1단계 지역 진단(읍·시 스코어)이다 — 같은 화면 위쪽 RankTrace의 2단계
+                후보 스코어와 층위가 달라, 둘 다 "원 Score"로 부르면 같은 값으로 오독된다 */}
             <div className="mt-4 border-t border-admin-border pt-4">
-              <p className="text-xs font-bold text-admin-text-muted">원 정량 Score 상위</p>
+              <p className="text-xs font-bold text-admin-text-muted">1단계 읍·시 스코어 상위</p>
               <ol className="mt-2 divide-y divide-admin-border border-y border-admin-border">
                 {evidence.ranking.slice(0, 3).map((row) => (
                   <li key={row.eup} className="flex items-center justify-between gap-3 py-2 text-[13px]">
@@ -91,9 +98,13 @@ export function EvidenceSections({
         action={
           card.scenarios?.length ? (
             <PanelLink href="/incentive">인센티브 정책 보기</PanelLink>
-          ) : (
-            <PanelLink href={`/cards/${card.id}#location`}>정밀 시뮬레이션</PanelLink>
-          )
+          ) : isExpansion ? (
+            /* #simulation = 카드 상세의 "가맹 전환 시 예상 효과"(SimulateButton). 예전에는 지도
+               (#location)로 갔는데, 이 링크의 이름이 약속하는 것은 반사실 재계산 화면이다.
+               그 섹션은 EXPANSION일 때만 렌더되므로 시나리오도 없고 확충도 아닌 카드에서는
+               링크를 아예 만들지 않는다 — 허공을 가리키는 앵커가 되기 때문이다 */
+            <PanelLink href={`/cards/${card.id}?from=proposal#simulation`}>정밀 시뮬레이션</PanelLink>
+          ) : undefined
         }
       >
         {card.scenarios?.length ? (

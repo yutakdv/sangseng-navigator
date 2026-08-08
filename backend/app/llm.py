@@ -31,8 +31,10 @@ class LLMError(Exception):
 
 def generate_json(system: str, user: str, schema: dict, schema_name: str = "result",
                    timeout: float | None = None, attempts: int = 2) -> dict:
-    """attempts 는 총 시도 횟수 — 기본 2(최초+재시도 1회)로 기존 호출부 동작은 그대로다.
-    지연 상한이 중요한 호출부(위젯 blurb)만 attempts=1 로 재시도를 끄고 fallback 으로 넘긴다.
+    """attempts 는 총 시도 횟수 — 기본 2(최초+재시도 1회).
+    현재 호출부(cardgen 카드 생성·cards.simulate)는 모두 기본값을 쓴다. 위젯 추천 문구는 LLM을
+    쓰지 않고 결정론 문구만 반환하므로(routes/widget.py `_fallback_blurb`) 여기 해당하지 않는다.
+    지연 상한이 더 중요한 호출부가 생기면 attempts=1 로 재시도를 끄고 fallback 으로 넘긴다.
     """
     provider = os.environ.get("LLM_PROVIDER", "openai")
     if provider not in {"openai", "anthropic"}:

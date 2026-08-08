@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { AdminShell } from "@/components/AdminShell";
-import { AssumptionBadge, GradeChip, ProxyBadge } from "@/components/Badge";
+import { GradeChip, ProxyBadge } from "@/components/Badge";
 import { Icon } from "@/components/Icon";
 import { KpiCard } from "@/components/KpiCard";
 import { PageHeader } from "@/components/PageHeader";
@@ -14,7 +14,7 @@ import { DailyTrend } from "@/components/charts/DailyTrend";
 import { LineTrend } from "@/components/charts/LineTrend";
 import { ScaleCompare } from "@/components/charts/ScaleCompare";
 import { api } from "@/lib/api";
-import { REGIONS, REGION_TOOLTIP } from "@/lib/constants";
+import { REGIONS, REGION_TOOLTIP, STABILITY_NOTE } from "@/lib/constants";
 import { dash, monthLabel, num, pct, ratioPct, signed } from "@/lib/format";
 import {
   regionCategoryShare,
@@ -665,13 +665,18 @@ export default async function DashboardPage({
             )}
           </Section>
 
-          {/* ── AI 제안 안정도 (P8 민감도) ─────────────────────── */}
+          {/* ── AI 제안 안정도 (P8 민감도) ───────────────────────
+              해석 주의 문구는 lib/constants의 STABILITY_NOTE 하나로만 쓴다 — 이 숫자는 허브
+              미리보기·제안 요약(ProposalSummary)에도 같이 뜨는데, 문구가 화면마다 갈리면
+              어느 쪽이 정본인지 흐려진다.
+              `가정 기반 전망` 배지는 붙이지 않는다 — 안정도는 미래를 내다본 전망이 아니라
+              가중치를 흔들어 본 **민감도 실측값**이라 절대 규칙 3의 대상이 아니다.
+              전망 배지를 남발하면 정작 시뮬레이션 출력에 붙은 배지의 무게가 줄어든다 */}
           {stability !== null && stability !== undefined ? (
             <Section
               icon="shield"
               title="추천 순위 안정도 · 해석 주의"
-              badge={<AssumptionBadge />}
-              desc="가중치 조합에서 상위 3개 후보가 유지된 비율이다. 후보 요인이 동률로 고정된 경우에는 선발 기준의 다양성이나 강건성을 의미하지 않는다."
+              desc={STABILITY_NOTE}
             >
               <div className="flex items-baseline gap-1.5">
                 <span className="text-[32px] font-bold leading-none tabular-nums text-admin-text">

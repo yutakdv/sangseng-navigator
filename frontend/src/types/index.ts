@@ -193,10 +193,12 @@ export interface CardAi {
   original_ranking: { rank: number; candidate: string; score: number }[] | null;
   /** LLM 자유서술의 숫자·순위·상태를 정본 데이터로 재검증했는지 */
   grounding?: {
-    status: "verified" | "fallback";
-    numeric_status?: "verified" | "fallback";
+    /** EXPANSION은 verified, INCENTIVE는 partial(시나리오 수치만 서버 고정) (05 §2) */
+    status: "verified" | "fallback" | "partial";
+    numeric_status?: "verified" | "fallback" | "fixed_by_server";
     narrative_status?: "verified" | "fallback" | "rule_based" | "ai_generated_unverified";
     selection_method?: string;
+    /** llm | rule_fallback | rule_seed | mock_rule — 설명 출처 칩의 근거 (05 §2) */
     explanation_source?: string;
     source: "structured";
     checks: string[];
@@ -218,7 +220,7 @@ export interface Card {
   target: { eup: string; category: string } | null;
   score_rank: number | null;
   ai_rank: number | null;
-  /** 활성 업무 제외 후 가용 후보 안에서의 순위. */
+  /** 진행 중인 업무 제외 후 선택 가능한 후보 안에서의 순위. */
   selection_rank?: number | null;
   confidence: "상" | "중" | "하";
   ai: CardAi;
@@ -375,6 +377,8 @@ export interface Simulation {
   effect_assessment: "미미" | "개선" | "심화" | "혼재";
   decision_note: string;
   narrative: string;
+  /** 이 문구가 LLM 응답인지 규칙 기반인지 (05 §2). mock 모드는 mock_rule */
+  narrative_source?: "llm" | "rule_based" | "mock_rule";
   assumption_note: string;
 }
 

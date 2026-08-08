@@ -71,6 +71,24 @@ URL 하나라 이 구분이 사라진다.
 DYNAMO_ENDPOINT=http://localhost:8001 python backend/seed_demo.py --reset
 ```
 
+## 기상청 실황 (방문객 위젯 "오늘의 추천")
+
+서버 전용 키 `DATA_GO_KR_API_KEY`가 있으면 위젯 오늘의 추천에 현재 기온·강수가 붙는다.
+없으면 요일 문구만 나온다 — 화면은 그대로 뜬다(키 미설정·403·타임아웃 전부 정상 경로다).
+
+- **Docker**: 루트 `.env`의 값을 compose가 frontend 컨테이너에 넘긴다 — 설정할 것이 없다.
+- **컨테이너 밖 `npm run dev`**: `frontend/.env.local`에 직접 넣는다(`.env*.local`은 `.gitignore` 등재됨).
+  `next.config.mjs`의 `fromRootEnv`는 `NEXT_PUBLIC_*`만 넘긴다 — 서버 전용 키를 거기 넣으면
+  빌드 때 번들에 인라인될 수 있어서 일부러 넣지 않았다.
+
+  ```bash
+  echo 'DATA_GO_KR_API_KEY=<루트 .env와 같은 Decoding 키>' >> .env.local
+  ```
+
+- **Vercel**: Settings → Environment Variables에 `DATA_GO_KR_API_KEY` 추가(Production + Preview).
+  **`NEXT_PUBLIC_` 접두사를 붙이지 않는다** — 붙이면 브라우저 번들에 키가 실린다.
+  빠뜨리면 배포본에서만 조용히 날씨 줄이 사라지므로(에러 없음) 배포 후 육안으로 확인한다.
+
 ## 구조
 
 ```

@@ -18,6 +18,11 @@ import type { ReactNode } from "react";
  * ⚠ `body`에 `overflow-x: hidden`이 있으면 body가 스크롤 컨테이너가 돼 이 sticky가 죽는다
  *   (globals.css의 body 규칙 주석 참고).
  *
+ * 접이 요약줄에는 **지역 전환율만** 상시 노출한다 (`headline`). 01 문서의 "절대 자르지 않는 것"과
+ * 데모 1단계가 이 숫자를 첫 화면에서 요구하는데, 진단 4지표를 통째로 접으면서 함께 사라졌던 것을
+ * 되돌린 것이다. 나머지 세 지표는 접은 채로 둔다 — 분기에 한 번 바뀌는 배경 맥락이라는 판단(18 §3②)은
+ * 그대로다. 숫자가 보이는 자리이므로 `근사 지표` 배지도 이 줄에 함께 온다 (절대 규칙 2).
+ *
  * 서버 컴포넌트 — 진단 펼침은 네이티브 `<details>`라 클라이언트 JS가 필요 없다.
  */
 export function StatusBar({
@@ -26,6 +31,7 @@ export function StatusBar({
   done,
   held,
   rejected,
+  headline,
   diagnostics,
 }: {
   waiting: number;
@@ -33,6 +39,11 @@ export function StatusBar({
   done: number;
   held: number;
   rejected: number;
+  /**
+   * 접이 **요약줄 안**에 상시 노출할 핵심 지표. 접힘/펼침 어느 상태에서도 보여야 하는 값만 넣는다.
+   * 지역 전환율이 여기 오므로 호출부는 `근사 지표` 배지를 이 노드 안에 함께 넣어야 한다 (절대 규칙 2).
+   */
+  headline?: ReactNode;
   /** 펼쳤을 때 바 아래로 내려오는 압축 진단 블록 */
   diagnostics?: ReactNode;
 }) {
@@ -59,9 +70,15 @@ export function StatusBar({
       ) : null}
 
       {diagnostics ? (
-        <details className="ml-auto">
+        <details className="ml-auto min-w-0">
+          {/* `u-disclosure`에 flex-row-reverse가 걸려 ::before(꺾쇠)가 오른쪽 끝에 온다 —
+              요약 내용은 span 하나로 감싸야 DOM 순서 그대로 왼쪽부터 읽힌다.
+              감싸지 않고 형제로 나열하면 "이번 분기 진단 → 20.5%" 순으로 뒤집힌다 */}
           <summary className="u-disclosure flex-row-reverse rounded-md px-2 py-1.5 text-[13px] font-semibold text-admin-text-soft transition-colors hover:text-admin-primary">
-            이번 분기 진단
+            <span className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
+              {headline}
+              <span>이번 분기 진단</span>
+            </span>
           </summary>
           {/* 바가 sticky(=positioned)라 이 패널은 바 바로 아래에 겹쳐 내려온다 —
               펼칠 때 본문이 밀려 스크롤 위치가 튀지 않게 하려는 배치다 */}

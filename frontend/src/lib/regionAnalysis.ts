@@ -138,10 +138,10 @@ export function topCategoryShifts(
 
 /* ── 일·요일 축 (usage_daily, 05 §6 — 피드백 ⑦) ─────────────────────────── */
 
-const round1 = (x: number): number => Math.round(x * 10) / 10;
+export const round1 = (x: number): number => Math.round(x * 10) / 10;
 
 /** 요일 인덱스 계약: 0=월(pandas dayofweek). 0~4 주중, 5~6 주말. */
-const isValidWeekday = (daily: UsageDaily): boolean =>
+export const isValidWeekday = (daily: UsageDaily): boolean =>
   daily.weekday_labels.length === 7 &&
   daily.weekday_days.length === 7 &&
   daily.weekday_days.every((d) => d > 0);

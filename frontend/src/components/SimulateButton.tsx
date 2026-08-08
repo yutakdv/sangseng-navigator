@@ -2,9 +2,10 @@
 
 import { type ReactNode, useState, useTransition } from "react";
 import { simulateAction } from "@/app/actions";
-import { AssumptionBadge, AssumptionNote } from "@/components/Badge";
+import { AssumptionBadge, AssumptionNote, NarrativeSourceChip } from "@/components/Badge";
 import { DeltaValue } from "@/components/DeltaValue";
 import { Icon } from "@/components/Icon";
+import { simulationNarrativeSource } from "@/lib/aiSource";
 import type { Simulation } from "@/types";
 
 /**
@@ -71,6 +72,9 @@ export function SimulateButton({ cardId }: { cardId: string }) {
           <div className="flex flex-wrap items-center gap-2">
             <h4 className="text-[13px] font-bold text-admin-primary">가맹 전환 시 예상 효과</h4>
             <AssumptionBadge />
+            {/* 아래 지표 4칸은 언제나 서버 계산값이고, 갈리는 것은 그 밑의 해설 문장 하나다.
+                LLM 응답을 못 받으면 규칙 기반 문구로 대체되는데 화면이 같아 보이면 안 된다 (05 §2) */}
+            <NarrativeSourceChip kind={simulationNarrativeSource(result)} />
           </div>
 
           <div className="mt-3 grid grid-cols-1 gap-2.5 sm:grid-cols-2 lg:grid-cols-4">

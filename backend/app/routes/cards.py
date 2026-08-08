@@ -243,7 +243,11 @@ def simulate_card(
     # 개선 구간에서 LLM이 "상승(집중 심화)"라고 뒤집어 쓴 문장이 그대로 승인 화면에 실린다(실측).
     wrong_direction = bool(narrative) and ((kind == "심화" and "개선" in narrative)
                                            or (kind == "개선" and "심화" in narrative))
-    if not narrative or wrong_direction or "예상" not in narrative or "가정" not in narrative:
+    # LLM 문구를 실제로 채택했는지 = 화면이 "AI가 쓴 문장"이라고 말해도 되는지 (05 §2 narrative_source).
+    # 호출 실패·내용 가드 불통과는 물론, 혼재·미미라 애초에 호출하지 않은 구간도 여기서 False가 된다.
+    used_llm = (bool(narrative) and not wrong_direction
+                and "예상" in narrative and "가정" in narrative)
+    if not used_llm:
         narrative = _fallback_narrative(result)
     estimate_basis = {
         1: "대상 지역·업종의 최근 3개월 가맹점당 평균",
@@ -277,6 +281,7 @@ def simulate_card(
         "effect_assessment": effect_assessment,
         "decision_note": decision_note,
         "narrative": narrative,
+        "narrative_source": "llm" if used_llm else "rule_based",
         "assumption_note": ASSUMPTION_NOTE,
     }}
 

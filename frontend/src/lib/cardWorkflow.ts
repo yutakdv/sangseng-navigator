@@ -61,6 +61,30 @@ export function normalizedProgress(card: Card): CardProgress | null {
   return card.progress;
 }
 
+/**
+ * 승인 카드를 6스텝 흐름(PolicyFlow)의 STEP4·STEP5로 가르는 기준.
+ *
+ * STEP4 "검토 시작"은 후보 접촉 단계에 머문 카드, STEP5 "적격성·실행"은 적격성 확인·가맹 심사·
+ * 추진중처럼 실제 실행에 들어간 카드다. 예전에는 STEP4가 승인 전체를 세고 STEP5는 `추진중`만
+ * 세어, 적격성 확인·가맹 심사 단계의 카드가 STEP4에 중복으로 잡히면서 STEP5에서는 통째로
+ * 빠졌다 — 데모 6단계에서 단계를 하나씩 올리는 동안 두 구간에서 건수가 0으로 사라진다.
+ * 두 함수는 배타적이라 `isStartStage + isExecutionStage + 완료 = 승인 카드 총수`가 항상 성립한다.
+ *
+ * `progress`가 비어 있는 승인 카드는 `workflowLabel`과 같은 기준으로 검토 시작으로 본다 (05 §2).
+ * `보류`는 완료도 검토 시작도 아니므로 STEP5에 남긴다 — 어느 스텝에도 안 잡혀 사라지는 편보다 낫다.
+ */
+const START_STAGES = new Set<CardProgress>(["후보 접촉·검토 시작", "검토중"]);
+
+export const isStartStage = (card: Card): boolean => {
+  const progress = normalizedProgress(card);
+  return progress === null || START_STAGES.has(progress);
+};
+
+export const isExecutionStage = (card: Card): boolean => {
+  const progress = normalizedProgress(card);
+  return progress !== null && !START_STAGES.has(progress) && progress !== "완료";
+};
+
 export function progressOptions(card: Card): { value: CardProgress; disabled: boolean; reason?: string }[] {
   const verified = isEligibilityVerified(card);
   const options = card.type === "EXPANSION" ? EXPANSION_PROGRESS : INCENTIVE_PROGRESS;

@@ -2,12 +2,15 @@ import { Icon } from "@/components/Icon";
 import type { Card } from "@/types";
 
 /**
- * `정량 Score N위 → 선택 가능한 후보 M위` 병기 — 진행 중인 업무 중복 제외를 숨기지 않는다.
+ * `후보 스코어 N위 → 선택 가능한 후보 M위` 병기 — 진행 중인 업무 중복 제외를 숨기지 않는다.
  *
  * 허브 목록·트래킹·카드 상세 세 곳에서 같은 표기를 쓰는데, 세 곳 모두 회색 알약 안에 12px
  * 한 줄로 눌려 있어서 심사에서 가장 중요한 "감사 가능성" 장치가 화면에서 가장 안 보였다.
- * 두 값을 각각의 상자에 나눠 넣고 화살표로 이어 놓아, 무엇이 정량 순위이고 무엇이 AI 제안인지
+ * 두 값을 각각의 상자에 나눠 넣고 화살표로 이어 놓아, 무엇이 정량 순위이고 무엇이 서버 선택인지
  * 라벨과 함께 읽히게 한다. 제외 여부는 색이 아니라 **문구**가 진다 (13 §4).
+ *
+ * 왼쪽 값은 **2단계 후보 스코어**(`card.score_rank`)다 — 1단계 읍·시 스코어와 층위가 달라
+ * 둘 다 "정량 Score"로 부르면 같은 화면(/proposals/[id])에서 같은 값처럼 읽힌다.
  */
 export function RankTrace({ card, size = "sm" }: { card: Card; size?: "sm" | "md" }) {
   if (card.score_rank === null || card.ai_rank === null) return null;
@@ -25,7 +28,7 @@ export function RankTrace({ card, size = "sm" }: { card: Card; size?: "sm" | "md
       }`}
     >
       <RankBox
-        label="정량 Score"
+        label="후보 스코어"
         rank={card.score_rank}
         md={md}
         tone="text-admin-text-muted"

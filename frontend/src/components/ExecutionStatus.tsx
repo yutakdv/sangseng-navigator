@@ -104,21 +104,26 @@ export function ExecutionStatus({
             icon="trend"
             label="실행 전환율"
             value={ratioPct(kpi.execution_rate)}
-            note={`결정 카드 ${kpi.counts.approved}건 중 추진중·완료 비중${sampleNote ? ` · ${sampleNote}` : ""}`}
+            /* "결정"이 아니라 "승인"이다 — routes/kpi.py의 execution_rate 분모가 approved라
+               반려·보류는 들어가지 않는다. /dashboard의 같은 지표 설명과도 이 표기가 맞는다 */
+            note={`승인 카드 ${kpi.counts.approved}건 중 추진중·완료 비중${sampleNote ? ` · ${sampleNote}` : ""}`}
           />
           <Stat
             icon="clock"
             label="평균 의사결정 소요"
             value={dash(kpi.avg_decision_hours)}
             unit={kpi.avg_decision_hours === null ? undefined : "시간"}
-            note="검토 시작·반려·보류까지 걸린 시간"
+            /* 이 값은 created_at → decided_at 경과 시간이라 승인·반려·보류 **결정 시각**이 기준이다.
+               progress의 "후보 접촉·검토 시작"과는 다른 축이라 라벨에서 갈라 놓는다 */
+            note="승인·반려·보류까지 걸린 시간"
           />
           <Stat
             icon="scale"
             label="지역 균형지수"
             value={dash(kpi.regional_balance_index)}
             unit={kpi.regional_balance_index === null ? undefined : "/ 100"}
-            note="결정 카드가 여러 지역에 고루 쌓일수록 상승"
+            /* regional_balance_index도 승인 EXPANSION 카드의 6지역 분포만 본다 (routes/kpi.py) */
+            note="승인 카드가 여러 지역에 고루 쌓일수록 상승"
           />
         </dl>
       </div>

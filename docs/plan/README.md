@@ -60,6 +60,10 @@ DynamoDB(온디맨드) / OpenAI 또는 Claude(어댑터) / 배포: Vercel(FE) + 
 | 14 | [14-execution-plan.md](14-execution-plan.md) | **잔여 개발 실행 런북 (T0~T18)** — 매 태스크 시작 전 여기서 절차 확인. Docker 테스트·AWS 최종 배포 전환 반영 |
 | 15 | [15-plan-review.md](15-plan-review.md) | **개발 착수 전 최종 검토 결과 (2026-08-03)** — 착수 첫 커밋 수정분(배포 블로커 2건)·태스크별 계약 선수정 추적 (§8 시점표) |
 | 16 | [16-product-and-production-roadmap.md](16-product-and-production-roadmap.md) | **서비스 존재 이유·실사용자 관점 점검·실운영 전환 우선순위** — 데모 이후 제품 판단의 기준 |
+| 17 | [17-fe-design-plan.md](17-fe-design-plan.md) | **프론트엔드 디자인 실행 계획** — 허브 마스터-디테일 재편·라이트 테마 전환의 근거와 순서 |
+| 18 | [18-fe-redesign-record.md](18-fe-redesign-record.md) | **프론트엔드 리디자인 변경 기록** — §8 용어 치환표(지표 명명 축 포함)·§10-b 후속 라운드 |
+| 19 | [19-fe-remaining-issues-record.md](19-fe-remaining-issues-record.md) | **데모 피드백 7건 대응 기록** — 페이백 손익·지역 드릴다운·위젯 반영 연출 등 |
+| 20 | [20-codebase-audit-prompt.md](20-codebase-audit-prompt.md) | **전체 코드베이스 종합 점검 프롬프트** — 붙여넣어 실행하는 전수 감사(구조·E2E 5대 플로우·절대 규칙 6개·보안·배포). 제출·데모 전 점검용 |
 
 ## Phase 게이트 요약 (상세: 10 문서)
 

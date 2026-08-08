@@ -66,7 +66,7 @@ from app import llm                              # noqa: E402
 # 아래 fake_llm 픽스처가 llm.generate_json 을 통째로 갈아끼우므로, 어댑터 자체를 검증하는
 # 테스트(§8)를 위해 원본을 미리 잡아 둔다.
 REAL_GENERATE_JSON = llm.generate_json
-from app.services import simulate, workflow      # noqa: E402
+from app.services import cardgen, simulate, workflow      # noqa: E402
 
 import seed_demo                                 # noqa: E402
 
@@ -97,7 +97,8 @@ FAKE_AI = {
     "confidence": "상",
 }
 FAKE_NARRATIVE = "목업 서술입니다. 가정에 기반한 예상 수치입니다."
-FAKE_BLURB = "목업 추천 문구"
+# 위젯 blurb 목업은 두지 않는다 — 위젯은 LLM을 호출하지 않고 routes/widget.py `_fallback_blurb`의
+# 결정론 문구만 쓴다(§7 위젯 테스트가 그 문구를 그대로 단언한다).
 
 
 class FakeLLM:
@@ -112,7 +113,6 @@ class FakeLLM:
         self.attempts = []                                          # 호출부별 재시도 설정 (지연 상한 검증용)
         self.ai_rank_target = FAKE_AI["ai_rank_target"]
         self.narrative = FAKE_NARRATIVE
-        self.blurbs = None                                          # None이면 가맹점 수만큼 자동 생성
 
     def __call__(self, system, user, schema, schema_name="result", timeout=None, attempts=2):
         self.calls.append(schema_name)
@@ -120,11 +120,6 @@ class FakeLLM:
         props = schema.get("properties", {})
         if "narrative" in props:                                    # cards.simulate
             return {"narrative": self.narrative}
-        if "blurbs" in props:                                       # widget.recommend
-            if self.blurbs is not None:
-                return {"blurbs": self.blurbs}
-            n = len(json.loads(user)["가맹점"])
-            return {"blurbs": [f"{FAKE_BLURB} {i + 1}" for i in range(n)]}
         return {**FAKE_AI, "ai_rank_target": self.ai_rank_target}   # cardgen (CARD_AI_SCHEMA)
 
 
@@ -179,6 +174,14 @@ def _put_expansion(cid, eup, category, status="pending", progress=None):
                  "target": {"eup": eup, "category": category},
                  "created_at": db.now_iso(),
                  "decided_at": None if status == "pending" else db.now_iso(), "events": []})
+
+
+def _break_llm(monkeypatch):
+    """LLM 호출을 예외로 만든다 — 키 만료·쿼터 초과와 같은 경로 (llm.LLMError로 감싸이기 전 단계)."""
+    def boom(*args, **kwargs):
+        raise RuntimeError("llm down")
+
+    monkeypatch.setattr(llm, "generate_json", boom)
 
 
 # ── 1. health / 정적 서빙 ────────────────────────────────────────────────
@@ -322,17 +325,21 @@ def test_generate_expansion_creates_pending_card(fake_llm):
     assert res.status_code == 201
     card = res.json()["card"]
     assert fake_llm.calls == ["action_card"]
-    assert fake_llm.attempts == [2]                                   # 재시도 기본값 유지 (위젯만 1회)
+    assert fake_llm.attempts == [2]                                   # 재시도 기본값 유지 (llm.generate_json attempts=2)
 
     assert card["id"] == "AC-003" and card["type"] == "EXPANSION"
     assert card["status"] == "pending" and card["progress"] is None   # 절대 규칙 4 — AI는 제안만
-    # 정량 1위 음식점은 진행 중, 2위 소매점은 승인 대기라 서버가 가용 후보 1위(원 3위)를 고른다.
+    # 정량 1위 음식점은 진행 중, 2위 소매점은 승인 대기라 서버가 선택 가능한 후보 1위(원 3위)를 고른다.
     assert card["target"] == {"eup": "영월군", "category": "숙박업"}
     assert card["ai_rank"] == 1 and card["score_rank"] != 1 and card["ai"]["adjusted"] is True
     assert card["ai"]["comparison"] != FAKE_COMPARISON                # LLM 자유서술은 그대로 노출하지 않는다
     assert "Score 0.48" in card["ai"]["comparison"]                  # 정본 후보 수치로 재생성
     assert card["ai"]["grounding"]["selection_method"] == "deterministic_highest_available_score"
     assert card["ai"]["grounding"]["status"] == "verified"
+    # 설명 출처와 화면 문장이 같은 사실을 말하는지 (05 §2 — 이 카드는 LLM 응답을 실제로 채택했다)
+    assert card["ai"]["grounding"]["narrative_status"] == "ai_generated_unverified"
+    assert card["ai"]["grounding"]["explanation_source"] == "llm"
+    assert cardgen.NARRATIVE_NOTE["llm"] in card["ai"]["reasons"]
     assert card["candidate_verification"]["status"] == "unverified"
     assert card["ai"]["risks"]                                        # A-1 규칙 — 리스크 ≥1
     assert ASSUMPTION_NOTE in card["ai"]["expected_effect"]           # 절대 규칙 3 — 고정 문구 보장
@@ -404,7 +411,7 @@ def test_generate_expansion_deduplicates_immediate_retry():
 
 
 def test_generate_skips_target_already_in_progress(fake_llm):
-    """LLM이 어떤 타깃 문자열을 내도 서버가 활성 업무를 제외한 정량 최상위를 선택한다."""
+    """LLM이 어떤 타깃 문자열을 내도 서버가 진행 중인 업무를 제외한 정량 최상위를 선택한다."""
     fake_llm.ai_rank_target = "영월군 카페"
     card = _generate("EXPANSION").json()["card"]
 
@@ -426,7 +433,7 @@ def test_generate_skips_target_already_under_review(fake_llm):
 
 
 def test_generate_returns_409_when_every_candidate_is_blocked(fake_llm):
-    """전 후보에 활성 업무가 있으면 중복 제안 금지의 결론은 '제안할 카드 없음' — 409로 알린다.
+    """전 후보에 진행 중인 업무가 있으면 중복 제안 금지의 결론은 '제안할 카드 없음' — 409로 알린다.
 
     후보 하나를 골라 되돌아가면 A-1이 금지한 타깃의 카드가 저장되므로, 조용한 폴백이 아니라
     에러가 정답이다.
@@ -502,6 +509,57 @@ def test_generate_incentive_builds_scenarios(fake_llm):
     assert card["ai"]["adjusted"] is False and card["ai"]["original_ranking"] is None
     for keyword in MANDATORY_INCENTIVE_RISKS:               # A-3 필수 리스크 3종 보충
         assert any(keyword in r for r in card["ai"]["risks"]), keyword
+
+
+def test_expansion_card_admits_the_explanation_is_rule_based_when_llm_fails(monkeypatch):
+    """LLM이 죽어도 카드는 만들되, 화면 문구가 'AI가 썼다'고 말하면 안 된다 (감사 M1).
+
+    심사 기간에 키 만료·쿼터 초과가 나면 모든 제안이 조용히 규칙 기반이 되는데, 그 사실이
+    grounding에만 남고 reasons는 AI를 주장하면 화면과 데이터가 서로 다른 말을 한다.
+    """
+    _break_llm(monkeypatch)
+    card = _generate("EXPANSION").json()["card"]
+    grounding = card["ai"]["grounding"]
+
+    assert grounding["explanation_source"] == "rule_fallback"
+    assert grounding["narrative_status"] == "rule_based"
+    assert grounding["numeric_status"] == "verified"          # 숫자·순위 재검증은 그대로 성립한다
+    assert cardgen.NARRATIVE_NOTE["rule_fallback"] in card["ai"]["reasons"]
+    assert cardgen.NARRATIVE_NOTE["llm"] not in card["ai"]["reasons"]
+    assert card["ai"]["risks"] and ASSUMPTION_NOTE in card["ai"]["expected_effect"]
+
+
+def test_incentive_card_reports_its_explanation_source(fake_llm):
+    assert client.post("/api/cards/INC-001/decision", json={"decision": "rejected"}).status_code == 200
+    grounding = _generate("INCENTIVE").json()["card"]["ai"]["grounding"]
+
+    assert grounding["explanation_source"] == "llm"
+    assert grounding["narrative_status"] == "ai_generated_unverified"
+    # 비교문·근거는 LLM 원문이라 EXPANSION처럼 verified를 주장하지 않는다 (05 §2)
+    assert grounding["status"] == "partial" and grounding["numeric_status"] == "fixed_by_server"
+    assert grounding["selection_method"] == "fixed_scenarios_3_5_7"
+    assert grounding["checks"] == cardgen.INCENTIVE_GROUNDING_CHECKS
+
+
+def test_incentive_card_marks_rule_based_when_llm_fails(monkeypatch):
+    assert client.post("/api/cards/INC-001/decision", json={"decision": "rejected"}).status_code == 200
+    _break_llm(monkeypatch)
+    card = _generate("INCENTIVE").json()["card"]
+
+    assert card["ai"]["grounding"]["explanation_source"] == "rule_fallback"
+    assert card["ai"]["grounding"]["narrative_status"] == "rule_based"
+    for keyword in MANDATORY_INCENTIVE_RISKS:                  # A-3 필수 리스크는 폴백에도 남는다
+        assert any(keyword in r for r in card["ai"]["risks"]), keyword
+
+
+def test_demo_seed_cards_do_not_claim_ai_wrote_the_explanation():
+    """시드 3장은 사람이 실데이터로 검증한 규칙 기반 문구다 — 심사 첫 화면이 곧 이 카드들이다."""
+    for cid in ("AC-001", "AC-002", "INC-001"):
+        card = client.get(f"/api/cards/{cid}").json()["card"]
+        grounding = card["ai"]["grounding"]
+        assert grounding["explanation_source"] == "rule_seed"
+        assert grounding["narrative_status"] == "rule_based"
+        assert cardgen.NARRATIVE_NOTE["llm"] not in card["ai"]["reasons"]
 
 
 def test_generate_rejects_unknown_type():
@@ -680,12 +738,13 @@ def test_simulate_expansion_card(fake_llm):
     assert res.status_code == 200
     sim = res.json()["simulation"]
     assert fake_llm.calls == ["narrative"]
-    assert fake_llm.attempts == [2]                                # 재시도 기본값 유지 (위젯만 1회)
+    assert fake_llm.attempts == [2]                                # 재시도 기본값 유지 (llm.generate_json attempts=2)
 
     assert 0 <= sim["current_index"] <= 100 and 0 <= sim["projected_index"] <= 100
     lo, hi = sim["delta_pp"]
     assert lo <= hi and all(isinstance(v, (int, float)) for v in sim["delta_pp"])
     assert sim["narrative"] == FAKE_NARRATIVE                     # LLM 문구 채택 (fallback 아님)
+    assert sim["narrative_source"] == "llm"                       # 화면이 "AI가 쓴 문장"이라 말해도 되는 유일한 경우
     assert "예상" in sim["narrative"] and "가정" in sim["narrative"]
     assert sim["assumption_note"] == ASSUMPTION_NOTE              # 절대 규칙 3 — 고정 문구
     assert sim["expected_monthly_count"] >= 0
@@ -699,12 +758,10 @@ def test_simulate_expansion_card(fake_llm):
 
 def test_simulate_falls_back_when_llm_fails(monkeypatch):
     """LLM 실패 시에도 200 + 규칙 기반 문구 — 데모 루프가 LLM 장애에 끊기지 않아야 한다 (05 §8)."""
-    def boom(*args, **kwargs):
-        raise RuntimeError("llm down")
-
-    monkeypatch.setattr(llm, "generate_json", boom)
+    _break_llm(monkeypatch)
     sim = client.post("/api/cards/AC-002/simulate").json()["simulation"]
     assert "예상" in sim["narrative"] and "가정" in sim["narrative"]
+    assert sim["narrative_source"] == "rule_based"          # 폴백 사실이 응답에 남아야 화면이 칩을 바꾼다
     assert sim["assumption_note"] == ASSUMPTION_NOTE
 
 
@@ -715,6 +772,7 @@ def test_simulate_rejects_narrative_missing_required_words(fake_llm):
 
     assert fake_llm.calls == ["narrative"]                     # 예외가 아니라 내용 가드가 걸린 경로
     assert sim["narrative"] != fake_llm.narrative
+    assert sim["narrative_source"] == "rule_based"              # 내용 가드로 버린 문구도 AI라 부르지 않는다
     assert "예상" in sim["narrative"] and "가정" in sim["narrative"]
     assert "영월군 소매점" in sim["narrative"]                  # 규칙 기반 문구 형태 (AC-002 타깃)
 
@@ -731,6 +789,7 @@ def test_simulate_rejects_narrative_with_wrong_direction(fake_llm):
 
     assert sum(sim["delta_pp"]) < 0                            # 전제: 집중 심화 방향
     assert sim["narrative"] != fake_llm.narrative
+    assert sim["narrative_source"] == "rule_based"
     assert "상승(집중 심화)" in sim["narrative"]
     assert "예상" in sim["narrative"] and "가정" in sim["narrative"]
 
@@ -740,6 +799,7 @@ def test_simulate_rejects_narrative_with_wrong_direction(fake_llm):
 
     assert sim["delta_pp"][1] > 0 and sim["delta_pp"][0] >= 0   # 전제: 개선 방향
     assert sim["narrative"] != fake_llm.narrative
+    assert sim["narrative_source"] == "rule_based"
     assert "개선될" in sim["narrative"] and "심화" not in sim["narrative"]
 
 
@@ -790,6 +850,7 @@ def test_simulate_reports_no_change_without_claiming_a_direction(fake_llm):
 
     assert sim["delta_pp"] == [0.0, 0.0]                        # 전제: 변화 없는 구간
     assert fake_llm.calls == []                                 # LLM에 맡기지 않는다
+    assert sim["narrative_source"] == "rule_based"              # 호출 자체가 없었으므로 AI 문구가 아니다
     assert "개선" not in sim["narrative"] and "심화" not in sim["narrative"]
     assert "변화가 나타나지 않을" in sim["narrative"]
     assert "예상" in sim["narrative"] and "가정" in sim["narrative"]
