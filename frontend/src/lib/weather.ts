@@ -109,6 +109,7 @@ async function requestItems(
   key: string,
   spot: { nx: number; ny: number },
   slot: Slot,
+  signal: AbortSignal,
 ): Promise<KmaItem[] | null> {
   // serviceKey는 반드시 URLSearchParams로 인코딩한다 — Decoding 키에 +·/·= 가 섞이면
   // 문자열 연결로는 403이 난다 (파이프라인 p2~p4와 같은 이유)
@@ -130,7 +131,7 @@ async function requestItems(
       // next/dist/server/lib/patch-fetch.js의 noFetchConfigAndForceDynamic 조건이
       // `!currentFetchRevalidate`를 함께 보기 때문이다 (16.3.0에서 확인).
       next: { revalidate: CACHE_SECONDS },
-      signal: AbortSignal.timeout(TIMEOUT_MS),
+      signal,   // 슬롯 전체가 공유하는 마감 — 호출부에서 한 번만 만든다
     });
     if (!res.ok) return null; // 403(미등록 키)·5xx
     const body = (await res.json()) as KmaResponse;
@@ -167,15 +168,21 @@ function toNowcast(items: KmaItem[], spotLabel: string, slot: Slot): Nowcast | n
 }
 
 /**
- * 프로세스 내 10분 메모 — Next Data Cache가 동작하지 않는 실행 모드에서도 호출량을 묶는다.
+ * 프로세스 내 메모 — Next Data Cache가 동작하지 않는 실행 모드에서도 호출량을 묶는다.
  * `?live=1` 데모를 몇 시간 켜 두면 일일 트래픽 한도를 태울 수 있어 이중으로 막는다.
- * 인스턴스마다 따로 사는 값이라 정확한 공유 캐시일 필요는 없고, **실패는 저장하지 않는다**.
+ * 인스턴스마다 따로 사는 값이라 정확한 공유 캐시일 필요는 없다.
+ *
+ * **실패(null)도 담는다** — Next Data Cache는 200 응답만 저장하므로 403(미등록 키)도, 타임아웃도
+ * 캐시 대상이 아니다. 실패를 안 담으면 기상청이 조용히 드롭되는 망에서 렌더마다 타임아웃 예산을
+ * 처음부터 다시 지불하고, `/widget`은 force-dynamic이라 그 시간이 그대로 TTFB에 얹힌다.
+ * 다만 실패 TTL은 성공보다 훨씬 짧게 둔다 — 일시 장애가 10분간 날씨 줄을 지우면 안 된다.
  *
  * 키는 격자(`nx,ny`)다 — 고한읍·사북읍·지역 미선택이 같은 격자(92,120)를 공유하므로 한 번만 부른다.
  * 대신 `spotLabel`은 격자가 아니라 **선택 지역**에서 오므로 캐시 적중 시 라벨만 갈아 끼운다
  * (안 그러면 사북읍 화면에 "지금 고한 …"이 뜬다).
  */
-const memo = new Map<string, { at: number; value: Nowcast }>();
+const memo = new Map<string, { at: number; value: Nowcast | null }>();
+const FAILURE_CACHE_SECONDS = 60;
 
 /** 실패는 전부 null이다 — 이 함수는 던지지 않는다 (호출부의 Promise.all을 깨지 않기 위함) */
 export async function fetchNowcast(region?: Region): Promise<Nowcast | null> {
@@ -184,16 +191,23 @@ export async function fetchNowcast(region?: Region): Promise<Nowcast | null> {
   const spot = (region && WEATHER_SPOT[region]) ?? DEFAULT_SPOT;
   const memoKey = `${spot.nx},${spot.ny}`;
   const hit = memo.get(memoKey);
-  if (hit && Date.now() - hit.at < CACHE_SECONDS * 1000) {
-    return { ...hit.value, spotLabel: spot.label };
+  if (hit) {
+    const ttl = (hit.value ? CACHE_SECONDS : FAILURE_CACHE_SECONDS) * 1000;
+    if (Date.now() - hit.at < ttl) {
+      return hit.value && { ...hit.value, spotLabel: spot.label };
+    }
   }
+  // 슬롯마다 타임아웃을 새로 만들면 최악 대기가 슬롯 수만큼 곱해진다(2.5초 × 2 = 5초).
+  // 하나를 공유해 함수 전체의 상한을 TIMEOUT_MS로 묶는다.
+  const deadline = AbortSignal.timeout(TIMEOUT_MS);
   for (const slot of baseSlots(new Date())) {
-    const items = await requestItems(key, spot, slot);
+    const items = await requestItems(key, spot, slot, deadline);
     const nowcast = items && toNowcast(items, spot.label, slot);
     if (nowcast) {
       memo.set(memoKey, { at: Date.now(), value: nowcast });
       return nowcast;
     }
   }
+  memo.set(memoKey, { at: Date.now(), value: null });
   return null;
 }

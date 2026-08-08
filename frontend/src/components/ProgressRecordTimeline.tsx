@@ -163,7 +163,7 @@ export function ProgressRecordTimeline({
                             ) : (
                               <DeltaValue
                                 value={value - prev}
-                                unit={metric.unit}
+                                unit={metric.deltaUnit}
                                 digits={metric.digits}
                                 variant="text"
                                 className="text-[10px] font-semibold"

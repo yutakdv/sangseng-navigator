@@ -16,6 +16,7 @@ import {
   type ProgressMetricMeta,
 } from "@/lib/progressMetrics";
 import {
+  approvedAsOf,
   distributionLayers,
   metricSeries,
   unrecordedCards,
@@ -44,12 +45,15 @@ export function ProgressReportDashboard({
   /** 목록 상한 때문에 기록을 읽지 않은 카드 수 — 파생값이 왜 적을 수 있는지 화면에 밝힌다 */
   truncated?: number;
 }) {
-  const dist = distributionLayers(cardRecords, report.period.to);
+  // 모집단을 BE와 맞춘다 — 기간 종료일 시점에 이미 승인돼 있던 카드만 센다 (05 §8 `_approved_as_of`).
+  // 이 한 줄이 빠지면 과거 기간 조회에서 "미기록 0건" 헤더 아래 카드가 1~2장 뜬다.
+  const scoped = approvedAsOf(cardRecords, report.period.to);
+  const dist = distributionLayers(scoped, report.period.to);
   // 리포트 합계가 정본 — 파생이 못 따라간 만큼(기록 상한·개별 요청 실패)은 `미분류`로 흡수해
   // 두 층의 합이 항상 `기록 카드 N건`과 같게 만든다.
   const distGap = Math.max(0, report.recorded_card_count - dist.total) + dist.unclassified;
-  const unrecorded = unrecordedCards(cardRecords, report.period.to);
-  const series = metricSeries(cardRecords, report.period.from, report.period.to);
+  const unrecorded = unrecordedCards(scoped, report.period.to);
+  const series = metricSeries(scoped, report.period.from, report.period.to);
 
   return (
     <div className="flex flex-col gap-4">
@@ -129,7 +133,7 @@ export function ProgressReportDashboard({
           {dist.layers
             .filter(
               (layer) =>
-                layer.total > 0 || cardRecords.some((entry) => entry.card.type === layer.type),
+                layer.total > 0 || scoped.some((entry) => entry.card.type === layer.type),
             )
             .map((layer) => (
               <DistributionLayer key={layer.type} layer={layer} />
@@ -347,7 +351,7 @@ export function ProgressReportDashboard({
                               </b>
                               <DeltaValue
                                 value={last - first}
-                                unit={meta.unit}
+                                unit={meta.deltaUnit}
                                 digits={meta.digits}
                                 variant="text"
                                 className="text-[11px] font-semibold"
@@ -383,7 +387,7 @@ export function ProgressReportDashboard({
  * 같은 표가 화면마다 조금씩 달라졌다. 정본은 lib/progressMetrics의 PROGRESS_METRICS 하나다.
  */
 function MetricChangeCard({ meta, change }: { meta: ProgressMetricMeta; change: ProgressMetricChange }) {
-  const { label, icon, unit: valueUnit, digits } = meta;
+  const { label, icon, unit: valueUnit, deltaUnit, digits } = meta;
   const verdict = improvementVerdict(change.improvement);
   return (
     <article className="flex min-w-0 flex-col rounded-xl border border-admin-border bg-admin-surface-sunken p-3.5">
@@ -414,11 +418,13 @@ function MetricChangeCard({ meta, change }: { meta: ProgressMetricMeta; change: 
           </dl>
           <div className="mt-3 border-t border-admin-border pt-3">
             <p className="mb-1 text-[11px] font-semibold text-admin-text-muted">관측 변화</p>
-            <DeltaValue
-              value={change.delta}
-              unit={change.delta_unit === "KRW" ? "원" : change.delta_unit === "count" ? valueUnit : change.delta_unit}
-              digits={digits}
-            />
+            {/*
+              BE `delta_unit`(count·KRW·%p·point)은 계약값이라 그대로 두고, 화면 단위는
+              PROGRESS_METRICS의 `deltaUnit` 한 표에서만 가져온다 — 예전처럼 계약값을 그대로
+              붙이면 집중도가 "0.60point"로 영문이 새고, 같은 화면 아래 흐름 섹션의 "0.60점"과
+              단위가 갈린다.
+            */}
+            <DeltaValue value={change.delta} unit={deltaUnit} digits={digits} />
             {change.relative_change_pct !== null ? (
               <p className="mt-1 text-[11px] tabular-nums text-admin-text-muted">
                 기초 평균 대비 {change.relative_change_pct > 0 ? "+" : ""}{change.relative_change_pct.toFixed(1)}%

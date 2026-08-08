@@ -21,7 +21,7 @@ import sys
 import traceback
 import types
 from concurrent.futures import ThreadPoolExecutor
-from datetime import datetime
+from datetime import datetime, timedelta
 from pathlib import Path
 from urllib.parse import urlparse
 
@@ -433,11 +433,13 @@ def test_generate_skips_target_already_under_review(fake_llm):
 
 
 def test_generate_returns_409_when_every_candidate_is_blocked(fake_llm):
-    """전 후보에 진행 중인 업무가 있으면 중복 제안 금지의 결론은 '제안할 카드 없음' — 409로 알린다.
+    """전 후보에 진행 중인 업무가 있고 승인 대기 카드도 없으면 결론은 '제안할 카드 없음' — 409.
 
     후보 하나를 골라 되돌아가면 A-1이 금지한 타깃의 카드가 저장되므로, 조용한 폴백이 아니라
     에러가 정답이다.
     """
+    # 시드의 유일한 승인 대기 카드를 치운다 — 남아 있으면 아래 200 경로로 빠진다
+    db.put_card({**db.get_card("AC-002"), "status": "rejected", "decided_at": db.now_iso()})
     for i, cand in enumerate(dataload.load("candidates"), start=100):
         _put_expansion(f"AC-{i}", cand["eup"], cand["category"],
                        status="approved", progress="추진중")
@@ -447,6 +449,27 @@ def test_generate_returns_409_when_every_candidate_is_blocked(fake_llm):
     assert res.status_code == 409
     assert fake_llm.calls == []                     # 가용성 판정이 LLM 호출보다 앞선다 (12초 낭비 방지)
     assert {c["id"] for c in _cards()} == before    # 새 카드도, 덮어쓴 카드도 없다
+
+
+def test_generate_returns_existing_pending_card_when_candidates_exhausted(fake_llm):
+    """후보가 소진된 이유가 '승인 대기 카드'면 409가 아니라 그 카드를 200으로 돌려준다 (05 §8).
+
+    심사위원이 버튼을 두 번째로 누르는 상황이 정확히 이 경로다 — 첫 클릭이 만든 pending 카드가
+    마지막 후보를 차지한다. 그때 409만 주면 대표 AI 기능이 '제안할 후보가 없습니다'로만 보인다.
+    dedupe 창(60초) 밖에서도 성립해야 하므로 생성 시각을 창 밖으로 밀어 두고 확인한다.
+    """
+    for i, cand in enumerate(dataload.load("candidates"), start=100):
+        _put_expansion(f"AC-{i}", cand["eup"], cand["category"],
+                       status="approved", progress="추진중")
+    stale = datetime.now(db.KST) - timedelta(seconds=cardgen.GENERATION_DEDUPE_SECONDS + 60)
+    db.put_card({**db.get_card("AC-002"), "created_at": stale.isoformat(timespec="seconds")})
+    before = {c["id"] for c in _cards()}
+
+    res = _generate("EXPANSION")
+    assert res.status_code == 200                   # 신규 생성이 아니므로 201이 아니다
+    assert res.json()["card"]["id"] == "AC-002"   # 시드의 승인 대기 카드
+    assert fake_llm.calls == []
+    assert {c["id"] for c in _cards()} == before    # 새 카드는 만들지 않는다
 
 
 def test_generate_does_not_overwrite_non_sequential_ids(fake_llm):

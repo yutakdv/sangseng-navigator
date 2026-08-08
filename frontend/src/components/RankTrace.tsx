@@ -1,5 +1,27 @@
 import { Icon } from "@/components/Icon";
-import type { Card } from "@/types";
+import type { Card, SelectionReason } from "@/types";
+
+/** 선택 사유 코드 → 배지 문구 (05 §2). 코드가 없으면 순위로 추론한다. */
+const REASON_LABEL: Record<SelectionReason, string> = {
+  top_score: "정량 1순위 선택",
+  exclude_in_progress: "진행 중인 건 제외하고 선택",
+  region_quota: "지역 배분 몫에서 선택",
+};
+
+/**
+ * 사유를 단정할 수 있을 때만 배지를 만든다.
+ *
+ * 예전에는 `adjusted` 하나로 두 문구를 갈랐는데, 그러면 정량 4·5위 카드에도 "정량 1순위 선택"이
+ * 붙어 같은 화면의 순위 표시·근거문과 정면으로 모순된다. 사유를 알 수 없으면 아무 말도 하지 않는
+ * 편이 낫다 — 틀린 근거를 적는 것이 이 장치가 막으려는 오류 그 자체다.
+ */
+function badgeLabel(card: Card, selectionRank: number): string | null {
+  const reason = card.ai.selection_reason;
+  if (reason) return REASON_LABEL[reason] ?? null;
+  if (card.score_rank === 1 && selectionRank === 1) return REASON_LABEL.top_score;
+  if (card.ai.adjusted && selectionRank === 1) return REASON_LABEL.exclude_in_progress;
+  return null;
+}
 
 /**
  * `후보 스코어 N위 → 선택 가능한 후보 M위` 병기 — 진행 중인 업무 중복 제외를 숨기지 않는다.
@@ -18,6 +40,7 @@ export function RankTrace({ card, size = "sm" }: { card: Card; size?: "sm" | "md
   const md = size === "md";
   const adjusted = card.ai.adjusted;
   const selectionRank = card.selection_rank ?? card.ai_rank;
+  const label = badgeLabel(card, selectionRank);
 
   return (
     <div
@@ -45,16 +68,18 @@ export function RankTrace({ card, size = "sm" }: { card: Card; size?: "sm" | "md
         md={md}
         tone={adjusted ? "text-admin-primary" : "text-admin-text"}
       />
-      <span
-        className={`ml-auto inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-semibold ring-1 ring-inset ${
-          adjusted
-            ? "bg-admin-surface text-admin-primary ring-admin-primary-line"
-            : "bg-admin-surface text-admin-text-muted ring-admin-border"
-        }`}
-      >
-        {adjusted ? <Icon name="workflow" size={12} strokeWidth={2} /> : null}
-        {adjusted ? "진행 중인 건 제외하고 선택" : "정량 1순위 선택"}
-      </span>
+      {label ? (
+        <span
+          className={`ml-auto inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-semibold ring-1 ring-inset ${
+            adjusted
+              ? "bg-admin-surface text-admin-primary ring-admin-primary-line"
+              : "bg-admin-surface text-admin-text-muted ring-admin-border"
+          }`}
+        >
+          {adjusted ? <Icon name="workflow" size={12} strokeWidth={2} /> : null}
+          {label}
+        </span>
+      ) : null}
     </div>
   );
 }

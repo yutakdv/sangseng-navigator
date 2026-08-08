@@ -119,13 +119,13 @@ export function GradeChip({ grade }: { grade: string }) {
 export function NarrativeSourceChip({ kind }: { kind: NarrativeSourceKind | null }) {
   if (!kind) return null;
   const { label, note } = NARRATIVE_SOURCE_TEXT[kind];
-  const tone =
-    kind === "ai"
-      ? "bg-admin-primary-soft text-admin-primary ring-admin-primary-line"
-      : "bg-admin-surface-sunken text-admin-text-muted ring-admin-border";
+  const byAi = kind === "ai" || kind === "ai_partial";
+  const tone = byAi
+    ? "bg-admin-primary-soft text-admin-primary ring-admin-primary-line"
+    : "bg-admin-surface-sunken text-admin-text-muted ring-admin-border";
   return (
     <span className={`${base} ${tone}`} title={note}>
-      <Icon name={kind === "ai" ? "sparkle" : "info"} size={12} strokeWidth={2} />
+      <Icon name={byAi ? "sparkle" : "info"} size={12} strokeWidth={2} />
       {label}
     </span>
   );

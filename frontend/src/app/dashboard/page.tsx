@@ -22,6 +22,7 @@ import {
   regionDailySeries,
   regionMonthlyTrend,
   regionWeekdayAverages,
+  overallWeekdayInsight,
   regionWeekdayInsight,
   shiftWindowLabel,
   topCategoryShifts,
@@ -110,6 +111,8 @@ export default async function DashboardPage({
   // 일·요일 축 (usage_daily — 피드백 ⑦). 관측 집계라 전망 문구·근사 배지 대상이 아니다 (설계 08-08)
   const weekdayBars = selectedRegion ? regionWeekdayAverages(usageDaily, selectedRegion) : [];
   const weekdayInsight = selectedRegion ? regionWeekdayInsight(usageDaily, selectedRegion) : null;
+  // 전 지역 기준선 — 지역 리듬이 "다르다"는 말은 비교 대상이 화면에 함께 있어야 성립한다
+  const overallWeekday = selectedRegion ? overallWeekdayInsight(usageDaily) : null;
   const categoryWeekdays = selectedRegion ? regionCategoryWeekdays(usageDaily, selectedRegion) : [];
   const dailySeries = selectedRegion ? regionDailySeries(usageDaily, selectedRegion) : [];
   const dailyPeriod = usageDaily.period;
@@ -394,6 +397,16 @@ export default async function DashboardPage({
                         {weekdayInsight.weekendVsWeekdayPct === null
                           ? "."
                           : ` — 주말 하루 평균은 주중 대비 ${signed(weekdayInsight.weekendVsWeekdayPct, "%", 1)}.`}
+                      </p>
+                    ) : null}
+                    {overallWeekday ? (
+                      <p className="u-note mb-2">
+                        전 지역 기준: {overallWeekday.maxLabel}요일 하루 평균{" "}
+                        <span className="font-semibold tabular-nums">{num(overallWeekday.maxAvg)}건</span>
+                        {overallWeekday.minLabel && overallWeekday.maxVsMinPct !== null
+                          ? ` (최저 ${overallWeekday.minLabel}요일 대비 ${signed(overallWeekday.maxVsMinPct ?? 0, "%", 1)})`
+                          : ""}
+                        . 지역마다 몰리는 요일이 다릅니다.
                       </p>
                     ) : null}
                     <BarRank data={weekdayBars} unit="건" height={236} />

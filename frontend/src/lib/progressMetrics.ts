@@ -20,6 +20,14 @@ export interface ProgressMetricMeta {
   shortLabel: string;
   icon: IconName;
   unit: string;
+  /**
+   * 변화량(Δ)에 붙는 단위 — 값 단위와 같을 수 없는 지표가 있어 따로 둔다.
+   *
+   * 지역 전환율은 값이 `%`지만 20.10%→21.40%의 차이는 1.30**%p**다. 값 단위를 그대로 쓰면
+   * "▲1.30%"가 되어 실제(0.26%p)와 5배 다른 값을 말하게 된다. 절대 규칙 2로 배지까지 붙여
+   * 방어하는 지표라 여기서 단위를 틀리면 안 된다.
+   */
+  deltaUnit: string;
   digits: number;
   lowerIsBetter: boolean;
 }
@@ -35,6 +43,7 @@ export const PROGRESS_METRICS: ProgressMetricMeta[] = [
     shortLabel: "지역 사용",
     icon: "receipt",
     unit: "건",
+    deltaUnit: "건",
     digits: 0,
     lowerIsBetter: false,
   },
@@ -44,6 +53,7 @@ export const PROGRESS_METRICS: ProgressMetricMeta[] = [
     shortLabel: "지역 전환율",
     icon: "trend",
     unit: "%",
+    deltaUnit: "%p",
     digits: 2,
     lowerIsBetter: false,
   },
@@ -53,6 +63,7 @@ export const PROGRESS_METRICS: ProgressMetricMeta[] = [
     shortLabel: "활성 가맹점",
     icon: "store",
     unit: "곳",
+    deltaUnit: "곳",
     digits: 0,
     lowerIsBetter: false,
   },
@@ -62,6 +73,7 @@ export const PROGRESS_METRICS: ProgressMetricMeta[] = [
     shortLabel: "지역 사용액",
     icon: "wallet",
     unit: "원",
+    deltaUnit: "원",
     digits: 0,
     lowerIsBetter: false,
   },
@@ -71,6 +83,7 @@ export const PROGRESS_METRICS: ProgressMetricMeta[] = [
     shortLabel: "소비 집중도",
     icon: "scatter",
     unit: "점",
+    deltaUnit: "점",
     digits: 2,
     lowerIsBetter: true,
   },

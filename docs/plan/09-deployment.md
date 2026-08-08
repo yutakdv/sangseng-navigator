@@ -138,7 +138,9 @@ aws cloudformation describe-stacks --stack-name sangseng-backend \
 - [ ] 환경변수 등록 (Vercel 대시보드 → Settings → Environment Variables):
       - `NEXT_PUBLIC_API_BASE` = SAM Outputs의 `ApiUrl` (Production + Preview 모두)
       - `API_MUTATION_TOKEN` = 백엔드 `MUTATION_API_TOKEN`과 **같은 값** (서버 전용 — 승인·기록 등
-        상태 변경 요청에 필요하다. 빠뜨리면 화면은 뜨는데 승인 버튼이 401로 실패한다)
+        상태 변경 요청과 **담당자 화면 전용 GET 2종**(`/api/progress-report`,
+        `/api/cards/{id}/progress-records`)에 모두 필요하다. 빠뜨리면 승인 버튼이 401로 실패하고
+        `/tracking`의 추진 경과 리포트가 통째로 접힌다 — 업무 목록만 남고 안내 배너가 뜬다)
       - `NEXT_PUBLIC_DEMO_READ_ONLY` = `false` (심사위원이 직접 승인해 보게 하려면 잠그지 않는다)
       - `DATA_GO_KR_API_KEY` = 루트 `.env`와 같은 **Decoding** 키 (Production + Preview).
         **`NEXT_PUBLIC_` 접두사 금지** — 붙이면 브라우저 번들에 키가 실린다. 빠뜨려도 에러는 없고

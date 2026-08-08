@@ -452,6 +452,7 @@ const generateExpansion = (): GeneratedCard => {
     confidence: top.gap_confidence >= 0.8 && top.road_minutes !== null ? "중" : "하",
     ai: {
       adjusted: top.rank !== 1,
+      selection_reason: top.rank === 1 ? "top_score" : "exclude_in_progress",
       comparison,
       reasons,
       risks,
@@ -720,7 +721,12 @@ export const deriveProgressReport = (opts: { from?: string; to?: string } = {}):
     })
     .sort((a, b) => recordTime(a) - recordTime(b) || a.record_id.localeCompare(b.record_id));
   const grouped = recordsByCard(inPeriod);
-  const approved = cards.filter((card) => card.status === "approved");
+  // 모집단은 **기간 종료일 시점에 이미 승인돼 있던 카드**다 (BE routes/progress.py `_approved_as_of`).
+  // 여기서 '현재 승인 카드 전체'를 쓰면 mock 모드와 실 API 모드가 같은 기간에 다른 미기록 건수를 낸다.
+  const approvedAsOf = (card: Card): boolean =>
+    Date.parse(card.created_at) <= period.endMs &&
+    Date.parse(card.decided_at ?? card.created_at) <= period.endMs;
+  const approved = cards.filter((card) => card.status === "approved" && approvedAsOf(card));
   const latestByCard = new Map<string, ProgressRecord>();
 
   for (const card of approved) {

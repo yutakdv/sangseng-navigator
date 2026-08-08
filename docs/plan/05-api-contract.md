@@ -168,6 +168,7 @@ Base URL: 로컬 `http://localhost:8000` / 배포 후 API Gateway URL. 경로 �
   "confidence": "중",
   "ai": {
     "adjusted": true,
+    "selection_reason": "exclude_in_progress",
     "comparison": "정량 2위 사북읍 카페(Score 0.57)를 AI 제안 1위로 검토했습니다. 정량 1위 고한읍 편의점(Score 0.59)보다 Score가 0.02 낮습니다. 두 후보의 도로 소요시간을 함께 확인한 뒤 결정해야 합니다.",
     "reasons": ["정량 기준: Score 0.57 · 2위", "상권 기준: 업종공백도 1.0 · 반경 500m 내 동일 업종 가맹점 0곳", "AI는 후보 선택에만 사용했으며 숫자·순위·상태는 서버가 정본 데이터로 재검증했습니다"],
     "risks": ["신규 가맹점 초기 실적 저조 가능성", "가맹 협상이 분기 내 완료되지 않을 수 있음"],
@@ -175,7 +176,7 @@ Base URL: 로컬 `http://localhost:8000` / 배포 후 API Gateway URL. 경로 �
     "grounding": {
       "status": "verified",
       "numeric_status": "verified",
-      "narrative_status": "rule_based",
+      "narrative_status": "ai_generated_unverified",
       "selection_method": "deterministic_highest_available_score",
       "explanation_source": "llm",
       "source": "structured",
@@ -254,6 +255,25 @@ Base URL: 로컬 `http://localhost:8000` / 배포 후 API Gateway URL. 경로 �
   (강원랜드는 콤프 부정거래 적발 시 고객 출입정지~영구·가맹점 자격취소 5년으로 제재 중이며
   2026년 한도 상향과 함께 제재를 강화한다 — 발행액을 늘리는 설계는 제안 자체가 성립하지 않는다)
 
+### 후보 선택 사유 (`ai.selection_reason`) — 순위 배지의 계약
+
+`adjusted`(= `score_rank != 1`)만으로는 화면이 "정량 1순위 선택"과 "진행 중인 건 제외하고 선택"
+둘 중 하나로만 갈려, 지역 배분 몫으로 고른 카드에까지 둘 중 하나가 **잘못** 붙는다. 사유를 코드로
+남겨 화면 문구를 여기서 결정한다 (절대 규칙 5의 감사 가능성).
+
+| 값 | 화면 배지 | 언제 |
+|---|---|---|
+| `top_score` | **정량 1순위 선택** | 정량 1위를 그대로 선택 (`score_rank == 1`) |
+| `exclude_in_progress` | **진행 중인 건 제외하고 선택** | 상위 후보에 진행 중인 업무가 있어 차순위 선택 |
+| `region_quota` | **지역 배분 몫에서 선택** | 이번 분기 선정 지역 배분에 따라 그 지역 후보 중에서 선택 |
+
+- 생성 경로(`cardgen`)가 내는 값은 앞의 둘뿐이다. `region_quota`는 분기 배분으로 만든 카드
+  (현재는 데모 이력 카드)에 쓴다.
+- `ai_rank`/`selection_rank`는 **최종 제안 목록 내 순위**라 항상 1이다 — 정량 순위는 `score_rank`가
+  진다. 여기에 정량 순위를 넣으면 화면의 `후보 스코어 N위 → 선택 가능한 후보 N위` 화살표가
+  좌우 같은 값이 되어 장치의 요지가 사라진다.
+- 값이 없는 구형 카드는 화면이 순위로 추론하고, 단정할 수 없으면 배지를 그리지 않는다.
+
 ### AI 설명 출처 (`ai.grounding`) — 화면 칩의 계약
 
 LLM 호출이 실패하거나 애초에 호출하지 않은 카드도 **똑같이 생성된다**. 그때 화면이 "AI가 썼다"고
@@ -261,7 +281,7 @@ LLM 호출이 실패하거나 애초에 호출하지 않은 카드도 **똑같�
 
 | `explanation_source` | `narrative_status` | 화면 칩 | 언제 |
 |---|---|---|---|
-| `llm` | `verified` | **AI 생성 · 서버 검증됨** | LLM 응답의 수치·순위·상태를 서버가 정본으로 재검증해 통과 |
+| `llm` | `ai_generated_unverified` | **AI 생성 · 서버 검증됨** | LLM 응답의 **수치·순위·상태**를 서버가 정본으로 재검증해 통과. 설명 문장 자체는 재검증 대상이 아니라 `narrative_status`가 `unverified`다 — 두 값이 서로 다른 층위를 말한다 |
 | `rule_fallback` | `rule_based` | **규칙 기반 설명(AI 응답 없음)** | LLM 호출 실패·타임아웃·내용 가드 탈락 |
 | `rule_seed` | `rule_based` | **사전 검증 예시 문구** | 데모 시드 카드(사람이 실데이터로 검증해 고정) |
 | `mock_rule` | `rule_based` | **규칙 기반 설명(AI 응답 없음)** | FE mock 모드 |
@@ -270,7 +290,9 @@ LLM 호출이 실패하거나 애초에 호출하지 않은 카드도 **똑같�
   사용했습니다"를 그대로 실으면 필드와 문장이 서로 다른 말을 하게 된다.
 - **INCENTIVE는 예외**: 시나리오 3/5/7%와 `delta_pp`가 서버 고정값이라
   `status: "partial"` · `numeric_status: "fixed_by_server"` · `selection_method: "fixed_scenarios_3_5_7"`을
-  쓴다. EXPANSION용 "검증됨" 배너를 그대로 재사용하지 않는다(검증 대상 자체가 다르다).
+  쓴다. EXPANSION용 "검증됨" 배너를 그대로 재사용하지 않는다(검증 대상 자체가 다르다) —
+  `explanation_source: "llm"`이면서 `status: "partial"`인 카드의 화면 칩은
+  **AI 생성 · 수치만 서버 고정**이다(FE `lib/aiSource.ts`의 `ai_partial`).
 
 ### INCENTIVE 카드 완성 예시
 
@@ -321,8 +343,13 @@ LLM 호출이 실패하거나 애초에 호출하지 않은 카드도 **똑같�
 | POST | `/api/cards/{id}/progress` | 추진 상태 변경 (approved만 가능) | `{"progress": "후보 접촉·검토 시작"\|"적격성 확인"\|"가맹 심사"\|"추진중"\|"보류"\|"완료"}` (INCENTIVE는 기존 4단계) | `{"card": Card}` |
 | POST | `/api/cards/{id}/simulate` | 가맹 전환 시 예상 효과 (반사실 재계산+LLM) | — | 아래 |
 | POST | `/api/cards/{id}/progress-records` | 추진 기록 저장(상태 전이 + 근거 메모 + 실측 관측값). 상태 변경과 감사 기록을 한 트랜잭션으로 남긴다 | 아래 `ProgressRecord 입력` | `{"card": Card, "record": ProgressRecord, "created": true}` — 신규 201, 같은 `idempotency_key` 재전송이면 기존 기록 200 |
-| GET | `/api/cards/{id}/progress-records` | 한 카드의 추진 기록 타임라인 (최신순) | 쿼리: `limit`(1~100, 기본 50) · `cursor` | `{"records": [ProgressRecord], "next_cursor": string\|null}` |
-| GET | `/api/progress-report` | 기간 추진 경과 리포트 (관측 기록만으로 집계) | 쿼리: `from` · `to` (`YYYY-MM-DD`, KST, 양끝 포함) | 아래 `progress-report 응답` |
+| GET | `/api/cards/{id}/progress-records` | 한 카드의 추진 기록 타임라인 (최신순). **🔒 인증 필수** | 쿼리: `limit`(1~100, 기본 50) · `cursor` | `{"records": [ProgressRecord], "next_cursor": string\|null}` · 토큰 없으면 401 |
+| GET | `/api/progress-report` | 기간 추진 경과 리포트 (관측 기록만으로 집계). **🔒 인증 필수** | 쿼리: `from` · `to` (`YYYY-MM-DD`, KST, 양끝 포함) | 아래 `progress-report 응답` · 토큰 없으면 401 |
+
+**🔒 인증**: 위 두 GET은 `Authorization: Bearer <MUTATION_API_TOKEN>` 헤더가 필요하다
+(`security.require_internal_access` — 모든 변경 계열 POST와 같은 가드). 담당자 화면 전용 데이터라
+공개 GET(대시보드·후보·위젯)과 층위가 다르기 때문이다. FE 서버 컴포넌트가 `API_MUTATION_TOKEN`
+환경변수로 헤더를 붙인다 — 이 값을 빠뜨리면 `/tracking`의 리포트가 401로 접히고 업무 목록만 남는다.
 
 `simulate` 응답:
 ```json
@@ -434,6 +461,13 @@ LLM 호출이 실패하거나 애초에 호출하지 않은 카드도 **똑같�
 - 기간 기본값은 **`to` = KST 오늘, `from` = `to` − 89일**(90일). 다음 세 경우는 **400**이다:
   `from > to` · `to`가 KST 오늘보다 미래 · `(to − from)`이 366일 이상.
   → FE가 만들 수 있는 최대 구간은 `from = to − 365일`이다.
+- **집계 모집단은 "기간 종료일 시점에 이미 승인돼 있던 카드"다** — `status="approved"`이면서
+  `created_at`·`decided_at`이 모두 기간 종료일 23:59:59.999999(KST) 이하인 카드만 센다
+  (`routes/progress.py _approved_as_of`). 이 규칙은 `recorded_card_count`·`cards_without_records`·
+  `status_distribution`·`completion`·`on_time`에 모두 적용된다. 과거 기간을 조회할 때 그 시점에
+  존재하지도 않던 카드를 "미기록"이라고 세지 않기 위함이다. **화면이 리포트 옆에 카드 목록을
+  직접 그린다면 같은 필터를 걸어야 한다** — 걸지 않으면 "미기록 0건" 헤더 아래 카드가 뜬다
+  (FE는 `lib/progressReportView.ts approvedAsOf`가 같은 정의를 복제한다).
 - `status_distribution`은 **기간 종료일까지의 카드별 최신 기록** 기준이다(기간 시작 이전 기록도 본다).
   경과 기록이 하나도 없는 승인 카드는 분포에서 빠지고 `cards_without_records`로만 센다 —
   화면은 이 사실을 문구로 밝혀야 헤더 건수와 칩 합계의 차이가 오해되지 않는다.
@@ -486,7 +520,7 @@ LLM 호출이 실패하거나 애초에 호출하지 않은 카드도 **똑같�
       "lat": 37.2211, "lng": 128.8123,
       "badge": "이번 분기 확충 업종",
       "payback": {"rate": 5, "label": "지금 여기서 쓰면 5% 페이백"},
-      "blurb": "사북읍 카페 · 하이원포인트 사용 가능",
+      "blurb": "사북읍의 카페 하이원포인트 가맹점이에요",
       "directions_url": "https://map.kakao.com/link/to/..."
     }
   ],
@@ -500,7 +534,7 @@ LLM 호출이 실패하거나 애초에 호출하지 않은 카드도 **똑같�
 - `payback` = INCENTIVE 카드가 `완료` 상태일 때만 포함, 아니면 `null`. `rate`는 해당 카드의 `selected_rate` 값
 - `blurb` = **결정론 문구**다(LLM 미사용 — 2026-08-08 확정). 실명 점포의 맛·분위기·메뉴를 추정하지
   않기 위한 설계 결정이며, `prompts.py`의 위젯 프롬프트(A-4)는 제거했다
-- **추천 정렬 근거(BE 확정):** ① `badge:"신규"`가 붙는 가맹점 먼저 ② 그다음 거점(`ANCHOR`)까지의
+- **추천 정렬 근거(BE 확정):** ① `badge:"이번 분기 확충 업종"`이 붙는 가맹점 먼저 ② 그다음 거점(`ANCHOR`)까지의
   **직선거리 오름차순**. `limit`은 1~120으로 클램프하며 기본 12곳이다. 원본 순서(상호명순)로 두면 필터 없이 호출할 때
   방문객 동선과 무관한 가맹점이 먼저 나오기 때문이다
   - **거리 값은 응답에 싣지 않는다**(정렬 근거로만 사용). `blurb` 생성 프롬프트에도 넣지 않는다 —

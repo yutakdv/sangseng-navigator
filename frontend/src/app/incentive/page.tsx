@@ -216,7 +216,7 @@ export default async function IncentivePage() {
               title="시나리오 비교문"
               badge={<NarrativeSourceChip kind={narrativeSource} />}
               desc={
-                narrativeSource === "ai"
+                narrativeSource === "ai" || narrativeSource === "ai_partial"
                   ? "AI 출력은 제안입니다. 확정은 담당자 승인을 거치며, AI의 역할은 의사결정 근거 제공입니다."
                   : "이 비교문은 서버 규칙으로 작성했습니다. 확정은 담당자 승인을 거치며, 시스템의 역할은 의사결정 근거 제공입니다."
               }

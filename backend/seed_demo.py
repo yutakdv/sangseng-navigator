@@ -47,6 +47,11 @@ ORIGINAL_RANKING = [
 ORIGINAL_CANDIDATE_NAMES = ["황금식당", "백민농장", "솔고개민박", "빈이슈퍼", "삼척맛척커피이야기"]
 # 카드 근거에 도로 소요시간을 표시하므로 rank·score·상호와 함께 대조한다.
 ORIGINAL_CANDIDATE_ROAD_MINUTES = [35.2, 35.9, 44.1, 41.5, 34.2]
+# 카드 '상권/이동 기준' 문장이 인용하는 값 — (업종공백도, 동선근접도, 동일 업종 상가 수).
+# 이 셋은 /candidates 표에 그대로 보이므로 카드와 어긋나면 두 화면을 대조하는 즉시 드러난다.
+ORIGINAL_CANDIDATE_EVIDENCE = [
+    (0.83, 0.68, 4), (0.75, 0.71, 2), (0.83, 0.62, 4), (0.86, 0.51, 5), (0.75, 0.52, 2),
+]
 EXPANSION_SOURCES = ["하이원포인트 사용현황", "가맹점 상세정보", "소진공 상가정보"]
 GROUNDING = {
     "status": "verified",
@@ -114,6 +119,14 @@ def assert_ranking_matches_pipeline() -> None:
             f"  하드코딩: {ORIGINAL_CANDIDATE_ROAD_MINUTES}\n"
             f"  실산출  : {roads}"
         )
+    evidence = [(c["gap"], c["proximity"], c.get("nearby_same_category_stores")) for c in rows]
+    if evidence != ORIGINAL_CANDIDATE_EVIDENCE:
+        raise SystemExit(
+            "seed_demo 중단: 카드 '상권/이동 기준' 문장이 인용하는 값(업종공백도·동선근접도·"
+            "동일 업종 상가 수)이 candidates.json 과 다릅니다.\n"
+            f"  하드코딩: {ORIGINAL_CANDIDATE_EVIDENCE}\n"
+            f"  실산출  : {evidence}"
+        )
 
 
 def demo_cards() -> list:
@@ -127,6 +140,7 @@ def demo_cards() -> list:
         "score_rank": 1, "ai_rank": 1, "selection_rank": 1, "confidence": "중",
         "ai": {
             "adjusted": False,
+            "selection_reason": "top_score",
             "comparison": (
                 "정량 1위 영월군 음식점(Score 0.5)을 서버 제안 대상으로 유지했습니다. 차순위 "
                 "영월군 소매점(Score 0.49)과 비교했으며, 영월군 음식점의 도로 소요시간 약 "
@@ -165,6 +179,7 @@ def demo_cards() -> list:
         "score_rank": 2, "ai_rank": 1, "selection_rank": 1, "confidence": "하",
         "ai": {
             "adjusted": True,
+            "selection_reason": "exclude_in_progress",
             "comparison": (
                 "정량 상위 후보 영월군 음식점(후보 접촉·검토 시작)은 진행 중인 업무가 있어 중복 제안에서 "
                 "제외했습니다. 따라서 선택 가능한 후보 중 최고점인 정량 2위 영월군 소매점(Score 0.49)을 "
@@ -260,19 +275,23 @@ VERIFIED_VERIFICATION = {
 
 def _history_card(cid: str, category: str, rank: int, score: float, gap: float,
                   proximity: float, road_min: float, stores: int,
-                  created_h: float) -> dict:
-    """이력 카드 공통 골격 — 문구 수치는 candidates.json 실산출값(위 ORIGINAL_* 상수와 대조된다)."""
+                  created_h: float, comparison: str) -> dict:
+    """이력 카드 공통 골격 — 문구 수치는 candidates.json 실산출값(위 ORIGINAL_* 상수와 대조된다).
+
+    `ai_rank`/`selection_rank`는 **최종 제안 목록 내 순위**라 항상 1이다(05 §2 · cardgen과 동일).
+    여기에 정량 순위(4·5)를 넣으면 RankTrace가 "후보 스코어 4위 → 선택 가능한 후보 4위"를 그려
+    화살표 좌우가 같아지고, 4위 카드에 "정량 1순위 선택" 배지까지 붙는다.
+    선택 사유는 정량 최고점도, 진행 중 제외도 아닌 **이번 분기 지역 배분 몫**이므로 그대로 적는다.
+    """
     return {
         "id": cid, "type": "EXPANSION", "status": "approved", "progress": None,
         "title": f"삼척시 {category} 업종 가맹점 확충",
         "target": {"eup": "삼척시", "category": category},
-        "score_rank": rank, "ai_rank": rank, "selection_rank": rank, "confidence": "중",
+        "score_rank": rank, "ai_rank": 1, "selection_rank": 1, "confidence": "중",
         "ai": {
-            "adjusted": False,
-            "comparison": (
-                f"이번 분기 선정 지역 2곳(영월군·삼척시) 가운데 삼척시 몫으로, 삼척시 후보 중 "
-                f"최고점인 정량 {rank}위 삼척시 {category}(Score {score})를 서버가 선택했습니다. "
-                f"도로 소요시간 약 {road_min}분을 함께 확인했습니다."),
+            "adjusted": rank != 1,
+            "selection_reason": "region_quota",
+            "comparison": comparison,
             "reasons": [
                 f"정량 기준: Score {score} · {rank}위",
                 f"상권 기준: 업종공백도 {gap} · 반경 500m 내 동일 업종 하이원포인트 가맹점 0곳 / 동일 업종 상가 {stores}곳",
@@ -301,12 +320,28 @@ def _history_card(cid: str, category: str, rank: int, score: float, gap: float,
 
 
 def history_cards() -> list:
-    """이력 카드 2장 — `--reset`에만 실린다 (테스트 기준선은 demo_cards 3장 그대로)."""
+    """이력 카드 2장 — `--reset`에만 실린다 (테스트 기준선은 demo_cards 3장 그대로).
+
+    근거 수치(gap·proximity·상가 수)는 candidates.json 실산출값이어야 한다. 어긋나면 심사위원이
+    /candidates 표와 카드 상세를 나란히 놓는 순간 바로 드러나므로, 아래 검증을 함께 돌린다.
+    """
+    assert_ranking_matches_pipeline()
     return [
-        # 정량 4위 (삼척시 최고점) — 완료까지 끝난 카드
-        _history_card("AC-003", "편의점", 4, 0.45, 0.8, 0.62, 41.5, 3, created_h=24 * 55),
-        # 정량 5위 — 추진중에서 멈춘 카드 (정체 점검 표본)
-        _history_card("AC-004", "카페", 5, 0.42, 0.78, 0.6, 34.2, 2, created_h=24 * 60),
+        # 정량 4위 — 삼척시 후보 중 최고점. 완료까지 끝난 카드
+        _history_card(
+            "AC-003", "편의점", 4, 0.45, 0.86, 0.51, 41.5, 5, created_h=24 * 55,
+            comparison=("이번 분기 선정 지역 2곳(영월군·삼척시) 가운데 삼척시 몫으로, 삼척시 후보 중 "
+                        "최고점인 정량 4위 삼척시 편의점(Score 0.45)을 서버가 선택했습니다. "
+                        "도로 소요시간 약 41.5분을 함께 확인했습니다."),
+        ),
+        # 정량 5위 — 삼척시 최고점(4위 편의점)이 이미 진행 중이라 차순위. 추진중에서 멈춘 정체 표본
+        _history_card(
+            "AC-004", "카페", 5, 0.42, 0.75, 0.52, 34.2, 2, created_h=24 * 60,
+            comparison=("이번 분기 선정 지역 2곳(영월군·삼척시) 가운데 삼척시 몫으로, 삼척시 최고점인 "
+                        "정량 4위 삼척시 편의점은 이미 추진 중이라 제외하고 선택 가능한 차순위인 "
+                        "정량 5위 삼척시 카페(Score 0.42)를 서버가 선택했습니다. "
+                        "도로 소요시간 약 34.2분을 함께 확인했습니다."),
+        ),
     ]
 
 

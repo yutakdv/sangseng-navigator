@@ -183,8 +183,19 @@ export interface CardOperations {
   actual_outcome: string | null;
 }
 
+/**
+ * 후보 선택 사유 코드 (05 §2) — 화면 배지 문구의 정본.
+ *
+ * `adjusted`만으로는 "정량 1순위 선택"과 "진행 중인 건 제외하고 선택" 둘 중 하나로만 갈려,
+ * 지역 배분 몫으로 고른 카드에까지 둘 중 하나가 잘못 붙는다. 값이 없는 구형 카드는 순위로
+ * 추론하되 단정할 수 없는 경우는 배지를 그리지 않는다.
+ */
+export type SelectionReason = "top_score" | "exclude_in_progress" | "region_quota";
+
 export interface CardAi {
   adjusted: boolean;
+  /** 없으면 score_rank·selection_rank로 추론 (RankTrace) */
+  selection_reason?: SelectionReason;
   comparison: string;
   reasons: string[];
   risks: string[];

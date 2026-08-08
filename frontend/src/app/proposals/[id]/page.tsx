@@ -8,6 +8,7 @@ import { DecisionBar } from "@/components/proposals/DecisionBar";
 import { EvidenceSections } from "@/components/proposals/EvidenceSections";
 import { ProposalSummary } from "@/components/proposals/ProposalSummary";
 import { api } from "@/lib/api";
+import { eventLabel, hasGeneratedEvent } from "@/lib/cardEvents";
 import { composeEvidence } from "@/lib/dashboardView";
 import { ApiError } from "@/lib/errors";
 
@@ -118,9 +119,13 @@ function HistoryList({
   decidedAt: string | null;
   events: { at: string; action: string; record_id?: string }[];
 }) {
+  // 서버가 `generated` 이벤트를 주면 합성하지 않는다 — 같은 시각의 생성 행이 두 줄로 겹친다.
+  // 내부 문자열(`generated`·`progress:추진중`)을 그대로 찍지 않도록 전부 eventLabel을 거친다.
   const rows = [
-    { at: createdAt, action: "AI 제안 생성 — 담당자 검토 대기" },
-    ...events.map((event) => ({ at: event.at, action: event.action })),
+    ...(hasGeneratedEvent(events)
+      ? []
+      : [{ at: createdAt, action: "AI 제안 생성 — 담당자 검토 대기" }]),
+    ...events.map((event) => ({ at: event.at, action: eventLabel(event.action) })),
   ].sort((a, b) => a.at.localeCompare(b.at));
 
   return (

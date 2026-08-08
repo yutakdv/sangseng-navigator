@@ -18,6 +18,7 @@ import { SimulateButton } from "@/components/SimulateButton";
 import { WorkflowChip } from "@/components/StatusChip";
 import { BarRank } from "@/components/charts/BarRank";
 import { api } from "@/lib/api";
+import { eventLabel } from "@/lib/cardEvents";
 import { NARRATIVE_SOURCE_TEXT, cardNarrativeSource } from "@/lib/aiSource";
 import { ANCHOR, PRIMARY } from "@/lib/constants";
 import { ApiError } from "@/lib/errors";
@@ -800,14 +801,3 @@ function distanceText(c: Candidate): string {
 const dateText = (iso: string): string => iso.slice(0, 10);
 const timeText = (iso: string): string => `${iso.slice(0, 10)} ${iso.slice(11, 16)}`;
 
-/** events의 action 값을 화면 문구로 (05 §7 — `approved` · `progress:완료` 형태) */
-function eventLabel(action: string): string {
-  const MAP: Record<string, string> = {
-    generated: "AI 제안 카드 생성",
-    approved: "담당자 승인",
-    rejected: "담당자 반려",
-    held: "담당자 보류",
-  };
-  if (action.startsWith("progress:")) return `추진 상태 변경 → ${action.slice("progress:".length)}`;
-  return MAP[action] ?? action;
-}

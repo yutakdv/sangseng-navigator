@@ -11,6 +11,7 @@ import { RankTrace } from "@/components/RankTrace";
 import { Section } from "@/components/Section";
 import { ProgressChip, WorkflowChip } from "@/components/StatusChip";
 import { api } from "@/lib/api";
+import { eventLabel } from "@/lib/cardEvents";
 import { eligibilityStatus, workflowLabel } from "@/lib/cardWorkflow";
 import { REGIONS } from "@/lib/constants";
 import { ApiError } from "@/lib/errors";
@@ -21,7 +22,7 @@ import {
   workflowLayers,
   type CardRecordsResult,
 } from "@/lib/progressReportView";
-import type { Card } from "@/types";
+import type { Card, ProgressReport } from "@/types";
 
 export const metadata: Metadata = { title: "추진 경과 리포트 · 상생 나침반" };
 
@@ -64,14 +65,22 @@ export default async function TrackingPage({
    */
   const reportRequest = api
     .progressReport(requested.query)
-    .then((value) => ({ report: value, fellBack: false }))
+    .then((value) => ({ report: value as ProgressReport | null, fellBack: false }))
     .catch((error: unknown) => {
       if (
         error instanceof ApiError &&
         error.status === 400 &&
         (requested.query.from || requested.query.to)
       ) {
-        return api.progressReport().then((value) => ({ report: value, fellBack: true }));
+        return api
+          .progressReport()
+          .then((value) => ({ report: value as ProgressReport | null, fellBack: true }));
+      }
+      // 401 = 내부 토큰 미설정(배포 시 `API_MUTATION_TOKEN` 누락). 이때 페이지 전체를 에러
+      // 바운더리로 떨어뜨리면 심사 동선(11 대본 6단계)이 통째로 막힌다 — 리포트만 접고
+      // 업무 목록은 살린다. 왜 비었는지는 아래 안내 배너가 밝힌다.
+      if (error instanceof ApiError && error.status === 401) {
+        return { report: null as ProgressReport | null, fellBack: false };
       }
       throw error;
     });
@@ -87,13 +96,22 @@ export default async function TrackingPage({
    * 표시용 기간의 정본은 **응답의 report.period**다(요청값이 아니라).
    * 폴백이 일어난 뒤 요청값을 그리면 화면이 실제로 집계한 구간과 다른 말을 하게 된다.
    */
-  const period = {
-    from: report.period.from,
-    to: report.period.to,
-    days: report.period.days,
-    activePresetId: presetIdFor(report.period.from, report.period.to),
-    invalid: requested.invalid || periodFellBack,
-  };
+  const period = report
+    ? {
+        from: report.period.from,
+        to: report.period.to,
+        days: report.period.days,
+        activePresetId: presetIdFor(report.period.from, report.period.to),
+        invalid: requested.invalid || periodFellBack,
+      }
+    : // 리포트를 못 읽었으면 표시할 "집계한 구간" 자체가 없다 — 요청값을 그대로 보여 준다
+      {
+        from: requested.from,
+        to: requested.to,
+        days: requested.days,
+        activePresetId: requested.activePresetId,
+        invalid: requested.invalid,
+      };
 
   // 최근에 승인한 카드가 맨 위 — 허브에서 막 승인하고 넘어온 카드를 바로 조작할 수 있게 한다.
   // 타임스탬프는 전부 KST 오프셋(+09:00)이라 문자열 비교로 시간순이 나온다 (05 §8).
@@ -124,8 +142,8 @@ export default async function TrackingPage({
 
   // 기록이 0건이면 리포트는 빈 지표의 벽이 된다 — 실제로 조작할 대상(업무 목록)을 위로 올리고
   // 리포트는 "구조는 볼 수 있게" 접어 둔다 (아래 details).
-  const hasRecords = report.record_count > 0 || report.recorded_card_count > 0;
-  const actionNeeded = report.stale.count + report.cards_without_records;
+  const hasRecords = report !== null && (report.record_count > 0 || report.recorded_card_count > 0);
+  const actionNeeded = report ? report.stale.count + report.cards_without_records : 0;
 
   const { layers, unclassified } = workflowLayers(rows);
 
@@ -155,7 +173,15 @@ export default async function TrackingPage({
         {/* 리포트를 끝까지 읽지 않아도 "지금 손댈 것"이 한 줄로 보이게 한다.
             기록이 0건일 때는 아래 빈 상태 안내가 같은 말을 더 자세히 하므로 중복해서 띄우지 않는다.
             앵커는 ProgressReportDashboard의 `#stale`(정체 점검 Section)·`#unrecorded`(미기록 목록)와 짝이다. */}
-        {hasRecords && actionNeeded > 0 ? (
+        {report === null ? (
+          <p className="flex flex-wrap items-center gap-x-2 gap-y-1 rounded-xl bg-state-notice-bg px-3.5 py-2.5 text-[13px] font-semibold leading-5 text-state-notice ring-1 ring-inset ring-state-notice-line">
+            <Icon name="warn" size={14} />
+            추진 경과 리포트를 불러오지 못했습니다 — 담당자 화면 전용 데이터라 내부 조회 권한이
+            필요합니다. 아래 업무 목록과 기록 입력은 그대로 사용할 수 있습니다.
+          </p>
+        ) : null}
+
+        {report && hasRecords && actionNeeded > 0 ? (
           <p className="flex flex-wrap items-center gap-x-3 gap-y-1.5 rounded-xl bg-state-notice-bg px-3.5 py-2.5 text-[13px] font-semibold leading-5 text-state-notice ring-1 ring-inset ring-state-notice-line">
             <span className="flex items-center gap-1.5">
               <Icon name="warn" size={14} />
@@ -187,9 +213,9 @@ export default async function TrackingPage({
 
         {/* ⚠ ProgressReportDashboard는 여기와 아래 접힌 details 중 **한 곳에서만** 렌더한다 —
             양쪽에 두면 같은 KPI 타일이 화면에 두 번 나온다. */}
-        {hasRecords ? (
+        {hasRecords && report ? (
           <ProgressReportDashboard report={report} cardRecords={cardRecords} truncated={truncated} />
-        ) : (
+        ) : report === null ? null : (
           <div className="rounded-panel border border-dashed border-admin-border bg-admin-surface px-5 py-6 text-center shadow-card">
             <span className="mx-auto flex h-11 w-11 items-center justify-center rounded-full bg-admin-surface-sunken text-admin-text-muted">
               <Icon name="report" size={20} />
@@ -442,7 +468,7 @@ export default async function TrackingPage({
                                   <span className="tabular-nums text-admin-text-muted">
                                     {stamp(e.at)}
                                   </span>
-                                  <span className="text-admin-text">{eventLabel(e.action)}</span>
+                                  <span className="text-admin-text">{eventLabel(e.action, { compact: true })}</span>
                                 </li>
                               ))}
                             </ol>
@@ -493,7 +519,7 @@ export default async function TrackingPage({
 
         {/* 기록 0건이면 리포트는 위가 아니라 여기 — 심사위원이 "지표가 어떤 구조인지"는 볼 수 있게
             지우지 않고 접어 둔다. 위쪽 분기와 배타적이라 KPI가 두 번 나오지 않는다. */}
-        {!hasRecords ? (
+        {!hasRecords && report ? (
           <details className="u-panel px-4 py-3.5 sm:px-5">
             <summary className="u-disclosure">기록이 쌓이면 채워지는 리포트 지표 미리 보기</summary>
             <div className="mt-4">
@@ -546,7 +572,7 @@ const nextAction = (card: Card): { label: string; href?: string } => {
  * 완료 행의 위젯 연결 — 데모 6→7단계의 인과를 화면에서 읽히게 하는 블록 (08 F8).
  *
  * 링크는 **업종 없이 지역만** 건다: 위젯은 완료 카드와 매칭되는 가맹점을 먼저 정렬하므로(05 §4)
- * 지역만 걸어도 `신규` 배지가 상단에 오고, 확충 대상이 가맹점 공백 업종이라 업종까지 걸면
+ * 지역만 걸어도 `이번 분기 확충 업종` 배지가 상단에 오고, 확충 대상이 가맹점 공백 업종이라 업종까지 걸면
  * 매칭 가맹점이 0곳인 경우 빈 상태로 떨어질 수 있다.
  */
 function DoneNote({ card }: { card: Card }) {
@@ -579,19 +605,6 @@ function DoneNote({ card }: { card: Card }) {
     </div>
   );
 }
-
-const EVENT_LABEL: Record<string, string> = {
-  generated: "카드 생성",
-  approved: "승인",
-  rejected: "반려",
-  held: "보류",
-};
-
-/** `progress:완료` 같은 접두 형식을 사람이 읽는 문구로 (05 §7) */
-const eventLabel = (action: string): string =>
-  action.startsWith("progress:")
-    ? `추진 상태 → ${action.slice("progress:".length)}`
-    : (EVENT_LABEL[action] ?? action);
 
 /**
  * "2026-08-03T12:00:00+09:00" → "2026.08.03 12:00".

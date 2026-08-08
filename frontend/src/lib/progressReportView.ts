@@ -254,6 +254,24 @@ const bump = (layer: WorkflowLayer, stage: CardProgress): boolean => {
 };
 
 /**
+ * 기간 종료일 시점에 **이미 승인돼 있던** 카드만 남긴다 —
+ * backend/app/routes/progress.py `_approved_as_of`와 같은 정의다 (05 §8).
+ *
+ * BE는 리포트 집계의 모집단을 이렇게 좁히는데 화면이 '현재 승인 카드 전체'를 쓰면, 기간
+ * 종료일보다 늦게 승인된 카드가 있는 순간 헤더의 집계 숫자(0건)와 바로 아래 목록(1~2장)이
+ * 서로 다른 말을 한다. 프리셋(to=오늘)에서는 두 모집단이 같지만 URL을 직접 고치면 갈린다.
+ *
+ * `decided_at`이 비어 있는 승인 카드는 승인 시점을 알 수 없으므로 `created_at`으로 판정한다.
+ */
+export function approvedAsOf(results: CardRecordsResult[], to: string): CardRecordsResult[] {
+  return results.filter(({ card }) => {
+    const created = kstDateOfIso(card.created_at);
+    const decided = card.decided_at ? kstDateOfIso(card.decided_at) : created;
+    return created !== null && decided !== null && created <= to && decided <= to;
+  });
+}
+
+/**
  * 승인 카드 목록을 유형별 단계 칩으로 (T-E, 업무 목록 헤더용).
  *
  * `progress`가 null인 승인 카드도 유형별 첫 단계로 폴백해 반드시 한 칩에 들어간다

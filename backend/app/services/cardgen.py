@@ -399,6 +399,15 @@ def _generate_expansion(cards: list) -> tuple[dict, bool]:
     # fallback으로 흘러가면 안 되기 때문(그러면 금지 타깃 카드가 만들어진다).
     available = _available(cands, cards)
     if not available:
+        # 후보가 소진되는 가장 흔한 이유는 '조금 전 이 버튼이 만든 승인 대기 카드'다. 그때 409만
+        # 주면 심사위원이 두 번째로 눌렀을 때 대표 AI 기능이 "제안할 후보가 없습니다"로만 보인다.
+        # 05 §8의 '기존 카드 200 반환'을 dedupe 창(60초) 밖에서도 성립시킨다.
+        # (아래 `_find_pending`은 `_available`이 pending 타깃을 이미 걸러 내므로 도달하지 않는다 —
+        #  EXPANSION의 중복 가드는 실질적으로 이 블록이 진다.)
+        pending = [c for c in cards
+                   if c.get("type") == "EXPANSION" and c.get("status") == "pending"]
+        if pending:
+            return max(pending, key=lambda c: c.get("created_at") or ""), False
         raise NoAvailableCandidate("모든 후보에 승인 대기 또는 진행 중인 업무가 있어 새로 제안할 후보가 없습니다")
     # 대상 선택은 LLM에 맡기지 않는다. 동일 입력·상태에서는 항상 같은 후보가 선택된다.
     target = available[0]
@@ -412,10 +421,6 @@ def _generate_expansion(cards: list) -> tuple[dict, bool]:
         log.warning("EXPANSION 카드 AI 설명 생성 실패 — 규칙 기반 fallback으로 진행합니다", exc_info=True)
         out = _fallback_ai(cands, cards)
         explanation_source = "rule_fallback"
-
-    existing = _find_pending(cards, "EXPANSION", target["eup"], target["category"])
-    if existing:                                        # 05 §8 — 기존 카드 200 반환 (버튼 연타 대비)
-        return existing, False
 
     grounded = _grounded_ai(cands, target, out, cards, explanation_source)
     now = db.now_iso()
@@ -434,6 +439,10 @@ def _generate_expansion(cards: list) -> tuple[dict, bool]:
         "ai": {
             # 표시 일관성: 조정 여부 = (원 Score 순위 ≠ 1) — LLM 출력과 어긋나면 순위 쪽이 정본
             "adjusted": target["rank"] != 1,
+            # 왜 이 후보인가를 코드로 남긴다 — 화면 배지가 `adjusted`만 보고 문구를 정하면
+            # "정량 1순위 선택"/"진행 중인 건 제외"라는 두 문장 중 아무거나 붙어 실제 선택 사유와
+            # 어긋난다(절대 규칙 5의 감사 가능성). 생성 경로의 사유는 이 둘뿐이다.
+            "selection_reason": "top_score" if target["rank"] == 1 else "exclude_in_progress",
             "comparison": grounded["comparison"],
             "reasons": grounded["reasons"],
             "risks": grounded["risks"],
