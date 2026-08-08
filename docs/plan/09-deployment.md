@@ -102,9 +102,19 @@ PARAMS=("LlmProvider=${LLM_PROVIDER:-openai}")
 [ -n "${ANTHROPIC_API_KEY:-}" ] && PARAMS+=("AnthropicApiKey=${ANTHROPIC_API_KEY}")
 # 비우면 fail-safe Default가 적용된다
 # (AllowedOrigins='https://configure-me.invalid', DemoReadOnly='true', ReservedConcurrency=5)
+[ -n "${MUTATION_API_TOKEN:-}" ] && PARAMS+=("MutationApiToken=${MUTATION_API_TOKEN}")
 [ -n "${ALLOWED_ORIGINS:-}" ] && PARAMS+=("AllowedOrigins=${ALLOWED_ORIGINS}")
 [ -n "${DEMO_READ_ONLY:-}" ] && PARAMS+=("DemoReadOnly=${DEMO_READ_ONLY}")
 [ -n "${RESERVED_CONCURRENCY:-}" ] && PARAMS+=("ReservedConcurrency=${RESERVED_CONCURRENCY}")
+
+# 위 두 줄은 값이 비면 파라미터를 넘기지 않아 template Default 가 조용히 적용된다 —
+# 그 결과가 변경 API 403(읽기 전용)·503(토큰 미설정)이라 배포 전에 잡는다
+if [ -z "${DEMO_READ_ONLY:-}" ]; then
+  echo "⚠ DEMO_READ_ONLY 미설정 → template Default 'true' 적용. 배포 후 변경 API가 전부 403입니다."
+elif [ "${DEMO_READ_ONLY}" != "true" ] && [ -z "${MUTATION_API_TOKEN:-}" ]; then
+  echo "✗ 읽기 전용을 풀었는데 MUTATION_API_TOKEN 이 비어 변경 API가 503이 됩니다 — 배포 중단" >&2
+  exit 1
+fi
 
 sam build -t template.yaml
 sam deploy \
@@ -119,8 +129,14 @@ aws cloudformation describe-stacks --stack-name sangseng-backend \
 ```
 
 - 스크립트가 `.env`에서 읽는 파라미터: `LLM_PROVIDER`·`OPENAI_API_KEY`·`ANTHROPIC_API_KEY`에 더해
-  **`ALLOWED_ORIGINS`·`DEMO_READ_ONLY`·`RESERVED_CONCURRENCY`**. 오리진과 read-only를 비워 두면
-  각각 차단용 오리진과 `true`가 적용되어 공개 mutation이 열리지 않는다 (§5·§5.5)
+  **`MUTATION_API_TOKEN`·`ALLOWED_ORIGINS`·`DEMO_READ_ONLY`·`RESERVED_CONCURRENCY`**. 오리진과
+  read-only를 비워 두면 각각 차단용 오리진과 `true`가 적용되어 공개 mutation이 열리지 않는다 (§5·§5.5)
+- **⚠ 심사용 배포는 `.env`에 `DEMO_READ_ONLY=false` + `MUTATION_API_TOKEN=<난수>`를 반드시 함께 넣는다.**
+  기본값(비워 둠)은 "아무도 못 바꾸는 안전한 배포"라서, 그대로 배포하면 데모 대본의 카드 생성·승인·
+  적격성·추진 상태 변경이 전부 403이 된다. 둘 중 하나만 채우면 403 대신 503이 날 뿐 결과는 같다 —
+  두 값은 한 쌍이며, 아래 §2의 Vercel `NEXT_PUBLIC_DEMO_READ_ONLY=false`·`API_MUTATION_TOKEN`과도
+  짝이 맞아야 한다(FE만 열리고 BE가 잠기면 버튼이 눌린 뒤 403 문구가 뜬다).
+  스크립트가 두 조합을 배포 전에 검사해 경고하거나 중단한다
 - `sam deploy`에는 `-t`를 주지 않는다 — `sam build` 산출물(`.aws-sam/build/template.yaml`)이 배포 대상이다
 - [ ] 최초 배포 후 Outputs의 `CardsTable` 값을 `.env`의 `CARDS_TABLE`에 반영 (로컬 BE도 같은 테이블 사용)
 - [ ] `python backend/seed_demo.py` 실행 — 데모 사례(추진중 카드 등) 시드
@@ -217,9 +233,15 @@ claude-sonnet-5 전환 시 $3/$15(인트로 $2/$10)로 수천 원 수준.
 - [ ] **검증:** 브라우저에서 Vercel 배포 URL로 정상 호출되는지 + 임의 오리진(로컬 파일 등)에서
       차단되는지 확인. 차단이 안 되면 게이트웨이 실제 설정부터 확인한다
       (`aws apigatewayv2 get-api --api-id <id> --query CorsConfiguration`)
-- [ ] 인증·RBAC가 구현되기 전까지 `.env`의 `DEMO_READ_ONLY=true`를 유지하고, health 응답의
-      `demo_read_only:true`를 확인한다. 실운영 mutation을 열 때는 공통 mutation dependency에 조직 사용자
-      인증과 역할 검사를 먼저 연결한 뒤에만 `false`로 전환한다
+- [ ] 읽기 전용 플래그는 **용도에 따라 둘 중 하나로 정하고 FE·BE를 같은 값으로 맞춘다.**
+      섞으면 버튼은 열리고 요청만 막히는 상태가 된다
+      - **심사·데모 배포(기본):** `DEMO_READ_ONLY=false` + `MUTATION_API_TOKEN=<난수>`,
+        Vercel은 `NEXT_PUBLIC_DEMO_READ_ONLY=false` + 같은 값의 `API_MUTATION_TOKEN`.
+        심사위원이 직접 승인해 볼 수 있어야 하기 때문이며(§2), 무인증 공개가 아니라
+        FE 서버만 아는 Bearer 토큰이 경계를 맡는다. 브라우저에는 토큰이 실리지 않는다
+      - **잠금 배포:** 양쪽 다 `true`. health 응답의 `demo_read_only:true`로 확인한다
+- [ ] 조직 사용자 인증·RBAC를 붙이는 시점에는 공통 mutation dependency(`security.require_mutation_access`)에
+      주체·역할 검사를 연결하고, 공유 토큰 한 개짜리 현재 경계를 대체한다
 - [ ] Billing 콘솔 $0 스크린샷 (발표 Q&A "운영 비용?" 대비)
 
 ## 5.5 심사 기간 운영 (제출 ~ 심사 종료, 상세: 12 문서 §5)

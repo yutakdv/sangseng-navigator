@@ -341,15 +341,20 @@ LLM 호출이 실패하거나 애초에 호출하지 않은 카드도 **똑같�
 | POST | `/api/cards/{id}/decision` | 담당자 결정. EXPANSION의 `approved` 표시는 **후보 접촉·검토 시작** | `{"decision": "approved"\|"rejected"\|"held", "selected_rate": 3\|5\|7}` — `selected_rate`는 **INCENTIVE 카드를 approved할 때만 필수**, 그 외 생략 | `{"card": Card}` |
 | POST | `/api/cards/{id}/verification` | EXPANSION 후보 적격성 5항목 저장 | `{"checks": [{"key": "business_status", "status": "verified"}, ...], "note": "..."}` | `{"card": Card}` |
 | POST | `/api/cards/{id}/progress` | 추진 상태 변경 (approved만 가능) | `{"progress": "후보 접촉·검토 시작"\|"적격성 확인"\|"가맹 심사"\|"추진중"\|"보류"\|"완료"}` (INCENTIVE는 기존 4단계) | `{"card": Card}` |
-| POST | `/api/cards/{id}/simulate` | 가맹 전환 시 예상 효과 (반사실 재계산+LLM) | — | 아래 |
+| POST | `/api/cards/{id}/simulate` | 가맹 전환 시 예상 효과 (반사실 재계산+LLM). **🔒 인증 필수 · 읽기 계산이라 `DEMO_READ_ONLY` 차단 대상이 아니다** (§8) | — | 아래 |
 | POST | `/api/cards/{id}/progress-records` | 추진 기록 저장(상태 전이 + 근거 메모 + 실측 관측값). 상태 변경과 감사 기록을 한 트랜잭션으로 남긴다 | 아래 `ProgressRecord 입력` | `{"card": Card, "record": ProgressRecord, "created": true}` — 신규 201, 같은 `idempotency_key` 재전송이면 기존 기록 200 |
 | GET | `/api/cards/{id}/progress-records` | 한 카드의 추진 기록 타임라인 (최신순). **🔒 인증 필수** | 쿼리: `limit`(1~100, 기본 50) · `cursor` | `{"records": [ProgressRecord], "next_cursor": string\|null}` · 토큰 없으면 401 |
 | GET | `/api/progress-report` | 기간 추진 경과 리포트 (관측 기록만으로 집계). **🔒 인증 필수** | 쿼리: `from` · `to` (`YYYY-MM-DD`, KST, 양끝 포함) | 아래 `progress-report 응답` · 토큰 없으면 401 |
 
-**🔒 인증**: 위 두 GET은 `Authorization: Bearer <MUTATION_API_TOKEN>` 헤더가 필요하다
-(`security.require_internal_access` — 모든 변경 계열 POST와 같은 가드). 담당자 화면 전용 데이터라
+**🔒 인증**: 위 두 GET과 `simulate`는 `Authorization: Bearer <MUTATION_API_TOKEN>` 헤더가 필요하다
+(`security.require_internal_access` — 모든 변경 계열 POST와 같은 토큰). 담당자 화면 전용 데이터라
 공개 GET(대시보드·후보·위젯)과 층위가 다르기 때문이다. FE 서버 컴포넌트가 `API_MUTATION_TOKEN`
 환경변수로 헤더를 붙인다 — 이 값을 빠뜨리면 `/tracking`의 리포트가 401로 접히고 업무 목록만 남는다.
+
+변경 계열 POST와 다른 점은 `DEMO_READ_ONLY`다. 변경 POST는 읽기 전용 모드에서 403이지만
+`simulate`는 카드 상태를 바꾸지 않는 계산이라 계속 열려 있다 — 막으면 승인 판단 근거가 사라지고
+상태 변경이 아닌 요청에 "읽기 전용입니다" 문구가 뜬다. 토큰을 요구하는 이유는 권한이 아니라
+요청마다 LLM을 호출하기 때문이다(무인증 공개 시 비용 남용).
 
 `simulate` 응답:
 ```json
@@ -617,7 +622,7 @@ FE mock 동기화: 레포 루트에서 `./scripts/sync-mocks.sh` — 위 산출 
 | INCENTIVE 승인 시 `selected_rate` 누락/범위 밖 | `400 {"detail": "selected_rate(3|5|7)가 필요합니다"}`. EXPANSION decision에 온 `selected_rate`는 무시. 이 400만은 상태 전이 확인(409) **뒤**에 온다 — pending이 아니라 애초에 결정할 수 없는 카드의 body를 먼저 따질 이유가 없다 |
 | 적격성 미확인 EXPANSION의 최종 단계 요청 | `409 {"detail": ...}` — 다섯 항목 검증 전에는 `적격성 확인`·`가맹 심사`·`추진중`·`완료`로 이동할 수 없다 |
 | 잘못된 상태 전이·동시 요청 | `409 {"detail": ...}` — 예: pending이 아닌 카드에 decision, approved가 아닌 카드에 progress, 같은 이전 상태를 조건으로 한 중복 요청의 패자 |
-| 공개 데모 mutation | `DEMO_READ_ONLY=true`이면 generate/decision/verification/progress를 `403`으로 차단한다. 인증·권한 도입 시 이 공통 mutation dependency에 연결한다 |
+| 공개 데모 mutation | `DEMO_READ_ONLY=true`이면 카드 상태를 바꾸는 POST 5종(generate/decision/verification/progress/progress-records)을 `403`으로 차단한다. 인증·권한 도입 시 이 공통 mutation dependency에 연결한다. **`simulate`는 차단 대상이 아니다** — 상태를 바꾸지 않는 읽기 계산이라 읽기 전용 모드에서도 200이며, Bearer 토큰만 요구한다(§2 인증). FE도 같은 경계를 따른다: `actions.ts`의 변경 액션 5개는 `isDemoReadOnly`에서 조기 403을 반환하고 `simulateAction`은 반환하지 않는다 |
 | 없는 카드 ID | `404 {"detail": "card not found"}`. **검사 순서는 404 → 400(body 값) → 409(상태 전이)** — 없는 카드에 값이 잘못된 body를 보내도 404가 나간다. 단 body가 **요청 스키마 자체**를 못 넘기면(필드 누락·타입 불일치) 라우트 진입 전 FastAPI가 `422`를 낸다 |
 | KPI에서 분모 0 | 해당 지표를 `null`로 반환 (예: approved 0건 → `execution_rate: null`, 채택 0건 → `regional_balance_index: null`). FE는 `null`이면 `—` 표시 |
 | 위젯 추천 결과 0건 | `{"recommendations": [], "policy_note": ...}` 200 반환. FE는 "해당 조건의 가맹점이 아직 없어요" 빈 상태 UI |

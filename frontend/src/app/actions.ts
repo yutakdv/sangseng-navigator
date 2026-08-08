@@ -128,7 +128,14 @@ export async function generateAction(
   }
 }
 
-/** 가맹 전환 시 예상 효과 — 상태를 바꾸지 않으므로 revalidate 하지 않는다 (EXPANSION 전용) */
+/**
+ * 가맹 전환 시 예상 효과 — 상태를 바꾸지 않으므로 revalidate 하지 않는다 (EXPANSION 전용).
+ *
+ * 이 액션에만 `isDemoReadOnly` 조기 반환이 **의도적으로 없다**. simulate는 카드를 바꾸지 않는
+ * 읽기 계산이라 05 §8의 읽기 전용 차단 대상이 아니고(BE도 `require_internal_access`),
+ * 막으면 승인 판단 근거가 사라진 채 "상태 변경은…" 문구만 뜬다. 나중에 일괄 정리한다며
+ * 여기에 가드를 넣으면 BE와 다시 어긋난다.
+ */
 export async function simulateAction(id: string): Promise<ActionResult<Simulation>> {
   try {
     const { simulation } = await api.simulate(id);
