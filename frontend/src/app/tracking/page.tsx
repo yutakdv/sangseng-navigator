@@ -155,7 +155,7 @@ export default async function TrackingPage({
           icon="cards"
           eyebrow="운영"
           title="추진 경과 리포트"
-          lede="담당자가 남긴 실제 경과 기록으로 상태 분포, 정체 항목, 목표일 준수와 관측 성과 변화를 확인합니다. 예상값은 실제 성과에 섞지 않습니다."
+          lede="담당자가 남긴 실제 경과 기록으로 상태 분포, 정체 항목, 목표일 준수와 관측 성과 변화를 확인합니다. 예상값은 실제 성과에 섞지 않습니다. 현재 기록은 데모용 시연 표본입니다."
           actions={
             <Link
               href="/tracking/new"

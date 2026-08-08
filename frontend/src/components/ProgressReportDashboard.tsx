@@ -439,7 +439,10 @@ function MetricChangeCard({ meta, change }: { meta: ProgressMetricMeta; change: 
         <div className="mt-3 flex flex-1 flex-col justify-center rounded-lg border border-dashed border-admin-border bg-admin-surface px-3 py-5 text-center">
           <p className="text-[13px] font-semibold text-admin-text">비교 전</p>
           <p className="mt-1 break-keep text-[11px] leading-4 text-admin-text-muted">
-            같은 카드의 실측값을 두 번 이상 입력해야 합니다.
+            {/* 원천 공개 데이터에 금액 필드가 없어 시드가 지어내지 않는다 (13 §2-13) — 의도된 공백임을 밝힌다 */}
+            {meta.key === "spend_krw"
+              ? "원천 공개 데이터에 금액 필드가 없어, 담당자 실측 입력 전까지 비워 둡니다."
+              : "같은 카드의 실측값을 두 번 이상 입력해야 합니다."}
           </p>
         </div>
       )}
