@@ -330,7 +330,7 @@ export function DashboardOverview({
               <section className="rounded-card bg-admin-surface shadow-card">
                 <div className="flex items-center gap-2 border-b border-admin-border px-5 py-4">
                   <Icon name="database" size={16} className="text-admin-primary" />
-                  <h2 className="text-[15px] font-bold text-admin-text">데이터 원천</h2>
+                  <h2 className="text-[15px] font-bold text-admin-text">데이터 원천 · 공공데이터 6종</h2>
                 </div>
                 <div className="divide-y divide-admin-border px-5">
                   <SourceRow
@@ -344,6 +344,10 @@ export function DashboardOverview({
                     href="https://www.data.go.kr/data/15133571/openapi.do"
                   />
                   <SourceRow label="상권 후보 원천" value="기준월 · 2026.06" />
+                  <SourceRow label="카지노 입장객 (전환율 분모)" value="교대 합산 연인원" />
+                  {/* 진단 참고용 배경 정보 — 순위·경고 뉘앙스를 붙이지 않는다 (절대 규칙 6) */}
+                  <SourceRow label="국세청 사업자현황 (존속연수별)" value="진단 참고용" />
+                  <SourceRow label="기상청 초단기실황" value="방문객 위젯 전용" />
                 </div>
                 {/* 산출 시각·지역 소비 분석 링크는 상단 진단 블록이 이미 싣는다 — 여기서 반복하지 않는다 */}
               </section>
