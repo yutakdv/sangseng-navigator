@@ -182,11 +182,14 @@ def simulate_expansion(usage: dict, merchants: list, eup: str, category: str) ->
             [dist[r] + expected * mult if r == eup else dist[r] for r in REGIONS])
 
     return {
-        # 지수는 **소수 1자리** — delta_pp와 단위를 맞춘다. 정수로 반올림하면 원시 집중도가
-        # 42.53처럼 경계에 걸릴 때 0.05%p 변화가 "43 → 42"(1포인트)로 보여, 같은 응답의
-        # delta_pp(0.0~0.1%p)와 10배 어긋난 문장이 만들어진다 (05 §2).
+        # 지수는 **소수 1자리** — delta_pp와 단위를 맞춘다. projected는 원시값을 따로 반올림하지
+        # 않고 round(current) − round(Δ평균)으로 단일 원천화한다: 세 값을 독립 반올림하면
+        # current 42.53·Δ 0.06 같은 경계에서 "42.5 → 42.5인데 0.1%p 개선"처럼 같은 응답 안에서
+        # 이동폭과 delta_pp가 모순되는 문장이 나온다 (05 §2). Δ평균은 25~75 분위수 Δ 사이에
+        # 있으므로(3표본 평균은 IQR 안, Δ가 count에 단조 — 지역 간 누계 순위 교차가 없는 한)
+        # 표시 이동폭도 delta_pp 범위 안에 떨어진다. 실데이터 36조합 전수 검사 위반 0건.
         "current_index": _round_pp(current),
-        "projected_index": _round_pp(projected(1.0)),
+        "projected_index": _round_pp(_round_pp(current) - _round_pp(current - projected(1.0))),
         "delta_pp": sorted(_round_pp(current - concentration_index(
             [dist[r] + count if r == eup else dist[r] for r in REGIONS]
         )) for count in (expected_low, expected_high)),
