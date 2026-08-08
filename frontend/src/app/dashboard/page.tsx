@@ -124,7 +124,7 @@ export default async function DashboardPage({
           icon="chart"
           eyebrow="진단"
           title="지역 소비 분석"
-          lede="하이원포인트 소비가 어디에 얼마나 몰려 있는지, 그 흐름이 어떻게 움직였는지를 본다. 이 화면의 값이 Action Card 제안의 정량 출발점이다."
+          lede="폐광지역 4개 시군(정선·태백·영월·삼척 도계읍)에서 하이원포인트(강원랜드 방문객이 적립해 지역 가맹점에서 쓰는 포인트) 소비가 어디에 얼마나 몰려 있는지 본다. 이 화면의 값이 확충 제안의 정량 출발점이다."
         >
           <p className="u-note mt-2 flex flex-wrap items-center gap-x-2">
             <Icon name="database" size={13} />
@@ -138,7 +138,7 @@ export default async function DashboardPage({
             <Icon name="info" size={13} />
             {selectedRegion
               ? `${selectedRegion}의 지역별 소비 지표를 보고 있습니다. 아래 상세 분석에 이 지역의 업종 구성·월별 추이·상위 업종·요일과 일별 패턴이 나옵니다. 상단 진단 지표·추이·업종별 사용 비중·정책 운영 KPI는 전체 지역 기준입니다.`
-              : "전체 지역을 보고 있습니다. 지역을 고르면 해당 지역의 업종 구성·월별 추이·상위 업종·요일과 일별 패턴까지 좁혀 볼 수 있습니다."}
+              : "전체 지역을 보고 있습니다. 지역을 고르면 해당 지역의 업종 구성·월별 추이·상위 업종·요일과 일별 패턴까지 좁혀 볼 수 있습니다. (예: 진단 1위 영월군)"}
           </p>
         </section>
 
@@ -650,7 +650,7 @@ export default async function DashboardPage({
           <Section
             icon="info"
             title="운영 2년 미만 사업자 비중"
-            desc="지역 상권의 배경 정보다. 4개 시군 편차가 0.5%p 수준이라 지역 간 비교나 순위 근거로는 쓰지 않는다."
+            desc="국세청 사업자등록 데이터 기준 — 지역 상권의 배경 정보다. 4개 시군 편차가 0.5%p 수준이라 지역 간 비교나 순위 근거로는 쓰지 않는다."
           >
             {risk.length ? (
               <>
@@ -669,9 +669,6 @@ export default async function DashboardPage({
                     </li>
                   ))}
                 </ul>
-                <p className="u-note mt-3 border-t border-admin-border pt-2.5">
-                  차이가 없는 값이라 막대·순위 없이 수치만 적는다 — 진단 참고용 배경 정보다.
-                </p>
               </>
             ) : (
               <EmptyChart />
