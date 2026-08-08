@@ -237,7 +237,11 @@ export interface DailyTrendPoint {
   avg7: number;
 }
 
-/** 선택 지역의 일별 사용 건수 + 7일 이동평균 — DailyTrend 차트 입력 형식 */
+/**
+ * 선택 지역의 일별 사용 건수 + 7일 이동평균 — DailyTrend 차트 입력 형식.
+ * 이동평균 창은 달력 7일이 아니라 **행 7개**다 — 원장이 연속 일자(현 산출물 365일 무결)라는
+ * 전제이며, 날짜에 구멍이 있는 산출물이 오면 창이 조용히 더 긴 기간을 덮는다.
+ */
 export function regionDailySeries(daily: UsageDaily, region: Region): DailyTrendPoint[] {
   const rows = daily.daily_total[region];
   if (!rows?.length || !isValidWeekday(daily)) return [];
