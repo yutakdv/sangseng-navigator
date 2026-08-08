@@ -340,7 +340,9 @@ export default async function CardDetailPage({
           icon="sparkle"
           title="추천 근거와 리스크 설명"
           badge={<NarrativeSourceChip kind={narrativeSource} />}
-          desc={`서버가 진행 중인 업무가 없는 후보 중 후보 스코어 최상위를 결정론적으로 선택하고, 숫자·순위·상태는 정본 데이터로 다시 검증합니다. ${narrativeNote}`}
+          // 출처 문장은 상단 재검증 배너(1회)와 이 섹션의 출처 칩이 이미 진다 — 같은 문장을
+          // 세 번째로 찍으면 "믿지 마라"가 지배 정서가 된다 (검토 §5-2 처방 3 · §0-3 #4)
+          desc="서버가 진행 중인 업무가 없는 후보 중 후보 스코어 최상위를 결정론적으로 선택하고, 숫자·순위·상태는 정본 데이터로 다시 검증합니다."
         >
           <div className="flex flex-col gap-4">
             <Block title="후보 비교">
