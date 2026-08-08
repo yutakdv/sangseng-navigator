@@ -137,7 +137,14 @@ export default async function WidgetPage({ searchParams }: { searchParams: Promi
             <p className="text-xs font-semibold uppercase tracking-[0.14em] text-white/90">
               강원랜드 지역상생
             </p>
-            {live ? <WidgetLiveRefresh /> : null}
+            <span className="flex items-center gap-2">
+              {live ? <WidgetLiveRefresh /> : null}
+              {/* 두 얼굴(담당자↔방문객) 연결 고리가 최하단에만 있으면 모바일 심사에서 폐루프
+                  서사를 놓친다 (검토 §3-2) — 하단 줄은 유지하고 헤더에도 짧게 건다 */}
+              <Link href="/" className="text-[11px] font-semibold text-white/85 underline underline-offset-2">
+                담당자 화면 →
+              </Link>
+            </span>
           </div>
           <h1 className="relative mt-1.5 break-keep text-[22px] font-bold leading-8">
             지역별 하이원포인트 가맹점
