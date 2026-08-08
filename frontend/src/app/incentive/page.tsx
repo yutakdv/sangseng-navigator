@@ -136,7 +136,7 @@ export default async function IncentivePage() {
                 <p className="u-body">
                   이미 적립된 하이원포인트를 지역 가맹점에서 결제할 때만 붙는{" "}
                   <b className="font-semibold">사용 단계 리워드</b>입니다. 적립률을 건드리지 않으므로
-                  콤프 발행액은 늘지 않습니다.
+                  콤프(게임 참여시간·베팅액에 비례해 적립되는 보상 포인트) 발행액은 늘지 않습니다.
                 </p>
 
                 {card.status === "approved" ? (

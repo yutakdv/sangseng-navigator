@@ -98,7 +98,7 @@ export function DecisionActions({
 
       {rateMissing ? (
         <p id={hintId} className="u-note mt-2">
-          승인하려면 페이백률(3·5·7%)을 먼저 선택하세요 — 확정 rate는 담당자가 고른 값만 저장됩니다.
+          승인하려면 페이백률(3·5·7%)을 먼저 선택하세요 — 확정 페이백률은 담당자가 고른 값만 저장됩니다.
         </p>
       ) : null}
 
