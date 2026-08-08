@@ -121,7 +121,7 @@ function QueueRowBody({ card, lead, selected }: { card: Card; lead: boolean; sel
           {/* AI가 정량 순위를 반영한 카드 — 원 순위 병기는 카드 안에서 항상 함께 보인다 (절대 규칙 5) */}
           {card.ai.adjusted ? (
             <span className="rounded-full border border-lavender-200 bg-admin-surface px-2 py-0.5 text-xs font-semibold text-lavender-700">
-              AI가 순위 반영
+              순위 조정 · 원 순위 병기
             </span>
           ) : null}
         </span>

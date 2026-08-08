@@ -124,7 +124,7 @@ function HistoryList({
   const rows = [
     ...(hasGeneratedEvent(events)
       ? []
-      : [{ at: createdAt, action: "AI 제안 생성 — 담당자 검토 대기" }]),
+      : [{ at: createdAt, action: "제안 카드 생성 — 담당자 검토 대기" }]),
     ...events.map((event) => ({ at: event.at, action: eventLabel(event.action) })),
   ].sort((a, b) => a.at.localeCompare(b.at));
 
