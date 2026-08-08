@@ -136,7 +136,7 @@ export default async function IncentivePage() {
                 <p className="u-body">
                   이미 적립된 하이원포인트를 지역 가맹점에서 결제할 때만 붙는{" "}
                   <b className="font-semibold">사용 단계 리워드</b>입니다. 적립률을 건드리지 않으므로
-                  콤프 발행액은 늘지 않습니다.
+                  콤프(게임 참여시간·베팅액에 비례해 적립되는 보상 포인트) 발행액은 늘지 않습니다.
                 </p>
 
                 {card.status === "approved" ? (
@@ -161,7 +161,7 @@ export default async function IncentivePage() {
                   {proxyBadge}
                 </>
               }
-              desc="세 시나리오는 전 지역 공통 적용을 전제로 합니다. 개선폭은 단정하지 않고 범위로 적으며, 재원 부담은 정성 표기입니다(원천 데이터에 금액 필드가 없어 예산·ROI는 산출하지 않습니다)."
+              desc="세 시나리오는 전 지역 공통 적용을 전제로 합니다. 개선폭은 단정하지 않고 범위로 적으며, 재원 부담은 정성 표기입니다(원천 데이터에 금액 필드가 없어 예산·ROI는 산출하지 않습니다). 지역 전환율은 분자(지역 사용 건수)와 분모(입장 연인원)의 단위가 달라 비율이 아닌 근사 지표입니다."
             >
               {card.scenarios?.length ? (
                 <ScenarioTable
@@ -195,7 +195,7 @@ export default async function IncentivePage() {
                 <p className="break-keep text-[15px] leading-7 text-admin-text">
                   {card.ai.expected_effect}
                 </p>
-                <AssumptionNote className="mt-2" />
+                <AssumptionNote className="mt-2" dedupeWith={card.ai.expected_effect} />
               </div>
             </Section>
 

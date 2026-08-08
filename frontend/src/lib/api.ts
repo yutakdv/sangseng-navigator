@@ -69,6 +69,9 @@ async function get<T>(path: string, mock: () => T): Promise<T> {
   const res = await fetch(`${BASE}${path}`, {
     cache: "no-store",
     headers: internalToken ? { Authorization: `Bearer ${internalToken}` } : undefined,
+    // BE가 거부가 아니라 무응답으로 매달리면 스켈레톤이 무한 지속된다 — 콜드스타트(1~3초)의
+    // 여유를 두고 끊어 error.tsx의 "다시 시도" 화면으로 회복시킨다.
+    signal: AbortSignal.timeout(10_000),
   });
   if (!res.ok) await fail(res, path);
   return res.json();
@@ -97,6 +100,9 @@ async function postWithStatus<T>(
       ...(mutationToken ? { Authorization: `Bearer ${mutationToken}` } : {}),
     },
     body: JSON.stringify(body ?? {}),
+    // generate는 LLM 재시도까지 최대 24.5초, simulate도 LLM 8초를 품는다 — BE 자체 타임아웃보다
+    // 길게 잡아 정상 경로는 절대 자르지 않으면서 무응답만 끊는다.
+    signal: AbortSignal.timeout(30_000),
   });
   if (!res.ok) await fail(res, path);
   return { data: (await res.json()) as T, status: res.status };

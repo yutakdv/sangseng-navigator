@@ -124,7 +124,12 @@ export function DashboardOverview({
               오늘 결정할 사안을 확인합니다
             </h1>
             <p className="mt-2.5 max-w-2xl break-keep text-sm leading-7 text-admin-text-soft sm:text-[15px]">
-              AI 제안은 결론이 아닙니다. 근거와 예상 효과를 상세에서 확인한 뒤 결정하고 실행으로 넘깁니다.
+              강원랜드 하이원포인트(방문객이 적립해 지역 가맹점에서 쓰는 포인트)의 소비가 폐광지역
+              4개 시군 어디에 쏠렸는지 진단하고, 이번 분기 가맹점 확충과 인센티브를 결정합니다.
+            </p>
+            <p className="mt-1.5 max-w-2xl break-keep text-[13px] leading-6 text-admin-text-muted">
+              AI 제안은 결론이 아닙니다 — 근거와 예상 효과를 상세에서 확인한 뒤 담당자가 결정합니다.
+              포인트 적립률·발행액은 그대로 두고, 이미 적립된 포인트의 지역 사용만 다룹니다.
             </p>
           </div>
 
@@ -325,7 +330,7 @@ export function DashboardOverview({
               <section className="rounded-card bg-admin-surface shadow-card">
                 <div className="flex items-center gap-2 border-b border-admin-border px-5 py-4">
                   <Icon name="database" size={16} className="text-admin-primary" />
-                  <h2 className="text-[15px] font-bold text-admin-text">데이터 원천</h2>
+                  <h2 className="text-[15px] font-bold text-admin-text">데이터 원천 · 공공데이터 6종</h2>
                 </div>
                 <div className="divide-y divide-admin-border px-5">
                   <SourceRow
@@ -339,6 +344,10 @@ export function DashboardOverview({
                     href="https://www.data.go.kr/data/15133571/openapi.do"
                   />
                   <SourceRow label="상권 후보 원천" value="기준월 · 2026.06" />
+                  <SourceRow label="카지노 입장객 (전환율 분모)" value="교대 합산 연인원" />
+                  {/* 진단 참고용 배경 정보 — 순위·경고 뉘앙스를 붙이지 않는다 (절대 규칙 6) */}
+                  <SourceRow label="국세청 사업자현황 (존속연수별)" value="진단 참고용" />
+                  <SourceRow label="기상청 초단기실황" value="방문객 위젯 전용" />
                 </div>
                 {/* 산출 시각·지역 소비 분석 링크는 상단 진단 블록이 이미 싣는다 — 여기서 반복하지 않는다 */}
               </section>

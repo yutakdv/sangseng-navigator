@@ -43,8 +43,17 @@ export function AssumptionBadge() {
   );
 }
 
-/** 배지만으로 막지 못하는 오인을 본문으로 차단 — 블록 하단 고정 문구 (절대 규칙 3) */
-export function AssumptionNote({ className = "" }: { className?: string }) {
+/** 배지만으로 막지 못하는 오인을 본문으로 차단 — 블록 하단 고정 문구 (절대 규칙 3).
+ *  본문(dedupeWith)이 이미 같은 문장을 담고 있으면 같은 문장을 연달아 두 번 찍지 않는다 —
+ *  규칙 3은 본문 쪽 문구가 계속 충족한다 (BE cardgen._ensure_assumption이 데이터 계약으로 보장). */
+export function AssumptionNote({
+  className = "",
+  dedupeWith,
+}: {
+  className?: string;
+  dedupeWith?: string;
+}) {
+  if (dedupeWith?.includes(ASSUMPTION_NOTE)) return null;
   return (
     <p className={`u-note flex items-start gap-1.5 ${className}`}>
       <Icon name="info" size={13} strokeWidth={2} className="mt-[3px]" />

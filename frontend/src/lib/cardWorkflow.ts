@@ -99,7 +99,7 @@ export function progressOptions(card: Card): { value: CardProgress; disabled: bo
 }
 
 export function workflowLabel(card: Card): string {
-  if (card.status === "pending") return "AI 제안 생성";
+  if (card.status === "pending") return "담당자 결정 대기";
   if (card.status === "held") return "보류";
   if (card.status === "rejected") return "부적격 또는 반려";
   if (card.type === "EXPANSION" && eligibilityStatus(card) === "ineligible") return "부적격";

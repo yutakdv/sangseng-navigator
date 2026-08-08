@@ -508,7 +508,7 @@ export function ProgressRecordForm({
           <div>
             <h2 className="u-h2">실제 관측 성과</h2>
             <p className="mt-1 max-w-3xl text-[13px] leading-5 text-admin-text-muted">
-              선택 입력입니다. 같은 카드에 같은 산식으로 두 번 이상 입력된 지표만 기초값 대비 변화로 리포트합니다.
+              선택 입력입니다. 같은 카드에 같은 계산 기준으로 두 번 이상 입력된 지표만 기초값 대비 변화로 리포트합니다.
             </p>
           </div>
           <span className="rounded-full bg-state-notice-bg px-2.5 py-1 text-[11px] font-semibold text-state-notice ring-1 ring-inset ring-state-notice-line">

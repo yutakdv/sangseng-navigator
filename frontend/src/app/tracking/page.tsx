@@ -76,10 +76,11 @@ export default async function TrackingPage({
           .progressReport()
           .then((value) => ({ report: value as ProgressReport | null, fellBack: true }));
       }
-      // 401 = 내부 토큰 미설정(배포 시 `API_MUTATION_TOKEN` 누락). 이때 페이지 전체를 에러
-      // 바운더리로 떨어뜨리면 심사 동선(11 대본 6단계)이 통째로 막힌다 — 리포트만 접고
-      // 업무 목록은 살린다. 왜 비었는지는 아래 안내 배너가 밝힌다.
-      if (error instanceof ApiError && error.status === 401) {
+      // 401 = 내부 토큰 미설정(배포 시 `API_MUTATION_TOKEN` 누락), 503 = BE 쪽 토큰 미설정
+      // (DEMO_READ_ONLY=true + MUTATION_API_TOKEN 공란 조합 — deploy 가드를 조용히 통과한다).
+      // 어느 쪽이든 페이지 전체를 에러 바운더리로 떨어뜨리면 심사 동선(11 대본 6단계)이 통째로
+      // 막힌다 — 리포트만 접고 업무 목록은 살린다. 왜 비었는지는 아래 안내 배너가 밝힌다.
+      if (error instanceof ApiError && (error.status === 401 || error.status === 503)) {
         return { report: null as ProgressReport | null, fellBack: false };
       }
       throw error;
@@ -154,7 +155,7 @@ export default async function TrackingPage({
           icon="cards"
           eyebrow="운영"
           title="추진 경과 리포트"
-          lede="담당자가 남긴 실제 경과 기록으로 상태 분포, 정체 항목, 목표일 준수와 관측 성과 변화를 확인합니다. 예상값은 실제 성과에 섞지 않습니다."
+          lede="담당자가 남긴 실제 경과 기록으로 상태 분포, 정체 항목, 목표일 준수와 관측 성과 변화를 확인합니다. 예상값은 실제 성과에 섞지 않습니다. 현재 기록은 데모용 시연 표본입니다."
           actions={
             <Link
               href="/tracking/new"
