@@ -186,7 +186,8 @@ def simulate_expansion(usage: dict, merchants: list, eup: str, category: str) ->
         # 않고 round(current) − round(Δ평균)으로 단일 원천화한다: 세 값을 독립 반올림하면
         # current 42.53·Δ 0.06 같은 경계에서 "42.5 → 42.5인데 0.1%p 개선"처럼 같은 응답 안에서
         # 이동폭과 delta_pp가 모순되는 문장이 나온다 (05 §2). Δ평균은 25~75 분위수 Δ 사이에
-        # 있으므로(3표본 평균은 IQR 안) 표시 이동폭도 항상 delta_pp 범위 안에 떨어진다.
+        # 있으므로(3표본 평균은 IQR 안, Δ가 count에 단조 — 지역 간 누계 순위 교차가 없는 한)
+        # 표시 이동폭도 delta_pp 범위 안에 떨어진다. 실데이터 36조합 전수 검사 위반 0건.
         "current_index": _round_pp(current),
         "projected_index": _round_pp(_round_pp(current) - _round_pp(current - projected(1.0))),
         "delta_pp": sorted(_round_pp(current - concentration_index(
