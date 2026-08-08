@@ -393,7 +393,7 @@ export default async function CardDetailPage({
               <p className="mt-2 break-keep text-[15px] leading-7 text-admin-text">
                 {card.ai.expected_effect}
               </p>
-              <AssumptionNote className="mt-2" />
+              <AssumptionNote className="mt-2" dedupeWith={card.ai.expected_effect} />
             </div>
           </div>
         </Section>

@@ -126,7 +126,10 @@ export function EvidenceSections({
             desc="지금 수치가 아니라 전환을 가정한 전망입니다. 반경·후보 전제는 지도 화면에서 확인합니다."
           >
             <p className="break-keep text-sm leading-7 text-admin-text-soft">{card.ai.expected_effect}</p>
-            <AssumptionNote className="mt-4 border-t border-admin-border pt-3" />
+            <AssumptionNote
+              className="mt-4 border-t border-admin-border pt-3"
+              dedupeWith={card.ai.expected_effect}
+            />
           </Panel>
         )}
       </Act>

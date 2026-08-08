@@ -1,4 +1,4 @@
-import { AssumptionNote, ProxyBadge } from "@/components/Badge";
+import { ProxyBadge } from "@/components/Badge";
 import { Icon } from "@/components/Icon";
 import { num } from "@/lib/format";
 import type { PaybackRate, Scenario } from "@/types";
@@ -117,7 +117,6 @@ export function PaybackImpactPanel({
         계산식: 최근 3개월({visitorsBasis}) 평균 입장 연인원(교대 합산) {num(Math.round(avgVisitors))}
         명 × 개선폭(%p) ÷ 100. 개선폭 범위는 AI 시나리오의 가정값이다.
       </p>
-      <AssumptionNote className="mt-1.5" />
     </div>
   );
 }

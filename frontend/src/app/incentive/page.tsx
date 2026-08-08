@@ -195,7 +195,7 @@ export default async function IncentivePage() {
                 <p className="break-keep text-[15px] leading-7 text-admin-text">
                   {card.ai.expected_effect}
                 </p>
-                <AssumptionNote className="mt-2" />
+                <AssumptionNote className="mt-2" dedupeWith={card.ai.expected_effect} />
               </div>
             </Section>
 
