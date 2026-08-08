@@ -345,6 +345,54 @@ def test_generate_expansion_creates_pending_card(fake_llm):
     assert all({"rank", "candidate", "score"} == set(r) for r in ranking)
 
 
+def test_generate_hands_target_weekday_pattern_to_the_llm(monkeypatch):
+    """AI 입력 ⑧ — 타깃 요일 패턴(참고용)이 usage_daily 집계에서 그대로 조립된다 (05 §6).
+
+    시드 상태의 확정 타깃(영월군 숙박업)은 하이원 실적 0인 공백 업종이라 읍 전 업종
+    패턴 폴백이 **기본 경로**다 — 폴백 사실이 집계_대상 라벨에 명시되는지까지 본다.
+    """
+    captured = {}
+
+    def spy(system, user, schema, schema_name="result", timeout=None, attempts=2):
+        captured["payload"] = json.loads(user)
+        return dict(FAKE_AI)
+
+    monkeypatch.setattr(llm, "generate_json", spy)
+    assert _generate("EXPANSION").status_code == 201
+
+    signal = captured["payload"]["8_타깃_요일_패턴(참고용)"]
+    daily = dataload.load("usage_daily")
+    by_cat = daily["weekday_category"]["영월군"]
+    assert sum(by_cat["숙박업"]) == 0 and "전 업종" in signal["집계_대상"]   # 폴백 경로가 기본
+    expected = {
+        label: round(sum(c[i] for c in by_cat.values()) / daily["weekday_days"][i], 1)
+        for i, label in enumerate(daily["weekday_labels"])
+    }
+    assert signal["요일별_하루평균_건수"] == expected                     # 입력에 없는 수치를 만들지 않는다
+    assert signal["최대_요일"] in daily["weekday_labels"]
+
+
+def test_generate_survives_missing_usage_daily(monkeypatch):
+    """usage_daily 부재 시 입력 ⑧만 빠지고 생성은 정상 — ⑦ risk_signal과 같은 실패 내성."""
+    captured = {}
+
+    def spy(system, user, schema, schema_name="result", timeout=None, attempts=2):
+        captured["payload"] = json.loads(user)
+        return dict(FAKE_AI)
+
+    monkeypatch.setattr(llm, "generate_json", spy)
+    real_load = dataload.load
+
+    def load_without_daily(name):
+        if name == "usage_daily":
+            raise FileNotFoundError(name)
+        return real_load(name)
+
+    monkeypatch.setattr(dataload, "load", load_without_daily)
+    assert _generate("EXPANSION").status_code == 201
+    assert not any(key.startswith("8_") for key in captured["payload"])
+
+
 def test_generate_expansion_deduplicates_immediate_retry():
     """버튼/네트워크의 즉시 재전송은 최근 알고리즘 생성 카드를 200으로 재사용한다."""
     first = _generate("EXPANSION")

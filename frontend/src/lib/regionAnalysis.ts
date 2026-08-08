@@ -1,6 +1,6 @@
 import { CATEGORIES } from "@/lib/constants";
 import { monthLabel } from "@/lib/format";
-import type { DisplayCategory, Region, UsageMonthlyRow } from "@/types";
+import type { DisplayCategory, Region, UsageDaily, UsageMonthlyRow } from "@/types";
 
 /**
  * 지역 드릴다운 파생 계산 — 지역×업종×월 원장(usage_monthly)을 화면용으로 집계하는 순수 함수 모음.
@@ -134,4 +134,130 @@ export function topCategoryShifts(
       previous: v.previous,
       changePct: comparable && v.previous > 0 ? ((v.recent - v.previous) / v.previous) * 100 : null,
     }));
+}
+
+/* ── 일·요일 축 (usage_daily, 05 §6 — 피드백 ⑦) ─────────────────────────── */
+
+const round1 = (x: number): number => Math.round(x * 10) / 10;
+
+/** 요일 인덱스 계약: 0=월(pandas dayofweek). 0~4 주중, 5~6 주말. */
+const isValidWeekday = (daily: UsageDaily): boolean =>
+  daily.weekday_labels.length === 7 &&
+  daily.weekday_days.length === 7 &&
+  daily.weekday_days.every((d) => d > 0);
+
+/** 선택 지역의 요일별 하루 평균 건수(전 업종 합) — 막대(BarRank) 입력 형식 */
+export function regionWeekdayAverages(
+  daily: UsageDaily,
+  region: Region,
+): { label: string; value: number; note?: string }[] {
+  const byCat = daily.weekday_category[region];
+  if (!byCat || !isValidWeekday(daily)) return [];
+  const totals = daily.weekday_labels.map((_, i) =>
+    CATEGORIES.reduce((sum, c) => sum + (byCat[c]?.[i] ?? 0), 0),
+  );
+  if (totals.every((t) => t === 0)) return [];
+  const avgs = totals.map((t, i) => round1(t / daily.weekday_days[i]));
+  const max = Math.max(...avgs);
+  return daily.weekday_labels.map((label, i) => ({
+    label,
+    value: avgs[i],
+    ...(avgs[i] === max ? { note: "요일 최대" } : {}),
+  }));
+}
+
+export interface WeekdayInsight {
+  maxLabel: string;
+  maxAvg: number;
+  weekdayAvg: number;
+  weekendAvg: number;
+  /** 주말 하루 평균이 주중 대비 몇 % 높은가(음수면 낮음). 주중 실적 0이면 null */
+  weekendVsWeekdayPct: number | null;
+}
+
+/** 요일 패턴 인사이트 한 줄 — "토요일 하루 평균 N건, 주중 대비 +M%" 문장의 재료 */
+export function regionWeekdayInsight(daily: UsageDaily, region: Region): WeekdayInsight | null {
+  const bars = regionWeekdayAverages(daily, region);
+  if (!bars.length) return null;
+  const byCat = daily.weekday_category[region];
+  const totals = daily.weekday_labels.map((_, i) =>
+    CATEGORIES.reduce((sum, c) => sum + (byCat[c]?.[i] ?? 0), 0),
+  );
+  const sum = (xs: number[]) => xs.reduce((a, b) => a + b, 0);
+  const weekdayAvg = sum(totals.slice(0, 5)) / sum(daily.weekday_days.slice(0, 5));
+  const weekendAvg = sum(totals.slice(5)) / sum(daily.weekday_days.slice(5));
+  const max = bars.reduce((a, b) => (b.value > a.value ? b : a));
+  return {
+    maxLabel: max.label,
+    maxAvg: max.value,
+    weekdayAvg: round1(weekdayAvg),
+    weekendAvg: round1(weekendAvg),
+    weekendVsWeekdayPct: weekdayAvg > 0 ? round1(((weekendAvg - weekdayAvg) / weekdayAvg) * 100) : null,
+  };
+}
+
+export interface CategoryWeekdayRow {
+  category: DisplayCategory;
+  maxLabel: string;
+  weekdayAvg: number;
+  weekendAvg: number;
+  /** 주말 하루 평균의 주중 대비 증감률(%). 주중 실적 0이면 null */
+  weekendVsWeekdayPct: number | null;
+}
+
+/** 선택 지역의 표시 6분류별 요일 패턴 — 실적 있는 업종만, CATEGORIES 고정 순서(13 §5) */
+export function regionCategoryWeekdays(daily: UsageDaily, region: Region): CategoryWeekdayRow[] {
+  const byCat = daily.weekday_category[region];
+  if (!byCat || !isValidWeekday(daily)) return [];
+  const sum = (xs: number[]) => xs.reduce((a, b) => a + b, 0);
+  return CATEGORIES.flatMap((category) => {
+    const counts = byCat[category];
+    if (!counts || counts.length !== 7 || sum(counts) === 0) return [];
+    const avgs = counts.map((c, i) => c / daily.weekday_days[i]);
+    const maxIdx = avgs.indexOf(Math.max(...avgs));
+    const weekdayAvg = sum(counts.slice(0, 5)) / sum(daily.weekday_days.slice(0, 5));
+    const weekendAvg = sum(counts.slice(5)) / sum(daily.weekday_days.slice(5));
+    return [{
+      category,
+      maxLabel: daily.weekday_labels[maxIdx],
+      weekdayAvg: round1(weekdayAvg),
+      weekendAvg: round1(weekendAvg),
+      weekendVsWeekdayPct:
+        weekdayAvg > 0 ? round1(((weekendAvg - weekdayAvg) / weekdayAvg) * 100) : null,
+    }];
+  });
+}
+
+export interface DailyTrendPoint {
+  date: string;
+  /** 툴팁 라벨 — "1월 3일 (금)" (서버에서 만들어 클라이언트 날짜 파싱을 없앤다) */
+  tooltipLabel: string;
+  value: number;
+  /** 7일 이동평균(뒤쪽 창). 처음 6일은 가용 구간 평균 — 라인이 7일째부터 시작하지 않게 */
+  avg7: number;
+}
+
+/**
+ * 선택 지역의 일별 사용 건수 + 7일 이동평균 — DailyTrend 차트 입력 형식.
+ * 이동평균 창은 달력 7일이 아니라 **행 7개**다 — 원장이 연속 일자(현 산출물 365일 무결)라는
+ * 전제이며, 날짜에 구멍이 있는 산출물이 오면 창이 조용히 더 긴 기간을 덮는다.
+ */
+export function regionDailySeries(daily: UsageDaily, region: Region): DailyTrendPoint[] {
+  const rows = daily.daily_total[region];
+  if (!rows?.length || !isValidWeekday(daily)) return [];
+  if (rows.every(([, v]) => v === 0)) return [];
+  let windowSum = 0;
+  return rows.map(([date, value], i) => {
+    windowSum += value;
+    if (i >= 7) windowSum -= rows[i - 7][1];
+    const span = Math.min(i + 1, 7);
+    // 요일은 파이프라인 계약(0=월)과 같은 값을 UTC 산술로 얻는다 — 2025-01-01(수)=dayofweek 2
+    const dow = (Math.floor(Date.parse(`${date}T00:00:00Z`) / 86_400_000) + 3) % 7;
+    return {
+      date,
+      tooltipLabel: `${Number(date.slice(5, 7))}월 ${Number(date.slice(8, 10))}일 (${daily.weekday_labels[dow]})`,
+      value,
+      avg7: round1(windowSum / span),
+    };
+  });
 }

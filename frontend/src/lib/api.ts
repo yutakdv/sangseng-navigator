@@ -28,11 +28,13 @@ import type {
   ProgressReport,
   RiskSignal,
   Simulation,
+  UsageDaily,
   UsageMonthly,
   WidgetResponse,
 } from "@/types";
 import { ApiError } from "@/lib/errors";
 import dashboardMock from "@/mocks/dashboard.json";
+import usageDailyMock from "@/mocks/usage_daily.json";
 import usageMonthlyMock from "@/mocks/usage_monthly.json";
 import candidatesMock from "@/mocks/candidates.json";
 import riskSignalMock from "@/mocks/risk_signal.json";
@@ -124,6 +126,10 @@ export const api = {
    */
   usageMonthly: (): Promise<UsageMonthly> =>
     Promise.resolve(usageMonthlyMock as unknown as UsageMonthly),
+
+  /** 일·요일 축 집계 — usageMonthly와 같은 이유로 정적 import (05 §6, 드릴다운 요일 섹션 전용) */
+  usageDaily: (): Promise<UsageDaily> =>
+    Promise.resolve(usageDailyMock as unknown as UsageDaily),
 
   /* ── Action Card (05 §2) ───────────────────────────────────── */
   cards: (opts: { type?: CardType; status?: CardStatus } = {}): Promise<{ cards: Card[] }> =>

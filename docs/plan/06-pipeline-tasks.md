@@ -91,6 +91,9 @@ COLMAP = {
 - [x] 월(`YYYY-MM`) 단위로 지역×업종 건수 합산 → `usage_monthly.json` 저장
       (실행 결과: 월 12개 2025-01~12, 업종 18종, 총 507,628건)
 - [x] **검증:** `python p1_usage.py && python -c "import json;d=json.load(open('../data/processed/usage_monthly.json'));print(len(d['months']), d['months'][:2])"` — 월 수·샘플 출력이 CSV 기간과 일치
+- [x] (2026-08-08 확장, 피드백 ⑦) 일·요일 축 집계 → `usage_daily.json` 추가 산출 —
+      요일×표시6분류 누적(지역별+전체)·지역별 일 총건수 시계열. 스키마·검증은
+      `docs/superpowers/specs/2026-08-08-daily-weekday-analysis-design.md`, 계약은 05 §6
 
 ### Task P2: 카지노 입장객 (`p2_visitors.py`)
 
