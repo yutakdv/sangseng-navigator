@@ -22,7 +22,7 @@ SRC="$ROOT/data/processed"
 DST="$ROOT/frontend/src/mocks"
 
 # 그대로 복사하는 산출물 (candidates.json 은 아래에서 병합본으로 별도 생성)
-COPY=(dashboard.json eup_scores.json merchants.json usage_monthly.json risk_signal.json sensitivity.json)
+COPY=(dashboard.json eup_scores.json merchants.json usage_monthly.json usage_daily.json risk_signal.json sensitivity.json)
 
 for f in "${COPY[@]}" candidates.json; do
   [ -f "$SRC/$f" ] || { echo "sync-mocks 실패: $SRC/$f 없음 — 먼저 pipeline/run_all.py 를 실행할 것" >&2; exit 1; }

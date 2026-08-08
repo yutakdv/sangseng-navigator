@@ -10,6 +10,7 @@ import { MenuDemoGuide } from "@/components/MenuDemoGuide";
 import { GroupHeading, Section } from "@/components/Section";
 import { BarRank } from "@/components/charts/BarRank";
 import { CategoryDonut } from "@/components/charts/CategoryDonut";
+import { DailyTrend } from "@/components/charts/DailyTrend";
 import { LineTrend } from "@/components/charts/LineTrend";
 import { ScaleCompare } from "@/components/charts/ScaleCompare";
 import { api } from "@/lib/api";
@@ -17,7 +18,11 @@ import { REGIONS, REGION_TOOLTIP } from "@/lib/constants";
 import { dash, monthLabel, num, pct, ratioPct, signed } from "@/lib/format";
 import {
   regionCategoryShare,
+  regionCategoryWeekdays,
+  regionDailySeries,
   regionMonthlyTrend,
+  regionWeekdayAverages,
+  regionWeekdayInsight,
   shiftWindowLabel,
   topCategoryShifts,
   USAGE_REGION_FOOTNOTE,
@@ -48,12 +53,13 @@ export default async function DashboardPage({
     : null;
   const demo = sp.demo === "merchant" || sp.demo === "report" || sp.demo === "data" ? sp.demo : null;
 
-  const [d, kpi, cand, risk, usageLedger] = await Promise.all([
+  const [d, kpi, cand, risk, usageLedger, usageDaily] = await Promise.all([
     api.dashboard(),
     api.kpi(),
     api.candidates(),
     api.riskSignal(),
     api.usageMonthly(),
+    api.usageDaily(),
   ]);
 
   // 음수/0·빈 배열 방어 (F5 검증 항목) — 데이터가 없으면 차트 대신 안내 문구를 낸다
@@ -101,6 +107,12 @@ export default async function DashboardPage({
   const regionShifts = selectedRegion ? topCategoryShifts(ledgerRows, ledgerMonths, selectedRegion) : [];
   // 라벨과 계산이 같은 창 정의를 쓰도록 regionAnalysis가 한 곳에서 만든다 (6개월 미만이면 null)
   const shiftWindow = shiftWindowLabel(ledgerMonths);
+  // 일·요일 축 (usage_daily — 피드백 ⑦). 관측 집계라 전망 문구·근사 배지 대상이 아니다 (설계 08-08)
+  const weekdayBars = selectedRegion ? regionWeekdayAverages(usageDaily, selectedRegion) : [];
+  const weekdayInsight = selectedRegion ? regionWeekdayInsight(usageDaily, selectedRegion) : null;
+  const categoryWeekdays = selectedRegion ? regionCategoryWeekdays(usageDaily, selectedRegion) : [];
+  const dailySeries = selectedRegion ? regionDailySeries(usageDaily, selectedRegion) : [];
+  const dailyPeriod = usageDaily.period;
 
   return (
     <AdminShell dashboard={d}>
@@ -122,8 +134,8 @@ export default async function DashboardPage({
           <p className="mt-2 flex items-center gap-1.5 text-xs text-admin-text-muted" aria-live="polite">
             <Icon name="info" size={13} />
             {selectedRegion
-              ? `${selectedRegion}의 지역별 소비 지표를 보고 있습니다. 아래 상세 분석에 이 지역의 업종 구성·월별 추이·상위 업종이 나옵니다. 상단 진단 지표·추이·업종별 사용 비중·정책 운영 KPI는 전체 지역 기준입니다.`
-              : "전체 지역을 보고 있습니다. 지역을 고르면 해당 지역의 업종 구성·월별 추이·상위 업종까지 좁혀 볼 수 있습니다."}
+              ? `${selectedRegion}의 지역별 소비 지표를 보고 있습니다. 아래 상세 분석에 이 지역의 업종 구성·월별 추이·상위 업종·요일과 일별 패턴이 나옵니다. 상단 진단 지표·추이·업종별 사용 비중·정책 운영 KPI는 전체 지역 기준입니다.`
+              : "전체 지역을 보고 있습니다. 지역을 고르면 해당 지역의 업종 구성·월별 추이·상위 업종·요일과 일별 패턴까지 좁혀 볼 수 있습니다."}
           </p>
         </section>
 
@@ -356,6 +368,93 @@ export default async function DashboardPage({
                       </tbody>
                     </table>
                   </div>
+                  <p className="u-note mt-3 border-t border-admin-border pt-2.5">
+                    {USAGE_REGION_FOOTNOTE}
+                  </p>
+                </>
+              ) : (
+                <EmptyChart />
+              )}
+            </Section>
+
+            {/* ── 요일·일별 패턴 (usage_daily — 피드백 ⑦) ─────────── */}
+            <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+              <Section
+                icon="calendar"
+                title={`${selectedRegion} 요일별 사용 패턴`}
+                desc={`요일별 하루 평균 사용 건수 — ${dailyPeriod.start.slice(0, 4)}년 ${dailyPeriod.days}일 일 단위 집계.`}
+              >
+                {weekdayBars.length ? (
+                  <>
+                    {weekdayInsight ? (
+                      <p className="mb-2 rounded-lg bg-admin-primary-soft px-3 py-2 text-[13px] text-admin-text">
+                        <span className="font-semibold">{weekdayInsight.maxLabel}요일</span>이 하루
+                        평균 <span className="font-semibold tabular-nums">{num(weekdayInsight.maxAvg)}건</span>으로
+                        가장 많다
+                        {weekdayInsight.weekendVsWeekdayPct === null
+                          ? "."
+                          : ` — 주말 하루 평균은 주중 대비 ${signed(weekdayInsight.weekendVsWeekdayPct, "%", 1)}.`}
+                      </p>
+                    ) : null}
+                    <BarRank data={weekdayBars} unit="건" height={236} />
+                  </>
+                ) : (
+                  <EmptyChart />
+                )}
+              </Section>
+              <Section
+                icon="list"
+                title={`${selectedRegion} 업종별 요일 패턴`}
+                desc="표시 6분류별로 사용이 가장 몰리는 요일과 주중·주말 하루 평균을 비교한다."
+              >
+                {categoryWeekdays.length ? (
+                  <div className="u-scroll-x">
+                    <table className="u-table min-w-[420px]">
+                      <thead>
+                        <tr>
+                          <th scope="col">업종</th>
+                          <th scope="col" className="text-right">최대 요일</th>
+                          <th scope="col" className="text-right">주중 하루 평균</th>
+                          <th scope="col" className="text-right">주말 하루 평균</th>
+                          <th scope="col" className="text-right">주말 - 주중</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {categoryWeekdays.map((row) => (
+                          <tr key={row.category}>
+                            <td className="font-medium">{row.category}</td>
+                            <td className="text-right">{row.maxLabel}</td>
+                            <td className="text-right tabular-nums text-admin-text-muted">
+                              {num(row.weekdayAvg)}건
+                            </td>
+                            <td className="text-right tabular-nums text-admin-text-muted">
+                              {num(row.weekendAvg)}건
+                            </td>
+                            <td className="text-right font-semibold tabular-nums">
+                              {row.weekendVsWeekdayPct === null ? (
+                                <span className="font-normal text-admin-text-muted">비교 불가</span>
+                              ) : (
+                                signed(row.weekendVsWeekdayPct, "%", 1)
+                              )}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                ) : (
+                  <EmptyChart />
+                )}
+              </Section>
+            </div>
+            <Section
+              icon="trend"
+              title={`${selectedRegion} 일별 사용 추이`}
+              desc="일별 사용 건수(옅은 선)와 7일 이동평균(진한 선) — 주말 파동과 계절 흐름이 함께 보인다."
+            >
+              {dailySeries.length ? (
+                <>
+                  <DailyTrend data={dailySeries} />
                   <p className="u-note mt-3 border-t border-admin-border pt-2.5">
                     {USAGE_REGION_FOOTNOTE}
                   </p>

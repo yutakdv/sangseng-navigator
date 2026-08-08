@@ -64,6 +64,21 @@ export interface UsageMonthly {
   visitors_monthly: Record<string, number>;
 }
 
+/**
+ * 파이프라인 정적 산출물 `usage_daily.json` — 일·요일 축 집계 (05 §6, 피드백 ⑦).
+ * `weekday_*` 배열 인덱스는 pandas dayofweek 계약(0=월)이며 `weekday_labels`가 라벨 정본.
+ * 요일×업종은 파이프라인이 표시 6분류로 사전 롤업한 값이다 (월 원장의 18종 유지와 다름).
+ */
+export interface UsageDaily {
+  source: string;
+  period: { start: string; end: string; days: number };
+  region_note: string;
+  weekday_labels: string[];
+  weekday_days: number[];
+  weekday_category: Record<string, Record<DisplayCategory, number[]>>;
+  daily_total: Record<string, [string, number][]>;
+}
+
 export interface EupScore {
   rank: number;
   eup: string;
