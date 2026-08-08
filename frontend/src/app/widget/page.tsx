@@ -61,7 +61,9 @@ export default async function WidgetPage({ searchParams }: { searchParams: Promi
   const [{ recommendations, policy_note, total }, dashboard, cand, incentiveRes, usageDaily, weather] =
     await Promise.all([
       api.widget(region, category, listLimit),
-      api.dashboard(),
+      // 푸터 "데이터 기준" 한 줄 전용 — 이 엔드포인트만 죽어도 방문객 위젯 전체가 에러 화면이
+      // 되면 안 된다 (아래 candidates와 같은 방어 관용구).
+      api.dashboard().catch(() => null),
       // 필터 칩의 가맹점 수 표기용 — merchants는 candidates 응답에 함께 실려 온다 (05 §1).
       // 칩 숫자는 장식이라, 이 엔드포인트가 503이어도 방문객 위젯 자체는 떠야 한다.
       api.candidates().catch(() => null),
@@ -303,7 +305,7 @@ export default async function WidgetPage({ searchParams }: { searchParams: Promi
           </p>
           <footer className="mt-3 border-t border-slate-200 pt-3 text-[11px] leading-5 text-admin-text-muted">
             <p>{VISITOR_SOURCE_NOTE}</p>
-            <p>데이터 기준: {dashboard.period_note}</p>
+            {dashboard ? <p>데이터 기준: {dashboard.period_note}</p> : null}
           </footer>
         </div>
       </div>
