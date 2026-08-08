@@ -52,21 +52,29 @@ export function AssumptionNote({ className = "" }: { className?: string }) {
   );
 }
 
-/** 완료된 확충 카드의 (읍×업종)과 매칭되는 업종 — 점포 신설로 오인시키지 않는다 */
-export function NewBadge({ label = "이번 분기 확충 업종" }: { label?: string }) {
+/**
+ * 완료된 확충 카드의 (읍×업종)과 매칭되는 업종 — 점포 신설로 오인시키지 않는다.
+ *
+ * `pop`은 **라이브 미리보기(?live=1)에서만** 켠다. router.refresh는 바뀐 DOM만 갈아끼우므로
+ * 그 모드에선 "새로 반영된 배지만" 등장 연출이 걸리지만, 일반 내비게이션(필터 칩 클릭 등)은
+ * 목록 전체를 재마운트해 모든 배지가 한꺼번에 튀어 오른다 — 그래서 기본값은 꺼짐이다.
+ */
+export function NewBadge({ label = "이번 분기 확충 업종", pop = false }: { label?: string; pop?: boolean }) {
   return (
-    <span className={`${base} bg-state-good-bg text-state-good ring-state-good-line`}>
+    <span
+      className={`${base} bg-state-good-bg text-state-good ring-state-good-line ${pop ? "motion-safe:animate-pop" : ""}`}
+    >
       <Icon name="sparkle" size={12} strokeWidth={2} />
       {label}
     </span>
   );
 }
 
-/** 페이백 배지 — 완료된 인센티브 카드가 있을 때만 (05 §4) */
-export function PaybackBadge({ label }: { label: string }) {
+/** 페이백 배지 — 완료된 인센티브 카드가 있을 때만 (05 §4). `pop`은 NewBadge와 같은 규칙 */
+export function PaybackBadge({ label, pop = false }: { label: string; pop?: boolean }) {
   return (
     <span
-      className={`${base} whitespace-normal bg-visitor-primary-soft text-visitor-primary ring-visitor-primary/20`}
+      className={`${base} whitespace-normal bg-visitor-primary-soft text-visitor-primary ring-visitor-primary/20 ${pop ? "motion-safe:animate-pop" : ""}`}
     >
       <Icon name="gift" size={12} strokeWidth={2} />
       {label}

@@ -46,6 +46,24 @@ export interface Dashboard {
   ai_stability?: number | null;
 }
 
+/** 지역×업종×월 사용 건수 원장 행. 정선군 컬럼은 고한·사북 제외 잔여분, 삼척시는 도계읍 한정 (region_note) */
+export type UsageMonthlyRow = { month: string; category: string } & Record<Region, number>;
+
+/**
+ * 파이프라인 정적 산출물 `usage_monthly.json` — BE 엔드포인트가 없는 FE 전용 진단 데이터다.
+ * `categories`는 원본 18종 표기 그대로이며(오타 포함 리터럴 수정 금지), 표시 6분류 롤업은
+ * pipeline/category_map.py `HIGHONE_TO_DISPLAY`가 정본이다 (lib/regionAnalysis.ts가 복제).
+ */
+export interface UsageMonthly {
+  source: string;
+  base_month: string;
+  months: string[];
+  categories: string[];
+  region_note: string;
+  usage: UsageMonthlyRow[];
+  visitors_monthly: Record<string, number>;
+}
+
 export interface EupScore {
   rank: number;
   eup: string;

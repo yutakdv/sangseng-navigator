@@ -20,6 +20,7 @@ export function KpiCard({
   icon,
   /** 화면의 대표 지표 하나만 — 인디고 톤으로 한 단계 띄운다 */
   accent = false,
+  alignDivider = false,
 }: {
   label: string;
   value: ReactNode;
@@ -31,6 +32,13 @@ export function KpiCard({
   delta?: Omit<DeltaValueProps, "variant" | "className">;
   icon?: IconName;
   accent?: boolean;
+  /**
+   * [구분선+설명]을 카드 하단에 정렬한다 — 같은 행에 증감 배지가 있는 카드와 없는 카드가
+   * 섞일 때(진단 지표 4장) 구분선 높이가 카드마다 어긋나는 것을 막는다.
+   * 행 전체가 같은 높이(grid stretch)라는 전제에서만 의미가 있으므로 기본값은 꺼짐 —
+   * 켜는 쪽이 다른 섹션의 카드 레이아웃을 건드리지 않는다.
+   */
+  alignDivider?: boolean;
 }) {
   return (
     <div
@@ -78,8 +86,14 @@ export function KpiCard({
       ) : null}
 
       {sub ? (
-        <div className="mt-2.5 break-keep border-t border-admin-border pt-2.5 text-xs leading-[1.55] text-admin-text-muted">
-          {sub}
+        // 바깥 div의 mt-auto가 남는 세로 공간을 흡수해 [구분선+설명]을 하단으로 밀고,
+        // 안쪽 mt-2.5는 공간이 없을 때(1열 등)의 최소 간격을 보장한다 — mt-auto와 고정 margin은 겹칠 수 없다
+        <div className={alignDivider ? "mt-auto" : undefined}>
+          <div className="mt-2.5 break-keep border-t border-admin-border pt-2.5 text-xs leading-[1.55] text-admin-text-muted">
+            {/* 하단 정렬만으로는 설명이 1줄인 카드의 구분선이 한 줄 낮게 온다 —
+                설명 영역을 2줄 높이로 고정해 행 전체의 구분선 y를 맞춘다 (lh 미지원 브라우저는 무해하게 무시) */}
+            <div className={alignDivider ? "min-h-[2lh]" : undefined}>{sub}</div>
+          </div>
         </div>
       ) : null}
     </div>

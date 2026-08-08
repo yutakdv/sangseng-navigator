@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { DeltaValue } from "@/components/DeltaValue";
 import { Icon } from "@/components/Icon";
 import { ProgressChip } from "@/components/StatusChip";
 import type { ProgressMetricKey, ProgressRecord } from "@/types";
@@ -14,9 +15,12 @@ const METRICS: { key: ProgressMetricKey; label: string; unit: string; digits: nu
 export function ProgressRecordTimeline({
   records,
   cardId,
+  hasMore = false,
 }: {
   records: ProgressRecord[];
   cardId: string;
+  /** 서버 페이지네이션으로 잘린 이전 기록이 더 있는지(next_cursor 존재) — "첫 관측" 오표기 방지 */
+  hasMore?: boolean;
 }) {
   if (!records.length) {
     return (
@@ -37,6 +41,20 @@ export function ProgressRecordTimeline({
         </Link>
       </div>
     );
+  }
+
+  // 기록별 "직전 대비" 변화 표기용. records는 서버가 최신순(동시각은 record_id 타이브레이커)으로
+  // 정렬해 준 배열이다 — 여기서 다시 정렬하면 동시각 기록에서 서버와 다른 이웃을 골라
+  // 델타 부호가 뒤집힐 수 있어 받은 순서를 그대로 쓴다. 오래된 것부터 한 번 훑으며
+  // "그 시점까지의 마지막 관측값" 스냅샷을 기록마다 남긴다 (O(기록 수 × 지표 수)).
+  const previousMetrics = new Map<string, Partial<Record<ProgressMetricKey, number>>>();
+  const lastSeen: Partial<Record<ProgressMetricKey, number>> = {};
+  for (let i = records.length - 1; i >= 0; i--) {
+    previousMetrics.set(records[i].record_id, { ...lastSeen });
+    for (const { key } of METRICS) {
+      const value = records[i].metrics?.[key];
+      if (value !== undefined && value !== null) lastSeen[key] = value;
+    }
   }
 
   return (
@@ -124,17 +142,43 @@ export function ProgressRecordTimeline({
                   <p className="text-[11px] font-bold text-admin-text-muted">실제 관측 성과</p>
                   <dl className="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-5">
                     {observed.map((metric) => {
-                      const value = record.metrics[metric.key];
+                      const value = record.metrics[metric.key] as number;
+                      const prev = previousMetrics.get(record.record_id)?.[metric.key];
                       return (
                         <div key={metric.key} className="rounded-lg bg-admin-surface-sunken px-2.5 py-2">
                           <dt className="text-[10px] leading-4 text-admin-text-muted">{metric.label}</dt>
                           <dd className="mt-0.5 text-xs font-bold tabular-nums text-admin-text">
-                            {formatMetric(value as number, metric.digits)}{metric.unit}
+                            {formatMetric(value, metric.digits)}{metric.unit}
+                          </dd>
+                          <dd className="mt-1 text-[10px] leading-4">
+                            {prev === undefined ? (
+                              // 더 이전 페이지가 있으면 이 페이지의 첫 값일 뿐, 최초 관측이라 단정할 수 없다
+                              <span className="text-admin-text-muted">
+                                {hasMore ? "표시 범위 첫 값" : "첫 관측"}
+                              </span>
+                            ) : value === prev ? (
+                              <span className="text-admin-text-muted">직전과 동일</span>
+                            ) : (
+                              <DeltaValue
+                                value={value - prev}
+                                unit={metric.unit}
+                                digits={metric.digits}
+                                variant="text"
+                                className="text-[10px] font-semibold"
+                                note="직전 대비"
+                              />
+                            )}
                           </dd>
                         </div>
                       );
                     })}
                   </dl>
+                  {/* 방향색은 값의 증감만 뜻한다 — 집중도는 의미가 반대라 문장으로 못 박는다 */}
+                  {observed.some((metric) => metric.key === "concentration_index") ? (
+                    <p className="mt-2 text-[10px] leading-4 text-admin-text-muted">
+                      소비 집중도는 값이 낮아질수록(▼) 분산이 개선된 것입니다.
+                    </p>
+                  ) : null}
                 </div>
               ) : null}
             </article>

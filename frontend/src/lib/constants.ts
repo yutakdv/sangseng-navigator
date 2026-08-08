@@ -28,10 +28,6 @@ export const REGION_COLORS: Record<string, string> = Object.fromEntries(
 /** 단일 시리즈 차트(전환율 추이·지역별 막대)는 팔레트 대신 이 단색 (13 §5) — lavender-500 */
 export const PRIMARY = "#8B7BF0";
 
-/** 차트 보조 계열 — lavender-400 / 300 (주 계열보다 연하게) */
-export const PRIMARY_SOFT = "#A695F3";
-export const PRIMARY_FAINT = "#C4B8F5";
-
 /**
  * 차트 공통 시각 토큰 (13 §5).
  * Recharts는 Tailwind 클래스를 받지 않아 축·툴팁 스타일을 인라인으로 넘겨야 한다 —

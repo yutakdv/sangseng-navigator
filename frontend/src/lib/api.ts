@@ -28,10 +28,12 @@ import type {
   ProgressReport,
   RiskSignal,
   Simulation,
+  UsageMonthly,
   WidgetResponse,
 } from "@/types";
 import { ApiError } from "@/lib/errors";
 import dashboardMock from "@/mocks/dashboard.json";
+import usageMonthlyMock from "@/mocks/usage_monthly.json";
 import candidatesMock from "@/mocks/candidates.json";
 import riskSignalMock from "@/mocks/risk_signal.json";
 import simulateMock from "@/mocks/simulate.json";
@@ -114,6 +116,14 @@ export const api = {
 
   /** 운영 2년 미만 사업자 비중 — 배경 정보. '위험' 라벨·순위 정렬 금지 (05 §6) */
   riskSignal: (): Promise<RiskSignal[]> => get("/api/risk-signal", () => riskSignalMock),
+
+  /**
+   * 지역×업종×월 원장 — BE 엔드포인트가 **없는** 파이프라인 정적 산출물이다.
+   * data/processed/usage_monthly.json은 분기 배치로 커밋되고 mocks/ 사본과 동일하므로
+   * 실 API 모드에서도 정적 import로 서빙한다 (지역 드릴다운 진단 전용, 05 §1 참조).
+   */
+  usageMonthly: (): Promise<UsageMonthly> =>
+    Promise.resolve(usageMonthlyMock as unknown as UsageMonthly),
 
   /* ── Action Card (05 §2) ───────────────────────────────────── */
   cards: (opts: { type?: CardType; status?: CardStatus } = {}): Promise<{ cards: Card[] }> =>

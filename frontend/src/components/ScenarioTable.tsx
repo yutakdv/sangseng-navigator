@@ -1,9 +1,11 @@
 "use client";
 
+import Link from "next/link";
 import { useState } from "react";
 import { AssumptionNote } from "@/components/Badge";
 import { DeltaValue } from "@/components/DeltaValue";
 import { DecisionActions } from "@/components/DecisionActions";
+import { PaybackImpactPanel, scenarioHi } from "@/components/PaybackImpactPanel";
 import type { CardStatus, PaybackRate, Scenario } from "@/types";
 
 /**
@@ -24,15 +26,15 @@ const DECIDED_LABEL: Record<CardStatus, string> = {
   held: "보류",
 };
 
-/** delta_pp = [낮은 값, 높은 값] — 막대 길이는 높은 값 기준 (05 §2) */
-const hiOf = (s: Scenario): number => s.delta_pp[s.delta_pp.length - 1] ?? 0;
-
 export function ScenarioTable({
   cardId,
   scenarios,
   status,
   selectedRate = null,
   assumptionNote,
+  avgVisitors = null,
+  visitorsBasis = "",
+  proxyNote,
 }: {
   cardId: string;
   scenarios: Scenario[];
@@ -41,6 +43,12 @@ export function ScenarioTable({
   selectedRate?: PaybackRate | null;
   /** 카드가 실어 보낸 가정 문구 — 있으면 요약 없이 그대로 노출한다 */
   assumptionNote?: string;
+  /** 최근 3개월 평균 입장 연인원(교대 합산) — 주면 재원 부담 대비 효과 패널을 그린다 */
+  avgVisitors?: number | null;
+  /** 평균의 근거 기간 라벨 (예: "2025-10~2025-12") */
+  visitorsBasis?: string;
+  /** 근사 지표 배지 툴팁 문구 — 패널로 그대로 내려간다 (절대 규칙 2) */
+  proxyNote?: string;
 }) {
   const editable = status === "pending";
   const [choice, setChoice] = useState<PaybackRate | null>(selectedRate);
@@ -48,7 +56,7 @@ export function ScenarioTable({
   // 결정된 카드는 읽기 전용 — 담당자가 고른 rate만 체크된 채로 남는다
   const checked = editable ? choice : selectedRate;
   // 크기 인코딩 막대는 단색 + 값 직접 표기 (13 §5). 0으로 나누지 않도록 하한을 둔다
-  const maxHi = Math.max(...scenarios.map(hiOf), 0.1);
+  const maxHi = Math.max(...scenarios.map(scenarioHi), 0.1);
 
   return (
     <div>
@@ -117,7 +125,7 @@ export function ScenarioTable({
                     <span className="mt-1.5 flex h-2 w-full min-w-[80px] max-w-[160px] overflow-hidden rounded-full bg-admin-surface-sunken ring-1 ring-inset ring-admin-border">
                       <span
                         className="block h-full rounded-full bg-admin-primary"
-                        style={{ width: `${Math.min(100, (hiOf(s) / maxHi) * 100)}%` }}
+                        style={{ width: `${Math.min(100, (scenarioHi(s) / maxHi) * 100)}%` }}
                       />
                     </span>
                   </td>
@@ -128,6 +136,17 @@ export function ScenarioTable({
           </tbody>
         </table>
       </div>
+
+      {/* 라디오 선택(결정 전)·확정 rate(결정 후)를 실시간 강조하는 손익 대비 패널 */}
+      {avgVisitors ? (
+        <PaybackImpactPanel
+          scenarios={scenarios}
+          activeRate={checked ?? null}
+          avgVisitors={avgVisitors}
+          visitorsBasis={visitorsBasis}
+          proxyNote={proxyNote}
+        />
+      ) : null}
 
       {assumptionNote ? <p className="u-note mt-3">{assumptionNote}</p> : null}
       <AssumptionNote className="mt-1.5" />
@@ -142,13 +161,27 @@ export function ScenarioTable({
             <DecisionActions cardId={cardId} requireRate selectedRate={choice} />
           </>
         ) : selectedRate ? (
-          <p className="flex flex-wrap items-baseline gap-x-2 gap-y-1 text-sm text-admin-text">
-            담당자가 선택한 페이백률{" "}
-            <b className="text-2xl font-bold tabular-nums text-admin-primary">{selectedRate}%</b>
-            <span className="u-note">
-              (승인 시 확정된 값 — 방문객 위젯의 페이백 배지도 이 값을 씁니다)
-            </span>
-          </p>
+          <div>
+            <p className="flex flex-wrap items-baseline gap-x-2 gap-y-1 text-sm text-admin-text">
+              담당자가 선택한 페이백률{" "}
+              <b className="text-2xl font-bold tabular-nums text-admin-primary">{selectedRate}%</b>
+              <span className="u-note">
+                (승인 시 확정된 값 — 방문객 위젯의 페이백 배지도 이 값을 씁니다)
+              </span>
+            </p>
+            {/* 페이백 배지는 승인이 아니라 **완료** 시점에 위젯에 붙는다 (05 §4, store.payback) —
+                승인 직후에 "배지 확인" 링크를 주면 빈 위젯을 보게 되므로 흐름을 정확히 적는다 */}
+            <p className="u-note mt-2">
+              트래킹에서 추진 상태를 <b className="font-semibold text-admin-text">완료</b>로 바꾸면
+              방문객 위젯 전 추천 항목에 페이백 배지가 붙습니다.{" "}
+              <Link
+                href="/widget?live=1"
+                className="font-semibold text-admin-primary underline-offset-4 hover:underline"
+              >
+                위젯 라이브 미리보기 →
+              </Link>
+            </p>
+          </div>
         ) : (
           <p className="u-note">
             {DECIDED_LABEL[status]} 처리된 카드라 확정된 페이백률이 없습니다. 시나리오 비교는

@@ -434,12 +434,16 @@ Base URL: 로컬 `http://localhost:8000` / 배포 후 API Gateway URL. 경로 �
 | `merchants.json` | §1 `merchants` 배열 (지오코딩·주소 포함) | BE(candidates, 위젯) |
 | `risk_signal.json` | `[{"sigungu": "정선군", "under2y_ratio": 0.1507}]` | BE(카드 생성 AI 입력 ⑥, `GET /api/risk-signal`), FE mock |
 | `sensitivity.json` | `{"combos": 25, "top3_stable_ratio": 0.88, "detail": [...]}` | 발표 슬라이드 |
-| `usage_monthly.json` | 월×지역×업종 원자료 집계 (재계산·검증용) | pipeline, simulate |
+| `usage_monthly.json` | 월×지역×업종 원자료 집계 (재계산·검증용) | pipeline, simulate, **FE 지역 드릴다운(정적 import)** |
 
 - `risk_signal.json` 표시 주의: 실측 4개 시군이 **14.6~15.1%로 최대 편차 0.5%p**라 지역 간 비교
   근거가 못 된다. 화면에 노출할 때 **'위험' 라벨·경고색·순위 정렬을 쓰지 않고**
   "운영 2년 미만 사업자 비중(배경 정보)"으로만 적는다 (AI 입력에서도 참고용 진단 지표 — 07 B4 ⑥).
 - `usage_monthly.json`의 `region_note`·`eup_ranking`의 "삼척시"는 도계읍 한정이다 (§1 지역 라벨 주의).
+- `usage_monthly.json`은 **BE 엔드포인트 없이** FE가 mock 사본을 정적 import 해 지역 소비 분석
+  드릴다운(업종 구성·월별 추이·상위 업종)에 쓴다 — 분기 배치 산출물이라 양 모드 데이터가 동일하다.
+  표시 6분류 롤업은 `pipeline/category_map.py`의 `HIGHONE_TO_DISPLAY`가 정본이며
+  `frontend/src/lib/regionAnalysis.ts`가 이를 복제한다(파이프라인 변경 시 함께 수정).
 
 FE mock 동기화: 레포 루트에서 `./scripts/sync-mocks.sh` — 위 산출 JSON을 `frontend/src/mocks/`로
 복사하고, `candidates.json`은 `GET /api/candidates`와 같은 병합 응답 형태로 생성한다.

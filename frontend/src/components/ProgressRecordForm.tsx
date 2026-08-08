@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useRef, useState, useTransition } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { createProgressRecordAction } from "@/app/actions";
 import { Icon } from "@/components/Icon";
@@ -18,11 +19,13 @@ import type {
 const FIELD =
   "mt-1.5 w-full rounded-xl border border-admin-border bg-admin-surface px-3 py-2.5 text-sm text-admin-text shadow-card transition-colors placeholder:text-admin-text-muted/70 hover:border-admin-primary/45 focus:border-admin-primary focus:outline-none focus:ring-2 focus:ring-admin-primary/20 disabled:cursor-not-allowed disabled:opacity-55";
 
+/** digits는 ProgressRecordTimeline의 METRICS와 같은 값 — 저장 확인 칩과 타임라인 표기가 어긋나면 안 된다 */
 const METRIC_FIELDS: {
   key: ProgressMetricKey;
   label: string;
   unit: string;
   step: string;
+  digits: number;
   max?: number;
   hint: string;
 }[] = [
@@ -31,6 +34,7 @@ const METRIC_FIELDS: {
     label: "지역 사용 건수",
     unit: "건",
     step: "1",
+    digits: 0,
     hint: "해당 카드 대상 지역·기간의 실제 사용 건수",
   },
   {
@@ -38,6 +42,7 @@ const METRIC_FIELDS: {
     label: "지역 전환율",
     unit: "%",
     step: "0.1",
+    digits: 2,
     max: 100,
     hint: "같은 산식과 기간으로 반복 관측한 비율",
   },
@@ -46,6 +51,7 @@ const METRIC_FIELDS: {
     label: "활성 가맹점 수",
     unit: "곳",
     step: "1",
+    digits: 0,
     hint: "실제로 운영 중인 확인 가맹점 수",
   },
   {
@@ -53,6 +59,7 @@ const METRIC_FIELDS: {
     label: "지역 사용액",
     unit: "원",
     step: "1",
+    digits: 0,
     hint: "같은 범위에서 집계한 실제 사용액",
   },
   {
@@ -60,6 +67,7 @@ const METRIC_FIELDS: {
     label: "소비 집중도",
     unit: "점",
     step: "0.1",
+    digits: 2,
     max: 100,
     hint: "0~100 지수이며 낮아지면 분산이 개선된 것",
   },
@@ -129,6 +137,11 @@ export function ProgressRecordForm({
   const [metrics, setMetrics] = useState<Record<ProgressMetricKey, string>>(EMPTY_METRICS);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
+  /** 직전 저장 성공의 요약 — 어떤 관측 지표가 이 기록으로 갱신됐는지 즉시 보여준다 */
+  const [savedSummary, setSavedSummary] = useState<{
+    cardId: string;
+    metrics: { label: string; text: string }[];
+  } | null>(null);
   const [busy, setBusy] = useState(false);
   const [pending, startTransition] = useTransition();
   const retryRef = useRef<{ signature: string; key: string } | null>(null);
@@ -154,6 +167,7 @@ export function ProgressRecordForm({
     retryRef.current = null;
     setError(null);
     setSuccess(null);
+    setSavedSummary(null);
   };
 
   const chooseProgress = (next: CardProgress) => {
@@ -171,6 +185,7 @@ export function ProgressRecordForm({
     event.preventDefault();
     setError(null);
     setSuccess(null);
+    setSavedSummary(null);
 
     if (!selectedCard) {
       setError("기록할 정책 카드를 선택해 주세요.");
@@ -253,6 +268,19 @@ export function ProgressRecordForm({
               ? "추진 경과 기록을 저장했습니다. 리포트와 카드 이력에 반영됩니다."
               : "같은 요청이 이미 저장되어 기존 기록을 확인했습니다.",
           );
+          const saved = result.data.record;
+          setSavedSummary({
+            cardId: selectedCard.id,
+            metrics: METRIC_FIELDS.filter(
+              (field) => saved.metrics?.[field.key] !== undefined && saved.metrics?.[field.key] !== null,
+            ).map((field) => ({
+              label: field.label,
+              text: `${Number(saved.metrics[field.key]).toLocaleString("ko-KR", {
+                minimumFractionDigits: field.digits,
+                maximumFractionDigits: field.digits,
+              })}${field.unit}`,
+            })),
+          });
           setNote("");
           setBlocker("");
           setNextAction("");
@@ -525,9 +553,42 @@ export function ProgressRecordForm({
         </p>
       ) : null}
       {success ? (
-        <p role="status" className="rounded-xl bg-state-good-bg px-4 py-3 text-[13px] leading-5 text-state-good ring-1 ring-inset ring-state-good-line">
-          {success}
-        </p>
+        <div role="status" className="rounded-xl bg-state-good-bg px-4 py-3 ring-1 ring-inset ring-state-good-line">
+          <p className="text-[13px] leading-5 text-state-good">{success}</p>
+          {savedSummary?.metrics.length ? (
+            <>
+              <p className="mt-2.5 text-[11px] font-bold text-state-good">
+                이 기록으로 갱신된 실제 관측 성과
+              </p>
+              <ul className="mt-1.5 flex flex-wrap gap-1.5">
+                {savedSummary.metrics.map((metric) => (
+                  <li
+                    key={metric.label}
+                    className="rounded-full bg-admin-surface px-2.5 py-1 text-[11px] font-semibold tabular-nums text-admin-text ring-1 ring-inset ring-admin-border"
+                  >
+                    {metric.label} {metric.text}
+                  </li>
+                ))}
+              </ul>
+            </>
+          ) : null}
+          {savedSummary ? (
+            <p className="mt-2.5 flex flex-wrap gap-x-4 gap-y-1 text-[12px] font-semibold">
+              <Link
+                href={`/cards/${encodeURIComponent(savedSummary.cardId)}`}
+                className="text-admin-primary underline-offset-4 hover:underline"
+              >
+                카드 이력에서 직전 대비 변화 보기
+              </Link>
+              <Link
+                href="/tracking"
+                className="text-admin-primary underline-offset-4 hover:underline"
+              >
+                경과 리포트 보기
+              </Link>
+            </p>
+          ) : null}
+        </div>
       ) : null}
 
       <div className="sticky bottom-3 z-10 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-admin-border bg-admin-surface/95 p-3 shadow-lift backdrop-blur sm:px-4">

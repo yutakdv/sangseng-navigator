@@ -39,6 +39,17 @@ export default async function IncentivePage() {
   // 최신 1장 = 생성 시각 내림차순 첫 카드 (허브에서 새로 생성하면 그 카드가 이 화면의 대상이 된다)
   const card = [...cards].sort((a, b) => Date.parse(b.created_at) - Date.parse(a.created_at))[0];
 
+  // 손익 대비 패널용 — 최근 3개월 평균 입장 연인원(교대 합산). 개선폭(%p)을 월 건수로 환산하는 분모다.
+  // 정확히 3개월이 안 되면 패널을 그리지 않는다 — "최근 3개월 평균"이라는 문구가 거짓이 되기 때문.
+  // 기간 라벨은 연-월을 온전히 적는다: 연도를 자르면 해가 바뀌는 창(2025-11~2026-01)이 거꾸로 읽힌다.
+  const recentMonthly = (dashboard.conversion.monthly ?? []).slice(-3);
+  const avgVisitors =
+    recentMonthly.length === 3
+      ? recentMonthly.reduce((a, m) => a + m.visitors, 0) / recentMonthly.length
+      : null;
+  const visitorsBasis =
+    recentMonthly.length === 3 ? `${recentMonthly[0].month}~${recentMonthly[2].month}` : "";
+
   // "지역 전환율"이 보이는 모든 위치에 붙인다 (절대 규칙 2) — note는 요약 없이 그대로 노출
   const proxyBadge = dashboard.conversion.is_proxy ? (
     <ProxyBadge note={dashboard.conversion.proxy_note} />
@@ -155,6 +166,9 @@ export default async function IncentivePage() {
                   status={card.status}
                   selectedRate={card.selected_rate ?? null}
                   assumptionNote={card.assumption_note}
+                  avgVisitors={avgVisitors}
+                  visitorsBasis={visitorsBasis}
+                  proxyNote={dashboard.conversion.is_proxy ? dashboard.conversion.proxy_note : undefined}
                 />
               ) : (
                 <p className="u-body text-admin-text-muted">이 카드에는 비교할 시나리오가 없습니다.</p>
@@ -205,8 +219,9 @@ export default async function IncentivePage() {
                     권고 근거
                   </h3>
                   <ul className="mt-2 flex list-disc flex-col gap-2 break-keep pl-4 text-[13px] leading-6 text-admin-text-soft">
-                    {card.ai.reasons.map((r) => (
-                      <li key={r}>{r}</li>
+                    {/* LLM 출력이라 중복 문자열이 가능 — 내용 키 대신 인덱스 키 (cards/[id]와 동일) */}
+                    {card.ai.reasons.map((r, i) => (
+                      <li key={i}>{r}</li>
                     ))}
                   </ul>
                 </div>
@@ -216,8 +231,8 @@ export default async function IncentivePage() {
                     리스크
                   </h3>
                   <ul className="mt-2 flex list-disc flex-col gap-2 break-keep pl-4 text-[13px] leading-6 text-admin-text-soft">
-                    {card.ai.risks.map((r) => (
-                      <li key={r}>{r}</li>
+                    {card.ai.risks.map((r, i) => (
+                      <li key={i}>{r}</li>
                     ))}
                   </ul>
                 </div>
