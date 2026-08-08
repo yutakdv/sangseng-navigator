@@ -1,12 +1,18 @@
-"""P1: 하이원포인트 사용현황 CSV → 월×지역×업종 집계 (usage_monthly.json).
+"""P1: 하이원포인트 사용현황 CSV → 월×지역×업종 집계 (usage_monthly.json)
+     + 일·요일 축 집계 (usage_daily.json — 2026-08-08 확장, 피드백 ⑦).
 
 입력 실측 (2026-08-03, docs/plan/04 §2): cp949, 일 단위, 2025-01~2025-12, 5,831행.
+usage_daily 스키마·검증 기준: docs/superpowers/specs/2026-08-08-daily-weekday-analysis-design.md, 05 §6.
 """
 import json
 
 import pandas as pd
 
+from category_map import DISPLAY_CATEGORIES, display_of_highone
 from common import PROCESSED_DIR, RAW_DIR, REGIONS
+
+# 인덱스 = pandas dayofweek (0=월요일)
+WEEKDAY_LABELS = ["월", "화", "수", "목", "금", "토", "일"]
 
 # 산출물 메타 — 표시명("삼척시")과 실제 범위가 다른 지역을 산출물만 봐도 알 수 있게 남긴다.
 # 하이원포인트 지역가맹 대상지역은 "정선군·태백시·영월군·삼척 도계읍"이라
@@ -60,6 +66,54 @@ def check_region_overlap(df: pd.DataFrame) -> str:
     return f"주의: 반례 0/{total}행 — 포함 관계 가능성 있음, 수동 확인 필요"
 
 
+def build_daily(df: pd.DataFrame, region_note: str) -> dict:
+    """일·요일 축 집계 — 요일 축은 표시 6분류로 사전 롤업한다 (05 §6, 소비처가 전부 6분류 단위).
+
+    정수 누적만 싣는다 — 요일별 하루 평균은 소비처(FE 패널·AI 근거)가 `weekday_days`를 분모로
+    계산한다. 반올림값을 실으면 재계산·검증이 안 되기 때문.
+    """
+    d = df.copy()
+    dt = pd.to_datetime(d["date"], format="%Y-%m-%d")
+    d["dow"] = dt.dt.dayofweek
+    d["display"] = d["category"].map(display_of_highone)
+
+    dates = sorted(d["date"].unique())
+    weekday_days = (
+        pd.to_datetime(pd.Series(dates)).dt.dayofweek
+        .value_counts().reindex(range(7), fill_value=0).sort_index().tolist()
+    )
+
+    by_dow = d.groupby(["dow", "display"])[REGIONS].sum()
+    weekday_category: dict[str, dict[str, list[int]]] = {}
+    for region in [*REGIONS, "전체"]:
+        weekday_category[region] = {
+            cat: [
+                int(by_dow.loc[(dow, cat)][REGIONS].sum() if region == "전체"
+                    else by_dow.loc[(dow, cat)][region])
+                if (dow, cat) in by_dow.index else 0
+                for dow in range(7)
+            ]
+            for cat in DISPLAY_CATEGORIES
+        }
+
+    by_date = d.groupby("date")[REGIONS].sum().reindex(dates, fill_value=0)
+    daily_total = {
+        region: [[date, int(by_date.loc[date, region])] for date in dates]
+        for region in REGIONS
+    }
+    daily_total["전체"] = [[date, int(by_date.loc[date].sum())] for date in dates]
+
+    return {
+        "source": "data/raw/highone_point_usage.csv",
+        "period": {"start": dates[0], "end": dates[-1], "days": len(dates)},
+        "region_note": region_note,
+        "weekday_labels": WEEKDAY_LABELS,
+        "weekday_days": weekday_days,
+        "weekday_category": weekday_category,
+        "daily_total": daily_total,
+    }
+
+
 def main():
     df = load_usage()
     region_note = f"{check_region_overlap(df)}. {PROGRAM_AREA_NOTE}"
@@ -79,10 +133,19 @@ def main():
     path = PROCESSED_DIR / "usage_monthly.json"
     path.write_text(json.dumps(out, ensure_ascii=False, indent=2), encoding="utf-8")
 
+    daily = build_daily(df, region_note)
+    daily_path = PROCESSED_DIR / "usage_daily.json"
+    daily_path.write_text(json.dumps(daily, ensure_ascii=False, indent=2), encoding="utf-8")
+
     total = int(df[REGIONS].to_numpy().sum())
     print(f"P1 완료: {path}")
     print(f"  월 {len(months)}개 ({months[0]}~{months[-1]}), 업종 {len(out['categories'])}종, 총 {total:,}건")
     print(f"  지역 컬럼 판정: {region_note}")
+    daily_sum = sum(v for _, v in daily["daily_total"]["전체"])
+    print(f"P1 일별 확장: {daily_path}")
+    print(f"  일 {daily['period']['days']}개 ({daily['period']['start']}~{daily['period']['end']}), "
+          f"요일 일수 {daily['weekday_days']}, 전체 일합계 {daily_sum:,}건 "
+          f"({'월 집계와 일치' if daily_sum == total else '⚠ 월 집계와 불일치'})")
 
 
 if __name__ == "__main__":
