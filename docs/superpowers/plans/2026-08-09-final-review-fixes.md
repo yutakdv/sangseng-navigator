@@ -1,5 +1,10 @@
 # 최종 심사 대비 수정 Implementation Plan
 
+> ✅ **상태 (2026-08-09)**: Task 0~18 **전부 완료·머지** (PR #38 감사 P0 · PR #39 수정 16건 스쿼시 `dc393d7`).
+> 2차 재검토(보고서 §0)로 라이브 실측 검증 — 신규 회귀 0건, 4인 평균 80.5→82.25.
+> 재검토 잔여 4건(보고서 §0-3)은 `fix/review-leftovers` 브랜치에서 처리 완료. D2의
+> `RESERVED_CONCURRENCY=20`도 `.env`에 추가 완료. **남은 것은 Phase D(D1·D3~D10 배포·제출 게이트)와 Phase E뿐.**
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** `docs/review/FINAL-REVIEW-20260809.md`의 발견을 반영해 심사 점수를 +5~8점 올리고(코드·문서 수정 Task 1~16), 배포·제출 게이트를 통과시킨다(Phase D 체크리스트).
@@ -517,7 +522,7 @@ docs/review/FINAL-REVIEW-20260809.md의 발견 반영. fix/audit-p0(감사 P0 3�
 > 전제: Task 18 머지 완료. 상세 근거는 검토 보고서 §2. **D4(BE 배포)는 "최종 1회" 규칙의 그 1회다 — 실행 전 사용자 확인.**
 
 - [ ] **D1 🧑 Vercel 프로젝트 연동** — vercel.com에서 GitHub 레포 import, **Root Directory=`frontend`** 지정 → 첫 Production 배포로 `https://<project>.vercel.app` 확보. Settings→Deployment Protection **전부 OFF** 확인.
-- [ ] **D2 🤖 `.env` 보강** — `ALLOWED_ORIGINS=https://<확보한 도메인>` 추가, `RESERVED_CONCURRENCY=20` 추가 (검토 §7 신규-3 — 동시 심사 스로틀 방지. deploy-backend.sh가 이 키를 읽는지 먼저 grep으로 확인하고, 안 읽으면 template.yaml 파라미터 직접 전달로).
+- [ ] **D2 🤖 `.env` 보강** — `ALLOWED_ORIGINS=https://<확보한 도메인>` 추가, ~~`RESERVED_CONCURRENCY=20` 추가~~ ✅ 완료(2026-08-09, `deploy-backend.sh:18` 지원 확인). `ALLOWED_ORIGINS`만 D1에서 도메인 확보 후 추가.
 - [ ] **D3 🤖 배포 전 점검** — `cd infra && sam validate --lint` 통과 재확인, `git log main -1`이 머지 커밋인지 확인.
 - [ ] **D4 🧑승인 후 🤖 BE 최종 배포** — `cd infra && ./deploy-backend.sh` → 출력의 `ApiUrl`·`CardsTable`·`ProgressRecordsTable` 기록.
 - [ ] **D5 🧑 Vercel Production env 등록 후 Redeploy** — ① `NEXT_PUBLIC_API_BASE`=ApiUrl ② `API_MUTATION_TOKEN`=.env의 `MUTATION_API_TOKEN`과 **동일 값** (NEXT_PUBLIC_ 접두 금지) ③ `NEXT_PUBLIC_DEMO_READ_ONLY=false` (쓰기 열림 결정) ④ `NEXT_PUBLIC_KAKAO_MAP_KEY` ⑤ `DATA_GO_KR_API_KEY`. NEXT_PUBLIC_* 는 빌드타임 인라인 — **등록 후 반드시 Redeploy**.

@@ -46,7 +46,7 @@ const METRIC_FIELDS: {
     step: "0.1",
     digits: 2,
     max: 100,
-    hint: "같은 산식과 기간으로 반복 관측한 비율",
+    hint: "같은 계산 기준과 기간으로 반복 관측한 비율",
   },
   {
     key: "active_merchant_count",
