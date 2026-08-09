@@ -54,7 +54,7 @@ export function QuarterDiagnostics({
           label="지역 사용"
           value={num(totalUses)}
           delta={<DeltaValue value={dashboard.growth?.mom_pct} unit="%" variant="text" className="text-xs" />}
-          note="전월"
+          note="전월 일평균"
         />
         <Metric
           label="정책 채택률"

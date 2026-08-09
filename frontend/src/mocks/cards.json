@@ -77,27 +77,27 @@
         "status": "unverified",
         "checks": [
           {
-            "key": "business_status",
+            "key": "영업 상태",
             "label": "영업 상태",
             "status": "unverified"
           },
           {
-            "key": "membership_eligibility",
+            "key": "가맹 자격",
             "label": "가맹 자격",
             "status": "unverified"
           },
           {
-            "key": "participation_intent",
+            "key": "사업자 참여 의향",
             "label": "사업자 참여 의향",
             "status": "unverified"
           },
           {
-            "key": "visitor_fit",
+            "key": "관광객 이용 적합성",
             "label": "관광객 이용 적합성",
             "status": "unverified"
           },
           {
-            "key": "settlement_integration",
+            "key": "정산 연동 가능성",
             "label": "정산 연동 가능성",
             "status": "unverified"
           }
@@ -214,27 +214,27 @@
         "status": "unverified",
         "checks": [
           {
-            "key": "business_status",
+            "key": "영업 상태",
             "label": "영업 상태",
             "status": "unverified"
           },
           {
-            "key": "membership_eligibility",
+            "key": "가맹 자격",
             "label": "가맹 자격",
             "status": "unverified"
           },
           {
-            "key": "participation_intent",
+            "key": "사업자 참여 의향",
             "label": "사업자 참여 의향",
             "status": "unverified"
           },
           {
-            "key": "visitor_fit",
+            "key": "관광객 이용 적합성",
             "label": "관광객 이용 적합성",
             "status": "unverified"
           },
           {
-            "key": "settlement_integration",
+            "key": "정산 연동 가능성",
             "label": "정산 연동 가능성",
             "status": "unverified"
           }
