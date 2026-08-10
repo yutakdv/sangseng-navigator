@@ -254,7 +254,16 @@ export default async function TrackingPage({
         <Section
           icon="cards"
           title={`진행 중인 업무 항목 ${rows.length}건`}
-          desc="가맹점 확충은 후보 접촉·검토 시작 → 적격성 확인 → 가맹 심사 → 추진중 → 완료, 페이백 인센티브는 검토중 → 추진중 → 완료 순서로 기록합니다(양쪽 모두 보류로 빠질 수 있습니다). 확충 카드는 필수 적격성 5개 항목 확인 전에는 가맹 심사·추진·완료로 이동할 수 없습니다."
+          desc={
+            <>
+              가맹점 확충은 후보 접촉·검토 시작 → 적격성 확인 → 가맹 심사 → 추진중 → 완료,
+              페이백 인센티브는 검토중 → 추진중 → 완료 순서로 기록합니다(양쪽 모두 보류로 빠질
+              수 있습니다).
+              <br />
+              확충 카드는 필수 적격성 5개 항목 확인 전에는 가맹 심사·추진·완료로 이동할 수
+              없습니다.
+            </>
+          }
         >
           {rows.length === 0 ? (
             <div className="rounded-xl border border-dashed border-admin-border bg-admin-surface-sunken px-4 py-10 text-center">

@@ -111,7 +111,18 @@ export function ProgressReportDashboard({
       <Section
         icon="workflow"
         title="현재 추진 상태 분포"
-        desc={`리포트 종료일(${report.period.to})까지 카드별 최신 경과 기록을 기준으로 집계하며, 단계 정의가 다른 가맹점 확충과 페이백 인센티브를 나눠 봅니다. 유형별 합계는 기록 카드 ${report.recorded_card_count}건입니다. 기록이 없는 승인 카드는 분포에서 제외합니다.`}
+        // 줄바꿈은 문장 끝에만 둔다 — 상자 폭에 맡기면 "…중복 단계로 / 세지 않습니다"처럼
+        // 뜻과 상관없는 자리에서 끊긴다 (이 파일의 다른 desc도 같은 규칙)
+        desc={
+          <>
+            리포트 종료일({report.period.to})까지 카드별 최신 경과 기록을 기준으로 집계하며,
+            단계 정의가 다른 가맹점 확충과 페이백 인센티브를 나눠 봅니다.
+            <br />
+            유형별 합계는 기록 카드 {report.recorded_card_count}건입니다.
+            <br />
+            기록이 없는 승인 카드는 분포에서 제외합니다.
+          </>
+        }
         right={
           <Link
             href="/tracking/new"
@@ -248,7 +259,16 @@ export function ProgressReportDashboard({
         <Section
           icon="layers"
           title="단계별 평균 소요"
-          desc="기간 내 같은 카드의 서로 다른 연속 상태 기록 사이 시간을 계산합니다. 같은 상태의 추가 메모는 중복 단계로 세지 않습니다. 관측된 전이가 한 줄로 이어지면 그 순서대로 잇고, 갈라지거나 끊기면 구간을 따로 나열합니다."
+          desc={
+            <>
+              기간 내 같은 카드의 서로 다른 연속 상태 기록 사이 시간을 계산합니다.
+              <br />
+              같은 상태의 추가 메모는 중복 단계로 세지 않습니다.
+              <br />
+              관측된 전이가 한 줄로 이어지면 그 순서대로 잇고, 갈라지거나 끊기면 구간을 따로
+              나열합니다.
+            </>
+          }
         >
           {report.stage_durations.length ? (
             <StageDurations rows={report.stage_durations} />
