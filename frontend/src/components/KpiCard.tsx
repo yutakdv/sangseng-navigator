@@ -41,9 +41,12 @@ export function KpiCard({
   alignDivider?: boolean;
 }) {
   return (
+    // 테두리를 두르지 않는다 — 카드가 이미 흰 면 + 그림자로 바닥(admin.bg)에서 떠 있어
+    // 선이 한 겹 더 붙으면 타일 넷이 격자처럼 갇힌다. 강조 카드도 테두리·링이 아니라
+    // **틴트 면**으로 구분한다: 같은 축(면의 색)에서 대비가 나야 넷 중 하나가 앞으로 나온다.
     <div
-      className={`flex min-w-0 flex-col rounded-card border bg-admin-surface p-4 shadow-card transition-shadow hover:shadow-card-hover sm:p-[18px] ${
-        accent ? "border-admin-primary-line ring-1 ring-inset ring-admin-primary/10" : "border-admin-border"
+      className={`flex min-w-0 flex-col rounded-card p-4 shadow-card transition-shadow hover:shadow-card-hover sm:p-[18px] ${
+        accent ? "bg-admin-primary-soft" : "bg-admin-surface"
       }`}
     >
       <div className="flex items-start gap-2">
@@ -89,7 +92,12 @@ export function KpiCard({
         // 바깥 div의 mt-auto가 남는 세로 공간을 흡수해 [구분선+설명]을 하단으로 밀고,
         // 안쪽 mt-2.5는 공간이 없을 때(1열 등)의 최소 간격을 보장한다 — mt-auto와 고정 margin은 겹칠 수 없다
         <div className={alignDivider ? "mt-auto" : undefined}>
-          <div className="mt-2.5 break-keep border-t border-admin-border pt-2.5 text-xs leading-[1.55] text-admin-text-muted">
+          {/* 강조 카드는 면이 라벤더라 중립 보더가 탁하게 뜬다 — 같은 계열의 선으로 바꾼다 */}
+          <div
+            className={`mt-2.5 break-keep border-t pt-2.5 text-xs leading-[1.55] text-admin-text-muted ${
+              accent ? "border-admin-primary-line" : "border-admin-border"
+            }`}
+          >
             {/* 하단 정렬만으로는 설명이 1줄인 카드의 구분선이 한 줄 낮게 온다 —
                 설명 영역을 2줄 높이로 고정해 행 전체의 구분선 y를 맞춘다 (lh 미지원 브라우저는 무해하게 무시) */}
             <div className={alignDivider ? "min-h-[2lh]" : undefined}>{sub}</div>
