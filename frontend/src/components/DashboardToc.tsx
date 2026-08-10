@@ -13,7 +13,8 @@ export type TocItem = { id: string; label: string };
  * 존 높이가 화면보다 훨씬 커서(드릴다운 존은 수천 px) 교차 비율 기반 판정이
  * 오히려 불안정하고, "기준선을 지난 마지막 존" 규칙이 결정적이다.
  *
- * sticky 오프셋(top)은 AdminShell 고정 헤더 높이와 짝이다 — 헤더 py·폰트를 바꾸면 함께 조정.
+ * sticky 오프셋(top)은 AdminShell 고정 헤더 높이와 짝이다 — 헤더 py·폰트·버튼을 바꾸면
+ * 함께 조정 (`3분 체험` 버튼이 들어오며 53px → 61px로 이미 한 번 자랐다).
  */
 export function DashboardToc({ items }: { items: TocItem[] }) {
   const [activeId, setActiveId] = useState<string | null>(items[0]?.id ?? null);
@@ -47,7 +48,7 @@ export function DashboardToc({ items }: { items: TocItem[] }) {
   return (
     <nav
       aria-label="지역 소비 분석 목차"
-      className="sticky top-[53px] z-10 -mx-1 flex gap-1 overflow-x-auto rounded-2xl border border-admin-border bg-admin-bg/90 p-1.5 backdrop-blur-xl"
+      className="sticky top-[61px] z-10 -mx-1 flex gap-1 overflow-x-auto rounded-2xl border border-admin-border bg-admin-bg/90 p-1.5 backdrop-blur-xl"
     >
       {items.map(({ id, label }) => {
         const active = id === activeId;

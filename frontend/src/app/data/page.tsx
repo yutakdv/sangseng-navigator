@@ -148,7 +148,8 @@ export default async function DataPage({
                     <tr key={name}>
                       <td className="font-mono text-[12px] font-medium">{name}</td>
                       <td className="text-right tabular-nums text-admin-text-muted">
-                        {num(Math.round(f.bytes / 1024))} KB
+                        {/* 260B 같은 작은 파일이 "0 KB"로 찍히면 빈 파일로 오독된다 — 올림 표기 */}
+                        {num(Math.max(1, Math.ceil(f.bytes / 1024)))} KB
                       </td>
                       <td
                         className="font-mono text-[11px] text-admin-text-muted"
