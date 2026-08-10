@@ -107,10 +107,11 @@ const GROUPS: { title: string; items: Item[] }[] = [
             match: (p) => p === "/dashboard/region",
           },
           {
-            // 별도 경로가 아니라 /dashboard 안의 한 섹션(#merchant-candidates)이다
+            // 별도 경로가 아니라 /dashboard의 `제안 근거` 뷰 안에 있는 한 섹션이다 —
+            // 뷰가 URL 상태라 `view=evidence`까지 지정해야 그 표가 그려진 화면에 닿는다
             label: "가맹점 후보",
             icon: "store",
-            href: "/dashboard?demo=merchant#merchant-candidates",
+            href: "/dashboard?view=evidence&demo=merchant#merchant-candidates",
             note: "후보·기존 가맹점 원본 확인",
             desktopOnly: true,
             match: (p, q) => p === "/dashboard" && q.get("demo") === "merchant",

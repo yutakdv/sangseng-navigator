@@ -2,7 +2,6 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { AdminShell } from "@/components/AdminShell";
 import { GradeChip, PrivacyBadge, ProxyBadge } from "@/components/Badge";
-import { DashboardToc } from "@/components/DashboardToc";
 import { EmptyChart } from "@/components/EmptyChart";
 import { Icon } from "@/components/Icon";
 import { KpiCard } from "@/components/KpiCard";
@@ -10,6 +9,7 @@ import { PageHeader } from "@/components/PageHeader";
 import { RegionStatusGrid } from "@/components/RegionStatusGrid";
 import { MenuDemoGuide } from "@/components/MenuDemoGuide";
 import { GroupHeading, Section } from "@/components/Section";
+import { DashboardTabs, NextViewLink, resolveView } from "@/components/DashboardTabs";
 import { BarRank } from "@/components/charts/BarRank";
 import { CategoryDonut } from "@/components/charts/CategoryDonut";
 import { LineTrend } from "@/components/charts/LineTrend";
@@ -24,17 +24,6 @@ export const metadata: Metadata = { title: "전체 지역 현황 · 상생 나�
 export const dynamic = "force-dynamic";
 
 /**
- * 존 목차 — 항목 순서가 곧 페이지 순서다. 마지막 항목은 SideNav의 `데이터 활용 정보`와
- * 데모 딥링크가 함께 쓰는 기존 앵커(#data-demo)를 그대로 가리킨다.
- */
-const TOC = [
-  { id: "overview", label: "현황" },
-  { id: "trends", label: "추이 · 분포" },
-  { id: "evidence", label: "제안 근거" },
-  { id: "data-demo", label: "데이터" },
-];
-
-/**
  * ③ 집중도 대시보드 (docs/plan/08 F5 · 13 §3).
  *
  * 서버 컴포넌트다 — mock JSON은 서버에서만 읽히고 브라우저 번들에 실리지 않는다.
@@ -42,23 +31,28 @@ const TOC = [
  *
  * **페이지 하나 = 모집단 하나.** 이 화면의 모든 값은 6개 지역 전체 기준이고,
  * 지역 한 곳으로 좁힌 값(업종 구성·시간 패턴)은 전부 `/dashboard/region`에 있다.
- * 예전에는 두 모집단이 한 페이지에 번갈아 나와(전체 → 선택 지역 → 다시 전체) 스크롤
- * 위치마다 기준을 다시 판단해야 했다 — 그 경계를 페이지로 끌어올린 것이 이 구조다.
  *
- * 남은 세 존은 담당자의 질문 순서를 따른다:
- *   ① 현황(#overview)      지금 어떤 상태인가 — KPI 4장 + 지역별 현재 상태(상세로 가는 진입점)
- *   ② 추이·분포(#trends)   어떻게 변해왔나 — 월별 흐름·지역/업종 분포·스케일 비교
- *   ③ 제안 근거(#evidence) 그래서 어디에 처방하나 — 1·2단계 스코어 + 접힌 배경·주의
- * 1·2단계 스코어가 여기 남는 이유: 모집단이 6개 지역 전체(순위표·후보 풀)이고,
+ * **뷰 하나 = 질문 하나.** 세 뷰를 한 스크롤에 쌓지 않고 `?view=`로 갈아 끼운다 —
+ * 담당자의 질문 순서가 곧 탭 순서다:
+ *   ① 현황(기본)   지금 어떤 상태인가 — KPI 4장 + 지역별 현재 상태(상세로 가는 진입점)
+ *   ② 추이·분포    어떻게 변해왔나 — 월별 흐름·지역/업종 분포·스케일 비교
+ *   ③ 제안 근거    그래서 어디에 처방하나 — 1·2단계 스코어 + 접힌 배경·주의
+ * 뷰를 URL에 두는 이유와 `role="tab"`을 쓰지 않는 이유는 DashboardTabs 주석 참고.
+ * 탭을 누르지 않는 사람도 순서를 따라갈 수 있도록 각 뷰 끝에 다음 뷰 링크를 둔다.
+ *
+ * 1·2단계 스코어가 이 화면에 남는 이유: 모집단이 6개 지역 전체(순위표·후보 풀)이고,
  * 진단에서 처방으로 이어지는 근거가 진단과 같은 화면에 있어야 감사 가능하다(절대 규칙 5).
- * 정책 운영 KPI(카드 상태값)는 소비 데이터가 아니므로 추진 경과 리포트(/tracking#kpi)로 옮겼다.
+ * 정책 운영 KPI(카드 상태값)는 추진 경과 리포트(/tracking#kpi)로, 데이터 출처·기준·비공개
+ * 내역은 데이터 활용 정보(/data)로 옮겼다 — 후자는 탭 하나를 차지할 내용이 남지 않았고,
+ * 기준월은 이미 이 화면 머리말에 있다. 소표본 보호 고지만 뷰와 무관하게 하단에 상시 노출한다.
  */
 export default async function DashboardPage({
   searchParams,
 }: {
-  searchParams: Promise<{ demo?: string }>;
+  searchParams: Promise<{ demo?: string; view?: string }>;
 }) {
   const sp = await searchParams;
+  const view = resolveView(sp.view);
   // 남은 데모 값은 `merchant` 하나다 — `report`는 운영 KPI와 함께 /tracking으로,
   // `data`는 데이터 활용 정보(/data)로 옮겨 갔다 (SideNav의 DASHBOARD_DEMO_ITEMS와 짝).
   const demo = sp.demo === "merchant" ? sp.demo : null;
@@ -124,10 +118,11 @@ export default async function DashboardPage({
           </p>
         </PageHeader>
 
-        <DashboardToc items={TOC} />
+        <DashboardTabs view={view} />
 
-        {/* ══ 존 ① 현황 — 전체 그림 먼저: KPI 4장 + 지역별 현재 상태(상세 진입점) ══ */}
-        <section id="overview" aria-label="현황" className="flex scroll-mt-32 flex-col gap-6">
+        {/* ══ 뷰 ① 현황 — 전체 그림 먼저: KPI 4장 + 지역별 현재 상태(상세 진입점) ══ */}
+        {view === "overview" ? (
+        <section aria-label="현황" className="flex flex-col gap-6">
           <GroupHeading note="원천 데이터에서 바로 계산한 값">현황</GroupHeading>
           {/* alignDivider: 증감 배지가 있는 카드(전환율·사용 건수)와 없는 카드(집중도·분산도)가
               한 행에 섞여 있어, 구분선을 하단 정렬로 통일한다 — 이 4장에만 적용 */}
@@ -193,10 +188,13 @@ export default async function DashboardPage({
               withDetailLink
             />
           </Section>
+          <NextViewLink view={view} />
         </section>
+        ) : null}
 
-        {/* ══ 존 ② 추이 · 분포 — 시간·공간 축 ══ */}
-        <section id="trends" aria-label="추이와 분포" className="flex scroll-mt-32 flex-col gap-6">
+        {/* ══ 뷰 ② 추이 · 분포 — 시간·공간 축 ══ */}
+        {view === "trends" ? (
+        <section aria-label="추이와 분포" className="flex flex-col gap-6">
           <GroupHeading note="월별 흐름과 분포">추이 · 분포</GroupHeading>
           <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
             <Section
@@ -264,10 +262,13 @@ export default async function DashboardPage({
           >
             {scaleData.length ? <ScaleCompare data={scaleData} /> : <EmptyChart />}
           </Section>
+          <NextViewLink view={view} />
         </section>
+        ) : null}
 
-        {/* ══ 존 ③ 제안의 정량 근거 — 관측값이 아니라 파생 스코어 층위 ══ */}
-        <section id="evidence" aria-label="제안의 정량 근거" className="flex scroll-mt-32 flex-col gap-6">
+        {/* ══ 뷰 ③ 제안의 정량 근거 — 관측값이 아니라 파생 스코어 층위 ══ */}
+        {view === "evidence" ? (
+        <section aria-label="제안의 정량 근거" className="flex flex-col gap-6">
           <GroupHeading note="AI 제안이 딛고 선 정량 값 — 순위는 화면에서 감추지 않는다">
             제안의 정량 근거
           </GroupHeading>
@@ -467,36 +468,26 @@ export default async function DashboardPage({
               ) : null}
             </div>
           </details>
+          <NextViewLink view={view} />
         </section>
+        ) : null}
 
-        {/* ══ 데이터 확인 — 본문은 전부 `데이터 활용 정보`(/data)로 옮겼다.
-            여기 남는 것은 "이 화면의 값이 어느 기준인가" 한 줄과 그리로 가는 길뿐이다.
-            출처·컬럼·체크섬·비공개 내역을 화면마다 되풀이하면 어느 쪽이 정본인지 흐려진다 ══ */}
-        <Section
-          id="data-demo"
-          icon="database"
-          title="이 화면의 데이터 기준"
-          desc="지표를 계산한 원천·기준 시점·비공개 처리 내역은 데이터 활용 정보에서 한곳에 모아 확인합니다."
-        >
-          <div className="rounded-xl bg-admin-surface-sunken px-3.5 py-3 text-xs leading-5 text-admin-text-muted">
-            데이터 기준: <span className="font-semibold text-admin-text">{d.period_note}</span> · 산출일{" "}
-            <span className="font-semibold text-admin-text">{d.updated_at}</span>
-          </div>
-          {privacy ? (
-            <p className="u-note mt-3 flex flex-wrap items-center gap-1.5">
-              <PrivacyBadge note={privacy.note} k={privacy.k} />
-              이 화면 일부 값은 가맹점 {privacy.k}곳 미만 셀 {privacy.suppressed_cells.length}개가
-              비공개 처리된 데이터로 그렸습니다.
-            </p>
-          ) : null}
-          <Link
-            href="/data"
-            className="mt-3 inline-flex items-center gap-1.5 text-[13px] font-semibold text-admin-primary underline-offset-4 hover:underline"
-          >
-            데이터 활용 정보 — 공공데이터 6종·산출 버전·비공개 내역
-            <Icon name="arrowRight" size={14} strokeWidth={2} />
-          </Link>
-        </Section>
+        {/* ══ 소표본 보호 고지 — 뷰와 무관하게 항상 보인다.
+            탭 뒤로 숨기면 "감춘 사실을 감춘" 꼴이 되므로 뷰 전환에 걸지 않는다.
+            출처·컬럼·체크섬·비공개 셀 목록 같은 상세는 /data가 정본이다 ══ */}
+        {privacy ? (
+          <p className="u-note flex flex-wrap items-center gap-x-1.5 gap-y-1 border-t border-admin-border pt-4">
+            <PrivacyBadge note={privacy.note} k={privacy.k} />
+            이 화면 일부 값은 가맹점 {privacy.k}곳 미만 셀 {privacy.suppressed_cells.length}개가
+            비공개 처리된 데이터로 그렸습니다.
+            <Link
+              href="/data#privacy"
+              className="font-semibold text-admin-primary underline-offset-4 hover:underline"
+            >
+              비공개 내역 보기 →
+            </Link>
+          </p>
+        ) : null}
       </div>
     </AdminShell>
   );
