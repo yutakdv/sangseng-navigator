@@ -80,10 +80,11 @@ EXPANSION_SOURCES = ["하이원포인트 사용현황", "가맹점 상세정보"
 SCENARIO_RATES = [3, 5, 7]
 MANDATORY_INCENTIVE_RISKS = ["예산", "약관", "미구현"]
 KST_OFFSET = "+09:00"                                       # 05 §8 시각 표기 — 모든 타임스탬프 KST
-# health의 산출물별 보고 대상 (05 §6 산출 JSON). risk_signal은 07 B4 ⑥ "없으면 컷"인 선택 입력이라
-# data_loaded(필수 AND) 판정에서 빠진다.
+# health의 산출물별 보고 대상 (05 §6 산출 JSON). risk_signal·manifest는 선택 입력이라
+# data_loaded(필수 AND) 판정에서 빠진다 (risk_signal=07 B4 ⑥ "없으면 컷", manifest=A4 버전 부가 정보).
 REQUIRED_DATASETS = ["dashboard", "eup_scores", "candidates", "merchants"]
-OPTIONAL_DATASET = "risk_signal"
+OPTIONAL_DATASET = "risk_signal"               # 개별 결손 시나리오 테스트용 대표값
+OPTIONAL_DATASETS_ALL = {OPTIONAL_DATASET, "manifest"}   # health()가 실제로 순회하는 선택 산출물 전체
 
 # ── LLM 목업 응답 (실호출 금지) ──
 FAKE_COMPARISON = "목업 비교문 — 1순위와 2순위를 비교한 문장입니다."
@@ -193,7 +194,7 @@ def test_health_reports_dataset_breakdown():
     body = res.json()
 
     assert body["ok"] is True and body["data_loaded"] is True
-    assert set(body["datasets"]) == set(REQUIRED_DATASETS) | {OPTIONAL_DATASET}
+    assert set(body["datasets"]) == set(REQUIRED_DATASETS) | OPTIONAL_DATASETS_ALL
     assert all(v is True for v in body["datasets"].values())    # 커밋된 data/processed 기준
 
 
@@ -1150,3 +1151,13 @@ def test_llm_rejects_unknown_provider(monkeypatch):
 
     with pytest.raises(llm.LLMError, match="Unsupported LLM_PROVIDER: opena1"):
         REAL_GENERATE_JSON("system", "user", {"type": "object"}, attempts=1)
+
+
+# ── A4: 데이터셋 버전 헤더 ────────────────────────────────────────────────
+
+def test_api_responses_carry_dataset_version_header():
+    """05 §5 — 모든 /api/* 응답에 X-Dataset-Version이 실려 화면이 어느 데이터로 만들어졌는지 드러난다."""
+    res = client.get("/api/dashboard")
+    assert res.status_code == 200
+    version = res.headers.get("X-Dataset-Version")
+    assert version and version.startswith("2025-12."), version

@@ -622,6 +622,15 @@ LLM 호출이 실패하거나 애초에 호출하지 않은 카드도 **똑같�
 
 ## 5. 기타
 
+### 데이터셋 버전 헤더 (`X-Dataset-Version`)
+
+모든 `/api/*` 응답에 `X-Dataset-Version: <base_month>.<해시8자리>`(예: `2025-12.a1b2c3d4`) 헤더가
+실린다 — 화면이 지금 어느 데이터셋 산출로 만들어졌는지 심사위원이 확인하는 용도(Task C1 출처 칩이
+표시). 값의 원천은 `data/processed/manifest.json`의 `dataset_version`이며, 파이프라인(`run_all.py`)이
+매 실행 끝에 산출 JSON 전체의 sha256을 모아 생성한다(§6 참고). `manifest.json`이 없는(구 데이터)
+환경에서는 헤더가 생략될 뿐 응답 자체는 정상 200이다. CORS `expose_headers`에 등록돼 있어 브라우저
+JS(`fetch(...).headers.get("X-Dataset-Version")`)에서도 읽을 수 있다.
+
 | 메서드 | 경로 | 응답 |
 |---|---|---|
 | GET | `/api/health` | `{"ok": true, "data_loaded": true, "datasets": {...}}` |
@@ -632,15 +641,17 @@ LLM 호출이 실패하거나 애초에 호출하지 않은 카드도 **똑같�
   "demo_read_only": false,
   "data_loaded": true,
   "datasets": {"dashboard": true, "eup_scores": true, "candidates": true,
-               "merchants": true, "risk_signal": true}
+               "merchants": true, "risk_signal": true, "manifest": true}
 }
 ```
 
-- `datasets`: 산출 JSON 5종의 로드 성공 여부(각 `true`/`false` — 파일 누락뿐 아니라 JSON 파손도
+- `datasets`: 산출 JSON 6종의 로드 성공 여부(각 `true`/`false` — 파일 누락뿐 아니라 JSON 파손도
   `false`). `dashboard` 하나만 보면 나머지
   결손을 놓치므로 개별로 보고한다 (배포 후 `deploy-backend.sh`의 data 복사 누락 진단용)
 - `data_loaded`: **필수 4종**(`dashboard`·`eup_scores`·`candidates`·`merchants`)의 AND.
-  `risk_signal`은 07 문서 B4 ⑥에서 "없으면 컷"인 선택 입력이라 `datasets`에만 싣고 AND에서는 뺀다
+  `risk_signal`은 07 문서 B4 ⑥에서 "없으면 컷"인 선택 입력이라 `datasets`에만 싣고 AND에서는 뺀다.
+  `manifest`도 마찬가지로 버전 표시용 부가 정보라 `datasets`에만 싣고 AND에서는 뺀다(A4) —
+  없어도 `/api/*` 응답 자체는 정상이고 `X-Dataset-Version` 헤더만 생략된다
 - `demo_read_only`: `DEMO_READ_ONLY` 환경변수 상태 — FE가 읽기 전용 배너·버튼 잠금을 서버 설정과
   맞추는 데 쓴다
 - 기존 키 `ok`·`data_loaded`는 형태·의미 그대로다 — `datasets`·`demo_read_only`가 추가되었다
@@ -658,6 +669,7 @@ LLM 호출이 실패하거나 애초에 호출하지 않은 카드도 **똑같�
 | `usage_monthly.json` | 월×지역×업종 원자료 집계 (재계산·검증용) — `k<5` 셀 건수는 P10이 `null`로 억제, `privacy_meta` 동반 | pipeline, simulate, **FE 지역 드릴다운(정적 import)** |
 | `usage_daily.json` | 일·요일 축 집계 — 요일×표시6분류(지역별+전체) 누적, 지역별 일 총건수 시계열 | **FE 지역 드릴다운 요일 섹션(정적 import)**, BE(카드 생성 AI 입력 ⑧) |
 | `cell_load.json` | (지역×표시업종) 셀별 가맹점 이용 부하 지수 — 최근 3개월 평균 월 거래 건수 ÷ 셀 가맹점 수 (건수 기반 추정치, k=5 미만 셀은 억제) | **FE 셀 탐색 시뮬레이터(정적 import)**, pipeline(A3 억제 검증 입력) |
+| `manifest.json` | 산출 JSON 전체(자기 자신 제외)의 sha256·바이트 수 + `dataset_version`(`<base_month>.<해시8자리>`) — 파이프라인을 다시 돌리면 `generated_at`·해시가 바뀌어 매번 값이 갱신된다 | BE(모든 `/api/*` 응답의 `X-Dataset-Version` 헤더), FE(Task C1 출처 칩) |
 
 - `risk_signal.json` 표시 주의: 실측 4개 시군이 **14.6~15.1%로 최대 편차 0.5%p**라 지역 간 비교
   근거가 못 된다. 화면에 노출할 때 **'위험' 라벨·경고색·순위 정렬을 쓰지 않고**
@@ -695,6 +707,15 @@ LLM 호출이 실패하거나 애초에 호출하지 않은 카드도 **똑같�
   가맹점 5곳 미만(`k_anonymity`) 셀은 `suppressed: true`이고 `monthly_uses_avg`·`load_index`가
   `null`, `tier`는 `"suppressed"`다(k-익명성 보호 — Task A3가 검증). **화면에 노출할 때는 절대 규칙 7
   에 따라 모든 화면에 `추정치` 배지와 산식 툴팁을 함께 표기해야 한다.**
+- `manifest.json`은 `run_all.py`가 STEPS 전체가 끝난 뒤(P10 프라이버시 억제가 `usage_monthly.json`·
+  `dashboard.json`을 마지막에 제자리 수정하므로, 그 이후에 떠야 해시가 최종 산출과 일치한다)
+  `data/processed/*.json`(자기 자신 제외)을 훑어 파일별 sha256·바이트 수를 기록하고, 그 해시들을
+  이어붙여 다시 sha256 한 값의 앞 8자리를 `base_month`(=`usage_monthly.json`의 `base_month`)에
+  붙여 `dataset_version`을 만든다. **BE 엔드포인트 없이** 모든 `/api/*` 응답의 `X-Dataset-Version`
+  헤더(§5)로만 노출되고, FE mock 사본(`frontend/src/mocks/manifest.json`)은 Task C1 출처 칩이
+  정적 import 해 같은 문자열을 표시한다. 원본 데이터가 그대로여도 재실행마다 `generated_at`이
+  바뀌므로, 이 파일에 의존하는 테스트는 특정 해시값이 아니라 `dataset_version`의 형태(접두사
+  `<base_month>.`)만 검증한다.
 
 FE mock 동기화: 레포 루트에서 `./scripts/sync-mocks.sh` — 위 산출 JSON을 `frontend/src/mocks/`로
 복사하고, `candidates.json`은 `GET /api/candidates`와 같은 병합 응답 형태로 생성한다.
