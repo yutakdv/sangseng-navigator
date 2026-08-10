@@ -256,7 +256,7 @@ export function ProgressReportDashboard({
         <Section
           icon="layers"
           title="단계별 평균 소요"
-          desc="기간 내 같은 카드의 서로 다른 연속 상태 기록 사이 시간을 계산합니다. 같은 상태의 추가 메모는 중복 단계로 세지 않으며, 오래 걸린 전이부터 보여 줍니다."
+          desc="기간 내 같은 카드의 서로 다른 연속 상태 기록 사이 시간을 계산합니다. 같은 상태의 추가 메모는 중복 단계로 세지 않습니다. 관측된 전이가 한 줄로 이어지면 그 순서대로 잇고, 갈라지거나 끊기면 구간을 따로 나열합니다."
         >
           {report.stage_durations.length ? (
             <StageDurations rows={report.stage_durations} />
@@ -554,31 +554,93 @@ function StageCell({
   );
 }
 
+type StageDurationRow = ProgressReport["stage_durations"][number];
+
 /**
- * 단계별 평균 소요 — 표가 아니라 **막대 비교 목록**.
+ * 관측된 전이들이 **한 줄로 이어지는 사슬인지** 판정하고, 맞으면 순서대로 정렬해 돌려준다.
+ *
+ * 사슬을 코드가 **데이터에서 유도한다** — 워크플로 정의(후보 접촉→적격성→…)를 그대로 믿고
+ * 그리지 않는다. 이유는 `stage_durations`에 카드 유형 정보가 없기 때문이다: 확충(5단계)과
+ * 인센티브(3단계)의 전이가 한 배열에 섞여 오고, `추진중 → 완료`처럼 두 워크플로에 모두
+ * 있는 구간은 어느 쪽인지 구분되지 않는다(위 분포 블록이 카드별 최신 기록에서 유형을 다시
+ * 파는 것과 같은 한계다). 그래서 "관측된 것만" 이어 보고, 갈라지거나 끊기면 사슬로 그리지
+ * 않는다 — 없는 순서를 지어내지 않기 위한 판정이다.
+ *
+ * 사슬 조건: ① 시작점(다른 전이의 도착지가 아닌 출발지)이 정확히 하나, ② 같은 출발지에서
+ * 두 갈래로 갈라지지 않음, ③ 한 번 걸어서 모든 전이를 소진. 하나라도 어긋나면 null.
+ */
+function chainOf(rows: StageDurationRow[]): StageDurationRow[] | null {
+  if (!rows.length) return null;
+  const byFrom = new Map<string, StageDurationRow>();
+  for (const row of rows) {
+    if (byFrom.has(row.from_progress)) return null; // 같은 출발지에서 분기 → 한 줄이 아니다
+    byFrom.set(row.from_progress, row);
+  }
+  const arrivals = new Set(rows.map((r) => r.to_progress));
+  const starts = rows.filter((r) => !arrivals.has(r.from_progress));
+  if (starts.length !== 1) return null;
+
+  const chain: StageDurationRow[] = [];
+  const seen = new Set<string>();
+  let cur: StageDurationRow | undefined = starts[0];
+  while (cur && !seen.has(cur.from_progress)) {
+    seen.add(cur.from_progress);
+    chain.push(cur);
+    cur = byFrom.get(cur.to_progress);
+  }
+  return chain.length === rows.length ? chain : null;
+}
+
+/**
+ * 단계별 평균 소요 — 표가 아니라 **파이프라인 사슬**.
  *
  * 예전에는 4열 표(상태 전이 / 평균 / 중앙값 / 표본)였는데, 첫 열에 상태 칩 두 개와 화살표가
- * 들어가 열 하나가 200px를 먹었다. 그 탓에 표 최소 폭이 560px이 되어 옆 블록과 반씩 나눠 쓰는
- * 자리에서는 늘 잘렸고, 가로 스크롤을 해야 정작 중요한 숫자가 보였다.
+ * 들어가 열 하나가 200px를 먹어 표 최소 폭이 560px이 됐고, 옆 블록과 나눠 쓰는 자리에서는
+ * 늘 잘려 가로 스크롤을 해야 숫자가 보였다.
  *
- * 게다가 이 표가 답해야 할 질문은 "어느 단계가 오래 걸리나"인데, 숫자 세 열을 나란히 읽어
- * 스스로 비교해야 했다. 막대로 바꾸면 그 비교가 형태로 끝난다 — 가장 긴 전이를 100%로 잡고
- * 상대 길이만 그린다(절대 척도가 아니므로 축을 그리지 않는다).
+ * 그 다음엔 막대 비교 목록(오래 걸린 순)으로 바꿨는데, 이 전이들이 사실은 **끊긴 네 항목이
+ * 아니라 한 줄로 이어지는 여정**(후보 접촉 → 적격성 → 가맹 심사 → 추진중 → 완료)이라는 게
+ * 화면에서 사라졌다. 그래서 세로 사슬로 다시 세운다 — 위 `추진 상태 분포` 트랙과 같은 흐름을
+ * 같은 문법으로 말한다. 구간 막대는 남긴다: 어디가 병목인지는 여전히 길이가 답한다.
  *
- * 중앙값·표본은 버리지 않는다: 표본이 두어 건이면 평균이 흔들린다는 사실을 같이 봐야 하므로
- * 막대 옆 보조 문구로 남긴다. 정렬은 오래 걸린 순 — 그래야 위에서부터 병목이 읽힌다
- * (원래 순서는 파이프라인 순도 정렬도 아닌 임의 순이었다).
+ * 사슬로 못 세우는 경우(유형이 섞여 분기·단절이 생긴 경우)에는 순서를 지어내지 않고
+ * 구간 목록으로 물러난다 — `chainOf`가 그 판정을 한다.
  */
-function StageDurations({ rows }: { rows: ProgressReport["stage_durations"] }) {
-  const sorted = [...rows].sort((a, b) => (b.average_hours ?? 0) - (a.average_hours ?? 0));
-  const longest = Math.max(...sorted.map((r) => r.average_hours ?? 0), 0);
+function StageDurations({ rows }: { rows: StageDurationRow[] }) {
+  const chain = chainOf(rows);
+  const legs = chain ?? [...rows].sort((a, b) => (b.average_hours ?? 0) - (a.average_hours ?? 0));
+  const longest = Math.max(...legs.map((r) => r.average_hours ?? 0), 0);
+  // 구간 평균을 더한 값이다 — 한 카드가 처음부터 끝까지 걸린 시간을 관측한 값이 아니라서
+  // 라벨도 "구간 평균의 합"으로 적는다. 구간 하나라도 평균이 없으면 합계를 내지 않는다.
+  const totalHours = chain?.every((r) => r.average_hours !== null)
+    ? chain.reduce((sum, r) => sum + (r.average_hours ?? 0), 0)
+    : null;
 
-  return (
-    <ol className="flex flex-col gap-3.5">
-      {sorted.map((row) => {
-        // 평균이 null이면 막대를 그리지 않는다 — 0%짜리 막대는 "0일"이라는 거짓말이 된다
-        const ratio = longest > 0 && row.average_hours !== null ? row.average_hours / longest : null;
-        return (
+  const bar = (row: StageDurationRow) => {
+    // 평균이 null이면 막대를 그리지 않는다 — 0%짜리 막대는 "0일"이라는 거짓말이 된다
+    const ratio = longest > 0 && row.average_hours !== null ? row.average_hours / longest : null;
+    return (
+      <div className="flex items-center gap-2.5">
+        <span className="h-1.5 min-w-0 flex-1 overflow-hidden rounded-full bg-admin-surface-sunken">
+          {ratio === null ? null : (
+            <span
+              className="block h-full rounded-full bg-admin-primary"
+              style={{ width: `${Math.max(ratio * 100, 4)}%` }}
+            />
+          )}
+        </span>
+        <span className="shrink-0 whitespace-nowrap text-[11px] tabular-nums text-admin-text-muted">
+          중앙값 {durationLabel(row.median_hours)} · 표본 {row.sample_size}건
+        </span>
+      </div>
+    );
+  };
+
+  // 사슬이 아니면 예전처럼 구간을 따로 나열한다 (순서를 만들어 내지 않는다)
+  if (!chain) {
+    return (
+      <ol className="flex flex-col gap-3.5">
+        {legs.map((row) => (
           <li key={`${row.from_progress}-${row.to_progress}`}>
             <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-0.5">
               <span className="flex min-w-0 items-center gap-1.5 break-keep text-[13px] font-semibold text-admin-text">
@@ -590,23 +652,68 @@ function StageDurations({ rows }: { rows: ProgressReport["stage_durations"] }) {
                 {durationLabel(row.average_hours)}
               </span>
             </div>
-            <div className="mt-1.5 flex items-center gap-2.5">
-              <span className="h-1.5 min-w-0 flex-1 overflow-hidden rounded-full bg-admin-surface-sunken">
-                {ratio === null ? null : (
-                  <span
-                    className="block h-full rounded-full bg-admin-primary"
-                    style={{ width: `${Math.max(ratio * 100, 4)}%` }}
-                  />
-                )}
-              </span>
-              <span className="shrink-0 whitespace-nowrap text-[11px] tabular-nums text-admin-text-muted">
-                중앙값 {durationLabel(row.median_hours)} · 표본 {row.sample_size}건
-              </span>
-            </div>
+            <div className="mt-1.5">{bar(row)}</div>
           </li>
-        );
-      })}
-    </ol>
+        ))}
+      </ol>
+    );
+  }
+
+  const nodes = [chain[0].from_progress, ...chain.map((r) => r.to_progress)];
+
+  return (
+    <>
+      <ol className="flex flex-col">
+        {nodes.map((node, i) => {
+          const leg = chain[i]; // 이 노드에서 다음 노드로 가는 구간 (마지막 노드면 undefined)
+          const isLast = i === nodes.length - 1;
+          return (
+            <li key={node}>
+              {/* 단계 — 점 + 이름. 마지막(도착) 단계만 상태색(완료 초록)을 갖는다 */}
+              <div className="flex items-center gap-3">
+                <span className="flex w-2.5 shrink-0 justify-center">
+                  <span
+                    className={`h-2.5 w-2.5 rounded-full ${
+                      isLast && node === "완료" ? "bg-state-good" : "bg-admin-primary"
+                    }`}
+                  />
+                </span>
+                <span className="break-keep text-[13px] font-semibold text-admin-text">{node}</span>
+              </div>
+
+              {/* 구간 — 세로 연결선 오른쪽에 소요 시간과 막대를 건다 */}
+              {leg ? (
+                <div className="flex gap-3">
+                  <span aria-hidden className="flex w-2.5 shrink-0 justify-center">
+                    <span className="w-px flex-1 bg-admin-border" />
+                  </span>
+                  <div className="min-w-0 flex-1 py-2">
+                    <div className="flex items-baseline justify-between gap-3">
+                      <span className="text-[11px] text-admin-text-muted">이 구간 평균</span>
+                      <span className="text-[15px] font-bold tabular-nums text-admin-text">
+                        {durationLabel(leg.average_hours)}
+                      </span>
+                    </div>
+                    <div className="mt-1.5">{bar(leg)}</div>
+                  </div>
+                </div>
+              ) : null}
+            </li>
+          );
+        })}
+      </ol>
+
+      {totalHours !== null ? (
+        <p className="mt-3 flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1 border-t border-admin-border pt-3">
+          <span className="text-[11px] text-admin-text-muted">
+            구간 평균의 합 — 한 카드가 처음부터 끝까지 걸린 시간을 관측한 값이 아닙니다
+          </span>
+          <span className="text-[15px] font-bold tabular-nums text-admin-text">
+            {durationLabel(totalHours)}
+          </span>
+        </p>
+      ) : null}
+    </>
   );
 }
 
