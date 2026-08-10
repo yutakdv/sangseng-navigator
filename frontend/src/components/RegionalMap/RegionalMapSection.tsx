@@ -56,8 +56,10 @@ export function RegionalMapSection({ statuses }: { statuses: RegionStatus[] }) {
 
   return (
     <div>
-      {/* 지도 상자 — 테두리·틴트 없이 흰 면. 폭 80%(가운데 정렬)로 여백을 둔다 */}
-      <div className="rounded-2xl bg-[#ffffff] p-3 sm:p-5">
+      {/* 지도 상자 — 테두리·틴트 없이 흰 면(패널 면과 동일). 자체 패딩을 두지 않는다:
+          패널(Section)의 상하 패딩과 겹쳐 블록 아래쪽만 두꺼워 보이게 만들었다.
+          폭 80%(가운데 정렬)로 여백을 둔다 */}
+      <div>
         <div className="mx-auto w-full sm:w-4/5">
           <RegionalMap
             selectedId={selected?.id ?? null}
