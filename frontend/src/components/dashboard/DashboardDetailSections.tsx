@@ -73,21 +73,24 @@ export function DashboardDetailSections({ view }: { view: DashboardView }) {
         >
           <PolicyFlow
             counts={{
-              cards: kpi.counts.total,
-              pending: kpi.counts.pending,
+              // kpi가 null(호출 실패)이면 0으로 지어내지 않고 null을 그대로 넘긴다 —
+              // PolicyFlow는 null인 단계의 건수 배지를 아예 표시하지 않는다(지어낸 수치 금지 원칙).
+              cards: kpi?.counts.total ?? null,
+              pending: kpi?.counts.pending ?? null,
               /* STEP4·5·6은 승인 카드를 겹치지 않게 나눈다 — 셋을 더하면 승인 카드 총수다.
                  예전에는 STEP4가 승인 전체를, STEP5가 `추진중`만 세어 적격성 확인·가맹 심사 카드가
                  STEP4에 중복 집계되고 STEP5에서는 통째로 빠졌다 (lib/cardWorkflow 주석 참고).
-                 `done`만 kpi를 그대로 쓴다 — 백엔드(routes/kpi.py)도 `승인 && 완료`로 세므로
-                 정의가 같고, 프런트에서 다시 셀 이유가 없다 */
+                 approved·inProgress는 이미 받아온 cards 배열에서 직접 세므로 kpi 실패와 무관하게
+                 항상 값이 있다. `done`만 kpi를 그대로 쓴다 — 백엔드(routes/kpi.py)도 `승인 && 완료`로
+                 세므로 정의가 같고, 프런트에서 다시 셀 이유가 없다 */
               approved: approved.filter(isStartStage).length,
               inProgress: approved.filter(isExecutionStage).length,
-              done: kpi.counts.done,
+              done: kpi?.counts.done ?? null,
             }}
           />
           <p className="u-note mt-4 border-t border-admin-border pt-3">
-            후보 데이터 {candidates.candidates.length}건 · 데이터 기준 {dashboard.period_note} · 실제 성과는 완료 후
-            운영 기록에 별도로 입력합니다.
+            후보 데이터 {candidates ? `${candidates.candidates.length}건` : "불러오지 못함"} · 데이터
+            기준 {dashboard.period_note} · 실제 성과는 완료 후 운영 기록에 별도로 입력합니다.
           </p>
         </Panel>
       </div>

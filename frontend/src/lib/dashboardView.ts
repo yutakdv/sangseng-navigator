@@ -18,7 +18,11 @@ const byDecidedDesc = (a: Card, b: Card): number =>
  */
 export function composeEvidence(
   dashboard: Dashboard,
-  candidates: CandidatesResponse,
+  // 허브(app/page.tsx)는 candidates를 보조 데이터로 보고 `.catch(() => null)`로 감싼다 — 이
+  // 함수가 그 null을 "0건"으로 조용히 삼키면 확충 카드의 "지역 근거"가 "6개 지역 공통"(원래는
+  // 대상 지역이 없는 인센티브 카드용 문구)으로 잘못 읽힌다. 그래서 `rankingUnavailable`을 함께
+  // 반환해 호출부가 "산출된 값이 없다"와 "불러오지 못했다"를 구분해 표시하게 한다.
+  candidates: CandidatesResponse | null,
   card: Card | undefined,
 ) {
   const monthlyRows = dashboard.monthly_by_region ?? [];
@@ -47,7 +51,8 @@ export function composeEvidence(
         ? `${latestMonth} 1위 ${topLatest.region} ${num(topLatest.value)}건 · 최하위 ${latestByRegion.at(-1)?.region} ${num(latestByRegion.at(-1)?.value ?? 0)}건`
         : "월별 지역 데이터가 없습니다";
 
-  const ranking = candidates.eup_ranking ?? [];
+  const ranking = candidates?.eup_ranking ?? [];
+  const rankingUnavailable = candidates === null;
   const targetCategory = card?.target?.category ?? null;
   const category = (dashboard.category_share ?? []).find((row) => row.category === targetCategory);
   const categoryInsight = category
@@ -71,6 +76,7 @@ export function composeEvidence(
     targetRegion,
     regionInsight,
     ranking,
+    rankingUnavailable,
     targetCategory,
     categoryInsight,
     scoreTopLine,
@@ -80,8 +86,8 @@ export function composeEvidence(
 export function composeDashboardView(
   dashboard: Dashboard,
   cards: Card[],
-  candidates: CandidatesResponse,
-  kpi: Kpi,
+  candidates: CandidatesResponse | null,
+  kpi: Kpi | null,
   activeType: CardType | null,
 ) {
   const visible = activeType ? cards.filter((card) => card.type === activeType) : cards;

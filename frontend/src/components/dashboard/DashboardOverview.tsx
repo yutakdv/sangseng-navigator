@@ -40,6 +40,7 @@ export function DashboardOverview({
   inProgress,
   completed,
   ranking,
+  rankingUnavailable = false,
   regionInsight,
   scoreTopLine,
   activeType,
@@ -48,7 +49,8 @@ export function DashboardOverview({
   children,
 }: {
   dashboard: Dashboard;
-  kpi: Kpi;
+  /** null이면 KPI 호출 실패 — 품질 배지·분기 진단 패널의 "정책 채택률"을 숨기고 "불러오지 못함"으로 표시한다 */
+  kpi: Kpi | null;
   /** 지금 좌측에 뜬 카드 — `?selected=`가 없으면 오늘 검토 1순위 */
   selected?: Card;
   /** 오늘 검토 1순위 카드 id — 선택과 무관하게 목록에서 배지로 표시한다 */
@@ -60,6 +62,8 @@ export function DashboardOverview({
   /** 완료 — 방문객 화면에 반영되는 카드이자 statusCounts.done의 근거 */
   completed: Card[];
   ranking: EupScore[];
+  /** true면 candidates 호출 실패로 ranking이 정말로는 비어 있지 않을 수 있다 — "0건"이 아니라 "불러오지 못함"으로 표시한다 */
+  rankingUnavailable?: boolean;
   /** 선택된 카드 기준 판독 문장 — 허브에서는 이 한 줄이 차트를 대신한다 */
   regionInsight: string;
   /** 읍·시 스코어 상위 3곳 한 줄 요약 (1단계 지역 진단 — 절대 규칙 5의 텍스트 병기) */
@@ -72,8 +76,11 @@ export function DashboardOverview({
 }) {
   const totalUses = (dashboard.region_share ?? []).reduce((sum, row) => sum + row.count, 0);
   const freshness = dataFreshness(dashboard.period_note);
-  const quality = sampleQuality(kpi.counts.decided);
-  const qualityLabel = quality === "demo" ? "예시 데이터" : quality === "limited" ? "표본 보강 필요" : "운영 표본";
+  // kpi가 null(호출 실패)이면 표본 품질을 판단할 근거가 없다 — "운영 표본"으로 기본값을 주면
+  // 실제로는 확인하지 못한 품질을 확인한 것처럼 말하게 되므로 배지 자체를 숨긴다.
+  const quality = kpi ? sampleQuality(kpi.counts.decided) : null;
+  const qualityLabel =
+    quality === "demo" ? "예시 데이터" : quality === "limited" ? "표본 보강 필요" : quality === "sufficient" ? "운영 표본" : null;
   const filterNote =
     activeType === "EXPANSION"
       ? "가맹점 확충 카드만 보고 있습니다."
@@ -217,6 +224,7 @@ export function DashboardOverview({
                   <ProposalSummary
                     card={selected}
                     ranking={ranking}
+                    rankingUnavailable={rankingUnavailable}
                     dashboard={dashboard}
                     leadBadge={
                       isLead ? (
@@ -246,7 +254,7 @@ export function DashboardOverview({
                           <span>
                             읍·시 스코어 상위:{" "}
                             <span className="font-semibold tabular-nums text-admin-text">
-                              {scoreTopLine || "산출 전"}
+                              {scoreTopLine || (rankingUnavailable ? "불러오지 못함" : "산출 전")}
                             </span>
                           </span>
                         </li>
@@ -306,9 +314,11 @@ export function DashboardOverview({
                    실행 관리·완료 목록은 기본값(바 있음)을 그대로 쓴다 */
                 accentBar={false}
                 badge={
-                  <span className="rounded-full bg-state-warn-bg px-2.5 py-1 text-xs font-bold text-state-warn">
-                    {qualityLabel}
-                  </span>
+                  qualityLabel ? (
+                    <span className="rounded-full bg-state-warn-bg px-2.5 py-1 text-xs font-bold text-state-warn">
+                      {qualityLabel}
+                    </span>
+                  ) : null
                 }
                 /* 종류 필터를 최상단에서 걷어냈으므로, `?type=` 딥링크로 들어온 담당자가
                    필터에 갇히지 않도록 해제 경로를 대기 목록 헤더에 둔다 */
