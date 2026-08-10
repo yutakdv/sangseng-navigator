@@ -28,6 +28,29 @@ aws sts get-caller-identity --profile sangseng   # 확인
 ./infra/scripts/zero-downtime-check.sh    # 배포가 끝나면 Ctrl-C
 ```
 
+## 자동 배포 (CI)
+
+`main`에 머지되면 `.github/workflows/backend-deploy.yml`이 백엔드를 배포한다.
+PR 단계에서는 `pr-checks.yml`이 pytest·cfn-lint·프론트 빌드만 돌리고 배포하지 않는다.
+
+- **인증:** GitHub OIDC → IAM 역할 `sangseng-github-deploy`. 저장소에 AWS 키가 없다.
+  신뢰 정책이 `main` 브랜치로 제한돼 있다
+- **범위:** service 스택만 갱신한다. foundation(VPC·DynamoDB)은 수동이다 —
+  `./infra/scripts/deploy-foundation.sh`
+- **경로 필터:** `backend/**`·`data/processed/**`·`infra/**`가 바뀐 경우에만 돈다.
+  문서만 고친 머지로는 배포하지 않는다
+- **수동 실행:** Actions 탭 → 백엔드 배포 → Run workflow
+
+로컬 `./infra/scripts/deploy.sh`와 CI는 **같은 스크립트**를 쓴다. 차이는 값의 출처뿐이다 —
+로컬은 `.env`, CI는 GitHub 저장소 변수이며, 스크립트의 `load_env`가 환경변수를 우선한다.
+`MUTATION_API_TOKEN`은 저장소 변수로 넘기지 않는다(정본은 SSM) — `preflight.sh`가 환경에 없으면
+SSM 선존재로 대체 확인하고, `smoke-test.sh`도 SSM 에서 직접 읽는다.
+
+> 나중에 "머지 후 사람이 한 번 더 승인" 게이트를 붙이려면 deploy job 에
+> `environment: production` 을 추가하고 **OIDC 신뢰 정책의 `sub` 를
+> `repo:…:environment:production` 으로 함께 바꿔야 한다** — environment 를 쓰면
+> 토큰의 subject 가 브랜치 형식에서 환경 형식으로 바뀌기 때문이다. 한쪽만 바꾸면 인증이 깨진다.
+
 ## 배포 후
 
 1. `deploy-service.sh`가 출력한 `ApiUrl`을 Vercel 환경변수 `NEXT_PUBLIC_API_BASE`에

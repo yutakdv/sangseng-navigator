@@ -184,6 +184,13 @@ Resources:
   # 애플리케이션 코드가 쓰는 권한.
   TaskRole:
     Type: AWS::IAM::Role
+    Metadata:
+      # cfn-lint 의 DynamoDB 액션 목록에 TransactWriteItems 가 빠져 있어 W3037 오탐이 난다
+      # (progress_db.py:330 이 실제로 호출하는 API 라 권한을 뺄 수 없다).
+      # 이 리소스에만 끄고 다른 곳의 IAM 액션 오타 검출은 그대로 살린다.
+      cfn-lint:
+        config:
+          ignore_checks: [W3037]
     Properties:
       AssumeRolePolicyDocument:
         Version: '2012-10-17'

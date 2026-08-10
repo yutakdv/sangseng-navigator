@@ -1,0 +1,59 @@
+name: PR 검증
+
+on:
+  pull_request:
+    branches: [main]
+
+# 포크 PR 에서도 안전하게 돌도록 자격증명이 필요한 단계를 두지 않는다.
+# ⚠ pull_request_target 은 절대 쓰지 않는다 — 포크의 코드를 시크릿과 함께 실행하게 된다.
+permissions:
+  contents: read
+
+jobs:
+  backend:
+    runs-on: ubuntu-24.04-arm      # public 레포는 ARM 러너 무료. 실패하면 ubuntu-latest 로 바꾼다
+    # 스모크 테스트는 DYNAMO_ENDPOINT 가 없으면 **스킵이 아니라 실패**한다(tests/test_smoke.py:40).
+    # 테이블은 테스트가 seed_demo.ensure_table() 로 직접 만들므로 컨테이너만 띄우면 된다.
+    services:
+      dynamodb:
+        image: amazon/dynamodb-local:latest
+        ports: ['8001:8000']
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: pip install -r backend/requirements.txt -r backend/requirements-dev.txt
+      - run: python -m pytest -q
+        working-directory: backend
+        env:
+          DYNAMO_ENDPOINT: http://localhost:8001
+
+  templates:
+    runs-on: ubuntu-24.04-arm
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      # AWS 자격증명 없이 검사한다 — cfn-lint 는 CI 전용이고 프로젝트 의존성이 아니다.
+      - run: pip install cfn-lint
+      - run: cfn-lint infra/cloudformation/foundation.yaml infra/cloudformation/service.yaml
+      - run: bash -n infra/config.sh infra/scripts/*.sh infra/scripts/lib/*.sh
+
+  frontend:
+    runs-on: ubuntu-24.04-arm
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - run: npm ci
+      - run: npm run lint
+      - run: npm run check:banned
+      - run: npm run build
