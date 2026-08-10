@@ -4,7 +4,6 @@ import { DeltaValue } from "@/components/DeltaValue";
 import { Icon } from "@/components/Icon";
 import { KpiCard } from "@/components/KpiCard";
 import { Section } from "@/components/Section";
-import { Sparkline } from "@/components/Sparkline";
 import { PROXY_NOTE } from "@/lib/constants";
 import { pctNum, pctUnit, ratioNum } from "@/lib/format";
 import {
@@ -119,7 +118,6 @@ export function ProgressReportDashboard({
             단계 정의가 다른 가맹점 확충과 페이백 인센티브를 나눠 봅니다.
             <br />
             유형별 합계는 기록 카드 {report.recorded_card_count}건입니다.
-            <br />
             기록이 없는 승인 카드는 분포에서 제외합니다.
           </>
         }
@@ -262,9 +260,7 @@ export function ProgressReportDashboard({
           desc={
             <>
               기간 내 같은 카드의 서로 다른 연속 상태 기록 사이 시간을 계산합니다.
-              <br />
               같은 상태의 추가 메모는 중복 단계로 세지 않습니다.
-              <br />
               관측된 전이가 한 줄로 이어지면 그 순서대로 잇고, 갈라지거나 끊기면 구간을 따로
               나열합니다.
             </>
@@ -292,9 +288,10 @@ export function ProgressReportDashboard({
           ))}
         </div>
 
-        {/* 위 타일은 카드 평균 한 쌍(기초·최신)만 보여 준다 — 그 사이에 값이 어떻게 움직였는지는
-            카드별로 펼쳐 봐야 답이 된다. 카드마다 관측 시점이 달라 여러 카드를 한 선으로 평균 내면
-            없는 추세를 만들어 내므로 **카드 1장 = 선 1개**로만 그린다 (metricSeries 주석). */}
+        {/* 위 타일은 카드 평균 한 쌍(기초·최신)만 보여 준다 — 어느 카드가 얼마나 움직였는지는
+            여기서 카드별로 펼쳐 본다. 스파크라인은 걷어냈다: 관측 간격이 카드마다 제각각이라
+            선의 기울기가 속도처럼 읽히는데 실제로는 그런 뜻이 아니었고, 26px 선 위의 점 두세 개가
+            숫자보다 덜 말했다. 지금은 기초값 → 최신값 + 변화량 숫자만 남긴다. */}
         {series.length ? (
           <details className="mt-3 border-t border-admin-border pt-3">
             <summary className="u-disclosure">기간 내 관측값 흐름 보기 · 지표 {series.length}종</summary>
@@ -315,7 +312,7 @@ export function ProgressReportDashboard({
                         return (
                           <li
                             key={card.cardId}
-                            className="grid grid-cols-1 gap-x-3 gap-y-1.5 rounded-lg bg-admin-surface-sunken px-3 py-2.5 sm:grid-cols-[minmax(0,1fr)_110px_auto] sm:items-center"
+                            className="grid grid-cols-1 gap-x-3 gap-y-1.5 rounded-lg bg-admin-surface-sunken px-3 py-2.5 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center"
                           >
                             <span
                               className="min-w-0 truncate text-xs font-semibold text-admin-text"
@@ -323,12 +320,6 @@ export function ProgressReportDashboard({
                             >
                               {card.title}
                             </span>
-                            <Sparkline
-                              data={card.values}
-                              id={`${card.cardId}-${entry.key}`}
-                              height={26}
-                              bare
-                            />
                             <span className="flex flex-wrap items-center gap-1.5 text-[11px] tabular-nums text-admin-text-muted">
                               {formatMetric(first, meta.digits)}
                               {meta.unit}
@@ -355,9 +346,11 @@ export function ProgressReportDashboard({
               })}
             </div>
             <p className="u-note mt-3">
-              선 하나가 카드 한 장의 관측 순서입니다 — 관측 간격이 일정하지 않으므로 기울기를 속도로
-              읽지 않습니다. 값을 두 번 이상 입력한 카드만 표시합니다. 지역 소비 집중도는 값이
-              낮아질수록(▼) 분산이 개선된 것입니다.
+              한 줄이 카드 한 장의 기초값 → 최신값입니다.
+              <br />
+              값을 두 번 이상 입력한 카드만 표시합니다.
+              <br />
+              지역 소비 집중도는 값이 낮아질수록(▼) 분산이 개선된 것입니다.
             </p>
           </details>
         ) : null}
