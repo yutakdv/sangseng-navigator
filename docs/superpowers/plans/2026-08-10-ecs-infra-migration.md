@@ -840,14 +840,17 @@ esac
   || die "service.yaml 의 CpuArchitecture($TEMPLATE_ARCH) 와 config.sh($CPU_ARCHITECTURE) 가 다릅니다. exec format error 로 첫 배포가 실패합니다."
 log_ok "$CPU_ARCHITECTURE / $DOCKER_PLATFORM (템플릿 일치)"
 
-log_step "5. 정적 산출물 5종"
-for name in dashboard eup_scores candidates merchants risk_signal; do
+log_step "5. 정적 산출물"
+# 백엔드가 dataload.load() 로 실제로 부르는 이름 전부 — /api/health 의 REQUIRED+OPTIONAL 보다 넓다.
+# usage_daily·usage_monthly 는 health 가 보고하지 않지만 대시보드·위젯 라우트가 부른다 —
+# 빠지면 health 는 초록인데 화면이 500 이 나는, 가장 늦게 발견되는 형태의 장애가 된다.
+for name in dashboard eup_scores candidates merchants risk_signal manifest usage_daily usage_monthly; do
   f="$REPO_ROOT/data/processed/$name.json"
   [ -f "$f" ] || die "$f 없음 — 먼저 'cd pipeline && python run_all.py' 를 실행하세요."
   python3 -c "import json,sys; json.load(open(sys.argv[1]))" "$f" \
     || die "$f 파싱 실패 (잘린 파일)"
 done
-log_ok "5종 존재·파싱 OK"
+log_ok "8종 존재·파싱 OK"
 
 log_step "6. 설정값과 읽기전용 짝 검사"
 load_env      # 환경변수 우선, .env 폴백
@@ -1763,7 +1766,13 @@ assert not missing, f"결손 산출물: {missing}"
 print("  datasets:", ", ".join(b["datasets"]))
 print("  demo_read_only:", b["demo_read_only"])
 ' || die "health 본문 검증 실패"
-log_ok "5종 적재"
+log_ok "health 보고 산출물 전부 적재"
+
+log_step "1-1. /api/dashboard — health 가 보고하지 않는 산출물까지 확인"
+# usage_daily·usage_monthly 는 health 의 datasets 에 안 들어 있다. 실제 라우트를 한 번 때려야
+# "health 는 초록인데 화면은 500" 인 상태를 잡을 수 있다.
+curl -fsS --max-time 20 "$API_URL/api/dashboard" >/dev/null || die "dashboard 호출 실패 — 산출물 결손 가능"
+log_ok "200"
 
 log_step "2. /api/health/ready — ALB 대상그룹이 보는 경로"
 CODE="$(curl -fsS -o /dev/null -w '%{http_code}' --max-time 20 "$API_URL/api/health/ready")"
