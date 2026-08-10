@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { AdminShell } from "@/components/AdminShell";
 import { AssumptionBadge, AssumptionNote, NarrativeSourceChip, ProxyBadge } from "@/components/Badge";
+import { CellExplorer } from "@/components/CellExplorer";
 import { Icon } from "@/components/Icon";
 import { PageHeader } from "@/components/PageHeader";
 import { PaybackCycle } from "@/components/PaybackCycle";
@@ -10,7 +11,7 @@ import { ScenarioTable } from "@/components/ScenarioTable";
 import { Section } from "@/components/Section";
 import { SourceChip } from "@/components/SourceChip";
 import { ProgressChip, StatusChip } from "@/components/StatusChip";
-import { api, datasetVersion } from "@/lib/api";
+import { api, cellLoad, datasetVersion } from "@/lib/api";
 import { cardNarrativeSource } from "@/lib/aiSource";
 
 export const metadata: Metadata = { title: "인센티브 정책 · 상생 나침반" };
@@ -31,12 +32,27 @@ const at = (iso: string): string => `${iso.slice(0, 10)} ${iso.slice(11, 16)}`;
  * - `original_ranking`이 null이다 — 후보 순위 비교가 아니라 전 지역 공통 시나리오 비교라서
  *   정량 순위 표를 렌더하지 않는다 (05 §2). 그 사실을 화면에 문장으로 밝힌다
  * - 승인에 `selected_rate`(3|5|7)가 필수다 — 미선택이면 승인 버튼이 비활성이다
+ *
+ * `?preset=flip`은 시연용 딥링크다 — 셀 탐색 섹션을 반전 직전 상태(사북읍 편의점·민감도 0.25)로
+ * 열어 슬라이더 한 칸에 처방이 뒤집히는 장면을 재현한다.
  */
-export default async function IncentivePage() {
-  const [dashboard, { cards }] = await Promise.all([
+export default async function IncentivePage({
+  searchParams,
+}: {
+  searchParams: Promise<{ preset?: string | string[] }>;
+}) {
+  // Next 15+ 에서 searchParams는 Promise다 — await 없이 접근하면 런타임 에러
+  const [sp, dashboard, { cards }] = await Promise.all([
+    searchParams,
     api.dashboard(),
     api.cards({ type: "INCENTIVE" }),
   ]);
+  const presetParam = Array.isArray(sp.preset) ? sp.preset[0] : sp.preset;
+  // 진입값 0.25는 반전 임계(0.30)에서 슬라이더 한 칸(0.05) 아래다 — 세 수치가 맞물려 있다
+  const preset =
+    presetParam === "flip"
+      ? { cell: { eup: "사북읍", category: "편의점" }, beta: 0.25 }
+      : undefined;
 
   // 최신 1장 = 생성 시각 내림차순 첫 카드 (허브에서 새로 생성하면 그 카드가 이 화면의 대상이 된다)
   const card = [...cards].sort((a, b) => Date.parse(b.created_at) - Date.parse(a.created_at))[0];
@@ -60,6 +76,29 @@ export default async function IncentivePage() {
     <ProxyBadge note={dashboard.conversion.proxy_note} />
   ) : null;
 
+  // 카드가 없어도 열려야 하는 섹션이다 — 딥링크(?preset=flip)는 카드 유무와 무관하게 동작한다
+  const explorerSection = (
+    <Section
+      id="cell-explorer"
+      icon="target"
+      title="어느 지역부터? — 셀 탐색"
+      badge={
+        <>
+          <AssumptionBadge />
+          {proxyBadge}
+        </>
+      }
+      desc="이 카드는 전 지역 공통이라 지역별 소비 여건 차이를 담지 못합니다. 지역×업종 한 칸과 가정 두 개(민감도·페이백률)를 움직이면 처방 방향이 수요 측과 공급 측 중 어디로 기우는지 견줄 수 있습니다. 탐색 결과는 카드에 저장되지 않습니다."
+    >
+      <CellExplorer
+        data={cellLoad()}
+        initial={preset}
+        proxyNote={dashboard.conversion.proxy_note}
+        version={datasetVersion()}
+      />
+    </Section>
+  );
+
   return (
     <AdminShell dashboard={dashboard}>
       <div className="mx-auto flex max-w-5xl flex-col gap-6">
@@ -71,6 +110,7 @@ export default async function IncentivePage() {
         />
 
         {!card ? (
+          <>
           <Section
             icon="gift"
             title="인센티브 카드가 아직 없습니다"
@@ -88,6 +128,8 @@ export default async function IncentivePage() {
               <Icon name="arrowRight" size={15} strokeWidth={2} />
             </Link>
           </Section>
+          {explorerSection}
+          </>
         ) : (
           <>
             {/* ── 카드 헤더 ─────────────────────────────────────── */}
@@ -206,6 +248,9 @@ export default async function IncentivePage() {
                 <AssumptionNote className="mt-2" dedupeWith={card.ai.expected_effect} />
               </div>
             </Section>
+
+            {/* ── 셀 탐색(반전 장면) ───────────────────────────── */}
+            {explorerSection}
 
             {/* ── 순환 구조 ─────────────────────────────────────── */}
             <Section

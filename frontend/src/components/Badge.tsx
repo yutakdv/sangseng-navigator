@@ -43,6 +43,23 @@ export function AssumptionBadge() {
   );
 }
 
+/**
+ * `추정치` — 실측이 아니라 산식으로 만들어 낸 지표에 붙인다 (절대 규칙 7).
+ * 지금 대상은 "가맹점 이용 부하"다: 원본에 금액 컬럼이 없어 한도 소진율 대신 건수로 나눈 값이라,
+ * 값이 보이는 자리마다 배지 + **산식 툴팁**(note)을 함께 둔다. note는 요약 없이 그대로 넣는다.
+ */
+export function EstimateBadge({ note }: { note: string }) {
+  return (
+    <span
+      className={`${base} bg-state-notice-bg text-state-notice ring-state-notice-line`}
+      title={note}
+    >
+      <Icon name="info" size={12} strokeWidth={2} />
+      추정치
+    </span>
+  );
+}
+
 /** 배지만으로 막지 못하는 오인을 본문으로 차단 — 블록 하단 고정 문구 (절대 규칙 3).
  *  본문(dedupeWith)이 이미 같은 문장을 담고 있으면 같은 문장을 연달아 두 번 찍지 않는다 —
  *  규칙 3은 본문 쪽 문구가 계속 충족한다 (BE cardgen._ensure_assumption이 데이터 계약으로 보장). */

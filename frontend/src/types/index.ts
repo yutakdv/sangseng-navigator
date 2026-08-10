@@ -99,6 +99,39 @@ export interface UsageDaily {
   daily_total: Record<string, [string, number][]>;
 }
 
+/** 셀 부하 구간 — 상위/중간/하위는 공개 셀의 사분위(Q3·Q1) 경계다. suppressed는 값 자체가 없다 */
+export type CellLoadTier = "high" | "mid" | "low" | "suppressed";
+
+/**
+ * 지역×표시업종 한 칸. 가맹점 수가 k(=5) 미만이면 개별 사업자가 역산될 수 있어
+ * 파이프라인(P9)이 값을 비우고 `suppressed: true`로 내려보낸다 — 그 셀은 화면 선택 목록에서 뺀다.
+ */
+export interface CellLoadCell {
+  eup: string;
+  category: string;
+  merchants: number;
+  /** 최근 3개월 평균 월 거래 건수. suppressed면 null */
+  monthly_uses_avg: number | null;
+  /** 부하 지수 = monthly_uses_avg ÷ merchants (건수 기반 추정치). suppressed면 null */
+  load_index: number | null;
+  tier: CellLoadTier;
+  suppressed: boolean;
+}
+
+/**
+ * 파이프라인 정적 산출물 `cell_load.json`(P9) — usageMonthly와 같은 이유로 BE 엔드포인트가 없다.
+ * 금액 컬럼이 원본에 없어 한도 소진율 대신 **건수 기반 부하 지수**를 쓴다(추정치 배지 필수).
+ */
+export interface CellLoad {
+  base_month: string;
+  window_months: string[];
+  /** 산식 고지 — 요약·의역 금지, 그대로 노출 */
+  method_note: string;
+  k_anonymity: number;
+  thresholds: { high: number; low: number };
+  cells: CellLoadCell[];
+}
+
 export interface EupScore {
   rank: number;
   eup: string;
