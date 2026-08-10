@@ -3,7 +3,7 @@ import Link from "next/link";
 import { AdminShell } from "@/components/AdminShell";
 import { PrivacyBadge } from "@/components/Badge";
 import { DashboardToc } from "@/components/DashboardToc";
-import { EmptyChart } from "@/components/EmptyChart";
+import { EmptyChart, FailedChart } from "@/components/EmptyChart";
 import { Icon } from "@/components/Icon";
 import { PageHeader } from "@/components/PageHeader";
 import { RegionFilter } from "@/components/RegionFilter";
@@ -63,19 +63,22 @@ export default async function RegionDetailPage({
     ? (sp.region as (typeof REGIONS)[number])
     : null;
 
+  // 핵심 데이터는 d(진단 계약) 하나 — 실패하면 에러 경계가 정직하다. 원장·일별 집계는
+  // 보조 데이터라 각자 실패해도 화면의 다른 축은 성립한다. null이면 아래에서 빈 배열
+  // ("정말 0건")과 구분해 FailedChart로 표시한다 (PR #44 견고성 원칙).
   const [d, usageLedger, usageDaily] = await Promise.all([
     api.dashboard(),
-    api.usageMonthly(),
-    api.usageDaily(),
+    api.usageMonthly().catch(() => null),
+    api.usageDaily().catch(() => null),
   ]);
 
   // 소표본 보호 고지 — 원장 쪽 값이 정본이고, 구형 산출물에는 아예 없을 수 있어 둘 다 가드한다
-  const privacy = usageLedger.privacy_meta ?? d.privacy_meta ?? null;
+  const privacy = usageLedger?.privacy_meta ?? d.privacy_meta ?? null;
   const privacyK = privacy?.k ?? 5;
 
   // 파생값은 지역을 골랐을 때만 계산한다 (원장은 서버에서만 읽는다)
-  const ledgerRows = usageLedger.usage ?? [];
-  const ledgerMonths = usageLedger.months ?? [];
+  const ledgerRows = usageLedger?.usage ?? [];
+  const ledgerMonths = usageLedger?.months ?? [];
   const regionDonut = selectedRegion
     ? regionCategoryShare(ledgerRows, selectedRegion)
     : { shares: [], suppressed: [] };
@@ -91,18 +94,18 @@ export default async function RegionDetailPage({
   // 라벨과 계산이 같은 창 정의를 쓰도록 regionAnalysis가 한 곳에서 만든다 (6개월 미만이면 null)
   const shiftWindow = shiftWindowLabel(ledgerMonths);
   // 일·요일 축 (usage_daily — 피드백 ⑦). 관측 집계라 전망 문구·근사 배지 대상이 아니다 (설계 08-08)
-  const weekdayBars = selectedRegion ? regionWeekdayAverages(usageDaily, selectedRegion) : [];
-  const weekdayInsight = selectedRegion ? regionWeekdayInsight(usageDaily, selectedRegion) : null;
+  const weekdayBars = selectedRegion && usageDaily ? regionWeekdayAverages(usageDaily, selectedRegion) : [];
+  const weekdayInsight = selectedRegion && usageDaily ? regionWeekdayInsight(usageDaily, selectedRegion) : null;
   // 전 지역 기준선 — 지역 리듬이 "다르다"는 말은 비교 대상이 화면에 함께 있어야 성립한다
-  const overallWeekday = selectedRegion ? overallWeekdayInsight(usageDaily) : null;
-  const categoryWeekdays = selectedRegion ? regionCategoryWeekdays(usageDaily, selectedRegion) : [];
+  const overallWeekday = selectedRegion && usageDaily ? overallWeekdayInsight(usageDaily) : null;
+  const categoryWeekdays = selectedRegion && usageDaily ? regionCategoryWeekdays(usageDaily, selectedRegion) : [];
   // 요일 축은 산출물이 달라(usage_daily) 억제 여부를 따로 읽는다 — 두 파일이 어긋나도 화면은 각자 사실대로 말한다
   const hiddenWeekdayLabel = categoryWeekdays
     .filter((r) => r.suppressed)
     .map((r) => r.category)
     .join(" · ");
-  const dailySeries = selectedRegion ? regionDailySeries(usageDaily, selectedRegion) : [];
-  const dailyPeriod = usageDaily.period;
+  const dailySeries = selectedRegion && usageDaily ? regionDailySeries(usageDaily, selectedRegion) : [];
+  const dailyPeriod = usageDaily?.period ?? null;
 
   return (
     <AdminShell dashboard={d}>
@@ -152,7 +155,9 @@ export default async function RegionDetailPage({
                   badge={hasHidden ? <PrivacyBadge note={privacy?.note} k={privacyK} /> : null}
                   desc="전 기간 누적 사용 건수를 표시 6분류로 집계했다."
                 >
-                  {regionDonut.shares.length ? (
+                  {usageLedger === null ? (
+                    <FailedChart />
+                  ) : regionDonut.shares.length ? (
                     <>
                       <CategoryDonut data={regionDonut.shares} height={240} />
                       {/* 억제 업종을 말없이 빼면 "그 업종 소비가 없다"로 읽힌다 — 뺀 사실과 이유를 밝힌다 */}
@@ -175,7 +180,9 @@ export default async function RegionDetailPage({
                   badge={hasHidden ? <PrivacyBadge note={privacy?.note} k={privacyK} /> : null}
                   desc={`누적 사용 건수 상위 업종을 원 업종 분류 그대로 보여준다.${shiftWindow ? ` 증감은 ${shiftWindow}한 값이다.` : ""}`}
                 >
-                  {regionShifts.length ? (
+                  {usageLedger === null ? (
+                    <FailedChart />
+                  ) : regionShifts.length ? (
                     <>
                       <div className="u-scroll-x">
                         <table className="u-table min-w-[520px]">
@@ -254,7 +261,9 @@ export default async function RegionDetailPage({
                 badge={hasHidden ? <PrivacyBadge note={privacy?.note} k={privacyK} /> : null}
                 desc="월별 하이원포인트 사용 건수 합계."
               >
-                {regionTrend.points.some((p) => p.value > 0) ? (
+                {usageLedger === null ? (
+                  <FailedChart />
+                ) : regionTrend.points.some((p) => p.value > 0) ? (
                   <>
                     <LineTrend data={regionTrend.points} unit="건" />
                     {hasHidden ? (
@@ -274,9 +283,11 @@ export default async function RegionDetailPage({
                 <Section
                   icon="calendar"
                   title={`${selectedRegion} 요일별 사용 패턴`}
-                  desc={`요일별 하루 평균 사용 건수 — ${dailyPeriod.start.slice(0, 4)}년 ${dailyPeriod.days}일 일 단위 집계.`}
+                  desc={dailyPeriod ? `요일별 하루 평균 사용 건수 — ${dailyPeriod.start.slice(0, 4)}년 ${dailyPeriod.days}일 일 단위 집계.` : "요일별 하루 평균 사용 건수."}
                 >
-                  {weekdayBars.length ? (
+                  {usageDaily === null ? (
+                    <FailedChart />
+                  ) : weekdayBars.length ? (
                     <>
                       {weekdayInsight ? (
                         <p className="mb-2 rounded-lg bg-admin-primary-soft px-3 py-2 text-[13px] text-admin-text">
@@ -318,7 +329,9 @@ export default async function RegionDetailPage({
                   badge={hiddenWeekdayLabel ? <PrivacyBadge note={privacy?.note} k={privacyK} /> : null}
                   desc="표시 6분류별로 사용이 가장 몰리는 요일과 주중·주말 하루 평균을 비교한다."
                 >
-                  {categoryWeekdays.length ? (
+                  {usageDaily === null ? (
+                    <FailedChart />
+                  ) : categoryWeekdays.length ? (
                     <div className="u-scroll-x">
                       <table className="u-table min-w-[420px]">
                         <thead>
@@ -385,7 +398,9 @@ export default async function RegionDetailPage({
                 title={`${selectedRegion} 일별 사용 추이`}
                 desc="일별 사용 건수(옅은 선)와 7일 이동평균(진한 선) — 주말 파동과 계절 흐름이 함께 보인다."
               >
-                {dailySeries.length ? (
+                {usageDaily === null ? (
+                  <FailedChart />
+                ) : dailySeries.length ? (
                   <>
                     <DailyTrend data={dailySeries} />
                     <p className="u-note mt-3 border-t border-admin-border pt-2.5">

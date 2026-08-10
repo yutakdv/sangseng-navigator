@@ -180,9 +180,12 @@ function Row({ label, value, mono = false }: { label: string; value: string; mon
       <dt className="text-[11px] font-semibold uppercase tracking-[0.1em] text-admin-text-muted">
         {label}
       </dt>
+      {/* word-break는 한 값만 가진다 — break-keep(기본)과 break-all(mono)을 겹쳐 걸면
+          CSS 정의 순서가 승부를 정해 버려서, 모바일에서 '고한읍·사북읍·…'처럼 가운뎃점으로
+          이어진 문자열이 한 단어로 취급돼 가로 스크롤을 만들었다 (e2e smoke가 잡은 회귀) */}
       <dd
-        className={`mt-0.5 break-keep text-[13px] leading-[1.6] text-admin-text ${
-          mono ? "break-all font-mono text-[12px]" : ""
+        className={`mt-0.5 text-[13px] leading-[1.6] text-admin-text ${
+          mono ? "break-all font-mono text-[12px]" : "break-keep"
         }`}
       >
         {value}

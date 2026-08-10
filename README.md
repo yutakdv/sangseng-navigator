@@ -13,6 +13,7 @@
 [![Demo Video](https://img.shields.io/badge/Demo%20Video-1%3A30-1E1840?style=for-the-badge&logo=youtube&logoColor=white)](#demo)
 [![Open Data](https://img.shields.io/badge/Open%20Data-6%20datasets-2E2560?style=for-the-badge)](#-활용-데이터)
 [![Stack](https://img.shields.io/badge/Next.js%2016%20%C2%B7%20FastAPI%20%C2%B7%20AWS-443597?style=for-the-badge)](#-기술-스택)
+[![License: MIT](https://img.shields.io/badge/License-MIT-33266B?style=for-the-badge)](LICENSE)
 
 **팀 V.I.B.E** · 공공데이터 활용 바이브코딩 경진대회 출품작 · 로그인 없이 접속 가능
 
@@ -206,14 +207,14 @@ LLM은 **문장만** 씁니다. 대상 선정·점수·순위·상태는 서버�
 
 | 데이터셋 | 제공 | 형태 | 역할 |
 |---|---|---|---|
-| (주)강원랜드_하이원포인트 사용현황 | 강원랜드 · 공공데이터포털 | 파일데이터(CSV) | 소비 집중도 · 전환율 분자 · 1단계 읍·시 스코어링 |
+| (주)강원랜드_하이원포인트 사용현황 | 강원랜드 · 공공데이터포털 | 파일데이터(CSV) | 소비 집중도 · 지역 전환율(근사 지표) 분자 · 1단계 읍·시 스코어링 |
 | (주)강원랜드_하이원포인트 가맹점 상세정보 | 강원랜드 · 공공데이터포털 | 오픈 API | 가맹점 지오코딩 → 지도 · 2단계 스코어링 · 위젯 추천 |
-| (주)강원랜드_일자별 카지노 입장객 현황 | 강원랜드 · 공공데이터포털 | 오픈 API | "지역 전환율"의 분모 (리조트 체류 규모) |
+| (주)강원랜드_일자별 카지노 입장객 현황 | 강원랜드 · 공공데이터포털 | 오픈 API | "지역 전환율(근사 지표)"의 분모 (리조트 체류 규모) |
 | 소상공인시장진흥공단_상가(상권)정보 | 소진공 · 공공데이터포털 | 오픈 API | 반경 500m 업종공백도 · 포화도 |
 | 국세청_사업자현황 (사업존속연수별) | 국세청 | 파일데이터(CSV) | 지역경제 위험 신호 (**진단 참고용** 파생지표) |
 | 기상청_단기예보 조회서비스 (초단기실황) | 기상청 · 공공데이터포털 | 오픈 API | 방문객 위젯 "오늘의 추천"의 현재 기온·강수 |
 
-원본 CSV는 [data/raw/](data/raw/)에, 파이프라인 산출 JSON은 [data/processed/](data/processed/)에 커밋합니다. 진단·스코어링·추천은 **배포 환경에서 외부 API 호출 없이** 이 정적 데이터로 동작합니다(경진대회 권장 "정적 데이터 방식"). 실시간 호출은 방문객 위젯이 쓰는 **기상청 초단기실황 한 건뿐**이며, 실패하면 날씨 줄만 빠지고 요일 패턴 추천은 그대로 뜹니다.
+원본 CSV는 [data/raw/](data/raw/)에, 파이프라인 산출 JSON은 [data/processed/](data/processed/)에 커밋합니다. 진단·스코어링·추천은 **배포 환경에서 외부 API 호출 없이** 이 정적 데이터로 동작합니다(경진대회 권장 "정적 데이터 방식"). 정책 판단에 쓰이는 실시간 데이터 API 호출은 방문객 위젯의 **기상청 초단기실황 한 건뿐**이며(지도 SDK·타일과 AI 설명 생성 호출은 별개), 실패하면 날씨 줄만 빠지고 요일 패턴 추천은 그대로 뜹니다.
 
 **파이프라인 10단계** — P1 사용현황 집계 → P2 카지노 입장객 → P3 가맹점 지오코딩 → P4 상가정보 → P6 2단계 스코어링 → P8 가중치 민감도(95개 조합 전수 재계산) → P5 진단 지표 → P7 국세청 파생지표 → P9 셀 부하 → P10 프라이버시. 산출물마다 SHA-256과 기준월을 담은 `manifest.json`을 발행하고, API 응답에 `X-Dataset-Version` 헤더로 실어 보냅니다.
 
@@ -267,10 +268,10 @@ cd frontend && npm install && npm run dev   # NEXT_PUBLIC_API_BASE 미설정 시
 | 영역 | 사용 기술 |
 |---|---|
 | 프론트엔드 | Next.js 16 (App Router) · TypeScript · Tailwind CSS 3 · Recharts |
-| 지도 | 제안 상세 MapLibre GL + OpenFreeMap / 방문객 위젯 Kakao Maps JS (키 없으면 정적 폴백) |
+| 지도 | 근거 상세(/cards/[id]) MapLibre GL + OpenFreeMap / 방문객 위젯 Kakao Maps JS (키 없으면 정적 폴백) |
 | 백엔드 | FastAPI on AWS Lambda + API Gateway + DynamoDB (SAM, 월 비용 사실상 $0) |
 | 데이터 | Python 파이프라인 10단계 → 정적 JSON 사전 계산 + SHA-256 manifest |
-| AI | LLM 어댑터 1곳으로 통일 (OpenAI ↔ Anthropic 전환 가능) · 스키마 강제 + 룰 폴백 |
+| AI | LLM 어댑터 1곳으로 통일 (OpenAI gpt-4o-mini) · 스키마 강제 + 룰 폴백 |
 | 배포 | Vercel(FE) + AWS SAM(BE) · 로컬 통합 환경은 Docker Compose |
 
 ---
@@ -327,3 +328,4 @@ cd frontend && npm install && npm run dev   # NEXT_PUBLIC_API_BASE 미설정 시
 - **모든 시뮬레이션 수치는 가정 기반 전망**이며 실제와 다를 수 있습니다. 임팩트 추정치(1%p ≈ 연 +24,787건)는 연간 입장 연인원 2,478,656명의 1%를 건수로 환산한 값입니다.
 - **AI 출력은 제안일 뿐**이며, 담당자 승인을 거쳐야 정책 카드가 확정됩니다. 카드의 숫자·순위·상태 문구는 LLM 원문을 그대로 노출하지 않고 정본 데이터로 다시 생성합니다.
 - 데이터: 공공데이터포털(강원랜드 · 소상공인시장진흥공단) · 국세청 · 기상청 | 지도: © OpenStreetMap contributors, OpenFreeMap, Kakao
+- 라이선스: [MIT](LICENSE) · Copyright (c) 2026 Team V.I.B.E.

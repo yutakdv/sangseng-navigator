@@ -23,7 +23,8 @@
 | 네트워크 | public ×2 (태스크) + **private ×2 (ALB·VPC Link, NAT 없음)** | NAT $43/월 회피 + 공식 튜토리얼과 동일 구성 |
 | IaC | 순수 CloudFormation 2스택 + bash 스크립트 | 기존 CFN 계열 유지, 신규 툴체인 0 |
 | 시크릿 | SSM Parameter Store SecureString | 표준 파라미터 무료, CFN에 값이 남지 않음 |
-| 이미지 빌드 | **로컬 맥북**(ARM64 네이티브) | CloudShell은 x86이라 ARM 빌드에 에뮬레이션 필요 |
+| 이미지 빌드 | 로컬은 맥북 ARM64 네이티브, CI 는 GitHub ARM64 러너 | 둘 다 네이티브 — 에뮬레이션 없음 |
+| 배포 트리거 | **`main` 머지 → GitHub Actions 자동 배포**(OIDC). PR 은 검증만 | 프론트 Vercel 연동과 같은 흐름. 저장소에 AWS 장기 키 없음 (§5-1) |
 | LLM provider | **OpenAI 단일** (Anthropic 제거) | 미사용 (§8) |
 | 월 비용 | 약 **$30** (상한 $42) | §7 |
 
@@ -231,6 +232,42 @@ infra/
 
 ---
 
+## 5-1. 자동 배포 (CI)
+
+`main` 머지가 배포 트리거다. PR 단계에서는 pytest·cfn-lint·프론트 빌드만 돌리고 배포하지 않는다.
+프론트는 Vercel git 연동이 이미 같은 흐름으로 동작하므로 백엔드만 추가하면 양쪽이 맞는다.
+
+```
+PR 생성 ──▶ pr-checks.yml     pytest · cfn-lint · FE lint/build   (AWS 자격증명 불필요)
+main 머지 ──▶ backend-deploy.yml  OIDC 인증 → ARM64 빌드 → ECR → service 스택 갱신 → 스모크
+```
+
+세 가지를 의도적으로 제한했다.
+
+**service 스택만 자동화한다.** CI가 VPC·DynamoDB를 건드릴 수 있으면 사고 규모가 달라진다.
+foundation은 거의 바뀌지 않는 계층이라 수동으로 남겨도 손해가 없다.
+
+**경로 필터를 건다.** `backend/**`·`data/processed/**`·`infra/**`가 바뀐 머지에만 반응한다.
+문서만 고친 머지로 컨테이너가 재배포되면 낭비이자 위험이다.
+
+**장기 키를 저장소에 두지 않는다.** GitHub OIDC로 역할(`sangseng-github-deploy`)을 맡고,
+신뢰 정책이 `main` 브랜치로 제한한다. 실제 시크릿은 SSM에 있어 CI가 알 필요조차 없다.
+비민감 설정값(`DEMO_READ_ONLY`·`ALLOWED_ORIGINS` 등)만 GitHub 저장소 변수로 넘긴다.
+
+레포가 public이라 Actions 실행 시간이 무제한이고 **ARM64 러너를 무료로 쓴다** — 이미지가 ARM64라
+x86 러너였으면 QEMU 에뮬레이션이 필요했다.
+
+로컬과 CI는 **같은 스크립트**를 쓴다. 차이는 값의 출처뿐이고(로컬 `.env` / CI 저장소 변수),
+스크립트의 `load_env`가 환경변수를 우선한다. 스크립트가 갈라지면 "로컬은 되는데 CI는 안 되는"
+문제가 반드시 생긴다.
+
+> **승인 게이트를 한 단계 더 붙이려면**(머지 후 사람이 Actions에서 한 번 더 승인) deploy job에
+> `environment: production`을 추가하고 **OIDC 신뢰 정책의 `sub`도 `repo:…:environment:production`으로
+> 함께 바꿔야 한다.** environment를 쓰면 토큰 subject가 브랜치 형식에서 환경 형식으로 바뀌어,
+> 한쪽만 고치면 인증이 깨진다.
+
+---
+
 ## 6. 백엔드 변경
 
 ### 6-1. `backend/app/main.py`
@@ -432,8 +469,9 @@ README:103, `01-overview.md:74`(**성공 기준이라 그대로 두면 구조적
 - CodeDeploy Blue/Green + 카나리(10% 5분), Application Auto Scaling(ALB `RequestCountPerTarget` 타깃 추적)
 - Container Insights · X-Ray · ALB 액세스 로그 → S3
 - Secrets Manager 자동 로테이션, DynamoDB PITR
-- **GitHub Actions OIDC 무키 배포** — 현재의 장기 액세스 키 + PowerUserAccess를 대체한다.
-  IAM OIDC 공급자 1개 + `sts:AssumeRoleWithWebIdentity` 역할 1개, AWS 측 무과금
+- ~~GitHub Actions OIDC 무키 배포~~ → **이번 범위에 포함됐다** (§5-1, 계획 Task C2).
+  남은 승격 항목은 **로컬 `sangseng-deployer` 액세스 키 폐기**다 — CI가 배포를 담당하면
+  로컬 키는 비상용으로만 남는다
 - 마지막에 **데모 구성 ↔ 실 배포 구성 대비표**(비용·가용성·보안 경계·복구 시간)와 승격 순서
 
 ---
@@ -453,4 +491,4 @@ README:103, `01-overview.md:74`(**성공 기준이라 그대로 두면 구조적
 - [x] **배포 권한 확보** — IAM 사용자 `sangseng-deployer` 생성, `PowerUserAccess` + `sangseng-*` 역할
       생성용 인라인 정책, 로컬 프로필 `sangseng`. 두 리전 9개 서비스 읽기 검증 완료
 - [x] **조직 SCP 차단 없음 확인** — 모든 거부가 IAM 정책 부족이었고 두 리전이 동일
-- [ ] 심사 종료 후 `sangseng-deployer` 정리 또는 GitHub Actions OIDC로 대체 (§13)
+- [ ] GitHub Actions OIDC 배포 구축 (계획 Task C2) → 그 후 로컬 `sangseng-deployer` 액세스 키 폐기

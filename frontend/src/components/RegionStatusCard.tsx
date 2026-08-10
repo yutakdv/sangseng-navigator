@@ -29,6 +29,12 @@ export type RegionStatus = {
   isTarget: boolean;
   /** 1단계 진단 대상 지역 */
   isDiagnosisTarget: boolean;
+  /**
+   * candidates 조회 자체가 실패했는지. rank가 null인 이유가 "순위가 없다"가 아니라
+   * "못 불러왔다"일 때 true — 빈 값을 사실처럼 그리면 `순위 없음`·`진단 대상` 누락이
+   * 적극적인 거짓 주장이 된다 (PR #44 견고성 원칙, ProposalSummary와 같은 관용구).
+   */
+  rankingUnavailable: boolean;
   tooltip: string | null;
 };
 
@@ -39,12 +45,14 @@ export function buildRegionStatuses({
   ranking,
   selectedRegions = [],
   targetRegion = null,
+  rankingUnavailable = false,
 }: {
   shares: RegionShare[];
   monthlyByRegion: MonthlyRegion[];
   ranking: EupScore[];
   selectedRegions?: string[];
   targetRegion?: string | null;
+  rankingUnavailable?: boolean;
 }): RegionStatus[] {
   const shareByRegion = new Map(shares.map((row) => [row.region, row]));
   const rankByRegion = new Map(ranking.map((row) => [row.eup, row]));
@@ -69,6 +77,7 @@ export function buildRegionStatuses({
       monthlyDelta: previousCount > 0 ? ((latestCount - previousCount) / previousCount) * 100 : null,
       isTarget,
       isDiagnosisTarget: selectedRegions.includes(region) && !isTarget,
+      rankingUnavailable,
       tooltip: REGION_TOOLTIP[region as Region] ?? null,
     };
   });
@@ -105,7 +114,13 @@ export function RegionStatusCard({ status }: { status: RegionStatus }) {
             <h4 className="text-[15px] font-bold text-admin-text">{s.region}</h4>
           </div>
           <p className="mt-1 text-[11px] text-admin-text-muted">
-            진단 {s.rank !== null && s.score !== null ? `${s.rank}위 · ${s.score.toFixed(2)}` : "순위 없음"}
+            {/* "순위 없음"(산출 결과 없음)과 "불러오지 못함"(호출 실패)을 구분한다 */}
+            진단{" "}
+            {s.rank !== null && s.score !== null
+              ? `${s.rank}위 · ${s.score.toFixed(2)}`
+              : s.rankingUnavailable
+                ? "순위 불러오지 못함"
+                : "순위 없음"}
           </p>
         </div>
         <div className="flex shrink-0 flex-wrap justify-end gap-1">

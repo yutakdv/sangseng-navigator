@@ -51,10 +51,14 @@ export default async function DataPage({
   const sp = await searchParams;
   const demo = sp.demo === "data";
 
-  const [d, usageLedger] = await Promise.all([api.dashboard(), api.usageMonthly()]);
+  // 원장이 실패해도 카탈로그·매니페스트·지표 정의는 성립한다 — 소표본 고지만 폴백된다
+  const [d, usageLedger] = await Promise.all([
+    api.dashboard(),
+    api.usageMonthly().catch(() => null),
+  ]);
 
   // 원장 쪽 값이 정본이고, 구형 산출물에는 아예 없을 수 있어 둘 다 가드한다
-  const privacy = usageLedger.privacy_meta ?? d.privacy_meta ?? null;
+  const privacy = usageLedger?.privacy_meta ?? d.privacy_meta ?? null;
   const mf = manifest();
   const files = Object.entries(mf.files).sort(([a], [b]) => a.localeCompare(b));
   const totalBytes = files.reduce((sum, [, f]) => sum + f.bytes, 0);

@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { AdminShell } from "@/components/AdminShell";
+import { FailedChart } from "@/components/EmptyChart";
 import { Icon } from "@/components/Icon";
 import { KpiCard } from "@/components/KpiCard";
 import { PageHeader } from "@/components/PageHeader";
@@ -91,7 +92,7 @@ export default async function TrackingPage({
   const [dashboard, { cards }, kpi, { report, fellBack: periodFellBack }] = await Promise.all([
     api.dashboard(),
     api.cards({ status: "approved" }),
-    api.kpi(),
+    api.kpi().catch(() => null),
     reportRequest,
   ]);
 
@@ -258,7 +259,7 @@ export default async function TrackingPage({
               {/* 승인 카드만 progress를 가진다 — approved가 아닌 카드에 progress를 보내면 409 (05 §8) */}
               <p className="mx-auto mt-1.5 max-w-md break-keep text-[13px] leading-6 text-admin-text-muted">
                 허브에서 카드를 승인해 주세요 — 승인한 카드만 추진 상태를 기록할 수 있습니다.
-                {kpi.counts.pending > 0 ? ` 현재 승인 대기 ${kpi.counts.pending}건.` : ""}
+                {kpi && kpi.counts.pending > 0 ? ` 현재 승인 대기 ${kpi.counts.pending}건.` : ""}
               </p>
               <Link
                 href="/"
@@ -545,6 +546,10 @@ export default async function TrackingPage({
           title="정책 운영 KPI"
           desc="Action Card 상태값으로 계산한 지표다. 위 기간 필터와 무관한 전 기간 현재 스냅샷이며, 승인·상태 변경이 일어나면 즉시 바뀐다."
         >
+          {kpi === null ? (
+            // 값을 0·"—"로 채우면 "채택률 0%"처럼 실제 성과로 오독된다 — 아예 못 불러왔다고 밝힌다
+            <FailedChart />
+          ) : (
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
             <KpiCard
               icon="check"
@@ -573,8 +578,10 @@ export default async function TrackingPage({
               sub={`승인 카드가 여러 지역에 고루 쌓일수록 상승 (현재 승인 ${kpi.counts.approved}건)`}
             />
           </div>
+          )}
         </Section>
 
+        {kpi ? (
         <p className="u-note">
           승인 대기 {kpi.counts.pending}건 · 반려 {kpi.counts.rejected}건 · 보류 {kpi.counts.held}
           건은 이 목록에 없습니다 —{" "}
@@ -586,6 +593,7 @@ export default async function TrackingPage({
           </Link>
           에서 확인합니다.
         </p>
+        ) : null}
       </div>
     </AdminShell>
   );

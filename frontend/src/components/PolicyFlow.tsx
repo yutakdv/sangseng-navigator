@@ -26,16 +26,16 @@ export function PolicyFlow({
   counts,
 }: {
   counts: {
-    /** STEP2 — 생성된 카드 전체 */
-    cards: number;
-    /** STEP3 — 결정 대기 */
-    pending: number;
-    /** STEP4 — 승인 카드 중 **검토 시작 단계에 머문** 것 (승인 총수가 아니다) */
+    /** STEP2 — 생성된 카드 전체. null이면 KPI 호출 실패 — 0으로 지어내지 않고 배지를 아예 뺀다 */
+    cards: number | null;
+    /** STEP3 — 결정 대기. null이면 KPI 호출 실패 */
+    pending: number | null;
+    /** STEP4 — 승인 카드 중 **검토 시작 단계에 머문** 것 (승인 총수가 아니다) — cards 배열에서 직접 센 값이라 KPI와 무관하게 항상 있다 */
     approved: number;
-    /** STEP5 — 승인 카드 중 적격성 확인·가맹 심사·추진중 */
+    /** STEP5 — 승인 카드 중 적격성 확인·가맹 심사·추진중 — 위와 같은 이유로 항상 있다 */
     inProgress: number;
-    /** STEP6 — 완료 */
-    done: number;
+    /** STEP6 — 완료. null이면 KPI 호출 실패 */
+    done: number | null;
   };
 }) {
   /**
@@ -58,14 +58,14 @@ export function PolicyFlow({
       title: "AI 제안",
       desc: "후보 비교 후 Action Card 생성",
       href: "/#proposal",
-      count: { value: counts.cards, unit: "장" },
+      count: counts.cards !== null ? { value: counts.cards, unit: "장" } : undefined,
     },
     {
       icon: "list",
       title: "담당자 검토",
       desc: "근거 · 리스크 · 원 순위 확인",
       href: "/#decision-queue",
-      count: { value: counts.pending, unit: "건" },
+      count: counts.pending !== null ? { value: counts.pending, unit: "건" } : undefined,
     },
     {
       icon: "check",
@@ -86,7 +86,7 @@ export function PolicyFlow({
       title: "방문객 반영",
       desc: "완료 카드가 위젯 추천에 반영",
       href: "/widget",
-      count: { value: counts.done, unit: "건" },
+      count: counts.done !== null ? { value: counts.done, unit: "건" } : undefined,
     },
   ];
 

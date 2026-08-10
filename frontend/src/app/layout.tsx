@@ -13,8 +13,8 @@ import "./globals.css";
  * 공유 카드에 뜨는 문구가 갈리지 않게 하기 위해서다.
  *
  * OG 이미지는 넣지 않았다: 12 §1이 정한 대표 스크린샷(실 구현 화면 1920×1080 캡처)이 Phase 6
- * 산출물이라 아직 없고, 목업(image-1.png)을 대신 실으면 구현되지 않은 화면을 산출물처럼 보여주게
- * 된다. 캡처가 나오면 `openGraph.images`에 그 파일만 추가하면 된다.
+ * 산출물이라 아직 없고, 목업(docs/images/dashboard-mockup.png)을 대신 실으면 구현되지 않은 화면을
+ * 산출물처럼 보여주게 된다. 캡처가 나오면 `openGraph.images`에 그 파일만 추가하면 된다.
  */
 const TITLE = "상생 나침반";
 const DESCRIPTION =

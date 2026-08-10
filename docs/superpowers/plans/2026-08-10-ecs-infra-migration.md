@@ -22,7 +22,8 @@
 - **CLAUDE.md 절대 규칙 유지:** UI에 Gini·HHI 노출 금지 · "지역 전환율"에 `근사 지표` 배지 · 시뮬레이션 출력에 "가정 기반 전망" 문구 · AI는 제안만 · 원래 Score 순위 병기 · 처방은 하이원포인트 가맹점 확충 고정.
 - **커밋:** `feat/*` 브랜치, Task 단위 커밋(`feat|fix|infra|docs: 요약`), main 직접 커밋 금지. **Claude 저자 표기 금지**(`Co-Authored-By` 트레일러·"Generated with Claude Code" 푸터 금지).
 - **`docs/audit/`·`docs/review/`는 수정하지 않는다** — 작성 시점의 사실 기록이다.
-- **신규 npm/pip 의존성 0.** `uvicorn[standard]`은 이미 `requirements-dev.txt`에 있던 것을 런타임으로 옮기는 것이다.
+- **신규 npm/pip 의존성 0.** `uvicorn[standard]`은 이미 `requirements-dev.txt`에 있던 것을 런타임으로 옮기는 것이다. CI 워크플로가 `cfn-lint`를 ad-hoc 설치하지만 **`requirements*.txt`에는 넣지 않는다** — CI 전용 도구는 프로젝트 의존성이 아니다.
+- **스크립트는 `.env` 없이도 동작해야 한다.** 값은 환경변수를 먼저 보고 `.env`는 폴백이다 — GitHub Actions 러너에는 `.env`가 없고, 로컬과 CI가 **같은 스크립트**를 써야 "로컬은 되는데 CI는 안 되는" 문제가 안 생긴다.
 - 백엔드 테스트: `cd backend && python -m pytest`
 
 ---
@@ -47,6 +48,9 @@
 | `infra/scripts/deploy.sh` | 전체 오케스트레이션 |
 | `infra/README.md` | 배포 절차 |
 | `backend/.dockerignore` | **신규 — 빌드 컨텍스트에서 `.env`·`.venv`·tests 배제 (보안)** |
+| `.github/workflows/pr-checks.yml` | PR 검증 — pytest·cfn-lint·FE 빌드. **AWS 자격증명 불필요** |
+| `.github/workflows/backend-deploy.yml` | `main` 머지 시 백엔드 자동 배포 (OIDC, 장기 키 없음) |
+| `infra/scripts/bootstrap-github-oidc.sh` | 1회용 — OIDC 공급자 + 배포 역할 생성 |
 
 **삭제:** `infra/template.yaml` · `infra/deploy-backend.sh` · `infra/.aws-sam/`(56MB)
 
@@ -694,7 +698,10 @@ git commit -m "fix: Vercel 함수 리전을 서울로 이전, POST 타임아웃 
 # ⚠ CPU_ARCHITECTURE / DOCKER_PLATFORM 은 반드시 짝이 맞아야 한다.
 #   불일치는 태스크가 exec format error 로 즉시 죽으며, 첫 배포에는 자동 롤백이 없다.
 
-export AWS_PROFILE="${AWS_PROFILE:-sangseng}"
+# CI(GitHub Actions)에는 프로필이 없다 — OIDC 로 주입된 환경변수 자격증명을 그대로 쓴다.
+# 로컬에서만 프로필을 강제하고, aws CLI 가 AWS_PROFILE 을 자동으로 읽으므로
+# 개별 호출에 --profile 을 붙이지 않는다.
+[ -n "${CI:-}" ] || export AWS_PROFILE="${AWS_PROFILE:-sangseng}"
 export AWS_REGION="${AWS_REGION:-ap-northeast-2}"
 
 export FOUNDATION_STACK="sangseng-foundation"
@@ -737,8 +744,23 @@ log_ok()   { printf '%s  ✓ %s%s\n' "$_C_GREEN" "$*" "$_C_RESET" >&2; }
 log_warn() { printf '%s  ⚠ %s%s\n' "$_C_YEL" "$*" "$_C_RESET" >&2; }
 die()      { printf '%s  ✗ %s%s\n' "$_C_RED" "$*" "$_C_RESET" >&2; exit 1; }
 
-# 프로필·리전을 항상 명시해 셸 환경에 상관없이 같은 대상에 배포한다.
-aws_() { aws --profile "$AWS_PROFILE" --region "$AWS_REGION" "$@"; }
+# 리전을 항상 명시해 셸 환경에 상관없이 같은 대상에 배포한다. 프로필은 config.sh 가
+# AWS_PROFILE 로 내보내고 aws CLI 가 자동으로 읽는다 — CI 에는 그 변수가 없고 OIDC 자격증명이 쓰인다.
+aws_() { aws --region "$AWS_REGION" "$@"; }
+
+# 환경변수 우선, .env 는 폴백. 이미 설정된 값은 덮지 않는다.
+# CI 러너에는 .env 가 없고 GitHub 저장소 변수로 값이 들어온다 —
+# 프론트의 next.config.mjs 가 루트 .env 를 승계하는 규칙과 같다.
+load_env() {
+  [ -f "$REPO_ROOT/.env" ] || return 0
+  local line key val
+  while IFS= read -r line || [ -n "$line" ]; do
+    case "$line" in ''|'#'*) continue ;; *=*) ;; *) continue ;; esac
+    key="${line%%=*}"; val="${line#*=}"
+    key="$(printf '%s' "$key" | tr -d '[:space:]')"
+    [ -n "${!key:-}" ] || export "$key=$val"
+  done < "$REPO_ROOT/.env"
+}
 
 stack_output() {   # $1=스택명 $2=OutputKey
   aws_ cloudformation describe-stacks --stack-name "$1" \
@@ -818,19 +840,25 @@ esac
   || die "service.yaml 의 CpuArchitecture($TEMPLATE_ARCH) 와 config.sh($CPU_ARCHITECTURE) 가 다릅니다. exec format error 로 첫 배포가 실패합니다."
 log_ok "$CPU_ARCHITECTURE / $DOCKER_PLATFORM (템플릿 일치)"
 
-log_step "5. 정적 산출물 5종"
-for name in dashboard eup_scores candidates merchants risk_signal; do
+log_step "5. 정적 산출물"
+# 백엔드가 dataload.load() 로 실제로 부르는 이름 전부 — /api/health 의 REQUIRED+OPTIONAL 보다 넓다.
+# usage_daily·usage_monthly 는 health 가 보고하지 않지만 대시보드·위젯 라우트가 부른다 —
+# 빠지면 health 는 초록인데 화면이 500 이 나는, 가장 늦게 발견되는 형태의 장애가 된다.
+for name in dashboard eup_scores candidates merchants risk_signal manifest usage_daily usage_monthly; do
   f="$REPO_ROOT/data/processed/$name.json"
   [ -f "$f" ] || die "$f 없음 — 먼저 'cd pipeline && python run_all.py' 를 실행하세요."
   python3 -c "import json,sys; json.load(open(sys.argv[1]))" "$f" \
     || die "$f 파싱 실패 (잘린 파일)"
 done
-log_ok "5종 존재·파싱 OK"
+log_ok "8종 존재·파싱 OK"
 
-log_step "6. .env 필수값과 읽기전용 짝 검사"
-[ -f "$REPO_ROOT/.env" ] || die ".env 없음"
-set -a; source "$REPO_ROOT/.env"; set +a
-[ -n "${OPENAI_API_KEY:-}" ] || die "OPENAI_API_KEY 미설정"
+log_step "6. 설정값과 읽기전용 짝 검사"
+load_env      # 환경변수 우선, .env 폴백
+if [ -f "$REPO_ROOT/.env" ]; then
+  [ -n "${OPENAI_API_KEY:-}" ] || die "OPENAI_API_KEY 미설정"
+else
+  log_warn ".env 없음 (CI 환경) — 시크릿은 SSM 에 이미 올라가 있어야 한다"
+fi
 if [ -z "${DEMO_READ_ONLY:-}" ]; then
   die "DEMO_READ_ONLY 미설정. 태스크 정의에 항상 명시해야 합니다 — 빠뜨리면 앱 기본값 false 로 공개 데모가 쓰기 가능 상태로 뜹니다. .env 에 true 또는 false 를 넣으세요."
 fi
@@ -1202,8 +1230,9 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "$SCRIPT_DIR/../config.sh"
 source "$SCRIPT_DIR/lib/common.sh"
 
-[ -f "$REPO_ROOT/.env" ] || die ".env 없음"
-set -a; source "$REPO_ROOT/.env"; set +a
+# 로컬 전용이다 — CI 는 SSM 에 이미 올라간 값을 쓰고 이 스크립트를 실행하지 않는다.
+[ -f "$REPO_ROOT/.env" ] || die ".env 없음 (put-secrets 는 로컬에서만 실행한다)"
+load_env
 
 put() {  # $1=파라미터명 $2=값
   [ -n "$2" ] || die "$1 값이 비어 있습니다."
@@ -1640,7 +1669,7 @@ aws_ ecr describe-images --repository-name "$ECR_REPO" --image-ids "imageTag=$TA
   (이미지 없이 서비스를 만들면 CannotPullContainerError 로 스택 전체가 롤백됩니다)"
 log_ok "존재"
 
-set -a; source "$REPO_ROOT/.env"; set +a
+load_env      # 환경변수 우선, .env 폴백 — CI 는 GitHub 저장소 변수로 값을 넘긴다
 
 log_step "service 스택 배포 (첫 생성은 VPC Link 때문에 12~18분 걸립니다)"
 if ! cfn_deploy "$SERVICE_STACK" "$REPO_ROOT/infra/cloudformation/service.yaml" \
@@ -1718,7 +1747,13 @@ source "$SCRIPT_DIR/lib/common.sh"
 
 API_URL="$(stack_output "$SERVICE_STACK" ApiUrl)"
 [ -n "$API_URL" ] && [ "$API_URL" != "None" ] || die "ApiUrl 을 읽지 못했습니다."
-set -a; source "$REPO_ROOT/.env"; set +a
+load_env
+# CI 에는 .env 가 없다 — 토큰 정본인 SSM 에서 직접 읽어 로컬과 똑같은 검증을 한다.
+if [ -z "${MUTATION_API_TOKEN:-}" ]; then
+  MUTATION_API_TOKEN="$(aws_ ssm get-parameter --name "$SSM_PREFIX/MUTATION_API_TOKEN" \
+    --with-decryption --query 'Parameter.Value' --output text)" \
+    || die "SSM 에서 MUTATION_API_TOKEN 을 읽지 못했습니다."
+fi
 
 log_step "1. /api/health — 정적 산출물 적재"
 BODY="$(curl -fsS --max-time 20 "$API_URL/api/health")" || die "health 호출 실패"
@@ -1731,7 +1766,13 @@ assert not missing, f"결손 산출물: {missing}"
 print("  datasets:", ", ".join(b["datasets"]))
 print("  demo_read_only:", b["demo_read_only"])
 ' || die "health 본문 검증 실패"
-log_ok "5종 적재"
+log_ok "health 보고 산출물 전부 적재"
+
+log_step "1-1. /api/dashboard — health 가 보고하지 않는 산출물까지 확인"
+# usage_daily·usage_monthly 는 health 의 datasets 에 안 들어 있다. 실제 라우트를 한 번 때려야
+# "health 는 초록인데 화면은 500" 인 상태를 잡을 수 있다.
+curl -fsS --max-time 20 "$API_URL/api/dashboard" >/dev/null || die "dashboard 호출 실패 — 산출물 결손 가능"
+log_ok "200"
 
 log_step "2. /api/health/ready — ALB 대상그룹이 보는 경로"
 CODE="$(curl -fsS -o /dev/null -w '%{http_code}' --max-time 20 "$API_URL/api/health/ready")"
@@ -2086,6 +2127,302 @@ git commit --allow-empty -m "infra: 첫 ECS 배포 성공 — P0 4건 실증 통
 
 ---
 
+### Task C2: GitHub Actions 자동 배포 (main 머지 → 배포)
+
+**Files:**
+- Create: `infra/scripts/bootstrap-github-oidc.sh`
+- Create: `.github/workflows/pr-checks.yml`
+- Create: `.github/workflows/backend-deploy.yml`
+- Modify: `infra/README.md` (CI 절 추가)
+
+**Interfaces:**
+- Consumes: Task C1이 배포해 둔 foundation·service 스택과 ECR 이미지. **CI는 "갱신"만 한다** — 첫 생성은 Task C1의 수동 배포가 이미 끝냈어야 한다.
+- Produces: `main` 머지 시 백엔드가 자동 배포된다. 프론트는 Vercel git 연동이 이미 담당한다.
+
+> **왜 service 스택만 자동화하는가.** CI가 VPC·DynamoDB 테이블을 건드릴 수 있으면 사고 규모가 달라진다. foundation은 거의 바뀌지 않는 계층이라 수동으로 남겨도 손해가 없다.
+>
+> **왜 OIDC인가.** 저장소에 AWS 장기 액세스 키를 두지 않는다. GitHub이 발급한 단기 토큰으로 역할을 맡고, 신뢰 정책이 `main` 브랜치로 제한한다. 실제 시크릿(OpenAI 키·mutation 토큰)은 이미 SSM에 있어 CI가 알 필요조차 없다.
+>
+> **레포가 public이라 유리하다.** Actions 실행 시간이 무제한이고 **ARM64 러너를 무료로 쓴다** — 이미지가 ARM64라 x86 러너였으면 QEMU 에뮬레이션이 필요했다.
+
+- [ ] **Step 1: OIDC 부트스트랩 스크립트 작성**
+
+`infra/scripts/bootstrap-github-oidc.sh`:
+
+```bash
+#!/usr/bin/env bash
+# 1회용 — GitHub Actions 가 AWS 역할을 맡을 수 있게 OIDC 공급자와 배포 역할을 만든다.
+# 장기 액세스 키를 저장소에 두지 않기 위한 구성이다.
+#
+# ⚠ IAM 자원을 만든다. 내용을 확인한 뒤 직접 실행할 것.
+# 되돌리기:
+#   aws iam delete-role-policy --role-name sangseng-github-deploy --policy-name PassTaskRoles
+#   aws iam detach-role-policy --role-name sangseng-github-deploy --policy-arn arn:aws:iam::aws:policy/PowerUserAccess
+#   aws iam delete-role --role-name sangseng-github-deploy
+#   aws iam delete-open-id-connect-provider --open-id-connect-provider-arn <위 출력의 ARN>
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+source "$SCRIPT_DIR/../config.sh"
+source "$SCRIPT_DIR/lib/common.sh"
+
+GH_REPO="yutakdv/sangseng-navigator"
+ROLE_NAME="sangseng-github-deploy"
+ACCOUNT="$(aws_ sts get-caller-identity --query Account --output text)"
+PROVIDER_ARN="arn:aws:iam::${ACCOUNT}:oidc-provider/token.actions.githubusercontent.com"
+
+log_step "1. OIDC 공급자"
+if aws_ iam get-open-id-connect-provider --open-id-connect-provider-arn "$PROVIDER_ARN" >/dev/null 2>&1; then
+  log_ok "이미 존재"
+else
+  # thumbprint 는 AWS 가 신뢰된 루트 CA 로 검증하므로 값 자체는 형식만 맞으면 된다.
+  aws_ iam create-open-id-connect-provider \
+    --url https://token.actions.githubusercontent.com \
+    --client-id-list sts.amazonaws.com \
+    --thumbprint-list 6938fd4d98bab03faadb97b34396831e3780aea1 >/dev/null
+  log_ok "생성됨"
+fi
+
+log_step "2. 배포 역할 ($ROLE_NAME)"
+TRUST="$(mktemp)"
+cat > "$TRUST" <<JSON
+{
+  "Version": "2012-10-17",
+  "Statement": [{
+    "Effect": "Allow",
+    "Principal": { "Federated": "${PROVIDER_ARN}" },
+    "Action": "sts:AssumeRoleWithWebIdentity",
+    "Condition": {
+      "StringEquals": {
+        "token.actions.githubusercontent.com:aud": "sts.amazonaws.com",
+        "token.actions.githubusercontent.com:sub": "repo:${GH_REPO}:ref:refs/heads/main"
+      }
+    }
+  }]
+}
+JSON
+if aws_ iam get-role --role-name "$ROLE_NAME" >/dev/null 2>&1; then
+  aws_ iam update-assume-role-policy --role-name "$ROLE_NAME" --policy-document "file://$TRUST"
+  log_ok "신뢰 정책 갱신"
+else
+  aws_ iam create-role --role-name "$ROLE_NAME" --assume-role-policy-document "file://$TRUST" \
+    --description "GitHub Actions deploy for ${GH_REPO} (main only)" >/dev/null
+  log_ok "생성됨"
+fi
+rm -f "$TRUST"
+
+log_step "3. 권한 부착"
+aws_ iam attach-role-policy --role-name "$ROLE_NAME" \
+  --policy-arn arn:aws:iam::aws:policy/PowerUserAccess
+PASS="$(mktemp)"
+cat > "$PASS" <<JSON
+{
+  "Version": "2012-10-17",
+  "Statement": [{
+    "Sid": "PassTaskRolesToEcs",
+    "Effect": "Allow",
+    "Action": ["iam:PassRole", "iam:GetRole"],
+    "Resource": "arn:aws:iam::${ACCOUNT}:role/sangseng-*",
+    "Condition": { "StringEqualsIfExists": { "iam:PassedToService": "ecs-tasks.amazonaws.com" } }
+  }]
+}
+JSON
+aws_ iam put-role-policy --role-name "$ROLE_NAME" --policy-name PassTaskRoles \
+  --policy-document "file://$PASS"
+rm -f "$PASS"
+log_ok "PowerUserAccess + PassTaskRoles"
+
+ROLE_ARN="arn:aws:iam::${ACCOUNT}:role/${ROLE_NAME}"
+printf '\n%s역할 ARN: %s%s\n' "$_C_GREEN" "$ROLE_ARN" "$_C_RESET"
+printf '\n다음 명령으로 GitHub 저장소 변수를 등록하세요 (시크릿 아님 — 전부 비민감 값):\n\n'
+printf '  gh variable set AWS_DEPLOY_ROLE_ARN --body "%s"\n' "$ROLE_ARN"
+printf '  gh variable set DEMO_READ_ONLY       --body "<true|false>"\n'
+printf '  gh variable set ALLOWED_ORIGINS      --body "https://<vercel-도메인>"\n'
+printf '  gh variable set OPENAI_MODEL         --body "gpt-4o-mini"\n'
+printf '  gh variable set DESIRED_COUNT        --body "2"\n'
+printf '  gh variable set ON_DEMAND_BASE_COUNT --body "1"\n'
+```
+
+- [ ] **Step 2: 스크립트 문법 검사 후 사용자에게 실행 요청**
+
+Run: `bash -n infra/scripts/bootstrap-github-oidc.sh && chmod +x infra/scripts/bootstrap-github-oidc.sh`
+Expected: 출력 없음
+
+**이 스크립트는 IAM 자원을 만들므로 에이전트가 직접 실행하지 않는다.** 사용자에게 파일 경로와 하는 일을 알리고 실행을 요청한 뒤, 출력된 역할 ARN과 저장소 변수 등록 완료를 확인받는다.
+
+확인 명령:
+
+Run: `gh variable list`
+Expected: `AWS_DEPLOY_ROLE_ARN`·`DEMO_READ_ONLY`·`ALLOWED_ORIGINS`·`OPENAI_MODEL`·`DESIRED_COUNT`·`ON_DEMAND_BASE_COUNT` 6종
+
+- [ ] **Step 3: PR 검증 워크플로**
+
+`.github/workflows/pr-checks.yml`:
+
+```yaml
+name: PR 검증
+
+on:
+  pull_request:
+    branches: [main]
+
+# 포크 PR 에서도 안전하게 돌도록 자격증명이 필요한 단계를 두지 않는다.
+# ⚠ pull_request_target 은 절대 쓰지 않는다 — 포크의 코드를 시크릿과 함께 실행하게 된다.
+permissions:
+  contents: read
+
+jobs:
+  backend:
+    runs-on: ubuntu-24.04-arm      # public 레포는 ARM 러너 무료. 실패하면 ubuntu-latest 로 바꾼다
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: pip install -r backend/requirements.txt -r backend/requirements-dev.txt
+      - run: python -m pytest -q
+        working-directory: backend
+
+  templates:
+    runs-on: ubuntu-24.04-arm
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      # AWS 자격증명 없이 검사한다 — cfn-lint 는 CI 전용이고 프로젝트 의존성이 아니다.
+      - run: pip install cfn-lint
+      - run: cfn-lint infra/cloudformation/foundation.yaml infra/cloudformation/service.yaml
+      - run: bash -n infra/config.sh infra/scripts/*.sh infra/scripts/lib/*.sh
+
+  frontend:
+    runs-on: ubuntu-24.04-arm
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - run: npm ci
+      - run: npm run lint
+      - run: npm run check:banned
+      - run: npm run build
+```
+
+- [ ] **Step 4: 배포 워크플로**
+
+`.github/workflows/backend-deploy.yml`:
+
+```yaml
+name: 백엔드 배포
+
+on:
+  push:
+    branches: [main]
+    # 문서만 고친 머지로 컨테이너가 재배포되지 않게 경로를 좁힌다.
+    paths:
+      - 'backend/**'
+      - 'data/processed/**'
+      - 'infra/cloudformation/service.yaml'
+      - 'infra/config.sh'
+      - 'infra/scripts/**'
+      - '.github/workflows/backend-deploy.yml'
+  workflow_dispatch:      # 경로 필터에 안 걸린 변경을 밀 때 수동 실행
+
+permissions:
+  id-token: write         # OIDC 토큰 발급에 필요
+  contents: read
+
+# 배포는 겹치면 안 되고, 진행 중인 배포를 중간에 끊어서도 안 된다.
+concurrency:
+  group: backend-deploy
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-24.04-arm     # 이미지가 ARM64 — 네이티브 빌드 (public 레포 무료)
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.AWS_DEPLOY_ROLE_ARN }}
+          aws-region: ap-northeast-2
+
+      - name: 사전 점검
+        env:
+          DEMO_READ_ONLY: ${{ vars.DEMO_READ_ONLY }}
+        run: ./infra/scripts/preflight.sh
+
+      - name: 빌드 · 배포
+        env:
+          DEMO_READ_ONLY:       ${{ vars.DEMO_READ_ONLY }}
+          ALLOWED_ORIGINS:      ${{ vars.ALLOWED_ORIGINS }}
+          OPENAI_MODEL:         ${{ vars.OPENAI_MODEL }}
+          DESIRED_COUNT:        ${{ vars.DESIRED_COUNT }}
+          ON_DEMAND_BASE_COUNT: ${{ vars.ON_DEMAND_BASE_COUNT }}
+        run: |
+          set -euo pipefail
+          TAG="$(./infra/scripts/build-and-push.sh | tail -1)"
+          ./infra/scripts/deploy-service.sh "$TAG"
+
+      - name: 스모크 테스트
+        run: ./infra/scripts/smoke-test.sh
+```
+
+> `deploy-service.sh`가 `rolloutState`와 태스크 정의 리비전을 대조하므로, 서킷 브레이커가 되돌린 배포는 **워크플로가 빨간불로 끝난다.** CloudFormation 성공만 보고 초록불이 되는 함정을 CI에서도 피한다.
+
+- [ ] **Step 5: `infra/README.md`에 CI 절 추가**
+
+`## 배포` 절 아래에 삽입:
+
+````markdown
+## 자동 배포 (CI)
+
+`main`에 머지되면 `.github/workflows/backend-deploy.yml`이 백엔드를 배포한다.
+PR 단계에서는 `pr-checks.yml`이 pytest·cfn-lint·프론트 빌드만 돌리고 배포하지 않는다.
+
+- **인증:** GitHub OIDC → IAM 역할 `sangseng-github-deploy`. 저장소에 AWS 키가 없다.
+  신뢰 정책이 `main` 브랜치로 제한돼 있다
+- **범위:** service 스택만 갱신한다. foundation(VPC·DynamoDB)은 수동이다 —
+  `./infra/scripts/deploy-foundation.sh`
+- **경로 필터:** `backend/**`·`data/processed/**`·`infra/**`가 바뀐 경우에만 돈다.
+  문서만 고친 머지로는 배포하지 않는다
+- **수동 실행:** Actions 탭 → 백엔드 배포 → Run workflow
+
+로컬 `./infra/scripts/deploy.sh`와 CI는 **같은 스크립트**를 쓴다. 차이는 값의 출처뿐이다 —
+로컬은 `.env`, CI는 GitHub 저장소 변수이며, 스크립트의 `load_env`가 환경변수를 우선한다.
+
+> 나중에 "머지 후 사람이 한 번 더 승인" 게이트를 붙이려면 deploy job 에 
+> `environment: production` 을 추가하고 **OIDC 신뢰 정책의 `sub` 를
+> `repo:…:environment:production` 으로 함께 바꿔야 한다** — environment 를 쓰면
+> 토큰의 subject 가 브랜치 형식에서 환경 형식으로 바뀌기 때문이다. 한쪽만 바꾸면 인증이 깨진다.
+````
+
+- [ ] **Step 6: 실제 동작 확인**
+
+Run: `git push -u origin feat/ecs-infra && gh pr create --base main --title "infra: ECS Fargate 무중단 배포 이전" --body "설계 스펙: docs/superpowers/specs/2026-08-10-ecs-infra-design.md"`
+Expected: PR 생성
+
+Run: `gh pr checks --watch`
+Expected: `backend`·`templates`·`frontend` 3개 job 전부 통과
+
+머지 후:
+
+Run: `gh run watch`
+Expected: `백엔드 배포` 워크플로가 사전 점검 → 빌드·배포 → 스모크 테스트까지 완주
+
+- [ ] **Step 7: 커밋**
+
+```bash
+git add .github/workflows infra/scripts/bootstrap-github-oidc.sh infra/README.md
+git commit -m "infra: GitHub Actions 자동 배포 — main 머지 시 OIDC 로 배포, PR 은 검증만"
+```
+
+---
+
 # Phase D — 문서
 
 ### Task D1: `09-deployment.md` 전면 재작성 + 실 배포 아키텍처 절
@@ -2105,6 +2442,8 @@ git commit --allow-empty -m "infra: 첫 ECS 배포 성공 — P0 4건 실증 통
 3. **§2 프론트엔드 — Vercel** — 환경변수 4종 + **`vercel.json` 리전 설정**과 `x-vercel-id` 실측
 4. **§3 비용** — 스펙 §7의 표를 그대로. **"사실상 $0" 서술 전면 삭제**, "월 $30 수준, 상한 $42" + 프리티어 미적용(조직 계정) 명시
 5. **§4 무중단 배포** — 롤링 메커니즘, 종료 타이밍 예산 표, **서킷 브레이커 한계 2가지**, Task C1의 실측 결과
+5-1. **§4-1 자동 배포(CI)** — 워크플로 2종(PR 검증 / `main` 머지 배포), OIDC 역할과 신뢰 정책,
+   경로 필터, **service 스택만 자동화하고 foundation 은 수동으로 두는 이유**, 로컬 `deploy.sh` 와의 관계
 6. **§5 마무리 조이기** — `ALLOWED_ORIGINS` 좁히기, `DEMO_READ_ONLY`/`MUTATION_API_TOKEN` 짝, 그리고
    **토큰 교체 절차**를 순서까지 못박는다:
 
@@ -2297,3 +2636,4 @@ git commit -m "docs: 전 문서를 ECS 구성으로 정합화 + 비용 서사 7�
 - [ ] Vercel `x-vercel-id`에 `icn1`
 - [ ] 레포 전체에 `SAM`·`Mangum`·`deploy-backend.sh`·"사실상 $0" 잔재 없음 (`docs/audit/`·`docs/review/` 제외)
 - [ ] 시드 후 `GET /api/cards`가 카드 5장 반환
+- [ ] PR 을 열면 `pr-checks` 3개 job 이 통과하고, `main` 머지 시 `backend-deploy` 가 배포까지 완주

@@ -380,8 +380,9 @@ FE Server Action / 서버 컴포넌트
   - 레포 루트에 **`.env` 실파일이 존재**한다. `.gitignore`에 확실히 잡혀 있는지 확인.
   - `git log -p` 전 이력에 API 키·토큰이 한 번이라도 커밋된 적이 있는지 검사한다
     (`git log --all -S'sk-' --oneline`, `-S'AKIA'`, `-S'ANTHROPIC_API_KEY='` 등).
-  - 루트의 PDF/이미지(`기획서_V.I.B.E.pdf`, `MVP_상생나침반_개정판.pdf`, `산출물_평가표_*.pdf`,
-    `image-1.png`, `image-2.png`)에 개인 연락처 등 민감정보가 있는데 커밋 대상인지 확인.
+  - 루트의 PDF(`기획서_V.I.B.E.pdf`, `MVP_상생나침반_개정판.pdf` — `.gitignore` 대상, 커밋되면 안 됨)와
+    `docs/reference/`(`제출요구사항.pdf`, `산출물평가표.pdf`)·`docs/images/`(`dashboard-mockup.png`,
+    `widget-mockup.png`)에 개인 연락처 등 민감정보가 있는데 커밋 대상인지 확인.
   - `data/raw/api_cache/`에 API 키가 포함된 URL이나 응답이 남아 있는지.
 - 입력 검증: `region`/`category`/`limit`/`cursor`/`from`/`to` 등 쿼리 파라미터의 상한·화이트리스트.
   `limit`에 큰 수를 넣어 전량 덤프가 가능한지 (`GET /api/widget/recommend?limit=99999`).

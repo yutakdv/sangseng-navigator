@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { AdminShell } from "@/components/AdminShell";
 import { GradeChip, PrivacyBadge, ProxyBadge } from "@/components/Badge";
-import { EmptyChart } from "@/components/EmptyChart";
+import { EmptyChart, FailedChart } from "@/components/EmptyChart";
 import { Icon } from "@/components/Icon";
 import { KpiCard } from "@/components/KpiCard";
 import { PageHeader } from "@/components/PageHeader";
@@ -58,11 +58,16 @@ export default async function DashboardPage({
   // `data`는 데이터 활용 정보(/data)로 옮겨 갔다 (SideNav의 DASHBOARD_DEMO_ITEMS와 짝).
   const demo = sp.demo === "merchant" ? sp.demo : null;
 
+  // 이 페이지의 존재 이유(핵심 데이터)는 진단 지표 하나(d = api.dashboard())뿐이다 — 실패하면
+  // 에러 경계로 보내는 것이 정직하다. 나머지 셋은 보조 데이터라 각자 실패해도 화면의 본 뜻은
+  // 성립한다 — 후보 목록(제안 근거 뷰) · 국세청 위험 신호(배경 참고) · 원장(소표본 고지).
+  // null이 되면 아래에서 빈 배열(진짜 "데이터 없음")과 구분해 FailedChart로 표시한다 —
+  // 0·빈 배열로 조용히 치환하지 않는다 (PR #44 견고성 원칙).
   const [d, cand, risk, usageLedger] = await Promise.all([
     api.dashboard(),
-    api.candidates(),
-    api.riskSignal(),
-    api.usageMonthly(),
+    api.candidates().catch(() => null),
+    api.riskSignal().catch(() => null),
+    api.usageMonthly().catch(() => null),
   ]);
 
   // 음수/0·빈 배열 방어 (F5 검증 항목) — 데이터가 없으면 차트 대신 안내 문구를 낸다
@@ -89,20 +94,25 @@ export default async function DashboardPage({
     };
   });
   const totalUses = (d.region_share ?? []).reduce((a, b) => a + b.count, 0);
-  const eupRanking = cand.eup_ranking ?? [];
+  const eupRanking = cand?.eup_ranking ?? [];
+  // candidates 호출 자체가 실패했는지 — ranking이 비어 있는 이유가 "없다"가 아니라
+  // "못 불러왔다"일 때 빈 값을 사실처럼 그리지 않기 위한 플래그 (지도 카드·제안 근거 뷰 공용)
+  const rankingUnavailable = cand === null;
 
   // 2단계 표 주석용 — 포화도 0.00이 빈 값이 아니라 "반경 내 기존 가맹점 0곳"의 계산 결과임을 명시한다
   const saturationAllZero =
-    (cand.candidates ?? []).length > 0 &&
-    (cand.candidates ?? []).every((c) => c.saturation === 0 && c.nearby_merchants === 0);
+    (cand?.candidates ?? []).length > 0 &&
+    (cand?.candidates ?? []).every((c) => c.saturation === 0 && c.nearby_merchants === 0);
   // 배경 정보 요약용 — 편차 0.5%p 수준이라 막대로 차이를 그리지 않고 문장으로 말한다 (05 §6)
-  const riskPcts = risk.map((r) => r.under2y_ratio * 100);
+  // risk가 null(호출 실패)이면 빈 배열로 계산하되, 렌더에서 null을 따로 분기해
+  // "0%"가 아니라 FailedChart로 표시한다.
+  const riskPcts = (risk ?? []).map((r) => r.under2y_ratio * 100);
   const riskSpread = riskPcts.length ? Math.max(...riskPcts) - Math.min(...riskPcts) : 0;
   const riskAvg = riskPcts.length ? riskPcts.reduce((a, b) => a + b, 0) / riskPcts.length : 0;
   const stability = d.ranking_stability ?? d.ai_stability;
 
   // 소표본 보호 고지 — 원장 쪽 값이 정본이고, 구형 산출물에는 아예 없을 수 있어 둘 다 가드한다
-  const privacy = usageLedger.privacy_meta ?? d.privacy_meta ?? null;
+  const privacy = usageLedger?.privacy_meta ?? d.privacy_meta ?? null;
 
   return (
     <AdminShell dashboard={d}>
@@ -143,7 +153,8 @@ export default async function DashboardPage({
                 shares: d.region_share ?? [],
                 monthlyByRegion: d.monthly_by_region ?? [],
                 ranking: eupRanking,
-                selectedRegions: cand.selected_eups ?? [],
+                selectedRegions: cand?.selected_eups ?? [],
+                rankingUnavailable,
               })}
             />
           </Section>
@@ -287,7 +298,9 @@ export default async function DashboardPage({
             title="1단계 지역 진단 — 읍·시 스코어"
             desc="소비저조도·소비증감을 0~1로 정규화해 합산한 값이다. AI 제안 대상 지역 선정의 정량 근거이며, 순위는 화면에서 감추지 않는다."
           >
-            {eupRanking.length ? (
+            {rankingUnavailable ? (
+              <FailedChart />
+            ) : eupRanking.length ? (
               <div className="u-scroll-x">
                 <table className="u-table min-w-[460px]">
                   <thead>
@@ -307,7 +320,7 @@ export default async function DashboardPage({
                   </thead>
                   <tbody>
                     {eupRanking.map((e) => {
-                      const selected = (cand.selected_eups ?? []).includes(e.eup);
+                      const selected = (cand?.selected_eups ?? []).includes(e.eup);
                       return (
                         <tr key={e.eup} data-highlight={selected ? "true" : undefined}>
                           <td className="tabular-nums text-admin-text-muted">{e.rank}</td>
@@ -349,7 +362,7 @@ export default async function DashboardPage({
             title="가맹점 관리 · 2단계 후보 스코어"
             desc="세 요인을 같은 가중치로 합산한다. 현재 데이터에서는 업종공백도·기존가맹포화도가 후보 간 동률인지 함께 확인한다."
           >
-            {demo === "merchant" ? (
+            {demo === "merchant" && cand ? (
               <MenuDemoGuide
                 icon="store"
                 title="가맹점 후보 관리 데모"
@@ -357,7 +370,9 @@ export default async function DashboardPage({
                 steps={["종합 점수로 검토 순서를 잡습니다.", "업종공백도·동선근접도·기존가맹포화도를 비교합니다.", "후보를 선택해 확충 Action Card를 생성·결정합니다."]}
               />
             ) : null}
-            {(cand.candidates ?? []).length ? (
+            {rankingUnavailable ? (
+              <FailedChart />
+            ) : (cand?.candidates ?? []).length ? (
                 <>
                   <div className="u-scroll-x">
                     <table className="u-table min-w-[480px]">
@@ -379,7 +394,7 @@ export default async function DashboardPage({
                         </tr>
                       </thead>
                       <tbody>
-                        {cand.candidates.map((c) => (
+                        {(cand?.candidates ?? []).map((c) => (
                           <tr key={c.id}>
                             <td>
                               <div className="font-semibold">{c.category}</div>
@@ -434,7 +449,10 @@ export default async function DashboardPage({
                   국세청 사업자등록 데이터 기준 — 지역 상권의 배경 정보다. 4개 시군 편차가 0.5%p
                   수준이라 지역 간 비교나 순위 근거로는 쓰지 않는다.
                 </p>
-                {risk.length ? (
+                {risk === null ? (
+                  // 0%·"—"로 채우면 실제 값으로 오독된다 — 못 불러왔다고 밝힌다
+                  <FailedChart />
+                ) : risk.length ? (
                   <>
                     <p className="mt-3 break-keep text-[15px] leading-7 text-admin-text">
                       {risk.length}개 시군 모두{" "}

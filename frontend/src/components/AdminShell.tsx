@@ -2,7 +2,9 @@ import type { ReactNode } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { Footer } from "@/components/Footer";
+import { Icon } from "@/components/Icon";
 import { SideNav } from "@/components/SideNav";
+import { TourOverlay } from "@/components/tour/TourOverlay";
 import type { Dashboard } from "@/types";
 import { dataFreshness } from "@/lib/dataFreshness";
 import { operator, operatorInitial } from "@/lib/operator";
@@ -82,24 +84,53 @@ export function AdminShell({
       </aside>
 
       <div className="flex min-w-0 flex-1 flex-col lg:min-h-screen lg:pl-[272px]">
-        {!hideSummary ? (
-          <header className="sticky top-0 z-20 border-b border-admin-border/80 bg-admin-bg/90 px-4 py-3 backdrop-blur-xl sm:px-6 xl:px-8">
-            <div className="mx-auto flex max-w-[1500px] items-center gap-3">
-              <Link href="/" className="text-sm font-bold text-admin-text lg:hidden">상생 나침반</Link>
+        {/*
+          "3분 체험" 진입점은 hideSummary(홈)에서도 필요하다 — 홈이 이 상단 바를 가장 많이 안 쓰는
+          화면이면서 동시에 심사위원이 가장 먼저 보는 화면이라, 여기서만 버튼이 사라지면 투어를
+          다시 시작할 길이 없어진다. 그래서 바는 항상 그리고, "중복 요약을 홈에 두지 않는다"는
+          hideSummary의 원래 취지는 라벨·데이터 신선도 배지에만 남긴다.
+
+          다만 **홈에서는 이 바를 sticky로 두지 않는다.** 홈 본문(DashboardOverview)의 StatusBar가
+          이미 `sticky top-0 z-30`이라, 이 헤더까지 `sticky top-0`이면 같은 스크롤 컨테이너·같은
+          top:0에서 두 sticky가 겹치고 z-index가 낮은 이 헤더(z-20)가 StatusBar(z-30)에 가려
+          "3분 체험" 버튼이 스크롤 즉시 사라진다. 헤더 높이만큼 StatusBar의 top을 밀어내는 방식은
+          쓰지 않는다 — 헤더 높이가 매직 넘버로 박히고 배지 유무에 따라 높이가 흔들려 조용히
+          어긋난다. 그래서 홈은 `relative`로 첫 화면에서만 보이게 하고, 스크롤 내내 붙어 있는
+          역할은 원래대로 StatusBar 하나에만 맡긴다.
+        */}
+        <header
+          className={`${hideSummary ? "relative" : "sticky top-0 z-20"} border-b border-admin-border/80 bg-admin-bg/90 px-4 py-3 backdrop-blur-xl sm:px-6 xl:px-8`}
+        >
+          <div className="mx-auto flex max-w-[1500px] items-center gap-3">
+            <Link href="/" className="text-sm font-bold text-admin-text lg:hidden">상생 나침반</Link>
+            {!hideSummary ? (
               <span className="hidden text-xs font-semibold text-admin-text-muted lg:inline">지역상생 운영 콘솔</span>
-              <span
-                className={`ml-auto inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-semibold ${
-                  freshness.isStale
-                    ? "border-state-warn-line bg-state-warn-bg text-state-warn"
-                    : "border-admin-primary-line bg-admin-primary-soft text-admin-primary"
-                }`}
+            ) : null}
+            <div className="ml-auto flex items-center gap-2">
+              {/* 심사위원이 화면 구조를 스스로 찾지 않아도 되도록 인앱 가이드 투어를 어디서든 다시 시작할 수 있게 한다.
+                  버튼 스타일은 새로 만들지 않고 사이트 전역 primary 버튼 톤(bg-admin-primary/hover:primary-strong)을 그대로 쓴다. */}
+              <Link
+                href="/?tour=1"
+                className="inline-flex min-h-9 items-center gap-1.5 rounded-lg bg-admin-primary px-3 py-1.5 text-xs font-bold text-white transition-colors hover:bg-admin-primary-strong"
               >
-                <span className={`h-1.5 w-1.5 rounded-full ${freshness.isStale ? "bg-state-warn" : "bg-admin-primary"}`} />
-                {freshness.label}
-              </span>
+                <Icon name="sparkle" size={14} strokeWidth={2} />
+                3분 체험
+              </Link>
+              {!hideSummary ? (
+                <span
+                  className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-semibold ${
+                    freshness.isStale
+                      ? "border-state-warn-line bg-state-warn-bg text-state-warn"
+                      : "border-admin-primary-line bg-admin-primary-soft text-admin-primary"
+                  }`}
+                >
+                  <span className={`h-1.5 w-1.5 rounded-full ${freshness.isStale ? "bg-state-warn" : "bg-admin-primary"}`} />
+                  {freshness.label}
+                </span>
+              ) : null}
             </div>
-          </header>
-        ) : null}
+          </div>
+        </header>
 
         <main id="main-content" className={`min-w-0 flex-1 px-4 sm:px-6 xl:px-9 ${hideSummary ? "py-5 sm:py-7" : "py-6 sm:py-8"}`}>
           {freshness.isStale && !hideFreshnessBanner ? (
@@ -119,6 +150,7 @@ export function AdminShell({
         </main>
         <Footer periodNote={period_note} />
       </div>
+      <TourOverlay />
     </div>
   );
 }

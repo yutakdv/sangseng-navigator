@@ -29,7 +29,8 @@ export function QuarterDiagnostics({
   totalUses,
 }: {
   dashboard: Dashboard;
-  kpi: Kpi;
+  /** null이면 KPI 호출 실패 — "정책 채택률" 칸을 0%로 그리지 않고 불러오지 못했다고 밝힌다 */
+  kpi: Kpi | null;
   totalUses: number;
 }) {
   return (
@@ -56,11 +57,15 @@ export function QuarterDiagnostics({
           delta={<DeltaValue value={dashboard.growth?.mom_pct} unit="%" variant="text" className="text-xs" />}
           note="전월 일평균"
         />
-        <Metric
-          label="정책 채택률"
-          value={ratioPct(kpi.adoption_rate)}
-          note={`승인 ${kpi.counts.approved}/결정 ${kpi.counts.decided}`}
-        />
+        {kpi ? (
+          <Metric
+            label="정책 채택률"
+            value={ratioPct(kpi.adoption_rate)}
+            note={`승인 ${kpi.counts.approved}/결정 ${kpi.counts.decided}`}
+          />
+        ) : (
+          <Metric label="정책 채택률" value="—" note="불러오지 못함" />
+        )}
       </div>
 
       <p className="mt-4 flex flex-wrap items-center gap-x-3 gap-y-1 border-t border-admin-border pt-3 text-xs text-admin-text-muted">
