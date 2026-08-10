@@ -65,7 +65,7 @@ cd infra && ./deploy-backend.sh
 - BE의 정적 데이터 로딩은 `backend/app/dataload.py` 한 곳에서만 한다
   (Lambda: `app/data/`, 로컬: `../../data/processed/` 폴백).
 - LLM 호출은 `backend/app/llm.py`의 `generate_json(system, user, schema)` 하나로 통일.
-  provider 분기(OpenAI/Anthropic)는 이 파일 안에만 존재한다.
+  provider는 OpenAI 단일이며 SDK 호출은 이 파일 안에만 존재한다.
 - 시크릿은 .env / SAM 파라미터로만. 코드·커밋에 키 금지.
 
 ## 환경 준비

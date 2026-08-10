@@ -269,7 +269,7 @@ cd frontend && npm install && npm run dev   # NEXT_PUBLIC_API_BASE 미설정 시
 | 지도 | 근거 상세(/cards/[id]) MapLibre GL + OpenFreeMap / 방문객 위젯 Kakao Maps JS (키 없으면 정적 폴백) |
 | 백엔드 | FastAPI on AWS Lambda + API Gateway + DynamoDB (SAM, 월 비용 사실상 $0) |
 | 데이터 | Python 파이프라인 10단계 → 정적 JSON 사전 계산 + SHA-256 manifest |
-| AI | LLM 어댑터 1곳으로 통일 (OpenAI ↔ Anthropic 전환 가능) · 스키마 강제 + 룰 폴백 |
+| AI | LLM 어댑터 1곳으로 통일 (OpenAI gpt-4o-mini) · 스키마 강제 + 룰 폴백 |
 | 배포 | Vercel(FE) + AWS SAM(BE) · 로컬 통합 환경은 Docker Compose |
 
 ---

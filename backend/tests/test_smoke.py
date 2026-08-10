@@ -1216,14 +1216,6 @@ def test_llm_retries_with_backoff_then_wraps(monkeypatch):
     assert slept == [llm.RETRY_BACKOFF_SECONDS]                     # 마지막 시도 뒤에는 쉬지 않는다
 
 
-def test_llm_rejects_unknown_provider(monkeypatch):
-    """provider 오타를 기본 OpenAI로 묵인하지 않고 명시적으로 실패시킨다."""
-    monkeypatch.setenv("LLM_PROVIDER", "opena1")
-
-    with pytest.raises(llm.LLMError, match="Unsupported LLM_PROVIDER: opena1"):
-        REAL_GENERATE_JSON("system", "user", {"type": "object"}, attempts=1)
-
-
 # ── A4: 데이터셋 버전 헤더 ────────────────────────────────────────────────
 
 def test_api_responses_carry_dataset_version_header():
