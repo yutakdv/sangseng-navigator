@@ -1,7 +1,7 @@
 {
-  "dataset_version": "2025-12.0605806a",
+  "dataset_version": "2025-12.4118debc",
   "base_month": "2025-12",
-  "generated_at": "2026-08-10T12:02:47+00:00",
+  "generated_at": "2026-08-10T12:18:35+00:00",
   "files": {
     "candidates.json": {
       "sha256": "fe4179a7319f5db959aaaa7945e0e42f8baab15beb6cbe2adea145d06b03b23e",
@@ -12,7 +12,7 @@
       "bytes": 7160
     },
     "dashboard.json": {
-      "sha256": "2bb8ce37657f11a1b746b488879065d03856c890f110eb3f344065dcd594760c",
+      "sha256": "119c8fbd227a302c355167cbba6fb1170250a25c19f554b13145e2bd1bd5ab5f",
       "bytes": 8052
     },
     "eup_scores.json": {

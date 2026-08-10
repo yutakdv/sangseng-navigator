@@ -229,7 +229,7 @@ def test_dashboard_returns_real_data():
     assert isinstance(conv["headline_rate"], (int, float)) and conv["headline_rate"] > 0
     assert conv["is_proxy"] is True                     # 절대 규칙 2 — 근사 지표 배지의 근거
     assert "입장 연인원" in conv["proxy_note"]           # 05 §1 — 배지만으로 못 막는 오인 차단 문구
-    assert "28.5%" in conv["proxy_note"]                # 금액 기준 공식 비율과 다른 지표임을 고지
+    assert "29.4%" in conv["proxy_note"]                # 금액 기준 공식 비율과 다른 지표임을 고지
     assert conv["monthly"] and all(
         {"month", "local_uses", "visitors", "rate"} <= set(m) for m in conv["monthly"])
 
