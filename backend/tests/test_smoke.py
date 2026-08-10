@@ -363,7 +363,8 @@ def test_generate_hands_target_weekday_pattern_to_the_llm(monkeypatch):
     captured = {}
 
     def spy(system, user, schema, schema_name="result", timeout=None, attempts=2):
-        captured["payload"] = json.loads(user)
+        # B2: user 메시지가 <data>...</data>로 감싸이므로 안쪽 JSON만 파싱한다.
+        captured["payload"] = json.loads(user.split("<data>", 1)[1].rsplit("</data>", 1)[0])
         return dict(FAKE_AI)
 
     monkeypatch.setattr(llm, "generate_json", spy)
@@ -386,7 +387,8 @@ def test_generate_survives_missing_usage_daily(monkeypatch):
     captured = {}
 
     def spy(system, user, schema, schema_name="result", timeout=None, attempts=2):
-        captured["payload"] = json.loads(user)
+        # B2: user 메시지가 <data>...</data>로 감싸이므로 안쪽 JSON만 파싱한다.
+        captured["payload"] = json.loads(user.split("<data>", 1)[1].rsplit("</data>", 1)[0])
         return dict(FAKE_AI)
 
     monkeypatch.setattr(llm, "generate_json", spy)
@@ -938,7 +940,8 @@ def test_simulate_does_not_hand_indices_to_the_llm(monkeypatch):
     captured = {}
 
     def spy(system, user, schema, schema_name="result", timeout=None, attempts=2):
-        captured["payload"] = json.loads(user)
+        # B2: user 메시지가 <data>...</data>로 감싸이므로 안쪽 JSON만 파싱한다.
+        captured["payload"] = json.loads(user.split("<data>", 1)[1].rsplit("</data>", 1)[0])
         return {"narrative": FAKE_NARRATIVE}
 
     monkeypatch.setattr(llm, "generate_json", spy)

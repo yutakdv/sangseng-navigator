@@ -245,8 +245,10 @@ def simulate_card(
                       "집중도 지수 값을 지어내지 말 것. '예상'과 '가정' 두 단어를 반드시 포함할 것"),
         }
         try:
-            out = llm.generate_json(prompts.SIMULATE_PROMPT, json.dumps(user_payload, ensure_ascii=False),
-                                    NARRATIVE_SCHEMA, schema_name="narrative", timeout=8)
+            out = llm.generate_json(
+                prompts.SIMULATE_PROMPT,
+                f"<data>\n{json.dumps(user_payload, ensure_ascii=False)}\n</data>",
+                NARRATIVE_SCHEMA, schema_name="narrative", timeout=8)
             narrative = out.get("narrative")
         except Exception:
             log.warning("simulate narrative LLM 실패 — 규칙 기반 문구로 대체 (card=%s)", cid, exc_info=True)
