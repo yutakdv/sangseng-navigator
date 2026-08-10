@@ -1,33 +1,69 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Icon } from "@/components/Icon";
 import { RegionalMap } from "@/components/RegionalMap/RegionalMap";
 import { type MapRegion } from "@/components/RegionalMap/regions";
 import { RegionStatusCard, type RegionStatus } from "@/components/RegionStatusCard";
 
 /**
- * 지도 + 지역 상태 팝업 패널 — 지역별 현재 상태 블록의 본문.
+ * 지도 + 지역 상태 팝업 — 지역별 현재 상태 블록의 본문.
  *
- * 수치는 전부 서버가 계산해 평면 배열(statuses)로 내려준다. 이 컴포넌트는 "어느 지역이
- * 선택됐나"만 들고 있다 — 선택은 일시적 미리보기라 URL에 올리지 않는다(이 레포의 URL
- * 상태 컨벤션과의 역할 분담: 정식 이동은 카드 안 `이 지역 상세 분석` 링크가 맡는다).
+ * 지도가 블록 전체 폭을 쓰고, 지역을 고르면 **화면 중앙 팝업**으로 상태 카드가 뜬다.
+ * 배경은 옅은 틴트 + 블러로 가라앉혀 카드에 시선을 모은다.
  *
- * 팝업은 지도 위 오버레이가 아니라 옆(모바일: 아래) 고정 패널이다 — 카드가 수치 6개짜리
- * 밀도라 지도를 덮으면 다음 선택을 방해한다. 등장 애니메이션(key 교체 + animate-rise)으로
- * 팝업감만 살린다. aria-live로 선택 결과가 스크린리더에도 알려진다.
+ * 수치는 전부 서버가 계산해 평면 배열(statuses)로 내려준다. 선택은 일시적 미리보기라
+ * URL에 올리지 않는다 — 정식 이동은 카드 안 `이 지역 상세 분석` 링크가 맡는다.
+ *
+ * 팝업 접근성: role="dialog" + aria-modal, 열리면 닫기 버튼으로 포커스 이동, 닫으면
+ * 방아쇠(지도 path)로 복귀. Esc·배경 클릭·닫기 버튼 세 경로로 닫힌다. 열려 있는 동안
+ * body 스크롤을 잠가 뒤 화면이 흐른 채 팝업만 남는 상태를 막는다.
+ * 닫아도 지도 강조는 남긴다 — 방금 본 지역이 어디였는지가 지도에 남아야 다음 비교가 쉽다.
  */
 export function RegionalMapSection({ statuses }: { statuses: RegionStatus[] }) {
   const [selected, setSelected] = useState<MapRegion | null>(null);
+  const [open, setOpen] = useState(false);
+  const closeButtonRef = useRef<HTMLButtonElement>(null);
+  const triggerRef = useRef<Element | null>(null);
+
   const statusByRegion = new Map(statuses.map((s) => [s.region, s]));
   const selectedStatus = selected ? statusByRegion.get(selected.name) : undefined;
+  const popupVisible = open && selectedStatus !== undefined;
+
+  const close = () => {
+    setOpen(false);
+    // 팝업을 연 지도 path로 포커스 복귀 — 키보드 사용자가 제자리에서 탐색을 잇는다
+    if (triggerRef.current instanceof HTMLElement || triggerRef.current instanceof SVGElement) {
+      (triggerRef.current as SVGElement & { focus: () => void }).focus();
+    }
+  };
+
+  useEffect(() => {
+    if (!popupVisible) return;
+    closeButtonRef.current?.focus();
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") close();
+    };
+    document.addEventListener("keydown", onKey);
+    // 팝업이 떠 있는 동안 뒤 화면 스크롤 잠금
+    const prevOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.removeEventListener("keydown", onKey);
+      document.body.style.overflow = prevOverflow;
+    };
+  }, [popupVisible]);
 
   return (
-    <div className="grid grid-cols-1 gap-4 lg:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]">
-      <div className="rounded-2xl border border-admin-border bg-admin-surface-sunken/40 p-3 sm:p-4">
+    <div>
+      <div className="rounded-2xl border border-admin-border bg-admin-surface-sunken/40 p-3 sm:p-5">
         <RegionalMap
           selectedId={selected?.id ?? null}
-          onRegionSelect={(region) => setSelected(region)}
+          onRegionSelect={(region) => {
+            triggerRef.current = document.activeElement;
+            setSelected(region);
+            setOpen(true);
+          }}
         />
         <p className="mt-2 flex items-center gap-1.5 px-1 text-[11px] text-admin-text-muted">
           <Icon name="info" size={12} />
@@ -36,28 +72,34 @@ export function RegionalMapSection({ statuses }: { statuses: RegionStatus[] }) {
         </p>
       </div>
 
-      {/* 선택 결과 패널 — key 교체로 지역을 바꿀 때마다 카드가 새로 떠오른다 */}
-      <div aria-live="polite" className="min-w-0">
-        {selectedStatus ? (
-          <div key={selectedStatus.region} className="animate-rise">
+      {popupVisible ? (
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-label={`${selectedStatus.region} 현재 상태`}
+          className="fixed inset-0 z-50 flex items-center justify-center p-4"
+        >
+          {/* 배경 — 옅은 틴트 + 블러. 버튼이라 클릭·보조기기 어느 쪽으로도 닫힌다 */}
+          <button
+            type="button"
+            aria-label="팝업 닫기"
+            onClick={close}
+            className="absolute inset-0 cursor-default bg-lavender-950/25 backdrop-blur-sm"
+          />
+          <div key={selectedStatus.region} className="relative w-full max-w-sm animate-rise">
             <RegionStatusCard status={selectedStatus} />
+            <button
+              ref={closeButtonRef}
+              type="button"
+              aria-label="닫기"
+              onClick={close}
+              className="absolute -right-2.5 -top-2.5 flex h-8 w-8 items-center justify-center rounded-full bg-admin-surface text-admin-text-muted shadow-card ring-1 ring-inset ring-admin-border transition-colors hover:text-admin-text focus-visible:ring-2 focus-visible:ring-admin-primary"
+            >
+              <Icon name="close" size={14} strokeWidth={2} />
+            </button>
           </div>
-        ) : (
-          <div className="flex h-full min-h-[220px] flex-col items-center justify-center rounded-2xl border border-dashed border-admin-border bg-admin-surface px-4 py-8 text-center">
-            <span className="flex h-11 w-11 items-center justify-center rounded-full bg-lavender-100 text-lavender-700">
-              <Icon name="pin" size={20} />
-            </span>
-            <p className="mt-3 text-[15px] font-semibold text-admin-text">
-              지도에서 지역을 선택하세요
-            </p>
-            <p className="mx-auto mt-1.5 max-w-xs break-keep text-[13px] leading-6 text-admin-text-muted">
-              누적 사용 건수·전체 비중·최근 월 흐름·진단 순위가 여기에 열립니다. (예: 진단
-              1위 영월군)
-            </p>
-          </div>
-        )}
-      </div>
-
+        </div>
+      ) : null}
     </div>
   );
 }
