@@ -1,0 +1,259 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: sangseng-navigator — ALB·ECS·API Gateway (배포마다 갱신되는 계층)
+
+Parameters:
+  FoundationStack:   { Type: String, Default: sangseng-foundation }
+  ImageTag:          { Type: String }
+  DesiredCount:      { Type: Number, Default: 2 }
+  # Fargate 는 Spot 부족 시 온디맨드로 자동 대체하지 않는다 — 전부 Spot 이면 최악의 경우
+  # 실행 태스크가 0 이 된다. 심사 기간에는 1 로 두어 최소 1대를 온디맨드로 확보한다.
+  OnDemandBaseCount: { Type: Number, Default: 0 }
+  TaskCpu:           { Type: String, Default: '256' }
+  TaskMemory:        { Type: String, Default: '512' }
+  DemoReadOnly:
+    Type: String
+    AllowedValues: ['true', 'false']
+    # 기본값을 두지 않는다 — 배포자가 반드시 명시하게 한다.
+    # 앱 기본값은 false 라 빠뜨리면 공개 데모가 쓰기 가능 상태로 뜬다.
+  AllowedOrigins:    { Type: String, Default: '' }
+  OpenAiModel:       { Type: String, Default: gpt-4o-mini }
+
+Resources:
+  # ── 보안그룹 ──────────────────────────────────────────────────────────
+  # 인그레스를 별도 리소스로 뺀다 — SG 끼리 서로 참조하면 CloudFormation 순환 의존이 된다.
+  VpcLinkSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: API Gateway VPC Link ENI
+      VpcId: !ImportValue
+        'Fn::Sub': '${FoundationStack}-VpcId'
+
+  AlbSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: internal ALB
+      VpcId: !ImportValue
+        'Fn::Sub': '${FoundationStack}-VpcId'
+
+  TaskSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      # 태스크는 public 서브넷에 public IP 를 달고 있다 — 인바운드 차단은 전적으로 이 SG 가 한다.
+      GroupDescription: ECS task (inbound only from ALB)
+      VpcId: !ImportValue
+        'Fn::Sub': '${FoundationStack}-VpcId'
+
+  AlbIngressFromVpcLink:
+    Type: AWS::EC2::SecurityGroupIngress
+    Properties:
+      GroupId: !Ref AlbSecurityGroup
+      IpProtocol: tcp
+      FromPort: 80
+      ToPort: 80
+      SourceSecurityGroupId: !Ref VpcLinkSecurityGroup
+
+  TaskIngressFromAlb:
+    Type: AWS::EC2::SecurityGroupIngress
+    Properties:
+      GroupId: !Ref TaskSecurityGroup
+      IpProtocol: tcp
+      FromPort: 8000
+      ToPort: 8000
+      SourceSecurityGroupId: !Ref AlbSecurityGroup
+
+  # ── 내부 ALB ─────────────────────────────────────────────────────────
+  LoadBalancer:
+    Type: AWS::ElasticLoadBalancingV2::LoadBalancer
+    Properties:
+      Scheme: internal          # 인터넷에서 접근 불가. 진입은 API Gateway 뿐이다.
+      Type: application
+      SecurityGroups: [!Ref AlbSecurityGroup]
+      Subnets: !Split
+        - ','
+        - !ImportValue
+          'Fn::Sub': '${FoundationStack}-PrivateSubnetIds'
+      LoadBalancerAttributes:
+        # API Gateway 통합 타임아웃 30초보다 크게 둔다.
+        - { Key: idle_timeout.timeout_seconds, Value: '65' }
+
+  TargetGroup:
+    Type: AWS::ElasticLoadBalancingV2::TargetGroup
+    Properties:
+      TargetType: ip
+      Protocol: HTTP
+      Port: 8000
+      VpcId: !ImportValue
+        'Fn::Sub': '${FoundationStack}-VpcId'
+      # /api/health 가 아니라 /api/health/ready 를 본다 —
+      # health 는 데이터가 없어도 200 이라 결손 이미지를 healthy 로 통과시킨다.
+      HealthCheckPath: /api/health/ready
+      HealthCheckProtocol: HTTP
+      HealthCheckIntervalSeconds: 15
+      HealthCheckTimeoutSeconds: 5
+      HealthyThresholdCount: 2
+      UnhealthyThresholdCount: 3
+      Matcher: { HttpCode: '200' }
+      TargetGroupAttributes:
+        # 기본 300초는 롤링 배포를 태스크당 5분씩 늘린다.
+        - { Key: deregistration_delay.timeout_seconds, Value: '30' }
+
+  Listener:
+    Type: AWS::ElasticLoadBalancingV2::Listener
+    Properties:
+      LoadBalancerArn: !Ref LoadBalancer
+      Protocol: HTTP
+      Port: 80
+      DefaultActions: [{ Type: forward, TargetGroupArn: !Ref TargetGroup }]
+
+  # ── ECS ──────────────────────────────────────────────────────────────
+  Cluster:
+    Type: AWS::ECS::Cluster
+    Properties:
+      ClusterName: sangseng-cluster
+      CapacityProviders: [FARGATE, FARGATE_SPOT]
+
+  TaskDefinition:
+    Type: AWS::ECS::TaskDefinition
+    Properties:
+      Family: sangseng-api
+      RequiresCompatibilities: [FARGATE]
+      NetworkMode: awsvpc
+      Cpu: !Ref TaskCpu
+      Memory: !Ref TaskMemory
+      RuntimePlatform:
+        CpuArchitecture: ARM64      # ⚠ infra/config.sh 의 CPU_ARCHITECTURE 와 일치해야 한다
+        OperatingSystemFamily: LINUX
+      ExecutionRoleArn: !ImportValue
+        'Fn::Sub': '${FoundationStack}-TaskExecutionRoleArn'
+      TaskRoleArn: !ImportValue
+        'Fn::Sub': '${FoundationStack}-TaskRoleArn'
+      ContainerDefinitions:
+        - Name: api
+          Image: !Sub
+            - '${Uri}:${Tag}'
+            - Uri: !ImportValue
+                'Fn::Sub': '${FoundationStack}-EcrRepositoryUri'
+              Tag: !Ref ImageTag
+          Essential: true
+          PortMappings: [{ ContainerPort: 8000, Protocol: tcp }]
+          # 최악 24.5초 LLM 요청이 진행 중일 수 있다. 기본 30초로는 잘린다. (최대 120)
+          StopTimeout: 60
+          Environment:
+            - { Name: APP_ENV, Value: production }
+            - { Name: AWS_REGION, Value: !Ref 'AWS::Region' }
+            - Name: CARDS_TABLE
+              Value: !ImportValue
+                'Fn::Sub': '${FoundationStack}-CardsTableName'
+            - Name: PROGRESS_RECORDS_TABLE
+              Value: !ImportValue
+                'Fn::Sub': '${FoundationStack}-ProgressRecordsTableName'
+            - { Name: ALLOWED_ORIGINS, Value: !Ref AllowedOrigins }
+            - { Name: DEMO_READ_ONLY,  Value: !Ref DemoReadOnly }
+            # 감사 지적 M2 — 미전달 시 배포본이 항상 코드 기본값을 쓴다
+            - { Name: OPENAI_MODEL,    Value: !Ref OpenAiModel }
+          Secrets:
+            - Name: OPENAI_API_KEY
+              ValueFrom: !Sub arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter/sangseng/prod/OPENAI_API_KEY
+            - Name: MUTATION_API_TOKEN
+              ValueFrom: !Sub arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter/sangseng/prod/MUTATION_API_TOKEN
+          LogConfiguration:
+            LogDriver: awslogs
+            Options:
+              awslogs-group: !ImportValue
+                'Fn::Sub': '${FoundationStack}-LogGroupName'
+              awslogs-region: !Ref 'AWS::Region'
+              awslogs-stream-prefix: ecs
+
+  Service:
+    Type: AWS::ECS::Service
+    DependsOn: Listener      # 리스너 없이 대상그룹에 등록하면 생성이 실패한다
+    Properties:
+      ServiceName: sangseng-api
+      Cluster: !Ref Cluster
+      TaskDefinition: !Ref TaskDefinition
+      DesiredCount: !Ref DesiredCount
+      CapacityProviderStrategy:
+        - { CapacityProvider: FARGATE,      Base: !Ref OnDemandBaseCount, Weight: 0 }
+        - { CapacityProvider: FARGATE_SPOT, Weight: 1 }
+      DeploymentConfiguration:
+        # 새 태스크가 헬스체크를 통과한 뒤에야 구 태스크를 내린다 = 무중단
+        MinimumHealthyPercent: 100
+        MaximumPercent: 200
+        DeploymentCircuitBreaker: { Enable: true, Rollback: true }
+      NetworkConfiguration:
+        AwsvpcConfiguration:
+          # public 서브넷 + public IP = NAT 없이 ECR pull·OpenAI 호출
+          AssignPublicIp: ENABLED
+          Subnets: !Split
+            - ','
+            - !ImportValue
+              'Fn::Sub': '${FoundationStack}-PublicSubnetIds'
+          SecurityGroups: [!Ref TaskSecurityGroup]
+      LoadBalancers:
+        - { ContainerName: api, ContainerPort: 8000, TargetGroupArn: !Ref TargetGroup }
+      # 0.25 vCPU 는 버스트가 없어 기동이 느리다. ENI 프로비저닝 + ECR pull +
+      # 타깃 등록 + 헬스체크 2연속 통과까지 여유를 준다.
+      HealthCheckGracePeriodSeconds: 120
+
+  # ── API Gateway ──────────────────────────────────────────────────────
+  HttpApi:
+    Type: AWS::ApiGatewayV2::Api
+    Properties:
+      Name: sangseng-api
+      ProtocolType: HTTP
+      # CORS 설정을 두지 않는다 — 모든 호출이 Vercel 서버에서 오는 서버-대-서버라
+      # 브라우저 프리플라이트가 발생하지 않는다. 앱(FastAPI)의 ALLOWED_ORIGINS 가 정본이다.
+
+  VpcLink:
+    Type: AWS::ApiGatewayV2::VpcLink
+    Properties:
+      Name: sangseng-vpclink
+      # ⚠ immutable — 서브넷·보안그룹 변경은 교체(Replacement)를 유발하고 생성에 수 분 걸린다.
+      SubnetIds: !Split
+        - ','
+        - !ImportValue
+          'Fn::Sub': '${FoundationStack}-PrivateSubnetIds'
+      SecurityGroupIds: [!Ref VpcLinkSecurityGroup]
+
+  Integration:
+    Type: AWS::ApiGatewayV2::Integration
+    Properties:
+      ApiId: !Ref HttpApi
+      IntegrationType: HTTP_PROXY
+      IntegrationMethod: ANY
+      ConnectionType: VPC_LINK
+      ConnectionId: !Ref VpcLink
+      IntegrationUri: !Ref Listener      # 프라이빗 통합의 대상은 ALB 리스너 ARN
+      PayloadFormatVersion: '1.0'
+
+  Route:
+    Type: AWS::ApiGatewayV2::Route
+    Properties:
+      ApiId: !Ref HttpApi
+      RouteKey: 'ANY /{proxy+}'
+      Target: !Sub 'integrations/${Integration}'
+
+  Stage:
+    Type: AWS::ApiGatewayV2::Stage
+    Properties:
+      ApiId: !Ref HttpApi
+      # ⚠ $default 여야 한다. 명명 스테이지를 쓰면 백엔드 경로에 /<stage> 접두사가 붙어
+      #   프론트의 모든 경로가 FastAPI 404 가 된다.
+      StageName: $default
+      AutoDeploy: true
+      DefaultRouteSettings:
+        # Lambda 의 ReservedConcurrentExecutions=5 를 대체하는 LLM 남용 방어선.
+        # 태스크 2대 × anyio 기본 40 스레드 = 최대 80 동시 generate 를 여기서 막는다.
+        ThrottlingRateLimit: 10
+        ThrottlingBurstLimit: 20
+
+Outputs:
+  ApiUrl:
+    Description: Vercel 의 NEXT_PUBLIC_API_BASE 에 넣을 값 (끝 슬래시 없이 그대로 복사)
+    Value: !Sub 'https://${HttpApi}.execute-api.${AWS::Region}.amazonaws.com'
+  TaskDefinitionArn:
+    Value: !Ref TaskDefinition
+  ClusterName:
+    Value: !Ref Cluster
+  ServiceName:
+    Value: !GetAtt Service.Name

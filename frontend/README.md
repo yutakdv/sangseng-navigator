@@ -28,7 +28,6 @@ docker compose up -d               # FE(3100) + BE(8000) + DynamoDB(8001) + 데�
 docker compose logs -f frontend
 
 FRONTEND_PORT=3200 docker compose up -d    # 3100번을 다른 용도로 써야 할 때
-FRONTEND_API_BASE= docker compose up -d frontend   # FE만 mock 모드로 (BE 불필요)
 ```
 
 `frontend/`를 바인드 마운트하므로 소스를 고치면 그대로 반영된다(HMR).
@@ -44,24 +43,27 @@ npm run lint       # eslint . (ESLint 9 flat config)
 npm run check:banned   # 금칙어 검사 (13 §9)
 ```
 
-## mock 모드 ↔ 실 API 전환
+## API 주소 설정 (필수)
 
-`NEXT_PUBLIC_API_BASE`가 **비어 있으면 mock 모드**다 — `src/mocks/`의 JSON과 `src/mocks/store.ts`가
-응답을 대신하므로 BE 없이 전 화면이 뜬다. 값을 채우면 코드 수정 없이 실 API로 붙는다.
+`NEXT_PUBLIC_API_BASE`는 **반드시 있어야 한다.** 비어 있으면 `lib/api.ts`가 모듈 로드에서
+에러를 던져 빌드가 실패한다 — 설정 누락이 배포까지 가지 못하게 한 의도된 동작이다.
 
-Docker에서는 **실 API 연동이 기본값**(`http://backend:8000`)이다. mock 모드로 보려면 비운다.
+> mock 폴백은 2026-08-11 실배포에서 **제거**했다. 폴백이 살아 있으면 환경변수를 빠뜨린 배포가
+> 조용히 가짜 데이터를 진짜처럼 보여준다(실제로 그렇게 배포됐다). 지금은 큰 소리로 실패한다.
 
 ```bash
-# 로컬 Node (컨테이너 밖)
+# 로컬 Node (컨테이너 밖) — 로컬 BE 또는 배포된 API 중 아무거나
 echo 'NEXT_PUBLIC_API_BASE=http://localhost:8000' > .env.local && npm run dev
 
-# Docker — mock 모드로 되돌리기
-FRONTEND_API_BASE= docker compose up -d --force-recreate frontend
+# Docker — 컨테이너 네트워크 주소가 기본값이라 그대로 두면 된다
+docker compose up -d
 ```
+
+배포(Vercel)에서는 프로젝트 환경변수에 API Gateway 주소를 **끝 슬래시 없이** 넣는다.
 
 **주소가 두 가지인 이유**: 페이지가 서버 컴포넌트라 `fetch`가 브라우저가 아니라 **Next 서버에서**
 일어난다. 컨테이너 안에서 도는 Next에게 `localhost:8000`은 자기 자신이라 `ECONNREFUSED`가 난다 —
-컴포즈 네트워크 이름 `http://backend:8000`을 써야 한다. 배포(Vercel + API Gateway)에서는 공개
+컴포즈 네트워크 이름 `http://backend:8000`을 써야 한다. 배포(Vercel + AWS ECS)에서는 공개
 URL 하나라 이 구분이 사라진다.
 
 데모 카드 3장은 compose의 `seed` 서비스가 매 기동마다 넣어 준다(DynamoDB Local이 `-inMemory`라
@@ -103,35 +105,35 @@ src/
 ├── components/          # Badge·KpiCard·StatusChip·AdminShell·SideNav·Section·CategoryIcon
 │   └── charts/          # LineTrend·BarRank·CategoryDonut·ScaleCompare ("use client")
 ├── lib/
-│   ├── api.ts           # 단일 데이터 접근 계층 (mock ↔ 실 API)
+│   ├── api.ts           # 단일 데이터 접근 계층 (실 API 전용)
 │   ├── constants.ts     # 6지역·6업종 고정 순서, 차트 팔레트, 고지 문구
 │   └── format.ts        # 숫자·퍼센트·증감 포맷 (null이면 "—")
-├── mocks/               # 데이터 mock (아래 참조)
+├── data/                # BE 엔드포인트가 없는 파이프라인 정적 산출물 (아래 참조)
 └── types/index.ts       # 05 계약 타입
 ```
 
 ### 서버 컴포넌트 기준으로 짰다
 
 페이지는 전부 서버 컴포넌트이고, 브라우저 전용인 차트(`components/charts/*`)와 사이드바만
-`"use client"`다. 덕분에 `merchants.json`(330KB)을 포함한 mock 전체가
-**브라우저 번들에 실리지 않는다**.
+`"use client"`다. 덕분에 `usage_monthly.json` 같은 정적 산출물이 **브라우저 번들에 실리지 않는다**.
 
-> ⚠ 페이지를 `"use client"`로 바꾸고 `lib/api.ts`를 import 하면 mock JSON 전체가 클라이언트 번들로
+> ⚠ 페이지를 `"use client"`로 바꾸고 `lib/api.ts`를 import 하면 정적 JSON이 클라이언트 번들로
 > 딸려 온다. 클라이언트 인터랙션이 필요하면 **서버에서 데이터를 받아 props로 내려** 주는 편이 낫다.
 > 위젯의 지역·업종 선택을 쿼리스트링(`/widget?region=영월군&category=카페`)으로 처리한 이유도 이것이다.
 
-## mock 데이터
+## 정적 산출물 (`src/data/`)
 
-| 파일 | 출처 | 갱신 방법 |
-|---|---|---|
-| `dashboard.json` `candidates.json` `eup_scores.json` `merchants.json` `usage_monthly.json` `risk_signal.json` `sensitivity.json` | 파이프라인 실산출 | 레포 루트에서 `./scripts/sync-mocks.sh` |
-| `cards.json` | 손으로 작성 — `backend/seed_demo.py`의 데모 3장과 같은 서사 | seed_demo가 바뀌면 함께 고친다 |
-| `simulate.json` | 손으로 작성 — 영월군×음식점 실제 재계산 값(43→42, 0.0~0.1%p) | 파이프라인 재산출 시 대조 |
+BE 엔드포인트가 **없는** 파이프라인 산출물 4종이다. mock이 아니라 배포본이 실제로 서빙하는
+데이터이며, 나머지 화면 데이터는 전부 실 API로 간다.
 
-- **05 문서의 예시 JSON을 베껴 쓰지 않는다.** 예시는 스키마 설명용이라 지역·업종·수치가
-  실산출(영월군 서사)과 다르다. 값의 원천은 `sync-mocks.sh` 하나다.
-- `src/mocks/`는 정적 import 대상이라 **레포에 커밋한다** — 없으면 Vercel 빌드가 실패하고
-  mock 모드 폴백도 성립하지 않는다.
+| 파일 | 쓰는 곳 |
+|---|---|
+| `usage_monthly.json` `usage_daily.json` | 지역 드릴다운(월·요일 축) |
+| `cell_load.json` | 셀 탐색 시뮬레이터 |
+| `manifest.json` | 출처 칩의 데이터 스냅샷 버전(`X-Dataset-Version`과 같은 값) |
+
+갱신은 레포 루트에서 `./scripts/sync-fe-static.sh` (선행: `cd pipeline && python run_all.py`).
+정적 import 대상이라 **레포에 커밋한다** — 없으면 Vercel 빌드가 실패한다.
 
 ### `mocks/store.ts` — mock 모드의 상태
 
@@ -167,7 +169,7 @@ src/
 - **F3·F4·F6·F8 화면** — 자리표시자에 "이미 연결된 데이터"와 "남은 작업"을 적어 뒀다.
 - **지도** — 카드 상세(F4)는 MapLibre GL + OpenFreeMap을 사용하고, 방문객 위젯(F7)은 Kakao Maps JS를
   우선 사용한다. Kakao 키·도메인이 준비되지 않은 환경에서는 좌표 기반 지도형 fallback과 길찾기 링크를 보인다.
-- **로딩·에러 상태** — F9 항목. Lambda 콜드스타트 1~3초를 "고장"으로 오인하지 않게
+- **로딩·에러 상태** — F9 항목. 느린 응답을 "고장"으로 오인하지 않게
   스켈레톤 + 재시도 UI가 필요하다.
 - **모바일 실기기 확인** — 390px 뷰포트 기준으로 짰지만(모바일 프레임·`overflow-x-auto` 표 래퍼·
   차트 `min-w-0`) iPhone Safari 실기기 확인은 F9/Phase 6 리허설 항목으로 남아 있다.

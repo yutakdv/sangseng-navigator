@@ -7,7 +7,8 @@
 #
 # 오버라이드 (레포 루트 .env 또는 셸 환경변수):
 #   FRONTEND_PORT=3100            # 배포·검증 기준 호스트 포트
-#   FRONTEND_API_BASE=            # 빈 값으로 두면 FE 가 mock 모드 (BE 없이 화면만 볼 때)
+#   FRONTEND_API_BASE=http://backend:8000   # FE 가 볼 API 주소. 비우면 FE 빌드가 실패한다
+#                                           # (mock 폴백 제거 — 주소 없이는 화면을 그리지 않는다)
 #   DEMO_READ_ONLY=true           # FE·BE 를 함께 읽기 전용으로 잠근다 (기본 false — 승인 버튼 동작)
 #   MUTATION_API_TOKEN=           # 비우면 양쪽 다 local-dev-token (BE 검증값 = FE 발신값)
 services:
@@ -54,7 +55,7 @@ services:
       AWS_DEFAULT_REGION: ap-northeast-2
     volumes:
       - ./backend/app:/app/app                    # 코드 핫리로드
-      - ./data/processed:/app/app/data:ro         # Lambda 번들과 동일 경로에 정적 JSON
+      - ./data/processed:/app/app/data:ro         # ECS 이미지와 동일 경로(/app/app/data)
     depends_on: [dynamodb]
     command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
 
@@ -65,8 +66,8 @@ services:
       # 기본값은 실 BE 연동이다. 페이지가 서버 컴포넌트라 fetch 가 **컨테이너 안에서** 일어나므로
       # 컨테이너 네트워크 주소를 쓴다 — http://localhost:8000 을 넣으면 ECONNREFUSED 가 난다.
       # (컨테이너 밖 `npm run dev` 는 frontend/.env.local 에 http://localhost:8000)
-      # FRONTEND_API_BASE= 로 비우면 mock 모드(frontend/src/mocks/) — BE 없이 화면만 볼 때.
-      NEXT_PUBLIC_API_BASE: "${FRONTEND_API_BASE-http://backend:8000}"
+      # ⚠ 빈 값으로 두지 말 것 — mock 폴백이 없어 FE 가 모듈 로드에서 실패한다.
+      NEXT_PUBLIC_API_BASE: "${FRONTEND_API_BASE:-http://backend:8000}"
       API_MUTATION_TOKEN: "${MUTATION_API_TOKEN:-local-dev-token}"
       # 읽기 전용 잠금은 FE·BE가 **같은 값**을 봐야 한다. 여기서 넘기지 않으면 루트 .env에
       # DEMO_READ_ONLY=true 를 넣어도 BE만 403으로 잠기고 FE 버튼은 전부 열린 채로 남는다.

@@ -1,11 +1,12 @@
 # 05. API 계약 — FE↔BE 단일 진실
 
-> **예시 JSON은 스키마·필드 형태의 기준이다.** mock 데이터의 실제 값 원천은 `data/processed/`의
-> 실산출이며, `./scripts/sync-mocks.sh`로 생성한 뒤 `frontend/src/mocks/`에 **커밋한다**
-> (정적 import·Vercel 빌드·`NEXT_PUBLIC_API_BASE` 미설정 시 mock 모드 폴백에 필요 — 12 문서 §5).
-> 예시의 지역·업종·수치는 스키마 설명용이며 실데이터와 다를 수 있다 — 값을 보고 mock을 손으로 만들지 말 것.
-> 데이터가 갱신되면 스크립트를 다시 실행해 커밋한다.
-> 계약 변경 절차: ① 이 문서 수정 → ② `scripts/sync-mocks.sh` 재실행 → ③ 팀원 공유 → ④ 코드 수정.
+> **예시 JSON은 스키마·필드 형태의 기준이다.** 예시의 지역·업종·수치는 스키마 설명용이며
+> 실데이터와 다를 수 있다.
+> **FE mock 폴백은 2026-08-11 ECS 실배포에서 제거됐다** — `NEXT_PUBLIC_API_BASE`가 없으면
+> FE는 빌드 단계에서 실패한다(설정 누락이 가짜 데이터로 배포되던 문제).
+> BE 엔드포인트가 없는 정적 산출물 4종(`usage_monthly`·`usage_daily`·`cell_load`·`manifest`)만
+> `./scripts/sync-fe-static.sh`로 `frontend/src/data/`에 복사해 **커밋한다**(정적 import·Vercel 빌드에 필요).
+> 계약 변경 절차: ① 이 문서 수정 → ② 필요하면 `scripts/sync-fe-static.sh` 재실행 → ③ 팀원 공유 → ④ 코드 수정.
 > 모든 응답은 `application/json`, 에러는 `{"detail": "메시지"}` + 4xx/5xx.
 
 Base URL: 로컬 `http://localhost:8000` / 배포 후 API Gateway URL. 경로 프리픽스 `/api`.
@@ -181,9 +182,8 @@ Base URL: 로컬 `http://localhost:8000` / 배포 후 API Gateway URL. 경로 �
 ]
 ```
 
-- 응답은 **최상위 배열**이며 산출 JSON과 완전히 같다 — `scripts/sync-mocks.sh`가 같은 파일을
-  `frontend/src/mocks/risk_signal.json`으로 복사하므로, 감싸거나 필드를 더하면 mock 모드와
-  실 API 모드가 갈린다 (§6 mock 원천 단일화)
+- 응답은 **최상위 배열**이며 산출 JSON과 완전히 같다 — 감싸거나 필드를 더하면
+  `data/processed/risk_signal.json`과 응답 형태가 갈린다
 - 요인 카드 4지표 중 `gap`·`proximity`·`saturation`은 `GET /api/candidates`에서, `under2y_ratio`만
   이 엔드포인트에서 온다 (13 §2-15가 확정한 "산출 가능한 지표"). FE는 `api.riskSignal()`로 받는다
 - **표시 규칙(필수):** 진단 참고용이며 처방 근거가 아니다(절대 규칙 6). 4개 시군 편차가 0.5%p뿐이라
@@ -348,7 +348,6 @@ LLM 호출이 실패하거나 애초에 호출하지 않은 카드도 **똑같�
 | `llm` | `ai_generated_unverified` | **AI 생성 · 서버 검증됨** | LLM 응답의 **수치·순위·상태**를 서버가 정본으로 재검증해 통과. 설명 문장 자체는 재검증 대상이 아니라 `narrative_status`가 `unverified`다 — 두 값이 서로 다른 층위를 말한다 |
 | `rule_fallback` | `rule_based` | **규칙 기반 설명(AI 응답 없음)** | LLM 호출 실패·타임아웃·내용 가드 탈락 |
 | `rule_seed` | `rule_based` | **사전 검증 예시 문구** | 데모 시드 카드(사람이 실데이터로 검증해 고정) |
-| `mock_rule` | `rule_based` | **규칙 기반 설명(AI 응답 없음)** | FE mock 모드 |
 
 - `ai.reasons`의 출처 문장도 이 값과 **일치해야 한다**. 폴백인데 "AI는 비정량 리스크 문구 생성에만
   사용했습니다"를 그대로 실으면 필드와 문장이 서로 다른 말을 하게 된다.
@@ -459,7 +458,7 @@ LLM 호출이 실패하거나 애초에 호출하지 않은 카드도 **똑같�
 
 - `narrative_source`는 `narrative` 문구의 출처다: `llm`(LLM 응답을 검증 통과 후 사용) ·
   `rule_based`(LLM 미호출 또는 응답이 내용 가드에 걸려 규칙 문구로 대체). **방향이 `혼재`·`미미`인
-  구간은 애초에 LLM을 호출하지 않으므로 항상 `rule_based`**다. mock 모드는 `mock_rule`.
+  구간은 애초에 LLM을 호출하지 않으므로 항상 `rule_based`**다.
   화면은 이 값으로 설명 출처 칩을 띄운다 — 폴백인데 "AI가 썼다"고 말하지 않기 위한 필드다.
 
 - `expected_monthly_count`는 반사실 계산에 더한 예상 월 이용 건수, `estimate_basis`는 3단계 폴백 중
@@ -688,6 +687,17 @@ JS(`fetch(...).headers.get("X-Dataset-Version")`)에서도 읽을 수 있다.
 - `demo_read_only`: `DEMO_READ_ONLY` 환경변수 상태 — FE가 읽기 전용 배너·버튼 잠금을 서버 설정과
   맞추는 데 쓴다
 - 기존 키 `ok`·`data_loaded`는 형태·의미 그대로다 — `datasets`·`demo_read_only`가 추가되었다
+
+### `GET /api/health/ready`
+
+ALB 대상그룹 헬스체크 전용. 필수 산출물(dashboard·eup_scores·candidates·merchants)이
+하나라도 없으면 **503**을 반환한다.
+
+- 200: `{"ready": true}`
+- 503: `{"detail": "필수 산출물 누락: merchants"}`
+
+`/api/health`와 나뉘어 있다 — health는 결손을 **보고**하는 진단용(항상 200)이고,
+이 경로는 결손 이미지가 트래픽을 받지 못하게 **차단**하는 용도다.
 
 ## 6. 파이프라인 산출 JSON (data/processed/) 스키마
 

@@ -1,0 +1,54 @@
+name: 백엔드 배포
+
+on:
+  push:
+    branches: [main]
+    # 문서만 고친 머지로 컨테이너가 재배포되지 않게 경로를 좁힌다.
+    paths:
+      - 'backend/**'
+      - 'data/processed/**'
+      - 'infra/cloudformation/service.yaml'
+      - 'infra/config.sh'
+      - 'infra/scripts/**'
+      - '.github/workflows/backend-deploy.yml'
+  workflow_dispatch:      # 경로 필터에 안 걸린 변경을 밀 때 수동 실행
+
+permissions:
+  id-token: write         # OIDC 토큰 발급에 필요
+  contents: read
+
+# 배포는 겹치면 안 되고, 진행 중인 배포를 중간에 끊어서도 안 된다.
+concurrency:
+  group: backend-deploy
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-24.04-arm     # 이미지가 ARM64 — 네이티브 빌드 (public 레포 무료)
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.AWS_DEPLOY_ROLE_ARN }}
+          aws-region: ap-northeast-2
+
+      - name: 사전 점검
+        env:
+          DEMO_READ_ONLY: ${{ vars.DEMO_READ_ONLY }}
+        run: ./infra/scripts/preflight.sh
+
+      - name: 빌드 · 배포
+        env:
+          DEMO_READ_ONLY:       ${{ vars.DEMO_READ_ONLY }}
+          ALLOWED_ORIGINS:      ${{ vars.ALLOWED_ORIGINS }}
+          OPENAI_MODEL:         ${{ vars.OPENAI_MODEL }}
+          DESIRED_COUNT:        ${{ vars.DESIRED_COUNT }}
+          ON_DEMAND_BASE_COUNT: ${{ vars.ON_DEMAND_BASE_COUNT }}
+        run: |
+          set -euo pipefail
+          TAG="$(./infra/scripts/build-and-push.sh | tail -1)"
+          ./infra/scripts/deploy-service.sh "$TAG"
+
+      - name: 스모크 테스트
+        run: ./infra/scripts/smoke-test.sh

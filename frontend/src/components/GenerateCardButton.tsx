@@ -104,7 +104,7 @@ export function GenerateCardButton({
 
       {isDemoReadOnly ? <p className="u-note">공개 데모 읽기 전용</p> : null}
 
-      {/* 콜드스타트·LLM 대기를 "멈춤"으로 오인하지 않게 하는 장치 (11 §1 · 12 §5) */}
+      {/* LLM 대기를 "멈춤"으로 오인하지 않게 하는 장치 (11 §1 · 12 §5) */}
       {working ? (
         <p role="status" className="u-note max-w-xs sm:text-right">
           Score·추진 상태·계절성 등을 종합해 후보를 비교하는 중입니다. 최대 12초(재시도 시 24초)까지

@@ -1,16 +1,15 @@
 /**
  * 단일 데이터 접근 계층 — 모든 화면은 이 파일만 통해 데이터를 얻는다 (docs/plan/08 F1).
  *
- * `NEXT_PUBLIC_API_BASE`가 비어 있으면 **mock 모드**: `src/mocks/`의 JSON과 `mocks/store.ts`가
- * 응답을 대신한다. 값을 채우면 코드 수정 없이 실 API로 전환된다.
+ * **실 API 전용이다.** 예전에는 `NEXT_PUBLIC_API_BASE`가 비면 `src/mocks/`로 폴백했는데,
+ * 그 폴백은 설정 누락을 **조용히** 감춰 배포된 화면이 가짜 데이터를 진짜처럼 보여줬다
+ * (2026-08-11 실배포에서 실제로 발생). 지금은 주소가 없으면 즉시 실패한다.
  *
- * 08 문서 예시와 한 곳 다르다: mock 인자를 값이 아니라 **thunk `() => T`** 로 받는다.
- * 값으로 받으면 실 API 모드에서도 `store.decide(...)` 같은 mock 변경 함수가 매번 실행돼
- * (상태 전이 검증에 걸려) 실 호출이 깨진다. 실행을 mock 모드로 미루기 위한 최소 변경이다.
+ * BE 엔드포인트가 없는 파이프라인 정적 산출물(`src/data/`)만 예외로 그대로 import한다 —
+ * 이건 mock이 아니라 배포본이 실제로 서빙하는 데이터다.
  *
- * ⚠ 이 파일은 mock JSON(merchants 330KB 포함)을 정적 import 한다. 지금은 **서버 컴포넌트에서만**
- *    호출하므로 브라우저 번들에 들어가지 않는다. `"use client"` 컴포넌트에서 import 하면
- *    mock 전체가 클라이언트 번들에 실린다 — 클라이언트에서 써야 하면 서버에서 받아 props로 넘길 것.
+ * ⚠ 이 파일은 **서버 컴포넌트에서만** 호출한다. `"use client"`에서 import하면
+ *   usage_monthly 등 정적 JSON이 브라우저 번들에 실린다 — 서버에서 받아 props로 넘길 것.
  */
 import type {
   Card,
@@ -34,25 +33,37 @@ import type {
   WidgetResponse,
 } from "@/types";
 import { ApiError } from "@/lib/errors";
-import cellLoadJson from "@/mocks/cell_load.json";
-import dashboardMock from "@/mocks/dashboard.json";
-import manifestJson from "@/mocks/manifest.json";
-import usageDailyMock from "@/mocks/usage_daily.json";
-import usageMonthlyMock from "@/mocks/usage_monthly.json";
-import candidatesMock from "@/mocks/candidates.json";
-import riskSignalMock from "@/mocks/risk_signal.json";
-import simulateMock from "@/mocks/simulate.json";
-import * as store from "@/mocks/store";
+import cellLoadJson from "@/data/cell_load.json";
+import manifestJson from "@/data/manifest.json";
+import usageDailyJson from "@/data/usage_daily.json";
+import usageMonthlyJson from "@/data/usage_monthly.json";
 
-const BASE = process.env.NEXT_PUBLIC_API_BASE;
-
-/** 실 API 모드인지 — 화면에서 "mock 데이터" 고지를 띄울 때 쓴다 */
-export const isMockMode = !BASE;
+// 끝 슬래시를 떼어 `${BASE}${path}`가 `//api/...`로 조립되는 것을 막는다 (그러면 전부 404다).
+const BASE = (process.env.NEXT_PUBLIC_API_BASE ?? "").trim().replace(/\/+$/, "");
 
 /**
- * 파이프라인 산출물 스냅샷 버전 — `mocks/manifest.json`(A4)은 실 API/mock 모드와 무관하게
- * 같은 값을 돌려주는 정적 메타다. usageMonthly·usageDaily와 같은 이유로 정적 import한다
- * (:133-134 주석 참조). SourceChip 팝오버에서 "이 숫자가 어느 데이터 스냅샷에서 왔는지"를 밝힌다.
+ * 담당자 전용 조회·변경에 실어 보내는 공유 Bearer 토큰.
+ *
+ * 이름이 두 가지인 역사: BE와 루트 `.env`는 `MUTATION_API_TOKEN`, FE와 docker-compose는
+ * `API_MUTATION_TOKEN`을 쓴다(compose가 값을 옮겨 담아 로컬에서는 차이가 드러나지 않는다).
+ * 실배포에서 실제로 이름을 바꿔 넣어 담당자 조회가 전부 401이 됐고, 화면에는 "권한이 필요합니다"
+ * 만 떠서 원인이 보이지 않았다 — 어느 이름으로 넣어도 동작하게 해 이 함정을 없앤다.
+ */
+const MUTATION_TOKEN = process.env.API_MUTATION_TOKEN ?? process.env.MUTATION_API_TOKEN;
+
+if (!BASE) {
+  // 모듈 로드 시점에 죽인다 — 설정이 빠진 빌드가 배포까지 가지 못하게 한다.
+  throw new Error(
+    "NEXT_PUBLIC_API_BASE가 비어 있습니다. 실 API 주소를 설정하세요 " +
+      "(예: https://<api-id>.execute-api.ap-northeast-2.amazonaws.com — 끝 슬래시 없이). " +
+      "Vercel은 프로젝트 환경변수, 로컬은 레포 루트 .env 또는 frontend/.env.local에 넣습니다. " +
+      "mock 폴백은 제거됐습니다 — 주소 없이는 화면을 그리지 않습니다.",
+  );
+}
+
+/**
+ * 파이프라인 산출물 스냅샷 버전 — `src/data/manifest.json`(A4)은 BE 엔드포인트가 없는 정적
+ * 메타다. SourceChip 팝오버에서 "이 숫자가 어느 데이터 스냅샷에서 왔는지"를 밝힌다.
  */
 export function datasetVersion(): string {
   return (manifestJson as { dataset_version: string }).dataset_version;
@@ -76,10 +87,8 @@ export function manifest(): Manifest {
 }
 
 /**
- * 셀(지역×표시업종) 가맹점 이용 부하 — 파이프라인 P9 산출물. usageMonthly와 같은 이유로
- * BE 엔드포인트가 없는 정적 데이터라 실 API 모드에서도 정적 import한다.
- * 동기 함수다: 셀 탐색기는 서버 컴포넌트에서 값을 읽어 클라이언트로 props로 내려보낸다
- * (이 파일을 "use client"에서 import하면 mock 전체가 브라우저 번들에 실린다 — 위 주석 참조).
+ * 셀(지역×표시업종) 가맹점 이용 부하 — 파이프라인 P9 산출물. BE 엔드포인트가 없어 정적 import한다.
+ * 동기 함수다: 셀 탐색기는 서버 컴포넌트에서 값을 읽어 클라이언트로 props로 내려보낸다.
  */
 export function cellLoad(): CellLoad {
   return cellLoadJson as CellLoad;
@@ -102,13 +111,11 @@ async function fail(res: Response, path: string): Promise<never> {
   throw new ApiError(res.status, detail);
 }
 
-async function get<T>(path: string, mock: () => T): Promise<T> {
-  if (!BASE) return mock(); // mock 모드
-  const internalToken = process.env.API_MUTATION_TOKEN;
+async function get<T>(path: string): Promise<T> {
   const res = await fetch(`${BASE}${path}`, {
     cache: "no-store",
-    headers: internalToken ? { Authorization: `Bearer ${internalToken}` } : undefined,
-    // BE가 거부가 아니라 무응답으로 매달리면 스켈레톤이 무한 지속된다 — 콜드스타트(1~3초)의
+    headers: MUTATION_TOKEN ? { Authorization: `Bearer ${MUTATION_TOKEN}` } : undefined,
+    // BE가 거부가 아니라 무응답으로 매달리면 스켈레톤이 무한 지속된다 — 네트워크 지연의
     // 여유를 두고 끊어 error.tsx의 "다시 시도" 화면으로 회복시킨다.
     signal: AbortSignal.timeout(10_000),
   });
@@ -116,8 +123,8 @@ async function get<T>(path: string, mock: () => T): Promise<T> {
   return res.json();
 }
 
-async function post<T>(path: string, body: unknown, mock: () => T): Promise<T> {
-  return (await postWithStatus(path, body, () => ({ data: mock(), status: 200 }))).data;
+async function post<T>(path: string, body: unknown): Promise<T> {
+  return (await postWithStatus<T>(path, body)).data;
 }
 
 /**
@@ -128,20 +135,18 @@ async function post<T>(path: string, body: unknown, mock: () => T): Promise<T> {
 async function postWithStatus<T>(
   path: string,
   body: unknown,
-  mock: () => { data: T; status: number },
 ): Promise<{ data: T; status: number }> {
-  if (!BASE) return mock(); // mock 모드: mock/store.ts가 로컬 상태를 갱신하고 그 결과를 돌려준다
-  const mutationToken = process.env.API_MUTATION_TOKEN;
   const res = await fetch(`${BASE}${path}`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
-      ...(mutationToken ? { Authorization: `Bearer ${mutationToken}` } : {}),
+      ...(MUTATION_TOKEN ? { Authorization: `Bearer ${MUTATION_TOKEN}` } : {}),
     },
     body: JSON.stringify(body ?? {}),
-    // generate는 LLM 재시도까지 최대 24.5초, simulate도 LLM 8초를 품는다 — BE 자체 타임아웃보다
-    // 길게 잡아 정상 경로는 절대 자르지 않으면서 무응답만 끊는다.
-    signal: AbortSignal.timeout(30_000),
+    // generate는 LLM 재시도까지 최대 24.5초. API Gateway HTTP API의 통합 타임아웃이 30초
+    // (증액 불가)이므로 FE를 35초로 두어 **게이트웨이가 먼저 끊게** 한다 — FE가 먼저 끊으면
+    // 서버가 만든 폴백 응답조차 못 받는다.
+    signal: AbortSignal.timeout(35_000),
   });
   if (!res.ok) await fail(res, path);
   return { data: (await res.json()) as T, status: res.status };
@@ -156,90 +161,75 @@ const qs = (params: Record<string, string | number | undefined>): string => {
 
 export const api = {
   /* ── 진단·대시보드 (05 §1) ─────────────────────────────────── */
-  dashboard: (): Promise<Dashboard> => get("/api/dashboard", () => dashboardMock as Dashboard),
+  dashboard: (): Promise<Dashboard> => get("/api/dashboard"),
 
-  candidates: (): Promise<CandidatesResponse> =>
-    get("/api/candidates", () => candidatesMock as unknown as CandidatesResponse),
+  candidates: (): Promise<CandidatesResponse> => get("/api/candidates"),
 
   /** 운영 2년 미만 사업자 비중 — 배경 정보. '위험' 라벨·순위 정렬 금지 (05 §6) */
-  riskSignal: (): Promise<RiskSignal[]> => get("/api/risk-signal", () => riskSignalMock),
+  riskSignal: (): Promise<RiskSignal[]> => get("/api/risk-signal"),
 
   /**
    * 지역×업종×월 원장 — BE 엔드포인트가 **없는** 파이프라인 정적 산출물이다.
-   * data/processed/usage_monthly.json은 분기 배치로 커밋되고 mocks/ 사본과 동일하므로
-   * 실 API 모드에서도 정적 import로 서빙한다 (지역 드릴다운 진단 전용, 05 §1 참조).
+   * data/processed/usage_monthly.json은 분기 배치로 커밋되고 src/data/ 사본과 동일하다
+   * (지역 드릴다운 진단 전용, 05 §1 참조).
    */
   usageMonthly: (): Promise<UsageMonthly> =>
-    Promise.resolve(usageMonthlyMock as unknown as UsageMonthly),
+    Promise.resolve(usageMonthlyJson as unknown as UsageMonthly),
 
   /** 일·요일 축 집계 — usageMonthly와 같은 이유로 정적 import (05 §6, 드릴다운 요일 섹션 전용) */
-  usageDaily: (): Promise<UsageDaily> =>
-    Promise.resolve(usageDailyMock as unknown as UsageDaily),
+  usageDaily: (): Promise<UsageDaily> => Promise.resolve(usageDailyJson as unknown as UsageDaily),
 
   /* ── Action Card (05 §2) ───────────────────────────────────── */
   cards: (opts: { type?: CardType; status?: CardStatus } = {}): Promise<{ cards: Card[] }> =>
-    get(`/api/cards${qs(opts)}`, () => ({ cards: store.listCards(opts) })),
+    get(`/api/cards${qs(opts)}`),
 
-  card: (id: string): Promise<{ card: Card | undefined }> =>
-    get(`/api/cards/${id}`, () => ({ card: store.getCard(id) })),
+  card: (id: string): Promise<{ card: Card | undefined }> => get(`/api/cards/${id}`),
 
   /**
-   * "이번 분기 카드 생성" — mock 모드도 `store.generateCard(type)`가 후보·중복 가드를 보고 만든다.
-   * 목업 카드를 호출부가 넘기던 구조를 걷어냈다: 화면마다 목업을 복제하면 서사가 갈라진다.
-   * 선택 가능한 후보가 전부 추진중/완료면 양쪽 모드 모두 409를 던진다 (05 §8).
+   * "이번 분기 카드 생성".
    *
    * `created`는 **신규 생성(201)인지 중복 가드로 기존 카드를 받은 것(200)인지**다. 실호출에서
    * 두 경우가 모두 나오는 것을 확인했고(LLM이 pending 타깃을 고르면 200), 화면이 이를 구분해야
    * 데모 2-b("카드가 하나 늘어남")에서 사실과 다른 말을 하지 않는다 (11 §1).
+   * 선택 가능한 후보가 전부 추진중/완료면 서버가 409를 돌려준다 (05 §8).
    */
   generate: async (type: CardType): Promise<{ card: Card; created: boolean }> => {
-    const { data, status } = await postWithStatus<{ card: Card }>(
-      "/api/cards/generate",
-      { type },
-      () => {
-        const { card, created } = store.generateCard(type);
-        return { data: { card }, status: created ? 201 : 200 };
-      },
-    );
+    const { data, status } = await postWithStatus<{ card: Card }>("/api/cards/generate", { type });
     return { card: data.card, created: status === 201 };
   },
 
   /** INCENTIVE를 approved 할 때는 selectedRate(3|5|7) 필수 (05 §2·§8) */
   decide: (id: string, decision: CardStatus, selectedRate?: PaybackRate): Promise<{ card: Card }> =>
-    post(
-      `/api/cards/${id}/decision`,
-      { decision, ...(selectedRate ? { selected_rate: selectedRate } : {}) },
-      () => ({ card: store.decide(id, decision, selectedRate) }),
-    ),
+    post(`/api/cards/${id}/decision`, {
+      decision,
+      ...(selectedRate ? { selected_rate: selectedRate } : {}),
+    }),
 
   progress: (id: string, progress: CardProgress): Promise<{ card: Card }> =>
-    post(`/api/cards/${id}/progress`, { progress }, () => ({ card: store.setProgress(id, progress) })),
+    post(`/api/cards/${id}/progress`, { progress }),
 
   progressRecords: (id: string, cursor?: string): Promise<ProgressRecordsResponse> =>
-    get(`/api/cards/${id}/progress-records${qs({ cursor })}`, () => store.listProgressRecords(id, cursor)),
+    get(`/api/cards/${id}/progress-records${qs({ cursor })}`),
 
   createProgressRecord: (
     id: string,
     input: ProgressRecordInput,
-  ): Promise<CreateProgressRecordResponse> =>
-    post(`/api/cards/${id}/progress-records`, input, () => store.createProgressRecord(id, input)),
+  ): Promise<CreateProgressRecordResponse> => post(`/api/cards/${id}/progress-records`, input),
 
   verification: (id: string, checks: EligibilityCheck[]): Promise<{ card: Card }> =>
-    post(`/api/cards/${id}/verification`, { checks }, () => ({ card: store.setVerification(id, checks) })),
+    post(`/api/cards/${id}/verification`, { checks }),
 
-  /** EXPANSION 전용 — INCENTIVE에 호출하면 실 API는 400 (05 §8) */
+  /** EXPANSION 전용 — INCENTIVE에 호출하면 400 (05 §8) */
   simulate: (id: string): Promise<{ simulation: Simulation }> =>
-    post(`/api/cards/${id}/simulate`, {}, () => simulateMock as { simulation: Simulation }),
+    post(`/api/cards/${id}/simulate`, {}),
 
   /* ── KPI (05 §3) ───────────────────────────────────────────── */
-  kpi: (): Promise<Kpi> => get("/api/kpi", () => store.deriveKpi()),
+  kpi: (): Promise<Kpi> => get("/api/kpi"),
 
   progressReport: (opts: { from?: string; to?: string } = {}): Promise<ProgressReport> =>
-    get(`/api/progress-report${qs(opts)}`, () => store.deriveProgressReport(opts)),
+    get(`/api/progress-report${qs(opts)}`),
 
   /* ── 방문객 위젯 (05 §4) ───────────────────────────────────── */
   widget: (region?: string, category?: string, limit = 12): Promise<WidgetResponse> =>
-    get(`/api/widget/recommend${qs({ region, category, limit })}`, () =>
-      store.deriveWidget(region, category, limit),
-    ),
+    get(`/api/widget/recommend${qs({ region, category, limit })}`),
 };

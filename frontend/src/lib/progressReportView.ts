@@ -5,8 +5,8 @@ import type { Card, CardProgress, CardType, ProgressMetricKey, ProgressRecord } 
 /**
  * 추진 경과 리포트(/tracking)의 파생 계산 — 순수 함수 모음 (lib/regionAnalysis.ts와 같은 위치·역할).
  *
- * 서버 컴포넌트에서만 호출한다: `"use client"`를 붙이거나 lib/api·mocks/store를 import 하면
- * mock JSON(330KB)이 브라우저 번들로 끌려간다. 여기서는 **이미 받아 온 응답만** 가공한다.
+ * 서버 컴포넌트에서만 호출한다: `"use client"`를 붙이거나 lib/api를 import 하면
+ * 정적 JSON(usage_monthly 등)이 브라우저 번들로 끌려간다. 여기서는 **이미 받아 온 응답만** 가공한다.
  *
  * 파생 규칙은 backend/app/services/progress_report.py와
  * backend/app/progress_db.latest_record(through=)의 정의를 그대로 복제한 것이다 — 정의가 갈리면
@@ -21,12 +21,11 @@ const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
  * BE 제약 (backend/app/routes/progress.py get_progress_report):
  *   from > to → 400 / to > KST 오늘 → 400 / (to - from).days >= 366 → 400
  * 따라서 만들 수 있는 최대 구간은 `from = to - 365일`(delta 365 < 366, 포함 일수 366일)이다.
- * mock(mocks/store.ts reportPeriod)은 366일 제한을 **검사하지 않으므로** 이 상한은 FE가 지켜야
- * mock 모드와 실 API 모드가 같은 화면을 만든다.
+ * FE가 이 상한을 지켜야 사용자가 400을 마주하지 않는다.
  */
 export const MAX_PERIOD_DAYS = 366;
 
-/** epoch ms → KST 'YYYY-MM-DD'. 서버 타임존과 무관하다 (mocks/store.ts kstDateFromMs와 같은 규칙) */
+/** epoch ms → KST 'YYYY-MM-DD'. 서버 타임존과 무관하다 */
 export const kstDate = (ms: number): string => new Date(ms + KST_OFFSET_MS).toISOString().slice(0, 10);
 
 export const kstToday = (): string => kstDate(Date.now());

@@ -17,10 +17,6 @@ frontend/.next/
 frontend/out/
 frontend/next-env.d.ts
 
-# aws sam
-infra/.aws-sam/
-samconfig.toml.bak
-
 # backend에 번들되는 데이터 사본 (원본은 data/processed/)
 backend/app/data/
 

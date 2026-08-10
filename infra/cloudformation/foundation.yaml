@@ -1,0 +1,250 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: sangseng-navigator — 네트워크·레지스트리·데이터·IAM (수명이 긴 계층)
+
+Parameters:
+  AzA: { Type: AWS::EC2::AvailabilityZone::Name, Default: ap-northeast-2a }
+  AzC: { Type: AWS::EC2::AvailabilityZone::Name, Default: ap-northeast-2c }
+  # ⚠ ap-northeast-2d(apne2-az4)는 VPC Link V2 미지원. 기본값을 바꾸지 말 것.
+
+Resources:
+  Vpc:
+    Type: AWS::EC2::VPC
+    Properties:
+      CidrBlock: 10.0.0.0/16
+      EnableDnsSupport: true
+      EnableDnsHostnames: true
+      Tags: [{ Key: Name, Value: sangseng }]
+
+  Igw:
+    Type: AWS::EC2::InternetGateway
+    Properties:
+      Tags: [{ Key: Name, Value: sangseng }]
+
+  IgwAttachment:
+    Type: AWS::EC2::VPCGatewayAttachment
+    Properties: { VpcId: !Ref Vpc, InternetGatewayId: !Ref Igw }
+
+  # public — ECS 태스크. assignPublicIp 로 IGW 직행(OpenAI·ECR). NAT 불필요.
+  PublicSubnetA:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref Vpc
+      AvailabilityZone: !Ref AzA
+      CidrBlock: 10.0.0.0/20
+      Tags: [{ Key: Name, Value: sangseng-public-a }]
+
+  PublicSubnetC:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref Vpc
+      AvailabilityZone: !Ref AzC
+      CidrBlock: 10.0.16.0/20
+      Tags: [{ Key: Name, Value: sangseng-public-c }]
+
+  # private — 내부 ALB·VPC Link ENI. 인터넷이 필요 없으므로 NAT 없이 local 라우트만 둔다(비용 0).
+  PrivateSubnetA:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref Vpc
+      AvailabilityZone: !Ref AzA
+      CidrBlock: 10.0.32.0/20
+      Tags: [{ Key: Name, Value: sangseng-private-a }]
+
+  PrivateSubnetC:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref Vpc
+      AvailabilityZone: !Ref AzC
+      CidrBlock: 10.0.48.0/20
+      Tags: [{ Key: Name, Value: sangseng-private-c }]
+
+  PublicRouteTable:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !Ref Vpc
+      Tags: [{ Key: Name, Value: sangseng-public }]
+
+  PublicDefaultRoute:
+    Type: AWS::EC2::Route
+    DependsOn: IgwAttachment
+    Properties:
+      RouteTableId: !Ref PublicRouteTable
+      DestinationCidrBlock: 0.0.0.0/0
+      GatewayId: !Ref Igw
+
+  PublicRouteAssocA:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties: { SubnetId: !Ref PublicSubnetA, RouteTableId: !Ref PublicRouteTable }
+
+  PublicRouteAssocC:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties: { SubnetId: !Ref PublicSubnetC, RouteTableId: !Ref PublicRouteTable }
+
+  PrivateRouteTable:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !Ref Vpc
+      Tags: [{ Key: Name, Value: sangseng-private }]
+
+  PrivateRouteAssocA:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties: { SubnetId: !Ref PrivateSubnetA, RouteTableId: !Ref PrivateRouteTable }
+
+  PrivateRouteAssocC:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties: { SubnetId: !Ref PrivateSubnetC, RouteTableId: !Ref PrivateRouteTable }
+
+  # DynamoDB 를 인터넷 경유 없이 부른다. Gateway 엔드포인트는 무과금이고 라우트 테이블에 붙는다.
+  # 태스크가 public 서브넷에 있으므로 public 라우트 테이블에 연결한다.
+  DynamoDbEndpoint:
+    Type: AWS::EC2::VPCEndpoint
+    Properties:
+      VpcId: !Ref Vpc
+      ServiceName: !Sub com.amazonaws.${AWS::Region}.dynamodb
+      VpcEndpointType: Gateway
+      RouteTableIds: [!Ref PublicRouteTable]
+
+  EcrRepository:
+    Type: AWS::ECR::Repository
+    Properties:
+      RepositoryName: sangseng-api
+      ImageScanningConfiguration: { ScanOnPush: true }
+      LifecyclePolicy:
+        LifecyclePolicyText: |
+          {"rules":[{"rulePriority":1,"description":"최근 10개만 보관",
+          "selection":{"tagStatus":"any","countType":"imageCountMoreThan","countNumber":10},
+          "action":{"type":"expire"}}]}
+
+  # 이름을 고정한다 — seed_demo.py·local_init.py·docker-compose 기본값과 일치시켜
+  # 원격 시드/리셋 명령을 문서에 고정할 수 있다.
+  CardsTable:
+    Type: AWS::DynamoDB::Table
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      TableName: sangseng-cards
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions: [{ AttributeName: id, AttributeType: S }]
+      KeySchema: [{ AttributeName: id, KeyType: HASH }]
+
+  ProgressRecordsTable:
+    Type: AWS::DynamoDB::Table
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      TableName: sangseng-progress-records
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - { AttributeName: record_id, AttributeType: S }
+        - { AttributeName: card_id, AttributeType: S }
+        - { AttributeName: report_bucket, AttributeType: S }
+        - { AttributeName: recorded_at_key, AttributeType: S }
+      KeySchema: [{ AttributeName: record_id, KeyType: HASH }]
+      GlobalSecondaryIndexes:
+        - IndexName: card-recorded-at-index
+          KeySchema:
+            - { AttributeName: card_id, KeyType: HASH }
+            - { AttributeName: recorded_at_key, KeyType: RANGE }
+          Projection: { ProjectionType: ALL }
+        - IndexName: report-bucket-recorded-at-index
+          KeySchema:
+            - { AttributeName: report_bucket, KeyType: HASH }
+            - { AttributeName: recorded_at_key, KeyType: RANGE }
+          Projection: { ProjectionType: ALL }
+
+  LogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: /ecs/sangseng-api
+      RetentionInDays: 7      # 서울 수집 단가가 $0.76/GB 로 높다 — 보존을 짧게 유지
+
+  # 이미지 pull·로그 전송·SSM 시크릿 주입은 '태스크 실행 역할'이 한다.
+  # ⚠ ssm:GetParameters 는 AmazonECSTaskExecutionRolePolicy 에 포함되지 않는다.
+  #   누락 시 애플리케이션 로그 없이 ResourceInitializationError 로 태스크가 죽는다.
+  TaskExecutionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal: { Service: ecs-tasks.amazonaws.com }
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AmazonECSTaskExecutionRolePolicy
+      Policies:
+        - PolicyName: read-ssm-parameters
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action: ssm:GetParameters
+                Resource: !Sub arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter/sangseng/prod/*
+
+  # 애플리케이션 코드가 쓰는 권한.
+  TaskRole:
+    Type: AWS::IAM::Role
+    Metadata:
+      # cfn-lint 의 DynamoDB 액션 목록에 TransactWriteItems 가 빠져 있어 W3037 오탐이 난다
+      # (progress_db.py:330 이 실제로 호출하는 API 라 권한을 뺄 수 없다).
+      # 이 리소스에만 끄고 다른 곳의 IAM 액션 오타 검출은 그대로 살린다.
+      cfn-lint:
+        config:
+          ignore_checks: [W3037]
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal: { Service: ecs-tasks.amazonaws.com }
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: dynamodb-access
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - dynamodb:GetItem
+                  - dynamodb:PutItem
+                  - dynamodb:UpdateItem
+                  - dynamodb:DeleteItem
+                  - dynamodb:Query
+                  - dynamodb:Scan
+                  - dynamodb:BatchGetItem
+                  - dynamodb:BatchWriteItem
+                  - dynamodb:TransactWriteItems
+                  - dynamodb:DescribeTable
+                Resource:
+                  - !GetAtt CardsTable.Arn
+                  - !GetAtt ProgressRecordsTable.Arn
+                  - !Sub '${ProgressRecordsTable.Arn}/index/*'
+
+Outputs:
+  VpcId:
+    Value: !Ref Vpc
+    Export: { Name: !Sub '${AWS::StackName}-VpcId' }
+  PublicSubnetIds:
+    Value: !Join [',', [!Ref PublicSubnetA, !Ref PublicSubnetC]]
+    Export: { Name: !Sub '${AWS::StackName}-PublicSubnetIds' }
+  PrivateSubnetIds:
+    Value: !Join [',', [!Ref PrivateSubnetA, !Ref PrivateSubnetC]]
+    Export: { Name: !Sub '${AWS::StackName}-PrivateSubnetIds' }
+  EcrRepositoryUri:
+    Value: !GetAtt EcrRepository.RepositoryUri
+    Export: { Name: !Sub '${AWS::StackName}-EcrRepositoryUri' }
+  CardsTableName:
+    Value: !Ref CardsTable
+    Export: { Name: !Sub '${AWS::StackName}-CardsTableName' }
+  ProgressRecordsTableName:
+    Value: !Ref ProgressRecordsTable
+    Export: { Name: !Sub '${AWS::StackName}-ProgressRecordsTableName' }
+  TaskExecutionRoleArn:
+    Value: !GetAtt TaskExecutionRole.Arn
+    Export: { Name: !Sub '${AWS::StackName}-TaskExecutionRoleArn' }
+  TaskRoleArn:
+    Value: !GetAtt TaskRole.Arn
+    Export: { Name: !Sub '${AWS::StackName}-TaskRoleArn' }
+  LogGroupName:
+    Value: !Ref LogGroup
+    Export: { Name: !Sub '${AWS::StackName}-LogGroupName' }
