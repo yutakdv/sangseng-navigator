@@ -928,10 +928,16 @@ def test_simulate_never_emits_negative_zero():
     """round(-0.001, 1)은 -0.0이라 그대로 실으면 화면에 "-0.0%p"가 찍힌다 (simulate._round_pp)."""
     usage, merchants = dataload.load("usage_monthly"), dataload.load("merchants")
     categories = sorted({m["category"] for m in merchants})
+    # A3 후속: 소표본 억제 타깃은 simulate_expansion이 ValueError로 거부한다 —
+    # 그 경로는 test_simulate_rejects_suppressed_target_cell이 따로 검증하므로 여기선 건너뛴다.
+    suppressed = {(c["eup"], c["category"])
+                  for c in (usage.get("privacy_meta") or {}).get("suppressed_cells", [])}
 
     seen_zero = False
     for eup in simulate.REGIONS:
         for category in categories:
+            if (eup, category) in suppressed:
+                continue
             for value in simulate.simulate_expansion(usage, merchants, eup, category)["delta_pp"]:
                 assert not (value == 0 and math.copysign(1, value) < 0), f"{eup} {category}: -0.0"
                 seen_zero = seen_zero or value == 0
@@ -944,6 +950,22 @@ def test_simulate_error_paths():
     _put_expansion("AC-910", "서울시", "카페")                                # 집계 6지역 밖 타깃
     res = client.post("/api/cards/AC-910/simulate")
     assert res.status_code == 400 and "집계 대상 지역이 아닙니다" in res.json()["detail"]
+
+
+def test_simulate_rejects_suppressed_target_cell():
+    """A3 후속: 타깃이 소표본 억제 셀(k=5 미만) 자체면 거짓 0 대신 400으로 명시 거부한다.
+
+    판정 근거는 usage_monthly.json의 privacy_meta.suppressed_cells(p10 정본)이며 하드코딩하지
+    않는다 — 억제 대상이 바뀌어도 이 테스트는 그대로 유효하다.
+    """
+    usage = dataload.load("usage_monthly")
+    eup, category = next(
+        (c["eup"], c["category"]) for c in usage["privacy_meta"]["suppressed_cells"])
+    _put_expansion("AC-921", eup, category)
+    res = client.post("/api/cards/AC-921/simulate")
+    assert res.status_code == 400
+    detail = res.json()["detail"]
+    assert "표본 보호" in detail and f"{eup} {category}" in detail
 
 
 # ── 6. KPI ──────────────────────────────────────────────────────────────

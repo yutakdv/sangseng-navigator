@@ -209,14 +209,16 @@ def simulate_card(
     try:
         usage = dataload.load("usage_monthly")
         merchants = dataload.load("merchants")      # §1 merchants 배열 — 요청 시점 로드
+        dashboard = dataload.load("dashboard")      # A3 후속: dist 정본 — usage 셀 합산의 억제 왜곡 회피
     except FileNotFoundError as exc:
         raise HTTPException(status_code=503, detail=f"{exc}.json이 아직 생성되지 않았습니다") from exc
     if not merchants:       # 폴백 체인 3단계 분모(전체 가맹점 수) 0 방지 — 빈 산출물도 미준비로 본다
         raise HTTPException(status_code=503, detail="merchants.json에 가맹점이 없습니다")
     target = card.get("target") or {}
     try:
-        result = simulate.simulate_expansion(usage, merchants, target.get("eup"), target.get("category"))
-    except ValueError as exc:       # 집계 6지역 밖 타깃 — 계산 자체가 성립하지 않는 요청이라 400
+        result = simulate.simulate_expansion(
+            usage, merchants, target.get("eup"), target.get("category"), dashboard=dashboard)
+    except ValueError as exc:       # 집계 6지역 밖 타깃·소표본 억제 타깃 — 계산이 성립하지 않는 요청 400
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
     # narrative에 '예상'·'가정'이 항상 포함되도록 입력에 지침을 싣고, 누락 시 fallback으로 대체.
