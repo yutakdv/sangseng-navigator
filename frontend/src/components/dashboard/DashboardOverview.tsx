@@ -8,7 +8,7 @@ import { StatusBar } from "@/components/dashboard/StatusBar";
 import { WorkQueue } from "@/components/dashboard/WorkQueue";
 import { ProposalSummary } from "@/components/proposals/ProposalSummary";
 import { SourceChip } from "@/components/SourceChip";
-import { datasetVersion, isMockMode } from "@/lib/api";
+import { datasetVersion } from "@/lib/api";
 import { isExecutionStage, isStartStage, sampleQuality } from "@/lib/cardWorkflow";
 import { dataFreshness } from "@/lib/dataFreshness";
 import { operatorGreeting } from "@/lib/operator";
@@ -116,7 +116,7 @@ export function DashboardOverview({
           <p className="flex flex-wrap items-center gap-2 text-xs font-semibold text-admin-text-muted">
             <span className="tabular-nums">기준 {dashboard.period_note}</span>
             <span className="rounded-full border border-lavender-200 bg-lavender-50 px-2.5 py-0.5 font-bold text-lavender-700">
-              {isMockMode ? "데모 운영" : "실시간 운영"}
+              실시간 운영
             </span>
           </p>
         </div>

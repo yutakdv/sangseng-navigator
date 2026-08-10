@@ -796,8 +796,7 @@ function Block({ title, children }: { title: string; children: React.ReactNode }
 }
 
 /**
- * 거점(ANCHOR)까지의 직선거리(km) — `mocks/store.ts`의 `anchorKm`과 같은 haversine 식이다
- * (그 함수는 모듈 내부용이라 여기서 같은 식을 쓴다).
+ * 거점(ANCHOR)까지의 직선거리(km) — 백엔드 후보 정렬(하이원리조트 거점 직선거리)과 같은 haversine 식이다.
  */
 function anchorKm(lat: number, lng: number): number {
   const R = 6371;

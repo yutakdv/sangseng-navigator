@@ -1,6 +1,6 @@
 /**
  * API 응답 타입 — 정본은 docs/plan/05-api-contract.md.
- * 계약을 바꿔야 하면 05 문서를 먼저 고치고(→ scripts/sync-mocks.sh 재실행 → 팀 공유) 여기를 맞춘다.
+ * 계약을 바꿔야 하면 05 문서를 먼저 고치고(→ scripts/sync-fe-static.sh 재실행 → 팀 공유) 여기를 맞춘다.
  */
 
 export type Region = "고한읍" | "사북읍" | "정선군" | "태백시" | "영월군" | "삼척시";
@@ -292,7 +292,7 @@ export interface CardAi {
     numeric_status?: "verified" | "fallback" | "fixed_by_server";
     narrative_status?: "verified" | "fallback" | "rule_based" | "ai_generated_unverified";
     selection_method?: string;
-    /** llm | rule_fallback | rule_seed | mock_rule — 설명 출처 칩의 근거 (05 §2) */
+    /** llm | rule_fallback | rule_seed — 설명 출처 칩의 근거 (05 §2) */
     explanation_source?: string;
     /** dissent만의 출처 — llm | rule_fallback | rule_based (05 §2, explanation_source와 다른 축) */
     dissent_source?: string;
@@ -473,8 +473,8 @@ export interface Simulation {
   effect_assessment: "미미" | "개선" | "심화" | "혼재";
   decision_note: string;
   narrative: string;
-  /** 이 문구가 LLM 응답인지 규칙 기반인지 (05 §2). mock 모드는 mock_rule */
-  narrative_source?: "llm" | "rule_based" | "mock_rule";
+  /** 이 문구가 LLM 응답인지 규칙 기반인지 (05 §2) */
+  narrative_source?: "llm" | "rule_based";
   assumption_note: string;
 }
 

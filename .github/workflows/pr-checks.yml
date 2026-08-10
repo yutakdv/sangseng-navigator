@@ -56,4 +56,8 @@ jobs:
       - run: npm ci
       - run: npm run lint
       - run: npm run check:banned
+      # mock 폴백 제거 후 lib/api.ts 가 주소 없이는 모듈 로드에서 죽는다 —
+      # 설정 누락이 배포까지 가지 못하게 한 의도된 동작이라 CI 도 실제 주소를 넘긴다.
       - run: npm run build
+        env:
+          NEXT_PUBLIC_API_BASE: ${{ vars.NEXT_PUBLIC_API_BASE }}

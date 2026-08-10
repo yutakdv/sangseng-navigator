@@ -52,7 +52,7 @@ function fold(source?: string, status?: string, groundingStatus?: string): Narra
     // 아예 없고, 비교문·근거는 LLM 원문 그대로다.
     return groundingStatus === "partial" ? "ai_partial" : "ai";
   }
-  if (source === "rule_seed" || source === "mock_rule") return "rule_reference";
+  if (source === "rule_seed") return "rule_reference";
   if (source === "rule_fallback" || source === "rule_based" || status === "rule_based") {
     return "rule_fallback";
   }
