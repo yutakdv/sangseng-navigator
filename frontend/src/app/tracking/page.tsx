@@ -11,7 +11,7 @@ import { ProgressReportDashboard } from "@/components/ProgressReportDashboard";
 import { ProgressSelect } from "@/components/ProgressSelect";
 import { RankTrace } from "@/components/RankTrace";
 import { Section } from "@/components/Section";
-import { ProgressChip, WorkflowChip } from "@/components/StatusChip";
+import { WorkflowChip } from "@/components/StatusChip";
 import { api } from "@/lib/api";
 import { eventLabel } from "@/lib/cardEvents";
 import { eligibilityStatus, workflowLabel } from "@/lib/cardWorkflow";
@@ -22,7 +22,6 @@ import {
   kstToday,
   presetIdFor,
   resolvePeriod,
-  workflowLayers,
   type CardRecordsResult,
 } from "@/lib/progressReportView";
 import type { Card, ProgressReport } from "@/types";
@@ -149,7 +148,6 @@ export default async function TrackingPage({
   const hasRecords = report !== null && (report.record_count > 0 || report.recorded_card_count > 0);
   const actionNeeded = report ? report.stale.count + report.cards_without_records : 0;
 
-  const { layers, unclassified } = workflowLayers(rows);
 
   return (
     <AdminShell dashboard={dashboard}>
@@ -288,121 +286,100 @@ export default async function TrackingPage({
             </div>
           ) : (
             <>
-              {/* 단계별 집계 — 목업의 "정책 실행 흐름"을 칸반 없이 요약한다 (13 §3).
-                  확충과 인센티브는 단계 정의가 다르다 — 한 줄에 섞으면 인센티브 전용 `검토중`이
-                  확충 4단계 사이에 설명 없이 끼어 두 워크플로가 하나처럼 읽힌다 (05 §2).
-                  두 층의 합 + 분류 외 = 헤더의 N건이어야 한다 (workflowLayers 불변식). */}
-              <div className="mb-4 flex flex-col gap-2.5">
-                {layers
-                  .filter((layer) => layer.total > 0 || rows.some((card) => card.type === layer.type))
-                  .map((layer) => (
-                    <div
-                      key={layer.type}
-                      className="rounded-xl border border-admin-border bg-admin-surface-sunken p-3"
-                    >
-                      <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
-                        <h3 className="text-[13px] font-bold text-admin-text">
-                          {layer.title}{" "}
-                          <span className="font-semibold tabular-nums text-admin-text-muted">
-                            {layer.total}건
-                          </span>
-                        </h3>
-                        <span className="text-[11px] text-admin-text-muted">{layer.flowLabel}</span>
-                      </div>
-                      <div className="mt-2 flex flex-wrap gap-2">
-                        {layer.stages.map((stage) => (
-                          <span
-                            key={stage}
-                            className="inline-flex items-center gap-2 rounded-full border border-admin-border bg-admin-surface py-1 pl-1 pr-3"
-                          >
-                            <ProgressChip progress={stage} />
-                            <span className="text-[13px] font-semibold tabular-nums text-admin-text">
-                              {layer.counts[stage] ?? 0}건
-                            </span>
-                          </span>
-                        ))}
-                      </div>
-                    </div>
-                  ))}
-                {unclassified > 0 ? (
-                  <p className="u-note">
-                    분류 외 {unclassified}건 — 카드 유형의 단계 목록에 없는 상태값입니다.
-                  </p>
-                ) : null}
-              </div>
-
+              {/* 단계별 집계 블록은 걷어냈다 — 같은 화면 위쪽 `현재 추진 상태 분포`가 같은 수를
+                  같은 기준으로 이미 그린다(그쪽은 트랙으로 순서까지 보여 준다). 두 번 그리면
+                  어느 쪽이 정본인지 흐려지고, 이 목록의 주인공인 카드가 아래로 밀린다. */}
               <ul className="flex flex-col gap-3">
                 {rows.map((card) => (
-                  <li
-                    key={card.id}
-                    className="flex flex-col gap-4 rounded-xl border border-admin-border p-4 sm:flex-row sm:items-start"
-                  >
-                    <div className="min-w-0 flex-1">
-                      <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
-                        <span className="rounded-md bg-admin-surface-sunken px-1.5 py-0.5 text-[11px] font-semibold tabular-nums text-admin-text-muted">
-                          {card.id}
-                        </span>
-                        <WorkflowChip card={card} />
-                      </div>
-
-                      <h3 className="mt-1.5 break-keep text-[15px] font-bold leading-6 text-admin-text">
-                        {card.title}
-                      </h3>
-
-                      <div className="mt-1.5 flex flex-wrap items-center gap-x-4 gap-y-1 text-[13px] text-admin-text-muted">
-                        <span className="flex items-center gap-1.5">
-                          <Icon name="pin" size={14} />
-                          대상{" "}
-                          <b className="font-semibold text-admin-text">
-                            {card.target
-                              ? `${card.target.eup} · ${card.target.category}`
-                              : "전 지역 공통"}
-                          </b>
-                        </span>
-                        <span className="flex items-center gap-1.5">
-                          <Icon name="clock" size={14} />
-                          {card.type === "EXPANSION" ? "검토 시작" : "승인"}{" "}
-                          <span className="tabular-nums">{stamp(card.decided_at)}</span>
-                        </span>
-                        {/* 확정 rate는 담당자가 승인할 때 고른 값만 존재한다 (05 §2) */}
-                        {card.selected_rate ? (
-                          <span className="flex items-center gap-1.5">
-                            <Icon name="gift" size={14} />
-                            확정 페이백률{" "}
-                            <b className="font-semibold text-admin-text">{card.selected_rate}%</b>
+                  /* 카드 한 장 — 테두리 대신 면 한 단(surface-sunken)으로 갈린다. 예전에는
+                     테두리 상자 안에 `다음 행동` 라벤더 바(링), 우측 `실행 기록` 상자(링),
+                     그 안의 접이 패널까지 상자가 세 겹이었고 라벤더 면이 카드마다 깔려
+                     정작 무엇을 눌러야 하는지 묻혔다. 지금은 가로 실선 두 개로만 나눈다:
+                     [머리: 식별·상태·조작] / [다음 행동] / [더 보기]. */
+                  <li key={card.id} className="rounded-xl bg-admin-surface-sunken p-4">
+                    <div className="flex flex-col gap-4 sm:flex-row sm:items-start">
+                      <div className="min-w-0 flex-1">
+                        <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+                          <span className="text-[11px] font-semibold tabular-nums text-admin-text-muted">
+                            {card.id}
                           </span>
-                        ) : null}
+                          <WorkflowChip card={card} />
+                        </div>
+
+                        <h3 className="mt-1.5 break-keep text-[15px] font-bold leading-6 text-admin-text">
+                          {card.title}
+                        </h3>
+
+                        <div className="mt-1.5 flex flex-wrap items-center gap-x-4 gap-y-1 text-[13px] text-admin-text-muted">
+                          <span className="flex items-center gap-1.5">
+                            <Icon name="pin" size={14} />
+                            <b className="font-semibold text-admin-text">
+                              {card.target
+                                ? `${card.target.eup} · ${card.target.category}`
+                                : "전 지역 공통"}
+                            </b>
+                          </span>
+                          <span className="flex items-center gap-1.5">
+                            <Icon name="clock" size={14} />
+                            {card.type === "EXPANSION" ? "검토 시작" : "승인"}{" "}
+                            <span className="tabular-nums">{stamp(card.decided_at)}</span>
+                          </span>
+                          {/* 확정 rate는 담당자가 승인할 때 고른 값만 존재한다 (05 §2) */}
+                          {card.selected_rate ? (
+                            <span className="flex items-center gap-1.5">
+                              <Icon name="gift" size={14} />
+                              확정 페이백률{" "}
+                              <b className="font-semibold text-admin-text">{card.selected_rate}%</b>
+                            </span>
+                          ) : null}
+                        </div>
                       </div>
 
+                      {/* 조작(상태 변경)은 카드의 머리 오른쪽에 둔다 — 별도 상자를 만들지 않는다.
+                          ProgressSelect가 자기 라벨을 이미 갖고 있어 제목을 덧붙이면 라벨이 두 겹이 된다 */}
+                      <div className="shrink-0 sm:w-48">
+                        <ProgressSelect
+                          cardId={card.id}
+                          cardType={card.type}
+                          progress={card.progress}
+                          verificationStatus={card.candidate_verification?.status}
+                        />
+                      </div>
+                    </div>
+
+                    <div className="min-w-0">
+                      {/* 다음 행동 — 채움 면 대신 가로 실선. 이 줄이 카드에서 유일하게 강조되는
+                          자리라, 라벤더는 링크 글자에만 남기고 배경은 쓰지 않는다 (13 §4) */}
                       <div
                         aria-label="담당자 다음 행동"
-                        className="mt-3 flex flex-wrap items-center justify-between gap-x-3 gap-y-1.5 rounded-xl bg-admin-primary-soft px-3 py-2.5 text-admin-primary ring-1 ring-inset ring-admin-primary-line"
+                        className="mt-3.5 flex flex-wrap items-center justify-between gap-x-3 gap-y-1 border-t border-admin-border pt-3"
                       >
                         <div className="flex min-w-0 items-center gap-2">
                           <Icon
                             name={card.progress === "완료" ? "check" : "workflow"}
-                            size={15}
+                            size={14}
                             strokeWidth={2}
+                            className="shrink-0 text-admin-text-muted"
                           />
-                          <span className="text-[11px] font-bold uppercase tracking-[0.1em]">
-                            다음 행동
-                          </span>
+                          <span className="shrink-0 text-[11px] text-admin-text-muted">다음 행동</span>
                           {(() => {
                             const action = nextAction(card);
                             return action.href ? (
                               <Link
                                 href={action.href}
-                                className="inline-flex items-center gap-1 break-keep text-[13px] font-bold underline underline-offset-4"
+                                className="inline-flex items-center gap-1 break-keep text-[13px] font-bold text-admin-primary underline-offset-4 hover:underline"
                               >
                                 {action.label}
                                 <Icon name="arrowRight" size={13} strokeWidth={2} />
                               </Link>
                             ) : (
-                              <span className="break-keep text-[13px] font-bold">{action.label}</span>
+                              <span className="break-keep text-[13px] font-bold text-admin-text">
+                                {action.label}
+                              </span>
                             );
                           })()}
                         </div>
-                        <span className="text-[11px] font-medium text-admin-primary/70">
+                        <span className="text-[11px] text-admin-text-muted">
                           현재 {workflowLabel(card)}
                         </span>
                       </div>
@@ -416,10 +393,10 @@ export default async function TrackingPage({
 
                       {card.progress === "완료" ? <DoneNote card={card} /> : null}
 
-                      <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-2">
+                      <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-2 border-t border-admin-border pt-3">
                         <Link
                           href={`/tracking/new?card_id=${encodeURIComponent(card.id)}`}
-                          className="inline-flex items-center gap-1 rounded-lg bg-admin-primary-soft px-2.5 py-1.5 text-[13px] font-semibold text-admin-primary ring-1 ring-inset ring-admin-primary-line hover:bg-admin-surface"
+                          className="inline-flex items-center gap-1 text-[13px] font-semibold text-admin-primary underline-offset-4 hover:underline"
                         >
                           상세 경과 입력
                           <Icon name="arrowRight" size={14} strokeWidth={2} />
@@ -517,19 +494,6 @@ export default async function TrackingPage({
                           </details>
                         ) : null}
                       </div>
-                    </div>
-
-                    <div className="shrink-0 rounded-xl bg-admin-surface-sunken p-3 ring-1 ring-inset ring-admin-border sm:w-52">
-                      <p className="mb-2 flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-[0.1em] text-admin-primary">
-                        <Icon name="workflow" size={13} /> 실행 기록
-                      </p>
-                      <ProgressSelect
-                        cardId={card.id}
-                        cardType={card.type}
-                        progress={card.progress}
-                        verificationStatus={card.candidate_verification?.status}
-                      />
-                      <p className="mt-2 text-[10px] leading-4 text-admin-text-muted">빠른 변경도 경과 이력과 리포트에 기록됩니다.</p>
                     </div>
                   </li>
                 ))}
