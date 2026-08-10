@@ -38,26 +38,11 @@ export const MAP_REGIONS: MapRegion[] = [
     label: "삼척시(도계읍)",
     type: "town",
     parentId: "samcheok",
-    labelDy: -4,
   },
   // 고한·사북은 정선군 위에 얹히는 별도 선택 영역 — 정선군 클릭은 두 읍을 제외한
-  // 잔여 지역을 뜻한다(데이터 집계 기준과 동일). 라벨은 서로 30px 거리라 위아래로 벌린다.
-  {
-    id: "gohan",
-    name: "고한읍",
-    label: "고한읍",
-    type: "town",
-    parentId: "jeongseon",
-    labelDx: 14,
-    labelDy: 16,
-  },
-  {
-    id: "sabuk",
-    name: "사북읍",
-    label: "사북읍",
-    type: "town",
-    parentId: "jeongseon",
-    labelDx: -12,
-    labelDy: -8,
-  },
+  // 잔여 지역을 뜻한다(데이터 집계 기준과 동일).
+  // 라벨 기준점이 내부 최심점(label_anchor)으로 바뀌면서 수동 오프셋은 걷어냈다 —
+  // 겹침이 다시 생기면 그때만 labelDx/labelDy로 미세 조정한다.
+  { id: "gohan", name: "고한읍", label: "고한읍", type: "town", parentId: "jeongseon" },
+  { id: "sabuk", name: "사북읍", label: "사북읍", type: "town", parentId: "jeongseon" },
 ];

@@ -90,19 +90,56 @@ def rdp(points, eps):
     return [p for p, k in zip(points, keep) if k]
 
 
-def centroid_of(ring):
-    a = cx = cy = 0.0
+def point_in_ring(x, y, ring):
+    inside = False
     for (x1, y1), (x2, y2) in zip(ring, ring[1:]):
-        cross = x1 * y2 - x2 * y1
-        a += cross
-        cx += (x1 + x2) * cross
-        cy += (y1 + y2) * cross
-    a /= 2.0
-    if abs(a) < 1e-9:
-        xs = [p[0] for p in ring]
-        ys = [p[1] for p in ring]
-        return (sum(xs) / len(xs), sum(ys) / len(ys))
-    return (cx / (6.0 * a), cy / (6.0 * a))
+        if (y1 > y) != (y2 > y) and x < (x2 - x1) * (y - y1) / (y2 - y1) + x1:
+            inside = not inside
+    return inside
+
+
+def dist_to_ring(x, y, ring):
+    best = float("inf")
+    for (x1, y1), (x2, y2) in zip(ring, ring[1:]):
+        dx, dy = x2 - x1, y2 - y1
+        seg2 = dx * dx + dy * dy
+        t = 0.0 if seg2 == 0 else max(0.0, min(1.0, ((x - x1) * dx + (y - y1) * dy) / seg2))
+        best = min(best, math.hypot(x - (x1 + t * dx), y - (y1 + t * dy)))
+    return best
+
+
+def label_anchor(ring):
+    """라벨 기준점 = 폴리곤 내부 최심점(pole of inaccessibility, 경계에서 가장 먼 내부 점).
+
+    면적 무게중심(centroid)은 오목한(L자형) 행정구역에서 시각적 중앙을 벗어나거나
+    폴리곤 밖으로 빠진다 — 실제로 영월군·태백시 라벨이 어긋났다. 최심점은 정의상
+    항상 내부이고, 라벨 주변 여백이 가장 넓은 지점이라 지도 라벨 배치의 표준이다.
+    구현: 거친 격자 탐색 → 최적점 주변을 격자 간격 반감하며 3회 정밀화 (오차 ≪ 1px).
+    """
+    xs = [p[0] for p in ring]
+    ys = [p[1] for p in ring]
+    min_x, max_x, min_y, max_y = min(xs), max(xs), min(ys), max(ys)
+    step = max(max_x - min_x, max_y - min_y) / 40.0
+    best = (0.0, (min_x + max_x) / 2.0, (min_y + max_y) / 2.0)
+
+    def scan(cx0, cy0, half, s):
+        nonlocal best
+        y = cy0 - half
+        while y <= cy0 + half:
+            x = cx0 - half
+            while x <= cx0 + half:
+                if point_in_ring(x, y, ring):
+                    d = dist_to_ring(x, y, ring)
+                    if d > best[0]:
+                        best = (d, x, y)
+                x += s
+            y += s
+
+    scan((min_x + max_x) / 2.0, (min_y + max_y) / 2.0, max(max_x - min_x, max_y - min_y) / 2.0, step)
+    for _ in range(3):
+        step /= 2.0
+        scan(best[1], best[2], step * 4.0, step)
+    return (best[1], best[2])
 
 
 def main(munis_path, dong_path):
@@ -156,9 +193,9 @@ def main(munis_path, dong_path):
         for r in simplified:
             coords = " L".join(f"{x:.1f} {y:.1f}" for x, y in r)
             d_parts.append(f"M{coords} Z")
-        # 라벨 기준점은 최대 폴리곤의 centroid
+        # 라벨 기준점은 최대 폴리곤의 내부 최심점 (label_anchor 주석 참고)
         big = max(simplified, key=ring_area)
-        cx, cy = centroid_of(big)
+        cx, cy = label_anchor(big)
         out[rid] = {
             "name": s["name"],
             "d": " ".join(d_parts),

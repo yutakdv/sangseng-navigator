@@ -14,11 +14,15 @@ import { MAP_REGIONS, type MapRegion } from "@/components/RegionalMap/regions";
  * 지도 전체가 버튼 그룹이다 — 각 지역 path가 개별 클릭·키보드 대상이고(role="button",
  * Enter/Space), 선택 결과는 콜백으로 올린다. PNG 한 장이나 지도 API iframe이 아니다.
  *
- * 전 지역이 같은 라벤더 계열이다 — 지역 구분은 흰 경계선·라벨이 맡고, 색 농도는
- * 상태만 인코딩한다: 기본 lavender-100 → hover/focus lavender-200 → 선택 lavender-300
- * + 굵은 흰 테두리 + 그림자. 색만으로 상태를 말하지 않도록 선택은 세 겹으로 표시한다.
+ * 전 지역이 같은 라벤더 계열이다 — 색 농도는 상태만 인코딩한다:
+ * 기본 lavender-50 → hover/focus lavender-200 → 선택 lavender-300 + 흰 테두리 + 그림자.
+ * 색만으로 상태를 말하지 않도록 선택은 세 겹으로 표시한다.
+ *
+ * 기본 면이 거의 흰색에 가까워 흰 경계선으로는 지역이 갈리지 않는다 — 기본·hover의
+ * 경계선은 라벤더(300)가 맡고, 선택만 흰 경계선으로 반전시켜 짙은 면 위에서 도드라진다.
  */
-const FILL = { base: "#E9E4FB", hover: "#D6CEF8", selected: "#C4B8F5" }; // lavender-100/200/300
+const FILL = { base: "#F6F4FE", hover: "#D6CEF8", selected: "#C4B8F5" }; // lavender-50/200/300
+const STROKE = { base: "#C4B8F5", selected: "#ffffff" }; // lavender-300 / white
 export function RegionalMap({
   selectedId,
   onRegionSelect,
@@ -68,10 +72,10 @@ export function RegionalMap({
             aria-label={`${region.label} 선택`}
             aria-pressed={selected}
             fill={selected ? FILL.selected : hovered ? FILL.hover : FILL.base}
-            stroke="#ffffff"
-            strokeWidth={selected ? 2.5 : 1.5}
+            stroke={selected ? STROKE.selected : STROKE.base}
+            strokeWidth={selected ? 2.5 : 1.8}
             strokeLinejoin="round"
-            className="cursor-pointer outline-none transition-[fill,stroke-width] duration-200"
+            className="cursor-pointer outline-none transition-[fill,stroke-width,stroke] duration-200"
             style={selected ? { filter: "drop-shadow(0 2px 6px rgb(63 61 86 / 0.28))" } : undefined}
             onClick={() => onRegionSelect(region)}
             onKeyDown={(e) => {
