@@ -202,6 +202,12 @@ export interface CardAi {
   expected_effect: string;
   /** 정량 순위 병기용 — 절대 규칙 5. INCENTIVE는 null */
   original_ranking: { rank: number; candidate: string; score: number }[] | null;
+  /**
+   * AI 반대 의견 3항 — 제안을 방어하지 않고 반박하는 문장만 담는다 (05 §2 "반대 의견도 AI
+   * 산출물이며 정본 수치만 인용"). B1 도입 이전에 생성·시드된 구형 카드에는 없을 수 있어
+   * optional이다 — 없으면 화면은 반대 관점 섹션을 그리지 않는다.
+   */
+  dissent?: string[];
   /** LLM 자유서술의 숫자·순위·상태를 정본 데이터로 재검증했는지 */
   grounding?: {
     /** EXPANSION은 verified, INCENTIVE는 partial(시나리오 수치만 서버 고정) (05 §2) */
@@ -211,6 +217,8 @@ export interface CardAi {
     selection_method?: string;
     /** llm | rule_fallback | rule_seed | mock_rule — 설명 출처 칩의 근거 (05 §2) */
     explanation_source?: string;
+    /** dissent만의 출처 — llm | rule_fallback | rule_based (05 §2, explanation_source와 다른 축) */
+    dissent_source?: string;
     source: "structured";
     checks: string[];
   };

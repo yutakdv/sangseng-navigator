@@ -323,6 +323,21 @@ const BLOCKED = [
 const isBlocked = (state: string): boolean => BLOCKED.some((p) => p === state);
 /** 백엔드 `cardgen.EXPANSION_SOURCES`와 동일 */
 const EXPANSION_SOURCES = ["하이원포인트 사용현황", "가맹점 상세정보", "소진공 상가정보"];
+/**
+ * B1 반대 의견(dissent) — mock에는 LLM이 없으므로 백엔드 `cardgen.DISSENT_FALLBACK`/
+ * `INCENTIVE_DISSENT`(=규칙 기반 폴백 문구)와 같은 내용을 그대로 재사용한다. mock 모드도
+ * 실 API와 같은 반대 관점 섹션을 보여줘야 하기 때문이다 (05 §2 "구조는 같아야 한다").
+ */
+const EXPANSION_DISSENT = [
+  "기준월(2025-12) 이후 소비 패턴이 변했다면 근거 수치가 현재와 다를 가능성이 있습니다.",
+  "가맹점 이용 부하는 건수 기반 추정치라 실제 매출·수요 여력과 다를 가능성이 있습니다.",
+  "계절성(겨울 성수기 등)에 따라 제안 시점과 실행 시점의 수요가 다를 가능성이 있습니다.",
+];
+const INCENTIVE_DISSENT = [
+  "전 지역 공통 페이백이라 지역별 소비 여건 차이를 반영하지 못할 가능성이 있습니다.",
+  "페이백률-전환율 관계는 실측 없는 팀 설정 가정이라 실제 효과가 다를 가능성이 있습니다.",
+  "지역 전환율은 근사 지표라 개선 폭이 금액 기준 성과와 다를 가능성이 있습니다.",
+];
 
 const CANDIDATES = candidatesMock.candidates as unknown as Candidate[];
 
@@ -457,12 +472,14 @@ const generateExpansion = (): GeneratedCard => {
       reasons,
       risks,
       expected_effect: `${candidateLabel(top)} 후보의 가맹 전환 효과는 반사실 시뮬레이션과 사업자 적격성 확인 후 판단해야 합니다 (${ASSUMPTION_NOTE})`,
+      dissent: EXPANSION_DISSENT,
       grounding: {
         status: "verified",
         numeric_status: "verified",
         narrative_status: "rule_based",
         selection_method: "deterministic_highest_available_score",
         explanation_source: "mock_rule",
+        dissent_source: "rule_based",
         source: "structured",
         checks: ["target", "score", "rank", "progress", "road_time"],
       },

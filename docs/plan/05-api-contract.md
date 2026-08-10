@@ -219,12 +219,18 @@ Base URL: 로컬 `http://localhost:8000` / 배포 후 API Gateway URL. 경로 �
       "narrative_status": "ai_generated_unverified",
       "selection_method": "deterministic_highest_available_score",
       "explanation_source": "llm",
+      "dissent_source": "llm",
       "source": "structured",
       "checks": ["target", "score", "rank", "progress", "road_time"]
     },
     "original_ranking": [
       {"rank": 1, "candidate": "고한읍 편의점", "score": 0.59},
       {"rank": 2, "candidate": "사북읍 카페", "score": 0.57}
+    ],
+    "dissent": [
+      "기준월(2025-12) 이후 소비 패턴이 변했다면 근거 수치가 현재와 다를 가능성이 있습니다.",
+      "가맹점 이용 부하는 건수 기반 추정치라 실제 매출·수요 여력과 다를 가능성이 있습니다.",
+      "계절성(겨울 성수기 등)에 따라 제안 시점과 실행 시점의 수요가 다를 가능성이 있습니다."
     ]
   },
   "candidate_verification": {
@@ -277,6 +283,17 @@ Base URL: 로컬 `http://localhost:8000` / 배포 후 API Gateway URL. 경로 �
   보이는 후보명·Score·순위·진행 상태·도로 소요시간·비교 문장은 서버가 구조화 데이터로 다시 만든다.
   `ai.grounding.status=verified`는 이 재검증을 통과했다는 뜻이지 후보 사업자의 적격성이 확인됐다는 뜻은
   아니다. 후자는 `candidate_verification.status=unverified`에서 별도로 관리한다.
+- **반대 의견(`ai.dissent`):** 정확히 문자열 3개 배열이며, "이 제안이 틀릴 수 있는 이유"만 담는다 —
+  제안을 방어하는 문장이 아니라 반박하는 문장이다. **반대 의견도 AI 산출물이며 정본 수치만
+  인용한다** — 입력에 없는 사실을 지어내지 않고, 추측은 "~가능성" 표현으로 쓴다(절대 규칙 4의
+  연장: AI는 제안만 하고, 그 제안에 대한 반박까지 함께 제시해 담당자 승인을 돕는다). 별도 LLM
+  호출을 추가하지 않고 카드 생성 호출의 `CARD_AI_SCHEMA`에 얹은 필드라, 폴백·grounding 재생성
+  경로를 EXPANSION/INCENTIVE 본문과 그대로 공유한다. LLM이 문자열 3개가 아닌 값을 주면
+  서버가 고정 규칙 문구로 대체하고 그 사실을 `ai.grounding.dissent_source`에 남긴다
+  (`llm` | `rule_fallback` | `rule_based` — 의미는 아래 `explanation_source` 표와 같은 축이며,
+  INCENTIVE는 시나리오 자체가 서버 고정값이라 LLM이 관여하지 않으므로 항상 `rule_based`다).
+  구형 카드(이 필드 도입 이전에 생성·시드된 카드)에는 `dissent`가 없을 수 있다 — 화면은
+  `undefined`/누락을 옵셔널로 다루고 없으면 반대 관점 섹션을 그리지 않는다.
 - 후보 적격성 확인 전 생성 카드의 `confidence`는 최대 `중`이다. `상`은 영업 상태·가맹 자격·참여 의향
   등 운영 검증을 저장하고 감사할 수 있게 된 뒤에만 허용한다.
 - `INCENTIVE` 타입은 `target`/`score_rank`/`ai_rank` 대신 `scenarios` + `selected_rate` 사용:
@@ -335,6 +352,15 @@ LLM 호출이 실패하거나 애초에 호출하지 않은 카드도 **똑같�
 
 - `ai.reasons`의 출처 문장도 이 값과 **일치해야 한다**. 폴백인데 "AI는 비정량 리스크 문구 생성에만
   사용했습니다"를 그대로 실으면 필드와 문장이 서로 다른 말을 하게 된다.
+- `ai.grounding.dissent_source`는 `ai.dissent`(반대 의견 3항)만의 출처다. `explanation_source`와
+  갈라지는 이유는, INCENTIVE는 본문 설명(`explanation_source`)은 LLM이 쓸 수 있어도 반대 의견은
+  시나리오가 서버 고정값이라 애초에 LLM에 맡기지 않기 때문이다.
+
+  | `dissent_source` | 언제 |
+  |---|---|
+  | `llm` | LLM이 문자열 3개를 그대로 반환해 채택 (EXPANSION) |
+  | `rule_fallback` | LLM 호출 실패·문자열 3개 형식 미달 — 서버 고정 문구(`cardgen.DISSENT_FALLBACK`)로 대체 (EXPANSION) |
+  | `rule_based` | LLM을 애초에 호출하지 않음 — INCENTIVE(시나리오 고정)와 데모 시드·mock 카드 |
 - **INCENTIVE는 예외**: 시나리오 3/5/7%와 `delta_pp`가 서버 고정값이라
   `status: "partial"` · `numeric_status: "fixed_by_server"` · `selection_method: "fixed_scenarios_3_5_7"`을
   쓴다. EXPANSION용 "검증됨" 배너를 그대로 재사용하지 않는다(검증 대상 자체가 다르다) —
@@ -360,7 +386,12 @@ LLM 호출이 실패하거나 애초에 호출하지 않은 카드도 **똑같�
     "reasons": ["적립이 아닌 사용 단계 정책 — 지역 가맹점 결제분에 한정해 리워드가 붙으므로 콤프 발행액(적립)은 늘지 않고 게임 참여 유인과도 무관", "지역 전환율이 월별 17~23%대에서 오르내려 저점 월을 방어할 수요 측 유인이 필요", "사용 건수가 사북읍·태백시에 절반 이상 몰려 있어 특정 지역 한정이 아닌 전 지역 공통 적용이라 지역 균형을 왜곡하지 않음", "페이백률이 높을수록 효과와 재원 부담이 함께 커지는 트레이드오프가 뚜렷"],
     "risks": ["재원 확보는 예산 부서의 별도 승인 사항", "기존 포인트 적립·할인 약관과의 중복 적용 여부 확인 필요", "실제 자동 지급 시스템 연동은 미구현(로드맵)"],
     "expected_effect": "5% 적용 시 지역 전환율 약 1.0~2.0%p 개선 예상 (가정 기반 전망이며 실제와 다를 수 있음)",
-    "original_ranking": null
+    "original_ranking": null,
+    "dissent": [
+      "전 지역 공통 페이백이라 지역별 소비 여건 차이를 반영하지 못할 가능성이 있습니다.",
+      "페이백률-전환율 관계는 실측 없는 팀 설정 가정이라 실제 효과가 다를 가능성이 있습니다.",
+      "지역 전환율은 근사 지표라 개선 폭이 금액 기준 성과와 다를 가능성이 있습니다."
+    ]
   },
   "scenarios": [
     {"rate": 3, "delta_pp": [0.5, 1.0], "budget_note": "재원 부담 낮음"},
@@ -375,6 +406,8 @@ LLM 호출이 실패하거나 애초에 호출하지 않은 카드도 **똑같�
 }
 ```
 
+- INCENTIVE의 `dissent`는 `grounding.dissent_source: "rule_based"`로 고정된다 — 시나리오·개선폭이
+  서버 고정 가정이라 LLM이 반대 의견 생성에도 관여하지 않는다(`cardgen.INCENTIVE_DISSENT`).
 - INCENTIVE의 `ai`는 EXPANSION과 **동일 스키마를 재사용**하며 순위 필드(`original_ranking`)만 `null`이다
   (`comparison`=시나리오 비교문, `reasons`=권고 근거, `risks`=A-3 프롬프트의 필수 리스크 3종).
 

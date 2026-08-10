@@ -67,6 +67,21 @@ INCENTIVE_MANDATORY_RISKS = [
     ("미구현", "실제 자동 지급 시스템 연동은 미구현(로드맵)"),
 ]
 
+# B1: AI 반대 의견(dissent) — 별도 LLM 호출을 추가하지 않고 기존 카드 생성 호출의 CARD_AI_SCHEMA에
+# 얹은 필드다(Lambda 30초 예산이 최악 24.5초라 호출을 늘릴 여유가 없다, llm.py 상단 주석).
+# LLM이 문자열 3개를 못 주면(호출 실패·개수 부족·빈 문자열) 이 고정 문구로 대체한다 (05 §2).
+DISSENT_FALLBACK = (
+    "기준월(2025-12) 이후 소비 패턴이 변했다면 근거 수치가 현재와 다를 가능성이 있습니다.",
+    "가맹점 이용 부하는 건수 기반 추정치라 실제 매출·수요 여력과 다를 가능성이 있습니다.",
+    "계절성(겨울 성수기 등)에 따라 제안 시점과 실행 시점의 수요가 다를 가능성이 있습니다.",
+)
+# INCENTIVE는 시나리오·개선폭이 서버 고정 가정이라 dissent도 LLM에 맡기지 않는다 — 항상 이 문구.
+INCENTIVE_DISSENT = (
+    "전 지역 공통 페이백이라 지역별 소비 여건 차이를 반영하지 못할 가능성이 있습니다.",
+    "페이백률-전환율 관계는 실측 없는 팀 설정 가정이라 실제 효과가 다를 가능성이 있습니다.",
+    "지역 전환율은 근사 지표라 개선 폭이 금액 기준 성과와 다를 가능성이 있습니다.",
+)
+
 # 출력 JSON 스키마 = 05 문서 Card.ai 필드 (07 문서 B4 부록 원문)
 CARD_AI_SCHEMA = {
     "type": "object", "additionalProperties": False,
@@ -78,9 +93,10 @@ CARD_AI_SCHEMA = {
         "risks": {"type": "array", "items": {"type": "string"}},
         "expected_effect": {"type": "string"},
         "confidence": {"type": "string", "enum": ["상", "중", "하"]},
+        "dissent": {"type": "array", "items": {"type": "string"}, "minItems": 3, "maxItems": 3},
     },
     "required": ["adjusted", "ai_rank_target", "comparison", "reasons", "risks",
-                 "expected_effect", "confidence"],
+                 "expected_effect", "confidence", "dissent"],
 }
 
 
@@ -257,6 +273,7 @@ def _fallback_ai(cands: list, cards: list) -> dict:
         "risks": ["신규 가맹점 초기 실적 저조 가능성", "가맹 협상이 분기 내 완료되지 않을 가능성"],
         "expected_effect": f"{top['eup']} {top['category']} 공백 해소로 지역 소비 접점 확대 예상",
         "confidence": "중",
+        "dissent": list(DISSENT_FALLBACK),
     }
 
 
@@ -318,6 +335,16 @@ def _grounded_ai(cands: list, target: dict, out: dict, cards: list,
         if risk not in risks:
             risks.append(risk)
 
+    # B1: dissent — LLM이 문자열 3개(공백 아님)를 그대로 줬을 때만 채택한다. 개수가 다르거나
+    # 빈 문자열이 섞이면 규칙 기반 문구로 통째로 대체하고, 그 사실을 dissent_source에 남긴다
+    # (explanation_source가 이미 rule_fallback이면 _fallback_ai가 DISSENT_FALLBACK을 그대로
+    # 돌려주므로 이 분기를 그대로 통과한다).
+    dissent_out = out.get("dissent")
+    dissent_ok = (isinstance(dissent_out, list) and len(dissent_out) == 3
+                  and all(isinstance(d, str) and d.strip() for d in dissent_out))
+    dissent = [d.strip() for d in dissent_out] if dissent_ok else list(DISSENT_FALLBACK)
+    dissent_source = explanation_source if (dissent_ok and explanation_source == "llm") else "rule_fallback"
+
     return {
         "adjusted": target["rank"] != 1,
         "comparison": comparison,
@@ -327,6 +354,7 @@ def _grounded_ai(cands: list, target: dict, out: dict, cards: list,
             f"{target['eup']} {target['category']} 후보의 가맹 전환 효과는 카드 상세의 반사실 "
             "시뮬레이션과 사업자 적격성 확인 후 판단해야 합니다"
         ),
+        "dissent": dissent,
         "grounding": {
             "status": "verified",
             "numeric_status": "verified",
@@ -334,6 +362,7 @@ def _grounded_ai(cands: list, target: dict, out: dict, cards: list,
                                  else "rule_based"),
             "selection_method": "deterministic_highest_available_score",
             "explanation_source": explanation_source,
+            "dissent_source": dissent_source,
             "source": "structured",
             "checks": ["target", "score", "rank", "progress", "road_time"],
         },
@@ -447,6 +476,7 @@ def _generate_expansion(cards: list) -> tuple[dict, bool]:
             "reasons": grounded["reasons"],
             "risks": grounded["risks"],
             "expected_effect": grounded["expected_effect"],
+            "dissent": grounded["dissent"],
             "grounding": grounded["grounding"],
             "original_ranking": [                        # 정량 순위 상시 병기 (절대 규칙 5)
                 {"rank": c["rank"], "candidate": f"{c['eup']} {c['category']}", "score": c["score"]}
@@ -538,6 +568,9 @@ def _generate_incentive(cards: list) -> tuple[dict, bool]:
             "reasons": [r for r in out.get("reasons", []) if isinstance(r, str) and r.strip()],
             "risks": risks,
             "expected_effect": _ensure_assumption(out.get("expected_effect", "")),
+            # 시나리오·개선폭이 서버 고정 가정이라 dissent도 LLM에 맡기지 않는다(LLM 미개입) —
+            # explanation_source(본문 설명)와 달리 항상 규칙 기반이다.
+            "dissent": list(INCENTIVE_DISSENT),
             "grounding": {
                 # EXPANSION과 달리 status는 partial — 수치는 서버 고정이지만 비교문·근거는
                 # LLM(또는 폴백) 원문을 그대로 쓰므로 문장까지 재검증했다고 주장할 수 없다.
@@ -547,6 +580,7 @@ def _generate_incentive(cards: list) -> tuple[dict, bool]:
                                      else "rule_based"),
                 "selection_method": "fixed_scenarios_3_5_7",
                 "explanation_source": explanation_source,
+                "dissent_source": "rule_based",
                 "source": "structured",
                 "checks": INCENTIVE_GROUNDING_CHECKS,
             },
