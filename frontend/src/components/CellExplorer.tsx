@@ -91,13 +91,39 @@ export function CellExplorer({
   const hidden = data.cells.filter((c) => c.suppressed);
 
   const presetKey = initial?.cell ? keyOf(initial.cell) : "";
+  // open이 비면(전 셀 억제) keyOf(open[0])이 undefined.eup을 읽어 크래시한다 — 빈 상태에서는
+  // 빈 문자열로 둔다. 아래 "cell 없음" 가드가 이후 렌더를 대신 처리한다.
   const [cellKey, setCellKey] = useState(
-    open.some((c) => keyOf(c) === presetKey) ? presetKey : keyOf(open[0]),
+    open.some((c) => keyOf(c) === presetKey) ? presetKey : open.length ? keyOf(open[0]) : "",
   );
   const [beta, setBeta] = useState(initial?.beta ?? 0.3);
   const [rate, setRate] = useState<number>(5);
 
+  // 훅은 조건 분기보다 먼저, 매 렌더 같은 순서로 호출해야 한다 — 아래 "cell 없음" 조기 반환보다
+  // 앞에 둔다. 딥링크로 들어왔을 때만 이 섹션까지 내려 준다 — 시연에서 스크롤을 찾느라 시간을
+  // 쓰지 않도록. 일반 진입(프리셋 없음)에서는 화면이 저절로 움직이지 않는다.
+  const root = useRef<HTMLDivElement>(null);
+  const deepLinked = Boolean(initial?.cell);
+  useEffect(() => {
+    if (deepLinked) root.current?.closest("section")?.scrollIntoView({ block: "start" });
+  }, [deepLinked]);
+
   const cell = open.find((c) => keyOf(c) === cellKey) ?? open[0];
+
+  // 억제 규칙상 34개 셀이 전부 표본 보호로 비공개 처리될 수 있다 — 현재 데모 데이터(34개 중
+  // 32개 공개)에서는 도달하지 않지만, 도달하면 아래 cell.tier 등 접근이 전부 크래시한다.
+  // 새 기능을 만들지 않고 빈 상태 문구 한 줄로만 막는다.
+  if (!cell) {
+    return (
+      <div
+        ref={root}
+        className="rounded-xl border border-dashed border-admin-border bg-admin-surface-sunken p-4 text-center text-sm text-admin-text-muted"
+      >
+        값이 공개된 셀이 없어 셀 탐색을 표시할 수 없습니다 — 전체 {data.cells.length}개 셀이 표본
+        보호로 비공개 처리됐습니다.
+      </div>
+    );
+  }
 
   // 부하 상위 셀은 페이백을 올려도 개선폭이 절반만 실현된다고 본다(가정)
   const damped = cell.tier === "high" ? beta * DAMPING : beta;
@@ -110,14 +136,6 @@ export function CellExplorer({
   // 정확도 문제는 아니다: 요율 3·5·7% × 민감도 0.10~0.60 전 구간에서 원값 판정과 반올림값 판정이
   // 갈리는 지점은 없다.
   const flipped = cell.tier === "high" && gapPp >= FLIP_GAP_PP;
-
-  // 딥링크로 들어왔을 때만 이 섹션까지 내려 준다 — 시연에서 스크롤을 찾느라 시간을 쓰지 않도록.
-  // 일반 진입(프리셋 없음)에서는 화면이 저절로 움직이지 않는다.
-  const root = useRef<HTMLDivElement>(null);
-  const deepLinked = Boolean(initial?.cell);
-  useEffect(() => {
-    if (deepLinked) root.current?.closest("section")?.scrollIntoView({ block: "start" });
-  }, [deepLinked]);
 
   const rank = open.indexOf(cell) + 1;
   const position =
