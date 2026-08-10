@@ -64,6 +64,8 @@ DynamoDB(온디맨드) / OpenAI 또는 Claude(어댑터) / 배포: Vercel(FE) + 
 | 18 | [18-fe-redesign-record.md](18-fe-redesign-record.md) | **프론트엔드 리디자인 변경 기록** — §8 용어 치환표(지표 명명 축 포함)·§10-b 후속 라운드 |
 | 19 | [19-fe-remaining-issues-record.md](19-fe-remaining-issues-record.md) | **데모 피드백 7건 대응 기록** — 페이백 손익·지역 드릴다운·위젯 반영 연출 등 |
 | 20 | [20-codebase-audit-prompt.md](20-codebase-audit-prompt.md) | **전체 코드베이스 종합 점검 프롬프트** — 붙여넣어 실행하는 전수 감사(구조·E2E 5대 플로우·절대 규칙 6개·보안·배포). 제출·데모 전 점검용 |
+| 21 | [21-final-judging-review-prompt.md](21-final-judging-review-prompt.md) | **최종 심사 대비 검토 프롬프트** — 제출 직전 1회, 공식 평가표 기준 점수 방어 관점의 붙여넣기용 |
+| 22 | [22-presentation-ppt-prompt.md](22-presentation-ppt-prompt.md) | **발표 PPT 생성 프롬프트** — 수치 고정된 발표 자료 생성용 |
 
 ## Phase 게이트 요약 (상세: 10 문서)
 

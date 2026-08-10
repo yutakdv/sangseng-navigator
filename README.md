@@ -13,6 +13,7 @@
 [![Demo Video](https://img.shields.io/badge/Demo%20Video-1%3A30-1E1840?style=for-the-badge&logo=youtube&logoColor=white)](#demo)
 [![Open Data](https://img.shields.io/badge/Open%20Data-6%20datasets-2E2560?style=for-the-badge)](#-활용-데이터)
 [![Stack](https://img.shields.io/badge/Next.js%2016%20%C2%B7%20FastAPI%20%C2%B7%20AWS-443597?style=for-the-badge)](#-기술-스택)
+[![License: MIT](https://img.shields.io/badge/License-MIT-33266B?style=for-the-badge)](LICENSE)
 
 **팀 V.I.B.E** · 공공데이터 활용 바이브코딩 경진대회 출품작 · 로그인 없이 접속 가능
 
@@ -325,3 +326,4 @@ cd frontend && npm install && npm run dev   # NEXT_PUBLIC_API_BASE 미설정 시
 - **모든 시뮬레이션 수치는 가정 기반 전망**이며 실제와 다를 수 있습니다. 임팩트 추정치(1%p ≈ 연 +24,787건)는 연간 입장 연인원 2,478,656명의 1%를 건수로 환산한 값입니다.
 - **AI 출력은 제안일 뿐**이며, 담당자 승인을 거쳐야 정책 카드가 확정됩니다. 카드의 숫자·순위·상태 문구는 LLM 원문을 그대로 노출하지 않고 정본 데이터로 다시 생성합니다.
 - 데이터: 공공데이터포털(강원랜드 · 소상공인시장진흥공단) · 국세청 · 기상청 | 지도: © OpenStreetMap contributors, OpenFreeMap, Kakao
+- 라이선스: [MIT](LICENSE) · Copyright (c) 2026 Team V.I.B.E.
