@@ -339,7 +339,7 @@ export interface MetricSeries {
  * 기간 내 관측값을 지표별·카드별 시계열로 (T-C).
  *
  * 여러 카드의 값을 한 선으로 평균 내지 않는다 — 카드마다 관측 시점이 달라 없는 추세를 만들어 낸다.
- * 카드 1장 = 선 1개로만 그리고, 선을 그릴 수 있는 2건 이상만 담는다(Sparkline도 2건 미만이면 null).
+ * 카드 1장 = 줄 1개로만 그리고, 변화를 말할 수 있는 2건 이상만 담는다(기초값·최신값 두 점이 필요).
  */
 export function metricSeries(
   results: CardRecordsResult[],

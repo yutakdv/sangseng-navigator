@@ -2,7 +2,7 @@ import Link from "next/link";
 import { Icon, type IconName } from "@/components/Icon";
 import { ProgressChip } from "@/components/StatusChip";
 import { normalizedProgress, sampleQuality } from "@/lib/cardWorkflow";
-import { dash, ratioPct } from "@/lib/format";
+import { dash, pctUnit, ratioNum } from "@/lib/format";
 import type { Card, CardProgress, Kpi } from "@/types";
 
 /**
@@ -99,13 +99,15 @@ export function ExecutionStatus({
             <Stat
               icon="check"
               label="채택률"
-              value={ratioPct(kpi.adoption_rate)}
+              value={ratioNum(kpi.adoption_rate)}
+              unit={pctUnit(kpi.adoption_rate)}
               note={`승인 ${kpi.counts.approved} / 결정 ${kpi.counts.decided}건${sampleNote ? ` · ${sampleNote}` : ""}`}
             />
             <Stat
               icon="trend"
               label="실행 전환율"
-              value={ratioPct(kpi.execution_rate)}
+              value={ratioNum(kpi.execution_rate)}
+              unit={pctUnit(kpi.execution_rate)}
               /* "결정"이 아니라 "승인"이다 — routes/kpi.py의 execution_rate 분모가 approved라
                  반려·보류는 들어가지 않는다. /dashboard의 같은 지표 설명과도 이 표기가 맞는다 */
               note={`승인 카드 ${kpi.counts.approved}건 중 추진중·완료 비중${sampleNote ? ` · ${sampleNote}` : ""}`}

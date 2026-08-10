@@ -39,12 +39,13 @@ type Item = {
 };
 
 /**
- * 사이드바에 자기 항목이 있는 대시보드 데모 화면. `지역 소비 분석`은 이 값들을 자기 것으로
+ * 사이드바에 자기 항목이 있는 대시보드 데모 화면. `지역 소비 분석`은 이 값을 자기 것으로
  * 보지 않고 넘겨준다 — 그러지 않으면 목록에서 먼저 나오는 `지역 소비 분석`이 항상 먼저
- * 걸려 아래 두 항목이 켜질 차례가 오지 않는다. 여기 없는 `demo` 값(`report` 등)은 전용 항목이
+ * 걸려 하위 `가맹점 후보`가 켜질 차례가 오지 않는다. 여기 없는 `demo` 값은 전용 항목이
  * 없으므로 `지역 소비 분석`이 그대로 활성이다.
+ * (`data`는 데이터 활용 정보가 `/data`라는 자기 경로를 갖게 되면서 이 목록에서 빠졌다.)
  */
-const DASHBOARD_DEMO_ITEMS = ["merchant", "data"];
+const DASHBOARD_DEMO_ITEMS = ["merchant"];
 
 /** 순서가 아니라 담당자가 찾는 업무 객체로 묶는다. 실제 단계는 카드 안에서만 안내한다. */
 const GROUPS: { title: string; items: Item[] }[] = [
@@ -84,30 +85,52 @@ const GROUPS: { title: string; items: Item[] }[] = [
     ],
   },
   {
-    title: "분석과 전달",
+    title: "분석",
     items: [
       {
+        // 부모 자체가 "전체 지역" 화면이다 — 같은 경로를 가리키는 `전체 지역 현황` 하위를
+        // 따로 두지 않는다. 그러면 한 화면에 메뉴가 두 줄이 되어 "활성은 정확히 하나"가 깨진다.
+        // 전체↔개별 구분은 부제(note)와 하위 `지역 상세 분석`의 대비가 말한다.
         label: "지역 소비 분석",
         icon: "chart",
         href: "/dashboard",
-        note: "지역·업종별 소비 신호 진단",
+        note: "전체 지역 현황·추이 진단",
         match: (p, q) => p === "/dashboard" && !DASHBOARD_DEMO_ITEMS.includes(q.get("demo") ?? ""),
+        children: [
+          {
+            // 별도 화면(모집단이 지역 한 곳) — `추진 경과 리포트 → 추진 기록 입력`과 같은 관계다.
+            // 모바일에서도 감추지 않는다: 보조 앵커가 아니라 그 자체로 목적지인 화면이다.
+            label: "지역 상세 분석",
+            icon: "pin",
+            href: "/dashboard/region",
+            note: "지역별 업종 구성·시간 패턴",
+            match: (p) => p === "/dashboard/region",
+          },
+          {
+            // 별도 경로가 아니라 /dashboard의 `제안 근거` 뷰 안에 있는 한 섹션이다 —
+            // 뷰가 URL 상태라 `view=evidence`까지 지정해야 그 표가 그려진 화면에 닿는다
+            label: "가맹점 후보",
+            icon: "store",
+            href: "/dashboard?view=evidence&demo=merchant#merchant-candidates",
+            note: "후보·기존 가맹점 원본 확인",
+            desktopOnly: true,
+            match: (p, q) => p === "/dashboard" && q.get("demo") === "merchant",
+          },
+        ],
       },
+    ],
+  },
+  {
+    // 출처·기준 시점 확인은 소비 신호를 읽는 "분석"과 업무 목적이 다르다(검증) —
+    // 같은 /dashboard 안에 있어도 담당자가 찾는 업무 객체 기준으로 그룹을 가른다 (GROUPS 원칙)
+    title: "데이터 활용",
+    items: [
       {
-        label: "가맹점 후보",
-        icon: "store",
-        href: "/dashboard?demo=merchant#merchant-candidates",
-        note: "후보·기존 가맹점 원본 확인",
-        desktopOnly: true,
-        match: (p, q) => p === "/dashboard" && q.get("demo") === "merchant",
-      },
-      {
-        label: "데이터 출처",
+        label: "데이터 활용 정보",
         icon: "database",
-        href: "/dashboard?demo=data#data-demo",
-        note: "공개 최신본과 실시간 원천 상태",
-        desktopOnly: true,
-        match: (p, q) => p === "/dashboard" && q.get("demo") === "data",
+        href: "/data",
+        note: "공공데이터 6종·산출 버전·지표 정의",
+        match: (p) => p === "/data",
       },
     ],
   },

@@ -69,6 +69,23 @@ export function datasetVersion(): string {
   return (manifestJson as { dataset_version: string }).dataset_version;
 }
 
+/** 산출물 매니페스트 한 벌 — 파일별 sha256·바이트까지. 데이터 활용 정보 화면이 그대로 표로 낸다. */
+export interface Manifest {
+  dataset_version: string;
+  base_month: string;
+  generated_at: string;
+  files: Record<string, { sha256: string; bytes: number }>;
+}
+
+/**
+ * `datasetVersion()`이 버전 문자열 하나만 쓰는 데 비해, 이쪽은 매니페스트 전체를 준다 —
+ * "이 화면의 숫자가 어느 스냅샷에서 나왔고 그 스냅샷이 위조되지 않았는가"를 확인하는 자리
+ * (`/data`의 산출 버전·무결성 섹션)에서만 쓴다.
+ */
+export function manifest(): Manifest {
+  return manifestJson as Manifest;
+}
+
 /**
  * 셀(지역×표시업종) 가맹점 이용 부하 — 파이프라인 P9 산출물. BE 엔드포인트가 없어 정적 import한다.
  * 동기 함수다: 셀 탐색기는 서버 컴포넌트에서 값을 읽어 클라이언트로 props로 내려보낸다.

@@ -56,7 +56,11 @@ export function SourceChip({
         // `min-h-12`(48px)로 떠 있어 화면 아래 60px를 차지한다(DashboardOverview.tsx). `bottom-3`로 두면
         // 팝오버 하단 약 48px — 하필 k=5 소표본 보호 고지 — 가 그 CTA에 덮이고, CTA가 `<Link>`라 고지를
         // 읽으려 탭하면 카드 상세로 이동해 버린다. 60px + 12px 여백으로 두 요소를 아예 겹치지 않게 띄운다.
-        className="invisible fixed inset-x-3 bottom-[72px] z-30 max-h-[70vh] overflow-y-auto rounded-lg border border-admin-border bg-admin-surface p-3 text-[12px] leading-relaxed text-admin-text-soft opacity-0 shadow-card-hover transition-opacity group-hover:visible group-hover:opacity-100 group-focus-within:visible group-focus-within:opacity-100 sm:absolute sm:inset-x-auto sm:bottom-auto sm:left-0 sm:top-full sm:mt-1 sm:w-64 sm:max-h-none sm:overflow-visible sm:p-2.5 sm:shadow-card"
+        //
+        // z-40인 이유: 허브의 `오늘 상태` 스티키 바가 z-30인데, 임팩트 히어로의 칩 팝오버가 같은
+        // z-30이면 DOM에서 나중에 오는 상태 바가 위에 그려져 팝오버 상단이 바 뒤로 숨는다.
+        // 화면을 덮는 오버레이(투어·지도 팝업, z-50)보다는 아래에 둔다.
+        className="invisible fixed inset-x-3 bottom-[72px] z-40 max-h-[70vh] overflow-y-auto rounded-lg border border-admin-border bg-admin-surface p-3 text-[12px] leading-relaxed text-admin-text-soft opacity-0 shadow-card-hover transition-opacity group-hover:visible group-hover:opacity-100 group-focus-within:visible group-focus-within:opacity-100 sm:absolute sm:inset-x-auto sm:bottom-auto sm:left-0 sm:top-full sm:mt-1 sm:w-64 sm:max-h-none sm:overflow-visible sm:p-2.5 sm:shadow-card"
       >
         <strong className="block text-admin-text">사용 데이터</strong>
         <ul className="mt-1 list-disc space-y-0.5 pl-4">

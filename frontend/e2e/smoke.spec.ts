@@ -37,10 +37,28 @@ const cases: RouteCase[] = [
     },
   },
   {
-    title: "대시보드 (/dashboard)",
+    // 화면 개편(FE_test): 지역 소비 분석이 전체 지역 현황(/dashboard)·지역 상세 분석
+    // (/dashboard/region)·데이터 활용 정보(/data)로 갈라졌다 — 세 화면을 각각 잰다.
+    title: "전체 지역 현황 (/dashboard)",
     path: () => "/dashboard",
     assertCoreElement: async (page) => {
-      await expect(page.getByRole("heading", { name: "지역 소비 분석", exact: true })).toBeVisible();
+      await expect(page.getByRole("heading", { name: "전체 지역 현황", exact: true })).toBeVisible();
+      // 현황 뷰의 첫 조망 — 지역 선택 지도가 떠야 한다
+      await expect(page.getByRole("group", { name: "강원 남부권 지역 선택 지도" })).toBeVisible();
+    },
+  },
+  {
+    title: "지역 상세 분석 (/dashboard/region)",
+    path: () => "/dashboard/region?region=%EC%98%81%EC%9B%94%EA%B5%B0",
+    assertCoreElement: async (page) => {
+      await expect(page.getByRole("heading", { name: "영월군 상세 분석", exact: true })).toBeVisible();
+    },
+  },
+  {
+    title: "데이터 활용 정보 (/data)",
+    path: () => "/data",
+    assertCoreElement: async (page) => {
+      await expect(page.getByRole("heading", { name: "데이터 활용 정보", exact: true })).toBeVisible();
     },
   },
   {

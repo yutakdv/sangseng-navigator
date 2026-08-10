@@ -47,7 +47,10 @@ export function PageHeader({
             </div>
           </div>
         </div>
-        {lede ? <p className="u-lede mt-2.5 max-w-3xl">{lede}</p> : null}
+        {/* 폭 제한을 걸지 않는다 — 페이지 컨테이너(max-w-6xl·5xl)가 이미 행길이를 정한다.
+            여기에 max-w를 한 번 더 두면 오른쪽에 공간이 남는데도 문장이 중간에서 접혀,
+            문장이 끝나서가 아니라 상자가 좁아서 줄이 바뀌는 것처럼 보인다. */}
+        {lede ? <p className="u-lede mt-2.5">{lede}</p> : null}
         {children}
       </div>
       {actions ? <div className="shrink-0">{actions}</div> : null}

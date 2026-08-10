@@ -31,9 +31,12 @@ export function PeriodFilter({
 }) {
   return (
     <div>
+      {/* `w-fit` — 이 바는 프리셋 넷을 담는 컨트롤이지 영역을 나누는 면이 아니다. 폭을 늘려
+          두면 오른쪽에 아무것도 없는 여백이 절반 넘게 남아 좌우가 어긋나 보인다.
+          좁은 화면에서는 `max-w-full`이 걸려 있어 평소처럼 줄바꿈된다. */}
       <nav
         aria-label="리포트 기간 필터"
-        className="flex flex-wrap items-center gap-2 rounded-2xl bg-admin-surface p-2 shadow-card ring-1 ring-inset ring-admin-border"
+        className="flex w-fit max-w-full flex-wrap items-center gap-2 rounded-2xl bg-admin-surface p-2 shadow-card ring-1 ring-inset ring-admin-border"
       >
         <span className="mr-1 inline-flex items-center gap-1.5 px-2 text-xs font-semibold text-admin-text-muted">
           <Icon name="calendar" size={14} />

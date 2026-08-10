@@ -60,7 +60,7 @@ export function Panel({
             {badge}
           </div>
           {desc ? (
-            <p className="mt-1.5 max-w-2xl break-keep text-[13px] leading-[1.65] text-admin-text-muted">
+            <p className="mt-1.5 break-keep text-[13px] leading-[1.65] text-admin-text-muted">
               {desc}
             </p>
           ) : null}

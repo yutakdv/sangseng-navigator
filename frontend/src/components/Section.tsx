@@ -39,8 +39,9 @@ export function Section({
               <h2 className="u-h2">{title}</h2>
               {badge}
             </div>
+            {/* 폭 제한 없음 — 패널이 이미 폭을 정한다 (PageHeader의 lede와 같은 규칙) */}
             {desc ? (
-              <p className="mt-1.5 max-w-3xl break-keep text-[13px] leading-[1.6] text-admin-text-muted">
+              <p className="mt-1.5 break-keep text-[13px] leading-[1.6] text-admin-text-muted">
                 {desc}
               </p>
             ) : null}
