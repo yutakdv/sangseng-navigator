@@ -195,7 +195,10 @@ export function ProgressReportDashboard({
         ) : null}
       </Section>
 
-      <div className="grid gap-4 xl:grid-cols-2">
+      {/* 두 블록의 폭이 다른 이유: 정체 점검은 카드 몇 장을 세로로 쌓는 목록이라 좁아도 되고,
+          단계별 소요는 전이 이름 + 막대 비교라 가로가 길수록 읽힌다. 5:7로 나눈다 —
+          예전 1:1에서는 소요 표가 잘려 가로 스크롤을 해야 보였다. */}
+      <div className="grid gap-4 xl:grid-cols-[minmax(0,5fr)_minmax(0,7fr)]">
         <Section
           id="stale"
           icon="clock"
@@ -203,32 +206,36 @@ export function ProgressReportDashboard({
           desc={`완료되지 않은 카드 중 ${report.stale.threshold_days}일 이상 새 기록이 없는 항목입니다.`}
         >
           {report.stale.items.length ? (
-            <ul className="divide-y divide-admin-border border-y border-admin-border">
+            // 좌측 주의색 레일 + 큰 일수 — "며칠째 멈췄나"가 이 목록의 유일한 정렬 기준이라
+            // 그 숫자를 카드의 머리로 올린다. 예전에는 divide-y 목록의 오른쪽 끝에 떠 있어
+            // 카드 제목과 시선이 두 갈래로 갈렸다.
+            <ul className="flex flex-col gap-2">
               {report.stale.items.map((item) => (
-                <li key={item.card_id} className="flex flex-wrap items-center gap-x-3 gap-y-2 py-3">
-                  <div className="min-w-0 flex-1 basis-64">
-                    <div className="flex flex-wrap items-center gap-2">
-                      <ProgressChip progress={item.progress} />
-                      <span className="text-xs font-semibold tabular-nums text-admin-text-muted">
-                        {item.card_id}
-                      </span>
-                    </div>
-                    <p className="mt-1.5 break-keep text-[13px] font-semibold leading-5 text-admin-text">
-                      {item.title}
-                    </p>
-                    <p className="mt-0.5 text-[11px] text-admin-text-muted">
-                      마지막 기록 {kstDateTime(item.last_recorded_at)}
-                    </p>
-                  </div>
-                  <div className="text-right">
-                    <p className="text-lg font-bold tabular-nums text-state-warn">
+                <li
+                  key={item.card_id}
+                  className="rounded-xl border border-admin-border border-l-[3px] border-l-state-warn bg-admin-surface-sunken px-3.5 py-3"
+                >
+                  <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
+                    <span className="text-[19px] font-bold leading-none tabular-nums text-state-warn">
                       {item.days_since_update}일
-                    </p>
+                    </span>
+                    <span className="text-[11px] font-semibold text-state-warn/80">미갱신</span>
+                    <span className="ml-auto">
+                      <ProgressChip progress={item.progress} />
+                    </span>
+                  </div>
+                  <p className="mt-2 break-keep text-[13px] font-semibold leading-5 text-admin-text">
+                    {item.title}
+                  </p>
+                  <div className="mt-1.5 flex flex-wrap items-baseline gap-x-2 gap-y-1 text-[11px] text-admin-text-muted">
+                    <span className="tabular-nums">{item.card_id}</span>
+                    <span aria-hidden>·</span>
+                    <span>마지막 기록 {kstDateTime(item.last_recorded_at)}</span>
                     <Link
                       href={`/tracking/new?card_id=${encodeURIComponent(item.card_id)}`}
-                      className="text-xs font-semibold text-admin-primary underline-offset-4 hover:underline"
+                      className="ml-auto shrink-0 font-semibold text-admin-primary underline-offset-4 hover:underline"
                     >
-                      경과 기록
+                      경과 기록 →
                     </Link>
                   </div>
                 </li>
@@ -249,41 +256,10 @@ export function ProgressReportDashboard({
         <Section
           icon="layers"
           title="단계별 평균 소요"
-          desc="기간 내 같은 카드의 서로 다른 연속 상태 기록 사이 시간을 계산합니다. 같은 상태의 추가 메모는 중복 단계로 세지 않습니다."
+          desc="기간 내 같은 카드의 서로 다른 연속 상태 기록 사이 시간을 계산합니다. 같은 상태의 추가 메모는 중복 단계로 세지 않으며, 오래 걸린 전이부터 보여 줍니다."
         >
           {report.stage_durations.length ? (
-            <div className="u-scroll-x">
-              <table className="u-table min-w-[560px]">
-                <thead>
-                  <tr>
-                    <th scope="col">상태 전이</th>
-                    <th scope="col" className="text-right">평균</th>
-                    <th scope="col" className="text-right">중앙값</th>
-                    <th scope="col" className="text-right">표본</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {report.stage_durations.map((row) => (
-                    <tr key={`${row.from_progress}-${row.to_progress}`}>
-                      <td>
-                        <div className="flex items-center gap-2 whitespace-nowrap">
-                          <ProgressChip progress={row.from_progress} />
-                          <Icon name="arrowRight" size={13} className="text-admin-text-muted" />
-                          <ProgressChip progress={row.to_progress} />
-                        </div>
-                      </td>
-                      <td className="text-right font-semibold tabular-nums">
-                        {durationLabel(row.average_hours)}
-                      </td>
-                      <td className="text-right tabular-nums text-admin-text-muted">
-                        {durationLabel(row.median_hours)}
-                      </td>
-                      <td className="text-right tabular-nums text-admin-text-muted">{row.sample_size}건</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+            <StageDurations rows={report.stage_durations} />
           ) : (
             <EmptyReport
               title="단계 전이 표본이 없습니다"
@@ -575,6 +551,62 @@ function StageCell({
         <span className={`h-px flex-1 ${last || standalone ? "bg-transparent" : rail}`} />
       </span>
     </li>
+  );
+}
+
+/**
+ * 단계별 평균 소요 — 표가 아니라 **막대 비교 목록**.
+ *
+ * 예전에는 4열 표(상태 전이 / 평균 / 중앙값 / 표본)였는데, 첫 열에 상태 칩 두 개와 화살표가
+ * 들어가 열 하나가 200px를 먹었다. 그 탓에 표 최소 폭이 560px이 되어 옆 블록과 반씩 나눠 쓰는
+ * 자리에서는 늘 잘렸고, 가로 스크롤을 해야 정작 중요한 숫자가 보였다.
+ *
+ * 게다가 이 표가 답해야 할 질문은 "어느 단계가 오래 걸리나"인데, 숫자 세 열을 나란히 읽어
+ * 스스로 비교해야 했다. 막대로 바꾸면 그 비교가 형태로 끝난다 — 가장 긴 전이를 100%로 잡고
+ * 상대 길이만 그린다(절대 척도가 아니므로 축을 그리지 않는다).
+ *
+ * 중앙값·표본은 버리지 않는다: 표본이 두어 건이면 평균이 흔들린다는 사실을 같이 봐야 하므로
+ * 막대 옆 보조 문구로 남긴다. 정렬은 오래 걸린 순 — 그래야 위에서부터 병목이 읽힌다
+ * (원래 순서는 파이프라인 순도 정렬도 아닌 임의 순이었다).
+ */
+function StageDurations({ rows }: { rows: ProgressReport["stage_durations"] }) {
+  const sorted = [...rows].sort((a, b) => (b.average_hours ?? 0) - (a.average_hours ?? 0));
+  const longest = Math.max(...sorted.map((r) => r.average_hours ?? 0), 0);
+
+  return (
+    <ol className="flex flex-col gap-3.5">
+      {sorted.map((row) => {
+        // 평균이 null이면 막대를 그리지 않는다 — 0%짜리 막대는 "0일"이라는 거짓말이 된다
+        const ratio = longest > 0 && row.average_hours !== null ? row.average_hours / longest : null;
+        return (
+          <li key={`${row.from_progress}-${row.to_progress}`}>
+            <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-0.5">
+              <span className="flex min-w-0 items-center gap-1.5 break-keep text-[13px] font-semibold text-admin-text">
+                {row.from_progress}
+                <Icon name="arrowRight" size={12} className="shrink-0 text-admin-text-muted" />
+                {row.to_progress}
+              </span>
+              <span className="text-[15px] font-bold tabular-nums text-admin-text">
+                {durationLabel(row.average_hours)}
+              </span>
+            </div>
+            <div className="mt-1.5 flex items-center gap-2.5">
+              <span className="h-1.5 min-w-0 flex-1 overflow-hidden rounded-full bg-admin-surface-sunken">
+                {ratio === null ? null : (
+                  <span
+                    className="block h-full rounded-full bg-admin-primary"
+                    style={{ width: `${Math.max(ratio * 100, 4)}%` }}
+                  />
+                )}
+              </span>
+              <span className="shrink-0 whitespace-nowrap text-[11px] tabular-nums text-admin-text-muted">
+                중앙값 {durationLabel(row.median_hours)} · 표본 {row.sample_size}건
+              </span>
+            </div>
+          </li>
+        );
+      })}
+    </ol>
   );
 }
 
