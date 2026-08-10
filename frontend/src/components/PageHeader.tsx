@@ -12,6 +12,7 @@ export function PageHeader({
   eyebrow,
   title,
   lede,
+  wideLede = false,
   badge,
   actions,
   children,
@@ -21,6 +22,12 @@ export function PageHeader({
   eyebrow?: string;
   title: string;
   lede?: ReactNode;
+  /**
+   * 설명의 최대 폭 제한(max-w-3xl)을 푼다. 기본 제한은 긴 문단의 행길이를 읽기 좋게 묶는
+   * 장치인데, 한 문장이 제한 폭을 조금 넘어 공간이 남는데도 접힐 때만 켠다
+   * (Section의 `wideDesc`와 같은 규칙).
+   */
+  wideLede?: boolean;
   /** 제목 옆 고지 배지 (`근사 지표` 등) */
   badge?: ReactNode;
   /** 오른쪽 액션 (카드 생성 버튼 등) */
@@ -47,7 +54,9 @@ export function PageHeader({
             </div>
           </div>
         </div>
-        {lede ? <p className="u-lede mt-2.5 max-w-3xl">{lede}</p> : null}
+        {lede ? (
+          <p className={`u-lede mt-2.5 ${wideLede ? "" : "max-w-3xl"}`}>{lede}</p>
+        ) : null}
         {children}
       </div>
       {actions ? <div className="shrink-0">{actions}</div> : null}

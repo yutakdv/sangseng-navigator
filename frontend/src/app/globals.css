@@ -63,8 +63,11 @@
   }
 
   /** 화면 제목 아래 설명 문단 */
+  /* `text-pretty`: 마지막 줄에 낱말 하나만 떨어지는 고아 줄을 막는다 — 실제로 추진 경과
+     리포트에서 "…예상값은 실제 성과에 섞지 / 않습니다."로 끊겼다. 미지원 브라우저는
+     이 선언을 무시하고 평소대로 줄바꿈하므로 안전한 점진적 향상이다. */
   .u-lede {
-    @apply break-keep text-[15px] leading-7 text-admin-text-soft;
+    @apply text-pretty break-keep text-[15px] leading-7 text-admin-text-soft;
   }
 
   /** 패널 제목 */
