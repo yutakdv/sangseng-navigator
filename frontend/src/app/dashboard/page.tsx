@@ -103,8 +103,14 @@ export default async function DashboardPage({
   // 지역 드릴다운 파생값 — 지역을 선택했을 때만 계산·렌더한다 (원장은 서버에서만 읽는다)
   const ledgerRows = usageLedger.usage ?? [];
   const ledgerMonths = usageLedger.months ?? [];
-  const regionDonut = selectedRegion ? regionCategoryShare(ledgerRows, selectedRegion) : [];
-  const regionTrend = selectedRegion ? regionMonthlyTrend(ledgerRows, ledgerMonths, selectedRegion) : [];
+  const regionDonut = selectedRegion
+    ? regionCategoryShare(ledgerRows, selectedRegion)
+    : { shares: [], suppressed: [] };
+  // 지역 월 합계는 억제 영향이 없는 monthly_by_region을 1순위로 읽는다 — 원장 셀만 더하면
+  // 비공개 셀만큼 비어 실제보다 낮게 그려진다 (regionMonthlyTrend 주석 참고)
+  const regionTrend = selectedRegion
+    ? regionMonthlyTrend(ledgerRows, ledgerMonths, selectedRegion, d.monthly_by_region ?? [])
+    : { points: [], basis: "ledger" as const };
   const regionShifts = selectedRegion ? topCategoryShifts(ledgerRows, ledgerMonths, selectedRegion) : [];
   // 라벨과 계산이 같은 창 정의를 쓰도록 regionAnalysis가 한 곳에서 만든다 (6개월 미만이면 null)
   const shiftWindow = shiftWindowLabel(ledgerMonths);
@@ -311,8 +317,8 @@ export default async function DashboardPage({
                 title={`${selectedRegion} 업종 구성`}
                 desc="전 기간 누적 사용 건수를 표시 6분류로 집계했다."
               >
-                {regionDonut.length ? (
-                  <CategoryDonut data={regionDonut} height={240} />
+                {regionDonut.shares.length ? (
+                  <CategoryDonut data={regionDonut.shares} height={240} />
                 ) : (
                   <EmptyChart />
                 )}
@@ -322,8 +328,8 @@ export default async function DashboardPage({
                 title={`${selectedRegion} 월별 사용 추이`}
                 desc="월별 하이원포인트 사용 건수 합계."
               >
-                {regionTrend.some((p) => p.value > 0) ? (
-                  <LineTrend data={regionTrend} unit="건" />
+                {regionTrend.points.some((p) => p.value > 0) ? (
+                  <LineTrend data={regionTrend.points} unit="건" />
                 ) : (
                   <EmptyChart />
                 )}
@@ -348,26 +354,36 @@ export default async function DashboardPage({
                         </tr>
                       </thead>
                       <tbody>
-                        {regionShifts.map((s) => (
-                          <tr key={s.category}>
-                            <td className="font-medium">{s.category}</td>
-                            <td className="text-right tabular-nums">{num(s.count)}건</td>
-                            <td className="text-right tabular-nums text-admin-text-muted">
-                              {ratioPct(s.share)}
-                            </td>
-                            <td className="text-right tabular-nums text-admin-text-muted">
-                              {num(s.recent)}건
-                            </td>
-                            <td className="text-right font-semibold tabular-nums">
-                              {s.changePct === null ? (
-                                <span className="font-normal text-admin-text-muted">비교 불가</span>
-                              ) : (
-                                // 0자리 반올림이면 ±0.x%가 "▲0%"로 찍혀 화살표와 크기가 모순된다
-                                signed(s.changePct, "%", 1)
-                              )}
-                            </td>
-                          </tr>
-                        ))}
+                        {regionShifts.map((s) =>
+                          // 억제 업종은 행을 지우지 않는다 — 사라지면 "소비가 없는 업종"으로 읽힌다
+                          s.suppressed ? (
+                            <tr key={s.category}>
+                              <td className="font-medium">{s.category}</td>
+                              <td colSpan={4} className="text-right text-admin-text-muted">
+                                표본 보호로 비공개
+                              </td>
+                            </tr>
+                          ) : (
+                            <tr key={s.category}>
+                              <td className="font-medium">{s.category}</td>
+                              <td className="text-right tabular-nums">{num(s.count)}건</td>
+                              <td className="text-right tabular-nums text-admin-text-muted">
+                                {ratioPct(s.share)}
+                              </td>
+                              <td className="text-right tabular-nums text-admin-text-muted">
+                                {num(s.recent)}건
+                              </td>
+                              <td className="text-right font-semibold tabular-nums">
+                                {s.changePct === null ? (
+                                  <span className="font-normal text-admin-text-muted">비교 불가</span>
+                                ) : (
+                                  // 0자리 반올림이면 ±0.x%가 "▲0%"로 찍혀 화살표와 크기가 모순된다
+                                  signed(s.changePct, "%", 1)
+                                )}
+                              </td>
+                            </tr>
+                          ),
+                        )}
                       </tbody>
                     </table>
                   </div>

@@ -66,8 +66,14 @@ export interface Dashboard {
   };
 }
 
-/** 지역×업종×월 사용 건수 원장 행. 정선군 컬럼은 고한·사북 제외 잔여분, 삼척시는 도계읍 한정 (region_note) */
-export type UsageMonthlyRow = { month: string; category: string } & Record<Region, number>;
+/**
+ * 지역×업종×월 사용 건수 원장 행. 정선군 컬럼은 고한·사북 제외 잔여분, 삼척시는 도계읍 한정 (region_note).
+ *
+ * 값이 `null`이면 소표본 억제 셀이다 — **0이 아니라 "모르는 값"이다.** 0으로 치환해 합산하면
+ * 억제된 지역의 소비가 실제보다 낮게 그려진다(실측: 2025-12 영월군 1,552건 → 1,223건).
+ * 집계는 lib/regionAnalysis.ts를 통해서만 하고, 지역 월 합계는 dashboard의 monthly_by_region을 쓴다.
+ */
+export type UsageMonthlyRow = { month: string; category: string } & Record<Region, number | null>;
 
 /**
  * 파이프라인 정적 산출물 `usage_monthly.json` — BE 엔드포인트가 없는 FE 전용 진단 데이터다.

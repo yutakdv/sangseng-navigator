@@ -1,6 +1,6 @@
 import { CATEGORIES } from "@/lib/constants";
 import { monthLabel } from "@/lib/format";
-import type { DisplayCategory, Region, UsageDaily, UsageMonthlyRow } from "@/types";
+import type { Dashboard, DisplayCategory, Region, UsageDaily, UsageMonthlyRow } from "@/types";
 
 /**
  * 지역 드릴다운 파생 계산 — 지역×업종×월 원장(usage_monthly)을 화면용으로 집계하는 순수 함수 모음.
@@ -40,53 +40,112 @@ export const rollupCategory = (raw: string): DisplayCategory =>
 export const USAGE_REGION_FOOTNOTE =
   "정선군은 고한읍·사북읍을 제외한 잔여 지역 기준이며, 삼척시는 도계읍(하이원포인트 지역가맹 대상지역) 기준이다.";
 
-const regionValue = (row: UsageMonthlyRow, region: Region): number => {
+/**
+ * 원장 한 칸의 값. **null은 0이 아니라 "비공개(모르는 값)"다** — 파이프라인 P10이 가맹점 5곳
+ * 미만인 (지역×업종) 셀의 건수를 비운다. 예전에는 이 자리에서 null을 0으로 치환했는데, 그러면
+ * 억제된 지역의 소비가 화면에서만 낮아진다(실측: 2025-12 영월군 실제 1,552건 → 화면 1,223건, -21%).
+ * 백엔드 시뮬레이션도 같은 이유로 억제 셀을 0으로 두지 않고 명시적으로 거부한다.
+ */
+const regionValue = (row: UsageMonthlyRow, region: Region): number | null => {
   const v = row[region];
-  return typeof v === "number" && Number.isFinite(v) ? v : 0;
+  return typeof v === "number" && Number.isFinite(v) ? v : null;
 };
 
-/** 선택 지역의 전 기간 누적 사용 건수를 표시 6분류로 집계 — 도넛(CategoryDonut) 입력 형식 */
+export interface RegionCategoryShare {
+  /** 값이 공개된 업종만 — 도넛(CategoryDonut) 입력 형식 */
+  shares: { category: DisplayCategory; count: number; share: number }[];
+  /** 소표본 억제 셀이 하나라도 섞인 업종. 부분 합계는 거짓 저값이라 도넛에서 빼고 문장으로 밝힌다 */
+  suppressed: DisplayCategory[];
+}
+
+/** 선택 지역의 전 기간 누적 사용 건수를 표시 6분류로 집계 */
 export function regionCategoryShare(
   usage: UsageMonthlyRow[],
   region: Region,
-): { category: DisplayCategory; count: number; share: number }[] {
+): RegionCategoryShare {
   const totals = new Map<DisplayCategory, number>(CATEGORIES.map((c) => [c, 0]));
+  const hidden = new Set<DisplayCategory>();
   for (const row of usage) {
     const display = rollupCategory(row.category);
-    totals.set(display, (totals.get(display) ?? 0) + regionValue(row, region));
+    const value = regionValue(row, region);
+    // 한 달이라도 비공개면 그 업종의 누적은 이미 실제보다 작다 — 부분 합계를 그리지 않는다
+    if (value === null) hidden.add(display);
+    else totals.set(display, (totals.get(display) ?? 0) + value);
   }
-  const total = [...totals.values()].reduce((a, b) => a + b, 0);
-  // 항목 순서는 CATEGORIES 고정(색 고정 원칙, 13 §5) — 0건 항목만 제외한다
-  return CATEGORIES.map((category) => ({
-    category,
-    count: totals.get(category) ?? 0,
-    share: total ? (totals.get(category) ?? 0) / total : 0,
-  })).filter((d) => d.count > 0);
+  const open = CATEGORIES.filter((c) => !hidden.has(c));
+  const total = open.reduce((a, c) => a + (totals.get(c) ?? 0), 0);
+  // 항목 순서는 CATEGORIES 고정(색 고정 원칙, 13 §5) — 0건 항목과 비공개 업종을 뺀다
+  return {
+    shares: open
+      .map((category) => ({
+        category,
+        count: totals.get(category) ?? 0,
+        share: total ? (totals.get(category) ?? 0) / total : 0,
+      }))
+      .filter((d) => d.count > 0),
+    suppressed: CATEGORIES.filter((c) => hidden.has(c)),
+  };
 }
 
-/** 선택 지역의 월별 사용 건수 합계 — 추이 라인(LineTrend) 입력 형식 */
+export interface RegionTrend {
+  points: { label: string; value: number }[];
+  /**
+   * 값의 출처. `dashboard`면 억제 전 원값 기준 지역 합계(영향받는 지역만 100단위 반올림 발행값),
+   * `ledger`면 원장 셀 합산(비공개 셀은 빠져 있어 억제 지역에서는 실제보다 낮다).
+   */
+  basis: "dashboard" | "ledger";
+}
+
+/**
+ * 선택 지역의 월별 사용 건수 합계 — 추이 라인(LineTrend) 입력 형식.
+ *
+ * 원장 셀을 더하면 비공개 셀만큼 합계가 비는데, dashboard의 monthly_by_region은 **억제 전 원값**을
+ * 지역 단위로 싣는다(영향받는 지역만 100단위 반올림). 그래서 그쪽을 1순위로 읽는다 —
+ * 백엔드 시뮬레이션이 기준월 지역 분포를 고를 때 내린 것과 같은 판단이다.
+ * 기준 월이 하나라도 비면 원장 합산으로 떨어지고, 그때는 화면이 낮게 잡힌 이유를 밝힌다.
+ */
 export function regionMonthlyTrend(
   usage: UsageMonthlyRow[],
   months: string[],
   region: Region,
-): { label: string; value: number }[] {
+  monthlyByRegion: Dashboard["monthly_by_region"] = [],
+): RegionTrend {
+  const published = new Map<string, number>();
+  for (const row of monthlyByRegion) {
+    const v = row[region];
+    if (typeof v === "number" && Number.isFinite(v)) published.set(String(row.month), v);
+  }
+  if (months.length > 0 && months.every((m) => published.has(m))) {
+    return {
+      points: months.map((m) => ({ label: monthLabel(m), value: published.get(m) as number })),
+      basis: "dashboard",
+    };
+  }
   const byMonth = new Map<string, number>(months.map((m) => [m, 0]));
   for (const row of usage) {
     if (!byMonth.has(row.month)) continue;
-    byMonth.set(row.month, (byMonth.get(row.month) ?? 0) + regionValue(row, region));
+    const value = regionValue(row, region);
+    if (value === null) continue;
+    byMonth.set(row.month, (byMonth.get(row.month) ?? 0) + value);
   }
-  return months.map((m) => ({ label: monthLabel(m), value: byMonth.get(m) ?? 0 }));
+  return {
+    points: months.map((m) => ({ label: monthLabel(m), value: byMonth.get(m) ?? 0 })),
+    basis: "ledger",
+  };
 }
 
 export interface CategoryShift {
   /** 원 업종 18종 표기 그대로 — 세부 업종을 봐야 확충 대상 판단에 쓸 수 있다 */
   category: string;
-  count: number;
-  share: number;
-  recent: number;
-  previous: number;
+  /** 소표본 억제 업종이면 null — 화면은 숫자 대신 "표본 보호로 비공개"를 찍는다 */
+  count: number | null;
+  share: number | null;
+  recent: number | null;
+  previous: number | null;
   /** 최근 3개월 합의 직전 3개월 대비 증감률(%). 비교 창이 안 만들어지면 null */
   changePct: number | null;
+  /** 이 지역에서 값이 비공개인 업종인지 */
+  suppressed: boolean;
 }
 
 /**
@@ -101,7 +160,13 @@ export function shiftWindowLabel(months: string[]): string | null {
   return `${monthLabel(recent[0])}~${monthLabel(recent[2])} 합을 ${monthLabel(previous[0])}~${monthLabel(previous[2])} 합과 비교`;
 }
 
-/** 선택 지역의 누적 상위 업종(원 18종)과 최근 3개월 증감 — 상세 표 입력 형식 */
+/**
+ * 선택 지역의 누적 상위 업종(원 18종)과 최근 3개월 증감 — 상세 표 입력 형식.
+ *
+ * 비공개(억제) 업종은 목록에서 조용히 빠지지 않는다: 0건으로 뭉쳐 걸러내면 "그 지역에 그 업종
+ * 소비가 없다"로 읽히기 때문이다. 상위 `limit`개 뒤에 **행을 남기고** 값 자리를 비워 돌려주며,
+ * 화면이 "표본 보호로 비공개"를 찍는다. 비중(share)의 분모는 값이 공개된 업종의 합이다.
+ */
 export function topCategoryShifts(
   usage: UsageMonthlyRow[],
   months: string[],
@@ -112,18 +177,23 @@ export function topCategoryShifts(
   const comparable = months.length >= 6;
   const recentMonths = new Set(months.slice(-3));
   const previousMonths = new Set(months.slice(-6, -3));
-  const acc = new Map<string, { count: number; recent: number; previous: number }>();
+  const acc = new Map<string, { count: number; recent: number; previous: number; hidden: boolean }>();
   for (const row of usage) {
     const value = regionValue(row, region);
-    const entry = acc.get(row.category) ?? { count: 0, recent: 0, previous: 0 };
-    entry.count += value;
-    if (recentMonths.has(row.month)) entry.recent += value;
-    if (previousMonths.has(row.month)) entry.previous += value;
+    const entry = acc.get(row.category) ?? { count: 0, recent: 0, previous: 0, hidden: false };
+    if (value === null) {
+      entry.hidden = true;
+    } else {
+      entry.count += value;
+      if (recentMonths.has(row.month)) entry.recent += value;
+      if (previousMonths.has(row.month)) entry.previous += value;
+    }
     acc.set(row.category, entry);
   }
-  const total = [...acc.values()].reduce((a, b) => a + b.count, 0);
-  return [...acc.entries()]
-    .filter(([, v]) => v.count > 0)
+  const entries = [...acc.entries()];
+  const total = entries.reduce((a, [, v]) => a + (v.hidden ? 0 : v.count), 0);
+  const open = entries
+    .filter(([, v]) => !v.hidden && v.count > 0)
     .sort((a, b) => b[1].count - a[1].count)
     .slice(0, limit)
     .map(([category, v]) => ({
@@ -133,7 +203,21 @@ export function topCategoryShifts(
       recent: v.recent,
       previous: v.previous,
       changePct: comparable && v.previous > 0 ? ((v.recent - v.previous) / v.previous) * 100 : null,
+      suppressed: false,
     }));
+  // 원장에 나온 순서를 유지한다 — 값이 없어 정렬할 기준 자체가 없다
+  const hidden = entries
+    .filter(([, v]) => v.hidden)
+    .map(([category]) => ({
+      category,
+      count: null,
+      share: null,
+      recent: null,
+      previous: null,
+      changePct: null,
+      suppressed: true,
+    }));
+  return [...open, ...hidden];
 }
 
 /* ── 일·요일 축 (usage_daily, 05 §6 — 피드백 ⑦) ─────────────────────────── */
