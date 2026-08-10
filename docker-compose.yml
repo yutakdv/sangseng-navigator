@@ -54,7 +54,7 @@ services:
       AWS_DEFAULT_REGION: ap-northeast-2
     volumes:
       - ./backend/app:/app/app                    # 코드 핫리로드
-      - ./data/processed:/app/app/data:ro         # Lambda 번들과 동일 경로에 정적 JSON
+      - ./data/processed:/app/app/data:ro         # ECS 이미지와 동일 경로(/app/app/data)
     depends_on: [dynamodb]
     command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
 
