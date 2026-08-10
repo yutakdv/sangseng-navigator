@@ -186,7 +186,7 @@ riskSignal: (): Promise<RiskSignal[]> => get("/api/risk-signal", () => riskSigna
 
 - [ ] `frontend/.env.local`에 `NEXT_PUBLIC_API_BASE` 설정 → 전 화면 실 API로 동작 확인
 - [ ] 로딩/에러 상태 최소 처리 (스피너/스켈레톤 + "데이터를 불러오지 못했습니다" + 재시도) —
-      **Lambda 콜드스타트 1~3초를 심사위원이 "고장"으로 오인하지 않게 하는 장치** (12 문서 §5)
+      **느린 응답을 심사위원이 "고장"으로 오인하지 않게 하는 장치** (12 문서 §5)
 - [ ] 발표 화면 폴리시: 1920×1080 빔프로젝터 기준 폰트·대비 확인, 데모 순서대로 네비게이션 동선 최적화
 - [ ] 탭·공유 메타: 루트 `layout.tsx` metadata에 title "상생 나침반"·description(12 문서 §3 한 줄
       소개 재사용)·OG 이미지(대표 스크린샷 재사용) + favicon 교체 — 무인 심사에서 기본

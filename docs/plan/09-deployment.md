@@ -1,300 +1,341 @@
-# 09. 배포 — FE: Vercel / BE: AWS (Lambda + API Gateway + DynamoDB)
+# 09. 배포 — FE: Vercel / BE: AWS ECS Fargate (내부 ALB + API Gateway + DynamoDB)
 
-> 구성: 프론트는 **Vercel**(git push 자동 배포 + PR 프리뷰), 백엔드는 **AWS SAM**으로
-> Lambda + HTTP API + DynamoDB. FE는 `NEXT_PUBLIC_API_BASE`로 API Gateway URL을 호출한다.
-> 리전은 `ap-northeast-2` 고정.
+> **2026-08-11 — SAM(Lambda + Mangum) 구성에서 ECS Fargate 로 전면 이전했다.**
+> 이전 구성에 대한 서술은 `docs/audit/`·`docs/review/` 에 작성 시점의 기록으로 남아 있으며
+> 그 문서들은 사실 기록이므로 수정하지 않는다. **현재 배포 정본은 이 문서다.**
+> 결정 근거·기각안·비용 산출은 [설계 스펙](../superpowers/specs/2026-08-10-ecs-infra-design.md)에 있다.
+
+이전한 이유는 하나다 — **배포 중 무중단**. Lambda 구성은 배포가 원자적이지 않아 시연 중 갱신이 위험했고,
+콜드스타트 1~3초가 첫인상을 깎았다. 대가는 상시 가동 비용(월 $30 수준)이다.
 
 ```
-사용자 ─▶ Vercel (Next.js, xxx.vercel.app)
-              │ fetch (NEXT_PUBLIC_API_BASE)
-              ▼
-        API Gateway(HTTP API) ─▶ Lambda(FastAPI+Mangum) ─▶ DynamoDB / LLM API
+브라우저(한국) ──https──▶ Vercel Function (icn1 = 서울)
+                              │  서버사이드 fetch, Authorization: Bearer
+                              ▼  https (AWS 관리 인증서, 무료)
+                   API Gateway HTTP API  ($default 스테이지)
+                              │  VPC Link (무과금, VPC 내부)
+    ┌─────────────────────────┼──────────────────────────────── VPC 10.0.0.0/16
+    │  private-a / private-c  ▼   (라우트: local 만 — NAT 없음, 비용 $0)
+    │        VPC Link ENI ──▶ 내부 ALB (scheme: internal)
+    │                              │  대상그룹 target-type: ip
+    │  public-a / public-c        ▼   (라우트: local + 0.0.0.0/0 → IGW)
+    │        ECS Fargate ARM64 Spot ×2  (assignPublicIp: ENABLED)
+    │              │  SG 인바운드: ALB SG 출처 8000 only
+    │              ├── DynamoDB ◀── Gateway Endpoint (무과금, 인터넷 미경유)
+    │              └── OpenAI / ECR ──▶ IGW 직행 (NAT 불필요)
+    └────────────────────────────────────────────────────────────
 ```
 
-## 1. 백엔드 — SAM
+---
 
-### `infra/template.yaml`
+## 1. 백엔드 — ECS Fargate
 
-```yaml
-AWSTemplateFormatVersion: '2010-09-09'
-Transform: AWS::Serverless-2016-10-31
-Description: sangseng-navigator backend
+### 스택 2개
 
-Parameters:
-  LlmProvider:      { Type: String, Default: openai }
-  OpenAiApiKey:     { Type: String, Default: '', NoEcho: true }
-  AnthropicApiKey:  { Type: String, Default: '', NoEcho: true }
-  # 무인증 공개 URL의 generate 엔드포인트가 호출마다 LLM을 부르므로 동시성 상한을 기본값으로 건다 (§5.5)
-  ReservedConcurrency: { Type: Number, Default: 5 }   # -1이면 설정 자체를 생략(계정 동시성 한도가 낮아 배포 실패할 때)
-  AllowedOrigins:      { Type: String, Default: 'https://configure-me.invalid' }
-  DemoReadOnly:        { Type: String, Default: 'true', AllowedValues: ['true', 'false'] }
+| 스택 | 담는 것 | 갱신 주기 |
+|---|---|---|
+| `sangseng-foundation` | VPC·IGW·서브넷 4개·라우트 테이블 2개·DynamoDB Gateway Endpoint·ECR·DynamoDB 테이블 2개·IAM 역할 2개·로그 그룹 | 거의 안 바뀜 (수동 배포) |
+| `sangseng-service` | 보안그룹 3개·내부 ALB·대상그룹·리스너·ECS 클러스터·태스크 정의·서비스·HTTP API·VPC Link·Integration·Route·Stage | 배포마다 (CI 자동) |
 
-Conditions:
-  HasReservedConcurrency: !Not [!Equals [!Ref ReservedConcurrency, '-1']]
+**분리 이유.** ① 코드만 바뀌면 service 스택만 갱신하면 되어 배포가 5분에 끝난다. ② ECR 리포지토리가
+먼저 있어야 첫 이미지를 밀 수 있는데 ECS 서비스는 그 이미지가 있어야 뜬다 — 이 순환이 스택 경계로 풀린다.
+③ DynamoDB 테이블에 `DeletionPolicy: Retain`을 걸어 service 스택을 몇 번 갈아엎어도 승인된 카드가 남는다.
 
-Globals:
-  Function:
-    Runtime: python3.12
-    Timeout: 30          # LLM 호출 여유
-    MemorySize: 512
+**스택 이름은 반드시 `sangseng-` 으로 시작한다.** 배포 사용자 인라인 정책이 역할 생성을
+`arn:aws:iam::325899476013:role/sangseng-*` 로 제한하고, CFN 자동 생성 역할 이름이
+`<스택명>-<논리ID>-<난수>` 형태이기 때문이다.
 
-Resources:
-  HttpApi:
-    Type: AWS::Serverless::HttpApi
-    Properties:
-      CorsConfiguration:
-        # 게이트웨이와 앱이 같은 명시적 오리진 목록을 사용한다.
-        AllowOrigins: !Split [',', !Ref AllowedOrigins]
-        AllowMethods: [GET, POST, OPTIONS]
-        AllowHeaders: [Authorization, Content-Type, X-Request-ID]
+### AZ 고정
 
-  ApiFunction:
-    Type: AWS::Serverless::Function
-    Properties:
-      CodeUri: ../backend
-      Handler: app.main.handler
-      ReservedConcurrentExecutions: !If [HasReservedConcurrency, !Ref ReservedConcurrency, !Ref 'AWS::NoValue']
-      Environment:
-        Variables:
-          CARDS_TABLE: !Ref CardsTable
-          LLM_PROVIDER: !Ref LlmProvider
-          OPENAI_API_KEY: !Ref OpenAiApiKey
-          ANTHROPIC_API_KEY: !Ref AnthropicApiKey
-          ALLOWED_ORIGINS: !Ref AllowedOrigins
-          DEMO_READ_ONLY: !Ref DemoReadOnly
-      Policies:
-        - DynamoDBCrudPolicy: { TableName: !Ref CardsTable }
-      Events:
-        Proxy:
-          Type: HttpApi
-          Properties: { ApiId: !Ref HttpApi, Path: '/{proxy+}', Method: ANY }
+`ap-northeast-2a` / `ap-northeast-2c` 로 **명시 지정**한다. `!GetAZs` 에 의존하지 않는다 —
+**`ap-northeast-2d`(apne2-az4)는 VPC Link V2 를 지원하지 않고**, VPC Link 는 immutable 이라
+잘못 만들면 삭제 후 재생성만이 복구 경로다.
 
-  CardsTable:
-    Type: AWS::Serverless::SimpleTable        # PAY_PER_REQUEST(온디맨드) 기본
-    Properties:
-      PrimaryKey: { Name: id, Type: String }
+### NAT 가 없는 이유
 
-  ApiLogGroup:
-    Type: AWS::Logs::LogGroup
-    Properties:
-      LogGroupName: !Sub /aws/lambda/${ApiFunction}
-      RetentionInDays: 7                      # 로그 비용 방지
+인터넷 egress 가 필요한 것은 ECS 태스크뿐이다(OpenAI 호출, ECR pull). 태스크를 public 서브넷에 두고
+public IP 를 붙이면 IGW 로 직접 나간다. 내부 ALB 와 VPC Link ENI 는 VPC 안에서만 통신하므로
+**NAT 없는 private 서브넷은 라우트 테이블에 local 만 두면 되어 비용이 0** 이다.
+서울 NAT Gateway 는 월 $43, 퍼블릭 IPv4 2개는 월 $7.3 이라 이 규모에서 public 직결이 5.9배 싸다.
 
-Outputs:
-  ApiUrl:     { Value: !Sub 'https://${HttpApi}.execute-api.${AWS::Region}.amazonaws.com' }
-  CardsTable: { Value: !Ref CardsTable }
-```
+대가는 인바운드 차단이 전적으로 보안그룹에 달린다는 것이다. 태스크 SG 는 **ALB SG 를 출처로 하는
+8000 포트만** 허용하고 `0.0.0.0/0` 인바운드는 어떤 포트에도 열지 않는다.
 
-### `infra/deploy-backend.sh`
+### 배포 절차
 
 ```bash
-#!/usr/bin/env bash
-set -euo pipefail
-cd "$(dirname "$0")"
-source ../.env   # LLM 키 로드
-
-# processed 데이터를 Lambda 번들에 포함
-rm -rf ../backend/app/data && cp -r ../data/processed ../backend/app/data
-
-# 빈 값 파라미터는 제외 — SAM이 "Key=" 형식을 거부함 (2026-08-03 실측, template Default: '' 활용)
-PARAMS=("LlmProvider=${LLM_PROVIDER:-openai}")
-[ -n "${OPENAI_API_KEY:-}" ] && PARAMS+=("OpenAiApiKey=${OPENAI_API_KEY}")
-[ -n "${ANTHROPIC_API_KEY:-}" ] && PARAMS+=("AnthropicApiKey=${ANTHROPIC_API_KEY}")
-# 비우면 fail-safe Default가 적용된다
-# (AllowedOrigins='https://configure-me.invalid', DemoReadOnly='true', ReservedConcurrency=5)
-[ -n "${MUTATION_API_TOKEN:-}" ] && PARAMS+=("MutationApiToken=${MUTATION_API_TOKEN}")
-[ -n "${ALLOWED_ORIGINS:-}" ] && PARAMS+=("AllowedOrigins=${ALLOWED_ORIGINS}")
-[ -n "${DEMO_READ_ONLY:-}" ] && PARAMS+=("DemoReadOnly=${DEMO_READ_ONLY}")
-[ -n "${RESERVED_CONCURRENCY:-}" ] && PARAMS+=("ReservedConcurrency=${RESERVED_CONCURRENCY}")
-
-# 위 두 줄은 값이 비면 파라미터를 넘기지 않아 template Default 가 조용히 적용된다 —
-# 그 결과가 변경 API 403(읽기 전용)·503(토큰 미설정)이라 배포 전에 잡는다
-if [ -z "${DEMO_READ_ONLY:-}" ]; then
-  echo "⚠ DEMO_READ_ONLY 미설정 → template Default 'true' 적용. 배포 후 변경 API가 전부 403입니다."
-elif [ "${DEMO_READ_ONLY}" != "true" ] && [ -z "${MUTATION_API_TOKEN:-}" ]; then
-  echo "✗ 읽기 전용을 풀었는데 MUTATION_API_TOKEN 이 비어 변경 API가 503이 됩니다 — 배포 중단" >&2
-  exit 1
-fi
-
-sam build -t template.yaml
-sam deploy \
-  --stack-name sangseng-backend \
-  --resolve-s3 --capabilities CAPABILITY_IAM \
-  --region ap-northeast-2 \
-  --parameter-overrides "${PARAMS[@]}" \
-  --no-confirm-changeset
-
-aws cloudformation describe-stacks --stack-name sangseng-backend \
-  --query 'Stacks[0].Outputs' --output table
+./infra/scripts/deploy.sh
 ```
 
-- 스크립트가 `.env`에서 읽는 파라미터: `LLM_PROVIDER`·`OPENAI_API_KEY`·`ANTHROPIC_API_KEY`에 더해
-  **`MUTATION_API_TOKEN`·`ALLOWED_ORIGINS`·`DEMO_READ_ONLY`·`RESERVED_CONCURRENCY`**. 오리진과
-  read-only를 비워 두면 각각 차단용 오리진과 `true`가 적용되어 공개 mutation이 열리지 않는다 (§5·§5.5)
-- **⚠ 심사용 배포는 `.env`에 `DEMO_READ_ONLY=false` + `MUTATION_API_TOKEN=<난수>`를 반드시 함께 넣는다.**
-  기본값(비워 둠)은 "아무도 못 바꾸는 안전한 배포"라서, 그대로 배포하면 데모 대본의 카드 생성·승인·
-  적격성·추진 상태 변경이 전부 403이 된다. 둘 중 하나만 채우면 403 대신 503이 날 뿐 결과는 같다 —
-  두 값은 한 쌍이며, 아래 §2의 Vercel `NEXT_PUBLIC_DEMO_READ_ONLY=false`·`API_MUTATION_TOKEN`과도
-  짝이 맞아야 한다(FE만 열리고 BE가 잠기면 버튼이 눌린 뒤 403 문구가 뜬다).
-  스크립트가 두 조합을 배포 전에 검사해 경고하거나 중단한다
-- `sam deploy`에는 `-t`를 주지 않는다 — `sam build` 산출물(`.aws-sam/build/template.yaml`)이 배포 대상이다
-- [ ] 최초 배포 후 Outputs의 `CardsTable` 값을 `.env`의 `CARDS_TABLE`에 반영 (로컬 BE도 같은 테이블 사용)
-- [ ] `python backend/seed_demo.py` 실행 — 데모 사례(추진중 카드 등) 시드
-- [ ] **검증:** `curl $ApiUrl/api/health` → `{"ok":true,"data_loaded":true,"datasets":{...}}`
-      (`datasets` 5종 전부 `true` — 번들 복사 누락 조기 발견, 05 §5),
-      `curl $ApiUrl/api/dashboard | jq .conversion.headline_rate`
+`preflight → put-secrets → foundation → build&push → service → smoke-test` 순으로 돈다.
+스크립트별 책임은 [infra/README.md](../../infra/README.md).
+
+| | 소요 | 병목 |
+|---|---|---|
+| foundation 최초 | 3~5분 | |
+| 이미지 빌드 + 푸시 (최초) | 2~4분 | |
+| service 최초 | 12~18분 | **VPC Link 생성 최대 10분** |
+| **첫 배포 합계** | **20~30분** | |
+| 이후 재배포 | **4~6분** | |
+| 철거 | 10~15분 | VPC Link 삭제 + ENI 정리 |
+
+### 컨테이너 이미지
+
+`backend/Dockerfile` — `python:3.12-slim`, ARM64, 비루트(uid 10001), uvicorn 단일 워커.
+
+- `--workers 1` 고정: 0.5GB 제약. OpenAI SDK 로드 후 RSS 116MB(실측)라 2워커는 OOM 위험이다.
+  확장은 `DESIRED_COUNT` 로 한다
+- `--timeout-graceful-shutdown 30` / `stopTimeout 60`: 최악 24.5초 LLM 요청이 진행 중일 수 있다
+- `--timeout-keep-alive 75`: ALB `idle_timeout` 65초보다 길게 (역전되면 간헐 502)
+- **`backend/.dockerignore` 는 보안 장치다** — 빌드 컨텍스트에 `.env` 가 들어가면 이미지에 구워지고
+  `main.py` 의 `load_dotenv` 가 그 키를 실제로 로드한다. ECR 레이어는 지워도 남아 회수 수단이 키 로테이션뿐이다
+
+정적 산출물은 `build-and-push.sh` 가 `data/processed/` → `backend/app/data/` 로 복사해 이미지에 굽는다.
+**이미지에도 태스크 정의에도 `/data` 디렉터리나 볼륨을 만들지 말 것** — `dataload` 의 첫 번째 후보 경로가
+`/data/processed` 라 그쪽이 잡히면 이미지에 구운 `/app/app/data` 를 조용히 가린다.
+
+---
 
 ## 2. 프론트엔드 — Vercel
 
-### 최초 1회 설정 (~10분)
+GitHub 연동으로 `main` 머지 시 자동 배포된다(PR 은 Preview 배포).
 
-- [ ] vercel.com 가입 → GitHub 레포 연결 → **Root Directory를 `frontend/`로 지정** (모노레포 대응)
-- [ ] Framework Preset: Next.js (자동 감지). `output: 'export'` 불필요 — Vercel이 네이티브 지원하므로
-      동적 라우트·이미지 최적화 전부 그대로 사용 가능
-- [ ] 환경변수 등록 (Vercel 대시보드 → Settings → Environment Variables):
-      - `NEXT_PUBLIC_API_BASE` = SAM Outputs의 `ApiUrl` (Production + Preview 모두)
-      - `API_MUTATION_TOKEN` = 백엔드 `MUTATION_API_TOKEN`과 **같은 값** (서버 전용 — 승인·기록 등
-        상태 변경 요청과 **담당자 화면 전용 GET 2종**(`/api/progress-report`,
-        `/api/cards/{id}/progress-records`)에 모두 필요하다. 빠뜨리면 승인 버튼이 401로 실패하고
-        `/tracking`의 추진 경과 리포트가 통째로 접힌다 — 업무 목록만 남고 안내 배너가 뜬다)
-      - `NEXT_PUBLIC_DEMO_READ_ONLY` = `false` (심사위원이 직접 승인해 보게 하려면 잠그지 않는다)
-      - `DATA_GO_KR_API_KEY` = 루트 `.env`와 같은 **Decoding** 키 (Production + Preview).
-        **`NEXT_PUBLIC_` 접두사 금지** — 붙이면 브라우저 번들에 키가 실린다. 빠뜨려도 에러는 없고
-        방문객 위젯 "오늘의 추천"에서 **날씨 줄만 조용히 사라진다**(요일 추천은 계속 뜬다)
-- [ ] 배포 도메인(`<project>.vercel.app`) 기록 → 최종 데모 URL
+### `frontend/vercel.json`
 
-### 이후 배포 흐름
+```json
+{ "$schema": "https://openapi.vercel.sh/vercel.json", "regions": ["icn1"] }
+```
 
-- `main`에 push → Production 자동 배포 / PR 생성 → Preview URL 자동 생성 (FE 팀원과 리뷰에 활용)
-- 수동 배포가 필요하면: `cd frontend && npx vercel --prod`
-- [ ] **검증:** Vercel URL 접속 → 허브 렌더 + 카드 승인까지 실 API로 동작, 모바일(Safari 포함)에서 위젯 확인
+기본값 `iad1`(버지니아)에서는 한국 사용자 요청이 태평양을 건너고, SSR 안의 API 호출이 서울 백엔드로
+**다시 왕복**한다(리전 간 RTT 182ms). `icn1` 로 옮기면 SSR TTFB 가 550~800ms → 60~120ms 가 된다.
 
-## 3. 비용 체크 (월 기준)
+**실측 확인 방법**: `curl -sI https://<도메인>/ | grep -i x-vercel-id` → `icn1::icn1::...`
+첫 칸은 엣지, **둘째 칸이 함수 실행 리전**이다. `icn1::iad1` 이면 리전 설정이 반영되지 않은 것이다.
 
-### AWS (서울 리전, 데모+테스트 트래픽 — 월 수만 요청 가정)
+### 환경변수 (Settings → Environment Variables, Production·Preview 양쪽)
 
-| 서비스 | 과금 기준 | 프리티어 | 예상 비용 |
-|---|---|---|---|
-| Lambda | 요청 수 + GB-초 | **상시 무료**: 월 100만 요청 + 40만 GB-초 | **$0** (512MB·0.5초 기준 월 수만 콜은 프리티어의 1% 미만) |
-| API Gateway (HTTP API) | 요청 100만 건당 약 $1.2 (서울) | 가입 12개월간 월 100만 건 | **$0** (프리티어 종료 후에도 월 3만 요청 ≈ $0.04) |
-| DynamoDB (온디맨드) | 쓰기 100만 건당 ~$1.6, 읽기 100만 건당 ~$0.3 | 스토리지 25GB 상시 무료 | **$0** (카드 수십 건, 요청 수천 건 수준) |
-| CloudWatch Logs | 수집 5GB 상시 무료 | 보존 7일 설정 | **$0** |
-| 데이터 전송 (아웃바운드) | 월 100GB 상시 무료 | JSON 응답 수 KB | **$0** |
-| **AWS 합계** | | | **사실상 $0 — 최악 가정으로도 월 $1 미만** |
+| 이름 | 값 | 비고 |
+|---|---|---|
+| `NEXT_PUBLIC_API_BASE` | service 스택 Outputs 의 `ApiUrl` | **끝 슬래시 없이.** 없으면 빌드가 실패한다(mock 폴백 없음) |
+| `API_MUTATION_TOKEN` | 백엔드 `MUTATION_API_TOKEN` 과 **같은 값** | 서버 전용 — `NEXT_PUBLIC_` 접두사 금지. `MUTATION_API_TOKEN` 이름으로 넣어도 동작한다 |
+| `NEXT_PUBLIC_DEMO_READ_ONLY` | 백엔드 `DEMO_READ_ONLY` 와 같은 값 | 다르면 버튼은 열려 있는데 서버가 403 |
+| `DATA_GO_KR_API_KEY` | 기상청 단기예보 키 | 위젯 '오늘의 추천' 날씨 줄. 없으면 날씨만 조용히 빠진다 |
+| `NEXT_PUBLIC_KAKAO_MAP_KEY` | Kakao JS 키 | 위젯 지도. 없으면 좌표 기반 대체 지도 |
 
-- S3·CloudFront가 구성에서 빠졌으므로(FE=Vercel) AWS 쪽은 순수 API 비용만 남는다
-- 비용이 발생할 수 있는 유일한 지점은 **Lambda 안에서의 LLM 호출 시간**(Timeout 30초 × 호출 수)이지만,
-  데모 수준 수백 콜 × 5초라도 GB-초 프리티어(40만) 대비 무시 가능
-- 안전장치: Billing 알림 $1 설정, 캠프 후 `sam delete`로 완전 철거 가능
+**값을 바꾸면 반드시 Redeploy** 한다 — `NEXT_PUBLIC_*` 는 빌드 시 인라인되므로 재배포 없이는 옛 값이 계속 쓰인다.
 
-### Vercel
+> **mock 폴백은 제거됐다.** 예전에는 `NEXT_PUBLIC_API_BASE` 가 비면 `frontend/src/mocks/` 로 조용히
+> 폴백해, 환경변수를 빠뜨린 배포가 **가짜 데이터를 진짜처럼 보여줬다**(2026-08-11 실제 발생 —
+> 배포본 `/tracking` 의 날짜 20개 중 13개가 실 API 와 달랐다). 지금은 빌드 단계에서 실패한다.
 
-| 항목 | 내용 |
-|---|---|
-| 플랜 | **Hobby(무료)** — 개인·비상업 용도. 대회 데모 사용은 문제 없음 |
-| 한도 | 대역폭 100GB/월, 빌드 6,000분/월 — 데모 트래픽 대비 여유 큼 |
-| 비용 | **$0** |
+---
 
-### LLM (참고)
+## 3. 비용 (서울 리전, 월 기준)
 
-gpt-4o-mini $0.15/$0.60 per 1M tokens 기준 데모 수백 호출 ≈ **수백 원**.
-claude-sonnet-5 전환 시 $3/$15(인트로 $2/$10)로 수천 원 수준.
+계정이 조직(`o-atbedhir51`) 소속이라 상시 무료 티어를 조직 전체가 공유한다. **프리티어를 가정하지 않는다.**
 
-**총계: AWS ≈ $0/월 + Vercel $0 + LLM 사용량(수백 원~) → 실질 비용은 LLM뿐.**
+| 항목 | 단가 | 월 |
+|---|---|---|
+| 내부 ALB 고정비 | $0.0225 / ALB-시간 | **$16.43** |
+| ALB LCU | $0.008 / LCU-시간, 데모 <0.1 LCU | ~$0.6 |
+| Fargate ARM Spot ×2 (0.25 vCPU / 0.5 GB) | $0.011175 / $0.001227 | **$4.98** |
+| 퍼블릭 IPv4 ×2 | $0.005 / IP-시간 | **$7.30** |
+| CloudWatch Logs(7일 보존) · ECR · API GW · DynamoDB | | ~$1 |
+| VPC Link · DynamoDB Gateway Endpoint · SSM 표준 파라미터 | 무과금 | $0 |
+| **합계** | | **≈ $30** |
+| 온디맨드 base 1 혼합 시 | | ≈ $36 |
+| **예산 상한 (ARM 온디맨드 ×2)** | | **≈ $42** |
 
-## 4. 배포 시점 — 개발 완료 후 최종 1회 (2026-08-03 결정 변경)
+- **ALB 고정비가 전체의 절반 이상**이고 리전 간 가격차가 0이다
+- Spot 단가는 AWS 가 수급에 따라 조정한다 — **예산 상한은 온디맨드 기준으로 잡는다**
+- Vercel Hobby $0 / LLM 은 사용량 과금(gpt-4o-mini, 데모 수준에서 월 $1 미만)
 
-**개발 기간에는 AWS에 배포하지 않는다.** 테스트는 Docker(BE+DynamoDB Local, 14 문서 T7)로 완결하고,
-전체 개발이 끝난 뒤 이 문서 §1~§2 절차로 1회 배포한다 (상세 시퀀스: 14 문서 T17).
+**"사실상 $0" 서사는 성립하지 않는다.** 새 서사는 **"월 $30 수준, 대가는 콜드스타트 없는 상시 가용"** 이다.
 
-사전 검증 완료분 (2026-08-03) — 최종 배포 리스크를 줄이는 근거:
-- [x] `sam validate --lint` 통과, `sam build` 성공 (번들·requirements 문제 없음)
-- [x] deploy 스크립트의 빈 파라미터 형식 오류 수정 완료 (§1 스크립트에 반영)
-- [ ] **미해결 선행조건: IAM 권한** — `Yutak_trading` 사용자에 CloudFormation·API Gateway·DynamoDB
-      권한 없음(AccessDenied 실측). 최종 배포 **전날까지** 인라인 정책 부착 (14 문서 T17 Step 1)
+---
+
+## 4. 무중단 배포
+
+`minimumHealthyPercent=100` / `maximumPercent=200`. desiredCount 2 → 배포 시 새 태스크 2개를 먼저 띄우고,
+**ALB 대상그룹 헬스체크를 통과한 뒤에야** 구 태스크를 등록 해제한다. 해제 후에는 드레이닝 시간 동안
+처리 중이던 요청을 마저 흘려보낸다.
+
+대상그룹이 보는 경로는 `/api/health` 가 아니라 **`/api/health/ready`** 다. `/api/health` 는 계약상
+결손 시에도 200이라(05 §5) 정적 JSON 이 빠진 이미지를 healthy 로 통과시킨다.
+
+### 종료 타이밍 예산
+
+| 설정 | 값 | 이유 |
+|---|---|---|
+| `deregistration_delay.timeout_seconds` | 30 | 기본 300초는 롤링 배포를 태스크당 5분씩 늘린다 |
+| `stopTimeout` | 60 | 기본 30초는 최악 24.5초 LLM 요청과 겹치면 빠듯하다 |
+| uvicorn `--timeout-graceful-shutdown` | 30 | 합계 최대 90초 < Fargate 한도 120초 |
+| `healthCheckGracePeriodSeconds` | 120 | 0.25 vCPU 는 버스트가 없어 기동이 느리다 |
+| ALB `idle_timeout` | 65 | API Gateway 통합 타임아웃 30초보다 크게 |
+| uvicorn `--timeout-keep-alive` | 75 | ALB idle 보다 길게 (역전 시 간헐 502) |
+
+### 서킷 브레이커의 한계 — 반드시 기억할 것
+
+1. **첫 배포에는 자동 롤백이 없다.** 되돌아갈 COMPLETED 배포가 없으면 롤백하지 못하고 배포가 정지한다
+   → 첫 배포를 심사 훨씬 전에 성공시켜 롤백 기준점을 만들어 둔다(2026-08-11 완료).
+2. **롤백을 CloudFormation 성공으로 오인할 수 있다.** 되돌린 뒤 steady state 에 도달하면 CFN 은
+   `UPDATE_COMPLETE` 로 끝난다 → `deploy-service.sh` 가 `rolloutState == COMPLETED` 이면서
+   태스크 정의 리비전이 방금 배포한 것과 일치하는지 대조하고, 불일치면 `exit 1` 한다.
+
+### 실측 (2026-08-11, 2차 배포 = CORS 좁히기)
+
+배포 전 구간을 0.5초 간격으로 폴링(`zero-downtime-check.sh`):
+
+```
+총 요청 507 · 실패 0 · 최대지연 469ms
+```
+
+### 용량 공급자
+
+```
+[{FARGATE, Base: ON_DEMAND_BASE_COUNT, Weight: 0}, {FARGATE_SPOT, Weight: 1}]
+```
+
+**Fargate 는 Spot 용량이 부족해도 온디맨드로 자동 대체하지 않는다.** 전부 Spot 이면 최악의 경우
+실행 태스크가 0이 된다. 개발 중에는 0(순수 Spot), **심사 기간에는 1** 로 둔다(§5.5).
+
+---
+
+## 4-1. 자동 배포 (CI)
+
+`main` 머지가 배포 트리거다. PR 단계에서는 검증만 하고 배포하지 않는다.
+
+```
+PR 생성 ──▶ pr-checks.yml      pytest · cfn-lint · FE lint/build   (AWS 자격증명 불필요)
+main 머지 ──▶ backend-deploy.yml  OIDC 인증 → ARM64 빌드 → ECR → service 스택 갱신 → 스모크
+```
+
+세 가지를 의도적으로 제한했다.
+
+- **service 스택만 자동화한다.** CI 가 VPC·DynamoDB 를 건드릴 수 있으면 사고 규모가 달라진다.
+  foundation 은 거의 바뀌지 않는 계층이라 수동(`deploy-foundation.sh`)으로 남겨도 손해가 없다
+- **경로 필터를 건다.** `backend/**`·`data/processed/**`·`infra/**` 가 바뀐 머지에만 반응한다
+- **장기 키를 저장소에 두지 않는다.** GitHub OIDC 로 역할 `sangseng-github-deploy` 를 맡고,
+  신뢰 정책이 `main` 브랜치로 제한한다. 실제 시크릿은 SSM 에 있어 CI 가 알 필요조차 없다
+
+> **OIDC subject 형식 주의.** 이 저장소는 GitHub 이 **불변 subject**
+> (`repo:<owner>@<ownerId>/<repo>@<repoId>:ref:...`)를 발급한다. 고전 형식만 신뢰 정책에 걸면
+> `Not authorized to perform sts:AssumeRoleWithWebIdentity` 로 거부되는데 원인이 로그에 드러나지 않는다.
+> `bootstrap-github-oidc.sh` 가 `gh api repos/<repo>/actions/oidc/customization/sub` 로 형식을 조회해
+> **두 형식을 모두** 허용한다(와일드카드가 아니라 정확한 문자열 2개라 main 제한은 유지).
+
+로컬 `deploy.sh` 와 CI 는 **같은 스크립트**를 쓴다. 차이는 값의 출처뿐이다 — 로컬은 `.env`,
+CI 는 GitHub 저장소 변수이며 `load_env` 가 환경변수를 우선한다. `MUTATION_API_TOKEN` 은 저장소 변수로
+넘기지 않는다(정본은 SSM) — `preflight.sh` 가 환경에 없으면 SSM 선존재로 대체 확인한다.
+
+**저장소 변수**: `AWS_DEPLOY_ROLE_ARN` · `DEMO_READ_ONLY` · `ALLOWED_ORIGINS` · `OPENAI_MODEL` ·
+`DESIRED_COUNT` · `ON_DEMAND_BASE_COUNT` · `NEXT_PUBLIC_API_BASE`(FE 빌드용).
+
+---
 
 ## 5. 마무리 조이기 (배포 URL 확정 후)
 
-**CORS는 2층이지만 배포에서 효력을 갖는 건 게이트웨이다.** ① API Gateway
-`CorsConfiguration.AllowOrigins` ② FastAPI `CORSMiddleware.allow_origins`(앱).
-⚠ **HTTP API에 `CorsConfiguration`이 설정돼 있으면 API Gateway는 통합(Lambda)이 돌려준 CORS 헤더를
-무시하고 자기 설정으로 덮는다**
-([AWS 문서](https://docs.aws.amazon.com/apigateway/latest/developerguide/http-api-cors.html)).
-따라서 앱 쪽만 좁히면 배포 환경에서는 **아무 효과가 없다** — 좁혔다고 착각하기 쉬운 함정이다.
+1. **`ALLOWED_ORIGINS` 좁히기** — `.env` 에 확정된 Vercel 도메인을 넣고 `deploy.sh` 재실행.
+   배포 기본값은 빈 목록이다(미설정 CORS 가 localhost 허용으로 새지 않게).
+2. **`DEMO_READ_ONLY` / `MUTATION_API_TOKEN` 짝** — `DEMO_READ_ONLY=false` 인데 토큰이 비면 변경 API 가
+   전부 503 이다. `preflight.sh` 가 배포 전에 막는다. 토큰은 `openssl rand -hex 32`
+   (`secrets.compare_digest` 가 ASCII 만 받는다).
+3. **토큰 교체 절차 — 순서를 지킬 것**
 
-그래서 template이 두 층을 **같은 파라미터 하나**로 묶는다: 게이트웨이는
-`AllowOrigins: !Split [',', !Ref AllowedOrigins]`, Lambda 환경변수는 `ALLOWED_ORIGINS: !Ref AllowedOrigins`.
-`AllowedOrigins`(기본 `https://configure-me.invalid`) 하나만 바꾸면 두 층이 함께 움직인다. 앱 레벨 설정은 로컬 uvicorn·Docker처럼
-게이트웨이를 거치지 않는 경로에서 의미가 있다.
+   ```
+   ① ./infra/scripts/put-secrets.sh          (SSM 값 갱신)
+   ② aws ecs update-service --cluster sangseng-cluster --service sangseng-api \
+        --force-new-deployment --profile sangseng --region ap-northeast-2
+   ③ Vercel 환경변수 API_MUTATION_TOKEN 갱신 → Redeploy
+   ```
 
-- [ ] `.env`에 실제 확정된 프론트 오리지만 `ALLOWED_ORIGINS=https://<확정-도메인>`으로 기입 →
-      `./deploy-backend.sh` 재실행 (스크립트가 `AllowedOrigins` 파라미터로 넘겨 두 층을 함께 좁힌다)
-      - Preview도 써야 하면 해당 Preview 오리진을 콤마로 명시한다. `*`는 사용하지 않는다
-- [ ] **검증:** 브라우저에서 Vercel 배포 URL로 정상 호출되는지 + 임의 오리진(로컬 파일 등)에서
-      차단되는지 확인. 차단이 안 되면 게이트웨이 실제 설정부터 확인한다
-      (`aws apigatewayv2 get-api --api-id <id> --query CorsConfiguration`)
-- [ ] 읽기 전용 플래그는 **용도에 따라 둘 중 하나로 정하고 FE·BE를 같은 값으로 맞춘다.**
-      섞으면 버튼은 열리고 요청만 막히는 상태가 된다
-      - **심사·데모 배포(기본):** `DEMO_READ_ONLY=false` + `MUTATION_API_TOKEN=<난수>`,
-        Vercel은 `NEXT_PUBLIC_DEMO_READ_ONLY=false` + 같은 값의 `API_MUTATION_TOKEN`.
-        심사위원이 직접 승인해 볼 수 있어야 하기 때문이며(§2), 무인증 공개가 아니라
-        FE 서버만 아는 Bearer 토큰이 경계를 맡는다. 브라우저에는 토큰이 실리지 않는다
-      - **잠금 배포:** 양쪽 다 `true`. health 응답의 `demo_read_only:true`로 확인한다
-- [ ] 조직 사용자 인증·RBAC를 붙이는 시점에는 공통 mutation dependency(`security.require_mutation_access`)에
-      주체·역할 검사를 연결하고, 공유 토큰 한 개짜리 현재 경계를 대체한다
-- [ ] Billing 콘솔 $0 스크린샷 (발표 Q&A "운영 비용?" 대비)
+   **②를 빠뜨리면 반영되지 않는다** — ECS `secrets` 는 컨테이너 기동 시 1회만 주입되므로 SSM 값을
+   바꿔도 도는 태스크는 옛 토큰을 계속 쓴다. ②와 ③ 사이에는 FE·BE 토큰이 어긋나 변경 API 가
+   401 이 되는 짧은 구간이 있다 — **데모 중에는 하지 않는다.**
+
+---
 
 ## 5.5 심사 기간 운영 (제출 ~ 심사 종료, 상세: 12 문서 §5)
 
-배포 URL은 전시 플랫폼에 등록되어 심사위원이 임의 시점에 접속한다. 발표가 끝나도 내리지 않는다.
+- **`ON_DEMAND_BASE_COUNT=1` 로 전환** — Spot 부족으로 배포가 완료되지 않는 사고를 막는다
+  (`.env` 와 GitHub 저장소 변수 양쪽)
+- **데모 시드 리셋**:
+  ```bash
+  cd backend && CARDS_TABLE=sangseng-cards PROGRESS_RECORDS_TABLE=sangseng-progress-records \
+    AWS_PROFILE=sangseng AWS_DEFAULT_REGION=ap-northeast-2 python seed_demo.py --reset
+  ```
+  카드 5장 + 추진 기록 9건이 들어간다
+- **VPC Link 는 60일 무트래픽 시 INACTIVE** 가 된다. 방치 후 시연하면 첫 요청이 수 분간 실패하므로
+  주기적으로 `/api/health` 를 한 번씩 친다
+- **Vercel Password Protection 은 꺼 둔다** — 켜져 있으면 심사위원이 로그인 벽을 만난다
+- 상시 가동이라 **콜드스타트 안내 문구는 쓰지 않는다**(사실과 다르다)
 
-- [ ] 제출 직전 `python backend/seed_demo.py --reset` — 데모 초기 상태 복원
-- [ ] (여유 시) 콜드스타트 완화 — SAM에 워밍 룰 추가 후 재배포 (프리티어 내 $0):
-
-```yaml
-  WarmerRule:
-    Type: AWS::Events::Rule
-    Properties:
-      ScheduleExpression: rate(5 minutes)
-      Targets: [{ Arn: !GetAtt ApiFunction.Arn, Id: warmer,
-                  Input: '{"requestContext":{"http":{"method":"GET","path":"/api/health"}},"rawPath":"/api/health","routeKey":"GET /api/health","version":"2.0","headers":{}}' }]
-  WarmerPermission:
-    Type: AWS::Lambda::Permission
-    Properties: { FunctionName: !Ref ApiFunction, Action: lambda:InvokeFunction,
-                  Principal: events.amazonaws.com, SourceArn: !GetAtt WarmerRule.Arn }
-```
-
-- [ ] (여유 시) 심사위원 조작으로 인한 데모 상태 오염 대비 — 시드 리셋을 EventBridge 스케줄(매시)로
-      자동화하거나, 최소한 심사 기간 중 하루 1회 수동 리셋
-- [x] **동시성 상한은 기본 적용** — `ApiFunction`의 `ReservedConcurrentExecutions`를 SAM 파라미터
-      `ReservedConcurrency`(**기본 5**)로 건다. 무인증 공개 URL의 `POST /api/cards/generate`가
-      호출마다 LLM을 부르므로 남용 시 비용·rate limit이 곧바로 튄다 — "여유 있으면"에 둘 항목이 아니다
-      - 해제가 필요하면 `RESERVED_CONCURRENCY=-1` (template의 `Conditions`가 속성 자체를 생략)
-      - **배포가 `ReservedConcurrentExecutions` 관련 오류로 실패하면**(계정의 미예약 동시성 여유가
-        부족한 경우 — 신규 계정은 총 한도가 낮다) `RESERVED_CONCURRENCY=-1`로 다시 배포하고,
-        상한은 API Gateway 쪽 throttling 또는 수동 모니터링으로 대체한다
-- [ ] Vercel Password Protection **OFF** 확인 (제출 요건 — 로그인 없이 접속)
+---
 
 ## 6. 철거 (종료 후)
 
-> ⚠ **심사·전시가 끝나기 전에는 절대 철거하지 않는다** (12 문서 §6 — 심사 기간 배포 유지 요건).
-
 ```bash
-sam delete --stack-name sangseng-backend --region ap-northeast-2
+./infra/scripts/teardown.sh    # ⚠ 심사·전시 종료 전에는 실행 금지
 # Vercel: 대시보드에서 프로젝트 Delete (또는 그냥 둬도 $0)
 ```
 
-## 트러블슈팅 메모
+service → foundation 역순으로 지운다. VPC Link 삭제와 ENI 정리가 느려 서브넷·SG 삭제가 실패할 수
+있으므로 스크립트가 최대 3회 재시도한다. **DynamoDB 테이블 2개는 `Retain` 이라 남는다** — 정말 지우려면
+`aws dynamodb delete-table` 을 직접 실행한다.
 
-| 증상 | 원인/조치 |
+---
+
+## 7. 실 배포 수준 아키텍처 (승격 경로 — 문서 전용)
+
+지금 구성은 데모·심사 규모에 맞춘 것이다. 실 운영으로 올린다면:
+
+```
+                     Route 53 + ACM + WAF
+                            │
+        ┌───────────────────▼──────────────── VPC ────────────────┐
+        │ public-a / public-c    인터넷 ALB (443, ACM) · NAT GW ×2 │
+        │ private-app-a / -c     ECS Fargate (assignPublicIp 없음) │
+        │ private-data-a / -c    RDS·ElastiCache 등 확장 여지       │
+        └──────────────────────────────────────────────────────────┘
+```
+
+| 항목 | 지금 | 승격 시 무엇을 바꾸나 |
+|---|---|---|
+| 진입 | API Gateway + VPC Link | Route 53 + ACM 인증서 + 인터넷 ALB, WAF 부착 |
+| 태스크 위치 | public 서브넷 + public IP | private 서브넷 + NAT. **NAT 비용을 줄이려면** ECR(`ecr.api`·`ecr.dkr`) + **S3 게이트웨이(이미지 레이어용, 필수)** + CloudWatch Logs + SSM 인터페이스 엔드포인트를 두면 NAT 를 타는 건 OpenAI egress 뿐이다 |
+| 배포 | ECS 롤링 + 서킷 브레이커 | CodeDeploy Blue/Green + 카나리(10% 5분) — 즉시 롤백이 생기는 대신 ECS 서비스가 CFN 관리에서 벗어난다 |
+| 확장 | 고정 2태스크 | Application Auto Scaling (ALB `RequestCountPerTarget` 타깃 추적) |
+| 관측 | CloudWatch Logs 7일 | Container Insights · X-Ray · ALB 액세스 로그 → S3 |
+| 시크릿 | SSM SecureString | Secrets Manager + 자동 로테이션 |
+| 데이터 | DynamoDB On-Demand | PITR 활성화, 백업 정책 |
+| 배포 자격증명 | GitHub OIDC(구축 완료) + 로컬 액세스 키 | **로컬 `sangseng-deployer` 액세스 키 폐기** — CI 가 배포를 담당하므로 로컬 키는 비상용으로만 |
+
+**돌려보지 않은 CloudFormation 을 검증된 코드와 섞지 않는다** — 위 항목은 문서로만 남긴다.
+
+---
+
+## 8. 알려진 리스크
+
+- **boto3 resource 스레드 안전성** — `db.py`·`progress_db.py` 가 모듈 전역 boto3 resource 를 두고
+  동기 라우트를 anyio 기본 40 스레드가 공유한다. boto3 는 resource 의 thread-safety 를 보장하지 않는다.
+  Lambda 구성에서도 동일한 코드였고 데모 트래픽은 동시성이 낮으며, API Gateway 스테이지 스로틀링
+  (rate 10 / burst 20)이 실질 상한이 되어 심사 기간에는 노출되지 않는다. 실 운영 승격 시 client 기반으로 전환한다.
+- **LLM 남용 방어** — Lambda `ReservedConcurrentExecutions=5` 를 대체하는 것이 위 스테이지 스로틀링이다.
+  라우트가 전부 동기 `def` 라 태스크 2대 × 40 스레드 = 최대 80 동시 generate 가 가능한데, 게이트웨이에서 막는다.
+- **퍼블릭 IPv4 과금** — 태스크마다 IP 하나씩 월 $7.3. 태스크 수를 늘리면 선형 증가한다.
+
+---
+
+## 트러블슈팅
+
+| 증상 | 원인 / 조치 |
 |---|---|
-| `sam build` 실패 (로컬 Python 버전 불일치) | 로컬에 Python 3.12가 없으면 `sam build --use-container` (Docker 필요) 또는 pyenv로 3.12 설치 |
-| Lambda 500 + "Unable to import module" | `sam build`가 requirements 미설치 — `backend/requirements.txt` 위치 확인. pandas 등 무거운 패키지가 섞였는지도 확인 (07 문서 의존성 원칙) |
-| Lambda 500 + Decimal 직렬화 오류 | DDB 응답의 Decimal 미변환 — `db.py`의 `_clean` 경유 확인 (07 문서 B2) |
-| BE만 고쳤는데 Vercel이 재빌드 | (선택) Vercel Settings → Git → Ignored Build Step에 `git diff --quiet HEAD^ HEAD -- .` 설정 — Root Directory(frontend) 변경 없으면 빌드 스킵 |
-| `data_loaded: false` | `deploy-backend.sh`의 data 복사 단계 누락 — 스크립트로만 배포. 응답의 `datasets`에서 어느 산출물이 `false`인지 바로 확인 (05 §5) |
-| FE에서 CORS 에러 | 배포 경로에서 효력을 갖는 건 **게이트웨이 `CorsConfiguration`** 하나다(§5 — API Gateway가 Lambda의 CORS 헤더를 덮는다). `aws apigatewayv2 get-api --api-id <id> --query CorsConfiguration`으로 실제 값부터 확인하고, API URL 끝 `/` 중복도 확인 |
-| 배포 실패 — `ReservedConcurrentExecutions` 오류 | 계정의 미예약 동시성 여유 부족 → `.env`에 `RESERVED_CONCURRENCY=-1` 후 재배포 (속성 자체가 생략된다 — §5.5) |
-| Vercel 빌드 실패 | Root Directory가 `frontend/`인지, 환경변수 등록 후 **재배포**했는지 확인 (env는 빌드 시점 주입) |
-| Vercel에서 mock만 나옴 | `NEXT_PUBLIC_API_BASE` 미설정 상태로 빌드됨 — env 넣고 Redeploy |
-| LLM 타임아웃 | Lambda Timeout 30s 확인, gpt-4o-mini/claude-sonnet-5 유지 (대형 모델 금지) |
+| `exec format error`, 태스크 무한 재시작 | 이미지 아키텍처 불일치. `config.sh` 의 `DOCKER_PLATFORM` 과 `service.yaml` 의 `CpuArchitecture` 확인 |
+| `ResourceInitializationError` (로그 없음) | 태스크 실행 역할의 `ssm:GetParameters` 누락 또는 SSM 파라미터 부재. `put-secrets.sh` 재실행 |
+| API Gateway 504 | VPC Link SG → ALB SG 인바운드 누락 |
+| `data_loaded: false` | `build-and-push.sh` 의 데이터 복사 단계 누락. 스크립트로만 배포할 것 |
+| 배포가 완료되지 않음 (서비스는 정상) | Fargate Spot 용량 부족. `ON_DEMAND_BASE_COUNT=1` 후 재배포 |
+| 롤백됐는데 CFN 은 성공 | `deploy-service.sh` 가 리비전 대조로 잡아 exit 1 한다. 진단 덤프 확인 |
+| 화면은 뜨는데 담당자 리포트만 "권한 필요" | Vercel 토큰 값이 SSM 과 다르다. §5 의 교체 절차 ②를 빠뜨렸는지 먼저 본다 |
+| FE 빌드 실패 `NEXT_PUBLIC_API_BASE가 비어 있습니다` | 의도된 가드다. Vercel 환경변수에 ApiUrl 을 넣고 Redeploy |
+| 오래 방치 후 첫 요청 실패 | VPC Link 는 60일 무트래픽 시 INACTIVE. 재개에 수 분 |

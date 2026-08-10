@@ -19,7 +19,7 @@ Phase 0 (준비·블로커 해소)
 - [ ] [유] ★ data.go.kr 활용신청 3건 (가맹점 상세정보 / 일자별 카지노 입장객 / 소진공 상가정보) — 승인 1~2일 걸릴 수 있어 **최우선** (04 문서)
 - [x] [유] ★ 파일데이터 확보 → `data/raw/` 복사 + **헤더 실컬럼 대조 완료** (06 문서 COLMAP 반영됨 — 04 문서 §2)
 - [ ] [유] ★ GitHub 초기 커밋 (현재 커밋 0개 — 커밋이 있어야 Vercel Import 가능) + **FE 팀원 콜라보레이터 초대·수락 확인**, 첫 커밋부터 키·개인정보 금지 (12 문서 §4)
-- [ ] [유] ★ `.env` 작성 (공공데이터·지오코딩·LLM 키), AWS 프로파일·SAM CLI 확인
+- [ ] [유] ★ `.env` 작성 (공공데이터·지오코딩·LLM 키), AWS 프로파일(sangseng)·Docker 확인
 - [ ] [유] ★ Vercel 계정 + GitHub 레포 연결 (Root Directory=`frontend/`) — F1 머지 직후 Import+첫 Deploy(15 §7 채택) (04 문서 §0·§6)
 - [ ] [공통] `docs/plan/` 정독, 데모 시나리오(01 문서) 숙지 + 제출 요건(12 문서)·디자인 기준(13 문서) 확인
 
@@ -32,7 +32,7 @@ Phase 0 (준비·블로커 해소)
 - [ ] [유] 03 문서 구조대로 디렉토리·빈 모듈 생성 — 단 `frontend/` 내부는 건드리지 않는다
       (mocks 포함 FE 영역 생성은 F1에서 FE 담당이 일원화 — 03 협업 규칙 1, 이중 생성 충돌 방지)
 - [ ] [F] F1 (Next.js 스캐폴딩 + `lib/api.ts` + mock 렌더 확인)
-- [x] [유] ~~배포 리허설~~ → **결정 변경 (2026-08-03): 개발 중 AWS 배포 없음.** `sam validate`·`sam build`
+- [x] [유] ~~배포 리허설~~ → **결정 변경 (2026-08-03): 개발 중 AWS 배포 없음.** `cloudformation validate-template`
       성공까지 확인 완료. 대신 **Docker 테스트 환경**(14 문서 T7)이 Phase 1 검증을 담당하고,
       실배포는 개발 완료 후 최종 1회 (09 §4, 14 문서 T17)
 
@@ -77,7 +77,7 @@ FE 대시보드가 실데이터 mock으로 렌더.
 
 ## Phase 6 — 실배포·리허설·발표 준비
 
-- [ ] [유] `./deploy-backend.sh` + `seed_demo.py` → git push로 Vercel Production 배포
+- [ ] [유] `./infra/scripts/deploy.sh` + `seed_demo.py` → git push로 Vercel Production 배포
 - [ ] [공통] 배포 URL에서 데모 시나리오 30초 완주 리허설 ×10 (클릭 단위 스크립트는 11 문서 §1, Safari 포함 크로스브라우저 확인)
 - [ ] [유] 확충 후보 매칭 정확도 수기 표본 검증 20~30건 (발표 KPI "⚠ 표본 검증" 항목)
 - [ ] [유] CORS 조이기 + Billing $0 스크린샷 (09 §5)

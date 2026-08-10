@@ -12,11 +12,11 @@
 ## 레포 구조
 ```
 frontend/   Next.js 16(App Router, TS, Tailwind 3) — Vercel 네이티브 배포(정적 export 아님), FE 팀원 담당
-backend/    FastAPI (Lambda+Mangum) — app/main.py 이 진입점, 유탁 담당
+backend/    FastAPI (ECS Fargate, uvicorn) — app/main.py 이 진입점, 유탁 담당
 pipeline/   Python 배치 스크립트 — data/raw/ → data/processed/ JSON 생성, 유탁 담당
 data/raw/       공공데이터 원본 CSV (커밋함)
 data/processed/ 파이프라인 산출 정적 JSON (커밋함 — BE 서빙·FE 정적 산출물의 원천)
-infra/      SAM 템플릿(template.yaml) + BE 배포 스크립트 (FE는 Vercel git 연동)
+infra/      CloudFormation 2스택 + BE 배포 스크립트 (FE는 Vercel git 연동)
 docs/plan/  개발 계획 문서 (단일 진실 원천)
 ```
 
@@ -36,7 +36,7 @@ cd backend && uvicorn app.main:app --reload --port 8000
 cd frontend && npm run dev
 
 # 백엔드 배포 — ⚠ 개발 완료 후 최종 1회만 (docs/plan/09 §4, 14 문서 T17)
-cd infra && ./deploy-backend.sh
+./infra/scripts/deploy.sh
 
 # 프론트 배포: Vercel — main에 push하면 자동 배포, PR은 Preview URL 자동 생성
 # (수동 배포가 필요하면: cd frontend && npx vercel --prod)
@@ -64,10 +64,10 @@ cd infra && ./deploy-backend.sh
   **실 API 전용이다** — `NEXT_PUBLIC_API_BASE`가 비면 모듈 로드에서 실패한다(mock 폴백 제거,
   설정 누락이 배포까지 가지 못하게). BE 엔드포인트가 없는 정적 산출물만 `frontend/src/data/`에 둔다.
 - BE의 정적 데이터 로딩은 `backend/app/dataload.py` 한 곳에서만 한다
-  (Lambda: `app/data/`, 로컬: `../../data/processed/` 폴백).
+  (컨테이너: `app/data/`, 로컬: `../../data/processed/` 폴백).
 - LLM 호출은 `backend/app/llm.py`의 `generate_json(system, user, schema)` 하나로 통일.
   provider는 OpenAI 단일이며 SDK 호출은 이 파일 안에만 존재한다.
-- 시크릿은 .env / SAM 파라미터로만. 코드·커밋에 키 금지.
+- 시크릿은 .env / SSM Parameter Store(SecureString)로만. 코드·커밋에 키 금지.
 
 ## 환경 준비
 `.env.example` 참고. API 키·파일데이터 준비 목록은 `docs/plan/04-env-and-data.md` (★ 항목은 유탁 담당).

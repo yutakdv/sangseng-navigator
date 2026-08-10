@@ -679,7 +679,7 @@ JS(`fetch(...).headers.get("X-Dataset-Version")`)에서도 읽을 수 있다.
 
 - `datasets`: 산출 JSON 6종의 로드 성공 여부(각 `true`/`false` — 파일 누락뿐 아니라 JSON 파손도
   `false`). `dashboard` 하나만 보면 나머지
-  결손을 놓치므로 개별로 보고한다 (배포 후 `deploy-backend.sh`의 data 복사 누락 진단용)
+  결손을 놓치므로 개별로 보고한다 (배포 후 `build-and-push.sh` 의 data 복사 누락 진단용)
 - `data_loaded`: **필수 4종**(`dashboard`·`eup_scores`·`candidates`·`merchants`)의 AND.
   `risk_signal`은 07 문서 B4 ⑥에서 "없으면 컷"인 선택 입력이라 `datasets`에만 싣고 AND에서는 뺀다.
   `manifest`도 마찬가지로 버전 표시용 부가 정보라 `datasets`에만 싣고 AND에서는 뺀다(A4) —
@@ -766,14 +766,14 @@ FE mock 동기화: 레포 루트에서 `./scripts/sync-mocks.sh` — 위 산출 
 
 ## 7. DynamoDB 스키마
 
-- 테이블: `sangseng-cards` (SAM이 생성, 실제 이름은 Outputs 참조)
+- 테이블: `sangseng-cards` (foundation 스택이 이 이름으로 고정 생성)
 - PK: `id` (S) — 예: `AC-001`, `INC-001`
 - 항목 = Card 객체 그대로 (map). 소량(수십 건)이므로 목록은 GSI 없이 Scan하되
   `LastEvaluatedKey`가 사라질 때까지 모든 페이지를 읽는다
 - 상태 변경 이력은 `events` 리스트 속성에 append: `{"at": iso8601, "action": "approved" | "progress:완료" | ...}`
 - decision/progress/verification은 DynamoDB conditional update 한 번에 상태·이벤트·`version`을 함께 갱신한다.
   같은 이전 상태에서 출발한 동시 요청 중 하나만 성공하고 나머지는 도메인 `409`가 된다
-- **추진 기록 테이블**: `sangseng-progress-records`(SAM `ProgressRecordsTable`) — PK `record_id`(S).
+- **추진 기록 테이블**: `sangseng-progress-records`(foundation 스택 `ProgressRecordsTable`) — PK `record_id`(S).
   GSI ① `card-recorded-at-index`(`card_id`, `recorded_at_key`) = 카드별 타임라인 조회,
   GSI ② `report-bucket-recorded-at-index`(`report_bucket`, `recorded_at_key`) = 기간 리포트 집계.
   기록 저장과 카드 투영(progress·`completed_at`·version)은 `TransactWriteItems`로 원자 커밋한다

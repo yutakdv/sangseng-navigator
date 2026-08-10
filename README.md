@@ -8,8 +8,7 @@
 
 하이원포인트 소비 쏠림 진단 → 2단계 스코어링 → AI 제안·반대 관점 → **담당자 승인** → 추진 트래킹 → 방문객 위젯 반영
 
-<!-- 배포 후: 아래 Live Demo 배지의 링크(your-project.vercel.app)를 실제 주소로 바꾼다 -->
-[![Live Demo](https://img.shields.io/badge/Live%20Demo-Vercel-8B7BF0?style=for-the-badge&logo=vercel&logoColor=white)](https://your-project.vercel.app)
+[![Live Demo](https://img.shields.io/badge/Live%20Demo-Vercel-8B7BF0?style=for-the-badge&logo=vercel&logoColor=white)](https://sangseng-navigator.vercel.app)
 [![Demo Video](https://img.shields.io/badge/Demo%20Video-1%3A30-1E1840?style=for-the-badge&logo=youtube&logoColor=white)](#demo)
 [![Open Data](https://img.shields.io/badge/Open%20Data-6%20datasets-2E2560?style=for-the-badge)](#-활용-데이터)
 [![Stack](https://img.shields.io/badge/Next.js%2016%20%C2%B7%20FastAPI%20%C2%B7%20AWS-443597?style=for-the-badge)](#-기술-스택)
@@ -19,7 +18,7 @@
 
 </div>
 
-> **🔗 배포 URL: `https://<project>.vercel.app`** *(배포 후 확정 — 이 줄과 위 Live Demo 배지를 함께 교체)*
+> **🔗 배포 URL: <https://sangseng-navigator.vercel.app>** *(로그인 없이 접속 · 모바일 지원)*
 
 ---
 
@@ -162,7 +161,7 @@
 flowchart LR
   RAW[공공데이터 6종] --> P[파이프라인 10단계]
   P --> J[(processed JSON + manifest)]
-  J --> BE[FastAPI Lambda]
+  J --> BE[FastAPI on ECS Fargate]
   J --> FE[Next.js Vercel]
   BE --> DDB[(DynamoDB)]
   FE --> USER[담당자·방문객]
@@ -267,10 +266,10 @@ cd frontend && npm install && npm run dev   # NEXT_PUBLIC_API_BASE 미설정 시
 |---|---|
 | 프론트엔드 | Next.js 16 (App Router) · TypeScript · Tailwind CSS 3 · Recharts |
 | 지도 | 근거 상세(/cards/[id]) MapLibre GL + OpenFreeMap / 방문객 위젯 Kakao Maps JS (키 없으면 정적 폴백) |
-| 백엔드 | FastAPI on AWS Lambda + API Gateway + DynamoDB (SAM, 월 비용 사실상 $0) |
+| 백엔드 | FastAPI on AWS ECS Fargate + 내부 ALB + API Gateway(HTTP API) + DynamoDB (CloudFormation 2스택) |
 | 데이터 | Python 파이프라인 10단계 → 정적 JSON 사전 계산 + SHA-256 manifest |
 | AI | LLM 어댑터 1곳으로 통일 (OpenAI gpt-4o-mini) · 스키마 강제 + 룰 폴백 |
-| 배포 | Vercel(FE) + AWS SAM(BE) · 로컬 통합 환경은 Docker Compose |
+| 배포 | Vercel(FE, 서울 icn1) + AWS ECS(BE, ap-northeast-2) — 배포 중 무중단(롤링 + 서킷 브레이커) · main 머지 시 자동 배포 · 로컬 통합 환경은 Docker Compose |
 
 ---
 
@@ -294,7 +293,7 @@ cd frontend && npm install && npm run dev   # NEXT_PUBLIC_API_BASE 미설정 시
 | 문서 | 내용 |
 |---|---|
 | [01-overview](docs/plan/01-overview.md) | 목표·범위·역할 분담·컷 리스트 |
-| [02-architecture](docs/plan/02-architecture.md) | 시스템 구조 + AWS 최소비용 배포 아키텍처 |
+| [02-architecture](docs/plan/02-architecture.md) | 시스템 구조 + AWS 배포 아키텍처 |
 | [03-repo-structure](docs/plan/03-repo-structure.md) | 모노레포 구조·협업 규칙·로컬 실행 |
 | [04-env-and-data](docs/plan/04-env-and-data.md) | ENV·API키·파일데이터 준비 (개발 전 필수) |
 | [05-api-contract](docs/plan/05-api-contract.md) | FE↔BE API 계약 (mock의 기준) |

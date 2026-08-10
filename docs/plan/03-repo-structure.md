@@ -28,17 +28,17 @@ sangseng-navigator/
 │                                       #   → ./scripts/sync-fe-static.sh 로 생성한 뒤 커밋
 │
 ├── backend/                   # ← 유탁 전담 영역
-│   ├── requirements.txt       # fastapi, mangum, boto3, python-dotenv, openai, anthropic (pandas 금지 — 07 문서)
+│   ├── requirements.txt       # fastapi, uvicorn[standard], boto3, python-dotenv, openai (pandas 금지 — 07 문서)
 │   ├── seed_demo.py           # 데모 시드/리셋 스크립트 (--reset 지원, 07 문서 B4)
 │   ├── tests/test_smoke.py    # 배포 전 스모크 기준 (07 문서 B7)
 │   └── app/
-│       ├── main.py            # FastAPI 앱 + `handler = Mangum(app)`
+│       ├── main.py            # FastAPI 앱 (uvicorn 진입점, `app.main:app`)
 │       ├── routes/            # dashboard.py, cards.py, widget.py, kpi.py
 │       ├── services/          # scoring.py(재계산), cardgen.py(LLM 카드 생성), simulate.py
 │       ├── llm.py             # generate_json(system, user, schema) — provider 분기 유일 지점
 │       ├── prompts.py         # 시스템 프롬프트(발표 공개용 원문 유지)
 │       ├── db.py              # DynamoDB CRUD (cards 테이블)
-│       └── dataload.py        # processed JSON 로더 (Lambda: app/data/, 로컬: ../../data/processed/)
+│       └── dataload.py        # processed JSON 로더 (컨테이너: app/data/, 로컬: ../../data/processed/)
 │
 ├── pipeline/                  # ← 유탁 전담 영역
 │   ├── requirements.txt       # pandas, requests, PublicDataReader, python-dotenv, xmltodict
@@ -61,8 +61,9 @@ sangseng-navigator/
 │   └── processed/             # 파이프라인 산출 JSON — 커밋함 (FE mock·BE 서빙 원천)
 │
 ├── infra/
-│   ├── template.yaml          # SAM: Lambda + HTTP API + DynamoDB
-│   └── deploy-backend.sh      # data 복사 → sam build → sam deploy
+│   ├── config.sh              # 리전·스택명·프로필·아키텍처 단일 정의
+│   ├── cloudformation/        # foundation.yaml(VPC·ECR·DDB·IAM) · service.yaml(ALB·ECS·API GW)
+│   └── scripts/               # preflight·put-secrets·build-and-push·deploy-service·smoke-test·deploy 등
 │                              # (FE 배포는 Vercel — git push 자동, 별도 스크립트 없음)
 │
 └── docs/plan/                 # 이 계획 문서들
