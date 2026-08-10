@@ -141,3 +141,25 @@ def test_dataload_refreshes_when_processed_file_changes(tmp_path, monkeypatch):
     # 크기도 바꿔 mtime 해상도가 낮은 파일시스템에서도 버전 키가 달라지게 한다.
     path.write_text(json.dumps({"version": 200}), encoding="utf-8")
     assert dataload.load("sample") == {"version": 200}
+
+
+def test_resolve_allowed_origins_deployed_defaults_to_empty():
+    """배포 환경에서 ALLOWED_ORIGINS 미설정이면 어떤 오리진도 허용하지 않는다.
+
+    구 코드는 AWS_LAMBDA_FUNCTION_NAME 유무로 판별했는데 ECS에는 그 변수가 없어
+    배포 환경에서도 localhost가 조용히 허용됐다.
+    """
+    from app import main
+    assert main.resolve_allowed_origins(None, True) == []
+
+
+def test_resolve_allowed_origins_local_defaults_to_localhost():
+    from app import main
+    assert main.resolve_allowed_origins(None, False) == [
+        "http://localhost:3100", "http://127.0.0.1:3100"]
+
+
+def test_resolve_allowed_origins_rejects_wildcard():
+    from app import main
+    with pytest.raises(RuntimeError, match="not allowed"):
+        main.resolve_allowed_origins("https://a.example,*", True)

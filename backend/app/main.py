@@ -3,28 +3,40 @@ import logging
 import os
 from pathlib import Path
 
-if not os.environ.get("AWS_LAMBDA_FUNCTION_NAME"):      # 로컬에서만 .env 로드
+# 배포 환경 판별 — ECS·Lambda 어디서도 성립하는 명시적 신호를 쓴다.
+# (구 코드는 AWS_LAMBDA_FUNCTION_NAME 유무로 판별해 ECS에서 항상 '로컬'로 오판했다)
+IS_DEPLOYED = os.environ.get("APP_ENV", "").strip().lower() == "production"
+
+if not IS_DEPLOYED:                                     # 로컬에서만 .env 로드
     from dotenv import load_dotenv
     load_dotenv(Path(__file__).parents[2] / ".env")
 
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
-from mangum import Mangum
 
 from app import security
 from app.routes import cards, dashboard, kpi, progress, widget
 
-# 배포 환경에서 미설정 CORS가 전체 허용으로 열리지 않게 한다. 로컬만 명시적인 localhost 기본값을
-# 쓰고, Lambda는 SAM 파라미터로 전달된 오리진만 허용한다.
-_origin_default = "" if os.environ.get("AWS_LAMBDA_FUNCTION_NAME") else "http://localhost:3100,http://127.0.0.1:3100"
-ALLOWED_ORIGINS = [o.strip() for o in os.environ.get("ALLOWED_ORIGINS", _origin_default).split(",") if o.strip()]
-if "*" in ALLOWED_ORIGINS:
-    raise RuntimeError("ALLOWED_ORIGINS='*' is not allowed; configure explicit frontend origins")
 
-# 로깅: Lambda·로컬 양쪽에서 app 로거(LLM 실패 경고 등)가 보이도록 최소 설정만 한다.
+def resolve_allowed_origins(raw: str | None, is_deployed: bool) -> list[str]:
+    """CORS 허용 오리진 결정.
+
+    배포 환경에서 미설정 CORS가 전체 허용이나 localhost 허용으로 새지 않게 한다.
+    로컬만 명시적인 localhost 기본값을 쓰고, 배포는 빈 목록이 기본이다.
+    """
+    default = "" if is_deployed else "http://localhost:3100,http://127.0.0.1:3100"
+    origins = [o.strip() for o in (default if raw is None else raw).split(",") if o.strip()]
+    if "*" in origins:
+        raise RuntimeError("ALLOWED_ORIGINS='*' is not allowed; configure explicit frontend origins")
+    return origins
+
+
+ALLOWED_ORIGINS = resolve_allowed_origins(os.environ.get("ALLOWED_ORIGINS"), IS_DEPLOYED)
+
+# 로깅: 컨테이너 stdout을 awslogs 드라이버가 CloudWatch로 보낸다.
 LOG_LEVEL = os.environ.get("LOG_LEVEL", "INFO")
-if not logging.getLogger().handlers:    # uvicorn·Lambda가 이미 붙인 핸들러는 덮지 않는다
+if not logging.getLogger().handlers:    # uvicorn이 이미 붙인 핸들러는 덮지 않는다
     logging.basicConfig(level=LOG_LEVEL)
 logging.getLogger("app").setLevel(LOG_LEVEL)
 
@@ -100,6 +112,3 @@ def health():
             "demo_read_only": security.demo_read_only(),
             "data_loaded": all(datasets[n] for n in REQUIRED_DATASETS),
             "datasets": datasets}
-
-
-handler = Mangum(app)   # Lambda 진입점
