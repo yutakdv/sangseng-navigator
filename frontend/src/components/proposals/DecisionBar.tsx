@@ -58,7 +58,10 @@ export function DecisionBar({
     "min-h-11 rounded-lg px-4 py-2 text-sm font-bold transition-colors disabled:cursor-not-allowed disabled:opacity-45";
 
   return (
-    <div className="fixed inset-x-0 bottom-0 z-40 border-t border-admin-border bg-admin-surface shadow-header lg:left-[272px]">
+    <div
+      data-tour="decision"
+      className="fixed inset-x-0 bottom-0 z-40 border-t border-admin-border bg-admin-surface shadow-header lg:left-[272px]"
+    >
       <div
         role="group"
         aria-label="담당자 결정"

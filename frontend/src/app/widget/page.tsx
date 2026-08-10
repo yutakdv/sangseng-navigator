@@ -5,6 +5,7 @@ import { CategoryIcon } from "@/components/CategoryIcon";
 import { Icon } from "@/components/Icon";
 import { KakaoMapView } from "@/components/KakaoMapView";
 import { TodayPick } from "@/components/TodayPick";
+import { TourOverlay } from "@/components/tour/TourOverlay";
 import { WidgetLiveRefresh } from "@/components/WidgetLiveRefresh";
 import { api } from "@/lib/api";
 import { CATEGORIES, REGIONS, REGION_TOOLTIP, VISITOR_SOURCE_NOTE } from "@/lib/constants";
@@ -157,6 +158,7 @@ export default async function WidgetPage({ searchParams }: { searchParams: Promi
         {/* 시행 중인 페이백은 전 항목 공통 — 목록을 스크롤하기 전에 상단에서 먼저 알린다 (카드 배지는 유지) */}
         {payback ? (
           <div
+            data-tour="widget-payback"
             className={`mx-5 mt-5 flex items-start gap-3 rounded-2xl bg-visitor-primary-soft px-4 py-3.5 ring-1 ring-inset ring-visitor-primary/20 sm:mx-8 ${live ? "motion-safe:animate-pop" : ""}`}
           >
             <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-visitor-primary text-white">
@@ -330,6 +332,8 @@ export default async function WidgetPage({ searchParams }: { searchParams: Promi
           인센티브 정책
         </Link>
       </p>
+      {/* /widget은 AdminShell을 쓰지 않으므로(방문객 화면) 여기서 직접 마운트한다 */}
+      <TourOverlay />
     </div>
   );
 }

@@ -266,9 +266,11 @@ export function DashboardOverview({
                           : "근거 차트 → 3·5·7% 시나리오 비교 → 담당자 결정"}
                       </p>
                     </div>
-                    {/* 상세로 가는 유일한 경로 */}
+                    {/* 상세로 가는 유일한 경로 — 가이드 투어 2단계가 이 href를 읽어 다음 목적지로 쓴다(카드 id가 동적이라
+                        nextHrefFromAnchor 방식이 필요하다). WorkQueue 줄은 `?selected=`만 갈아 끼울 뿐 상세로 가지 않는다. */}
                     <Link
                       href={`/proposals/${selected.id}`}
+                      data-tour="first-proposal"
                       className="inline-flex min-h-11 items-center gap-2 rounded-xl bg-admin-primary px-5 py-2.5 text-sm font-bold text-white transition-colors hover:bg-admin-primary-strong"
                     >
                       근거·전망 검토하기
