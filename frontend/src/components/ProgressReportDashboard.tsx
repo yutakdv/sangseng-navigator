@@ -367,67 +367,104 @@ export function ProgressReportDashboard({
  * 지표 메타를 통째로 받는다 — 라벨·아이콘·단위·소수 자리를 호출부에서 하나씩 넘기던 시절엔
  * 같은 표가 화면마다 조금씩 달라졌다. 정본은 lib/progressMetrics의 PROGRESS_METRICS 하나다.
  */
+/**
+ * 지표 하나의 관측 변화 타일.
+ *
+ * 예전에는 상자 안에 상자가 세 겹이었다 — 틴트 카드(테두리) 안에 점선 빈 상태 상자,
+ * 그리고 `성과 판정 · 개선`이 링 두른 초록 막대로 가로를 다 먹었다. 라벨도 다섯 개
+ * (기초 평균·최신 평균·관측 변화·성과 판정·표본)가 숫자 셋을 둘러싸고 있어, 정작
+ * 무엇이 주인공인지 보이지 않았다.
+ *
+ * 이 섹션의 이름이 `실제 관측 성과 변화`이므로 **변화량이 주인공**이다. 변화량 하나를
+ * 크게 세우고 나머지는 그 아래 조용한 보조선으로 내린다:
+ *   ▲ 104건            ← 22px, 방향색
+ *   개선 · 기초 대비 +13.2%
+ *   ────────────────
+ *   791건 → 895건 · 표본 2개 카드
+ *
+ * 판정은 색 막대가 아니라 **점 + 글자**로 말한다. 막대는 카드마다 초록 띠를 만들어
+ * "전부 좋음"이라는 인상을 먼저 주는데, 그건 판정이 아니라 장식이다 (13 §4 색은 신호일 때만).
+ * 테두리도 걷었다 — 패널 안의 중첩 블록은 면 한 단(surface-sunken)으로 충분히 갈린다.
+ */
 function MetricChangeCard({ meta, change }: { meta: ProgressMetricMeta; change: ProgressMetricChange }) {
   const { label, icon, unit: valueUnit, deltaUnit, digits } = meta;
   const verdict = improvementVerdict(change.improvement);
+  const comparable = change.sample_size > 0 && change.delta !== null;
+
   return (
-    <article className="flex min-w-0 flex-col rounded-xl border border-admin-border bg-admin-surface-sunken p-3.5">
-      <div className="flex items-center gap-2">
-        <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-admin-surface text-admin-text-muted shadow-card">
-          <Icon name={icon} size={14} />
-        </span>
-        <h3 className="break-keep text-[13px] font-bold text-admin-text">{label}</h3>
+    <article className="flex min-w-0 flex-col rounded-xl bg-admin-surface-sunken p-4">
+      <div className="flex min-w-0 items-center gap-1.5">
+        <Icon name={icon} size={13} className="shrink-0 text-admin-text-muted" />
+        <h3 className="min-w-0 break-keep text-[12px] font-semibold text-admin-text-muted">
+          {label}
+        </h3>
         {/* 절대 규칙 2 — 지역 전환율이 보이는 모든 화면에 근사 지표 배지 병기 */}
         {meta.key === PROXY_METRIC_KEY ? <ProxyBadge note={PROXY_NOTE} /> : null}
       </div>
 
-      {change.sample_size > 0 && change.delta !== null ? (
+      {comparable ? (
         <>
-          <dl className="mt-3 grid grid-cols-2 gap-2 text-xs">
-            <div>
-              <dt className="text-admin-text-muted">기초 평균</dt>
-              <dd className="mt-0.5 font-semibold tabular-nums text-admin-text">
-                {metricValue(change.baseline_average, valueUnit, digits)}
-              </dd>
-            </div>
-            <div>
-              <dt className="text-admin-text-muted">최신 평균</dt>
-              <dd className="mt-0.5 font-semibold tabular-nums text-admin-text">
-                {metricValue(change.latest_average, valueUnit, digits)}
-              </dd>
-            </div>
-          </dl>
-          <div className="mt-3 border-t border-admin-border pt-3">
-            <p className="mb-1 text-[11px] font-semibold text-admin-text-muted">관측 변화</p>
-            {/*
-              BE `delta_unit`(count·KRW·%p·point)은 계약값이라 그대로 두고, 화면 단위는
-              PROGRESS_METRICS의 `deltaUnit` 한 표에서만 가져온다 — 예전처럼 계약값을 그대로
-              붙이면 집중도가 "0.60point"로 영문이 새고, 같은 화면 아래 흐름 섹션의 "0.60점"과
-              단위가 갈린다.
-            */}
-            <DeltaValue value={change.delta} unit={deltaUnit} digits={digits} />
-            {change.relative_change_pct !== null ? (
-              <p className="mt-1 text-[11px] tabular-nums text-admin-text-muted">
-                기초 평균 대비 {change.relative_change_pct > 0 ? "+" : ""}{change.relative_change_pct.toFixed(1)}%
-              </p>
-            ) : null}
+          {/*
+            BE `delta_unit`(count·KRW·%p·point)은 계약값이라 그대로 두고, 화면 단위는
+            PROGRESS_METRICS의 `deltaUnit` 한 표에서만 가져온다 — 예전처럼 계약값을 그대로
+            붙이면 집중도가 "0.60point"로 영문이 새고, 같은 화면 아래 흐름 섹션의 "0.60점"과
+            단위가 갈린다.
+          */}
+          <div className="mt-2.5">
+            <DeltaValue
+              value={change.delta}
+              unit={deltaUnit}
+              digits={digits}
+              variant="text"
+              className="text-[22px] font-bold leading-none tracking-[-0.02em]"
+            />
           </div>
-          <p className={`mt-3 rounded-lg px-2.5 py-2 text-xs font-bold ring-1 ring-inset ${verdict.tone}`}>
-            성과 판정 · {verdict.label}
+
+          <p className="mt-2 flex flex-wrap items-center gap-x-1.5 gap-y-1 text-[11px] leading-4">
+            <span className={`inline-flex items-center gap-1 font-semibold ${verdict.text}`}>
+              <span aria-hidden className={`h-1.5 w-1.5 rounded-full ${verdict.dot}`} />
+              {verdict.label}
+            </span>
+            {change.relative_change_pct !== null ? (
+              <>
+                <span aria-hidden className="text-admin-text-muted">·</span>
+                <span className="tabular-nums text-admin-text-muted">
+                  기초 대비 {change.relative_change_pct > 0 ? "+" : ""}
+                  {change.relative_change_pct.toFixed(1)}%
+                </span>
+              </>
+            ) : null}
           </p>
+
+          {/* 기초→최신과 표본을 한 줄에 `·`로 잇지 않는다 — 좁은 칸에서 줄이 바뀌면
+              가운뎃점만 앞 줄 끝에 홀로 남는다. 두 줄로 고정해 다섯 칸의 높이도 맞춘다 */}
+          <div className="mt-auto border-t border-admin-border pt-2.5 text-[11px] leading-4 text-admin-text-muted">
+            <p className="flex flex-wrap items-center gap-x-1.5">
+              <span className="tabular-nums">
+                {metricValue(change.baseline_average, valueUnit, digits)}
+              </span>
+              <Icon name="arrowRight" size={10} strokeWidth={2} className="shrink-0" />
+              <span className="font-semibold tabular-nums text-admin-text">
+                {metricValue(change.latest_average, valueUnit, digits)}
+              </span>
+            </p>
+            <p className="mt-0.5 tabular-nums">표본 {change.sample_size}개 카드</p>
+          </div>
         </>
       ) : (
-        <div className="mt-3 flex flex-1 flex-col justify-center rounded-lg border border-dashed border-admin-border bg-admin-surface px-3 py-5 text-center">
-          <p className="text-[13px] font-semibold text-admin-text">비교 전</p>
-          <p className="mt-1 break-keep text-[11px] leading-4 text-admin-text-muted">
+        <>
+          <p className="mt-2.5 text-[15px] font-bold leading-none text-admin-text-muted">비교 전</p>
+          <p className="mt-2 break-keep text-[11px] leading-4 text-admin-text-muted">
             {/* 원천 공개 데이터에 금액 필드가 없어 시드가 지어내지 않는다 (13 §2-13) — 의도된 공백임을 밝힌다 */}
             {meta.key === "spend_krw"
               ? "원천 공개 데이터에 금액 필드가 없어, 담당자 실측 입력 전까지 비워 둡니다."
               : "같은 카드의 실측값을 두 번 이상 입력해야 합니다."}
           </p>
-        </div>
+          <p className="mt-auto border-t border-admin-border pt-2.5 text-[11px] tabular-nums leading-4 text-admin-text-muted">
+            표본 {change.sample_size}개 카드
+          </p>
+        </>
       )}
-      <p className="mt-2 text-[11px] tabular-nums text-admin-text-muted">표본 {change.sample_size}개 카드</p>
     </article>
   );
 }
@@ -762,17 +799,22 @@ const metricValue = (value: number | null, unit: string, digits: number): string
   })}${unit}`;
 };
 
+/**
+ * 개선 판정 — 채움 막대가 아니라 점 + 글자로 말한다.
+ * 방향(▲▼)과 판정(개선·악화)은 다른 축이다: 지역 소비 집중도는 값이 내려가야 개선이라
+ * `▼`인데 `개선`이다. 그래서 delta의 방향색과 이 색을 따로 둔다.
+ */
 const improvementVerdict = (
   improvement: number | null,
-): { label: string; tone: string } => {
+): { label: string; text: string; dot: string } => {
   if (improvement === null) {
-    return { label: "판정 불가", tone: "bg-state-notice-bg text-state-notice ring-state-notice-line" };
+    return { label: "판정 불가", text: "text-admin-text-muted", dot: "bg-admin-text-muted" };
   }
   if (improvement > 0) {
-    return { label: "개선", tone: "bg-state-good-bg text-state-good ring-state-good-line" };
+    return { label: "개선", text: "text-state-good", dot: "bg-state-good" };
   }
   if (improvement < 0) {
-    return { label: "악화", tone: "bg-state-warn-bg text-state-warn ring-state-warn-line" };
+    return { label: "악화", text: "text-state-warn", dot: "bg-state-warn" };
   }
-  return { label: "변화 없음", tone: "bg-state-notice-bg text-state-notice ring-state-notice-line" };
+  return { label: "변화 없음", text: "text-admin-text-muted", dot: "bg-admin-text-muted" };
 };
