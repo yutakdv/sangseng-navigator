@@ -41,8 +41,8 @@ type Item = {
 /**
  * 사이드바에 자기 항목이 있는 대시보드 데모 화면. `지역 소비 분석`은 이 값들을 자기 것으로
  * 보지 않고 넘겨준다 — 그러지 않으면 목록에서 먼저 나오는 `지역 소비 분석`이 항상 먼저
- * 걸려 아래 두 항목이 켜질 차례가 오지 않는다. 여기 없는 `demo` 값(`report` 등)은 전용 항목이
- * 없으므로 `지역 소비 분석`이 그대로 활성이다.
+ * 걸려 `가맹점 후보`(하위)·`데이터 활용 정보`(별도 그룹)가 켜질 차례가 오지 않는다.
+ * 여기 없는 `demo` 값(`report` 등)은 전용 항목이 없으므로 `지역 소비 분석`이 그대로 활성이다.
  */
 const DASHBOARD_DEMO_ITEMS = ["merchant", "data"];
 
@@ -84,7 +84,7 @@ const GROUPS: { title: string; items: Item[] }[] = [
     ],
   },
   {
-    title: "분석과 전달",
+    title: "분석",
     items: [
       {
         label: "지역 소비 분석",
@@ -92,20 +92,31 @@ const GROUPS: { title: string; items: Item[] }[] = [
         href: "/dashboard",
         note: "지역·업종별 소비 신호 진단",
         match: (p, q) => p === "/dashboard" && !DASHBOARD_DEMO_ITEMS.includes(q.get("demo") ?? ""),
+        children: [
+          {
+            // 별도 경로가 아니라 /dashboard 안의 한 섹션(#merchant-candidates)이다 —
+            // 같은 화면의 하위 작업이므로 `추진 기록 입력`과 같은 연결선 구조로 묶는다
+            label: "가맹점 후보",
+            icon: "store",
+            href: "/dashboard?demo=merchant#merchant-candidates",
+            note: "후보·기존 가맹점 원본 확인",
+            desktopOnly: true,
+            match: (p, q) => p === "/dashboard" && q.get("demo") === "merchant",
+          },
+        ],
       },
+    ],
+  },
+  {
+    // 출처·기준 시점 확인은 소비 신호를 읽는 "분석"과 업무 목적이 다르다(검증) —
+    // 같은 /dashboard 안에 있어도 담당자가 찾는 업무 객체 기준으로 그룹을 가른다 (GROUPS 원칙)
+    title: "데이터 활용",
+    items: [
       {
-        label: "가맹점 후보",
-        icon: "store",
-        href: "/dashboard?demo=merchant#merchant-candidates",
-        note: "후보·기존 가맹점 원본 확인",
-        desktopOnly: true,
-        match: (p, q) => p === "/dashboard" && q.get("demo") === "merchant",
-      },
-      {
-        label: "데이터 출처",
+        label: "데이터 활용 정보",
         icon: "database",
         href: "/dashboard?demo=data#data-demo",
-        note: "공개 최신본과 실시간 원천 상태",
+        note: "지표 원천·기준 시점·비공개 내역",
         desktopOnly: true,
         match: (p, q) => p === "/dashboard" && q.get("demo") === "data",
       },
