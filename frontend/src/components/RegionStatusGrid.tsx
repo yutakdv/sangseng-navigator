@@ -30,7 +30,7 @@ export function RegionStatusGrid({
   selectedRegions?: string[];
   targetRegion?: string | null;
   onlyRegion?: string | null;
-  /** 카드마다 지역 상세 존으로 가는 링크를 단다 — 이 그리드가 탐색 진입점을 겸할 때만 */
+  /** 카드마다 지역 상세 분석 화면으로 가는 링크를 단다 — 이 그리드가 탐색 진입점을 겸할 때만 */
   withDetailLink?: boolean;
 }) {
   const shareByRegion = new Map(shares.map((row) => [row.region, row]));
@@ -135,7 +135,7 @@ export function RegionStatusGrid({
 
             {withDetailLink ? (
               <Link
-                href={`/dashboard?region=${encodeURIComponent(region)}#region-detail`}
+                href={`/dashboard/region?region=${encodeURIComponent(region)}`}
                 className="mt-3 inline-flex items-center gap-1 text-[11px] font-semibold text-admin-primary underline-offset-4 hover:underline"
               >
                 이 지역 상세 분석

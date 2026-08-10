@@ -87,15 +87,26 @@ const GROUPS: { title: string; items: Item[] }[] = [
     title: "분석",
     items: [
       {
+        // 부모 자체가 "전체 지역" 화면이다 — 같은 경로를 가리키는 `전체 지역 현황` 하위를
+        // 따로 두지 않는다. 그러면 한 화면에 메뉴가 두 줄이 되어 "활성은 정확히 하나"가 깨진다.
+        // 전체↔개별 구분은 부제(note)와 하위 `지역 상세 분석`의 대비가 말한다.
         label: "지역 소비 분석",
         icon: "chart",
         href: "/dashboard",
-        note: "지역·업종별 소비 신호 진단",
+        note: "전체 지역 현황·추이 진단",
         match: (p, q) => p === "/dashboard" && !DASHBOARD_DEMO_ITEMS.includes(q.get("demo") ?? ""),
         children: [
           {
-            // 별도 경로가 아니라 /dashboard 안의 한 섹션(#merchant-candidates)이다 —
-            // 같은 화면의 하위 작업이므로 `추진 기록 입력`과 같은 연결선 구조로 묶는다
+            // 별도 화면(모집단이 지역 한 곳) — `추진 경과 리포트 → 추진 기록 입력`과 같은 관계다.
+            // 모바일에서도 감추지 않는다: 보조 앵커가 아니라 그 자체로 목적지인 화면이다.
+            label: "지역 상세 분석",
+            icon: "pin",
+            href: "/dashboard/region",
+            note: "지역별 업종 구성·시간 패턴",
+            match: (p) => p === "/dashboard/region",
+          },
+          {
+            // 별도 경로가 아니라 /dashboard 안의 한 섹션(#merchant-candidates)이다
             label: "가맹점 후보",
             icon: "store",
             href: "/dashboard?demo=merchant#merchant-candidates",

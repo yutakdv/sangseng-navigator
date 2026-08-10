@@ -40,6 +40,8 @@ const PATHS = {
 
   /* 방향 */
   arrowRight: "M4.6 12h14.2M13.4 6.6 18.8 12l-5.4 5.4",
+  /** arrowRight를 좌우 반전한 것 — 상세 화면에서 목록·개요로 돌아가는 복귀 링크에 쓴다 */
+  arrowLeft: "M19.4 12H5.2M10.6 6.6 5.2 12l5.4 5.4",
   arrowUpRight: "M7.6 16.4 16.4 7.6M9 7.6h7.4V15",
   chevronRight: "M9.4 5.8 15.6 12l-6.2 6.2",
   menu: "M4 7h16M4 12h16M4 17h16",

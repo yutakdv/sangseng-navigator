@@ -2,47 +2,33 @@ import type { Metadata } from "next";
 import { AdminShell } from "@/components/AdminShell";
 import { GradeChip, PrivacyBadge, ProxyBadge } from "@/components/Badge";
 import { DashboardToc } from "@/components/DashboardToc";
+import { EmptyChart } from "@/components/EmptyChart";
 import { Icon } from "@/components/Icon";
 import { KpiCard } from "@/components/KpiCard";
 import { PageHeader } from "@/components/PageHeader";
-import { RegionFilter } from "@/components/RegionFilter";
 import { RegionStatusGrid } from "@/components/RegionStatusGrid";
 import { MenuDemoGuide } from "@/components/MenuDemoGuide";
 import { GroupHeading, Section } from "@/components/Section";
 import { BarRank } from "@/components/charts/BarRank";
 import { CategoryDonut } from "@/components/charts/CategoryDonut";
-import { DailyTrend } from "@/components/charts/DailyTrend";
 import { LineTrend } from "@/components/charts/LineTrend";
 import { ScaleCompare } from "@/components/charts/ScaleCompare";
 import { api } from "@/lib/api";
 import { REGIONS, REGION_TOOLTIP, STABILITY_NOTE } from "@/lib/constants";
-import { monthLabel, num, pct, ratioPct, signed } from "@/lib/format";
-import {
-  regionCategoryShare,
-  regionCategoryWeekdays,
-  regionDailySeries,
-  regionMonthlyTrend,
-  regionWeekdayAverages,
-  overallWeekdayInsight,
-  regionWeekdayInsight,
-  shiftWindowLabel,
-  topCategoryShifts,
-  USAGE_REGION_FOOTNOTE,
-} from "@/lib/regionAnalysis";
+import { monthLabel, num, pct } from "@/lib/format";
 
-export const metadata: Metadata = { title: "지역 소비 분석 · 상생 나침반" };
+export const metadata: Metadata = { title: "전체 지역 현황 · 상생 나침반" };
 
 // mock/실 API 어느 쪽이든 매 요청 최신 상태를 읽는다 (승인 → KPI 반영이 데모 동선이라 캐시하지 않는다)
 export const dynamic = "force-dynamic";
 
 /**
- * 존 목차 — 항목 순서가 곧 페이지 순서다. id는 각 존 래퍼(#overview 등)와
- * SideNav·데모 딥링크가 쓰는 기존 앵커(#merchant-candidates·#data-demo)의 상위 존에 건다.
+ * 존 목차 — 항목 순서가 곧 페이지 순서다. 마지막 항목은 SideNav의 `데이터 활용 정보`와
+ * 데모 딥링크가 함께 쓰는 기존 앵커(#data-demo)를 그대로 가리킨다.
  */
 const TOC = [
   { id: "overview", label: "현황" },
   { id: "trends", label: "추이 · 분포" },
-  { id: "region-detail", label: "지역 상세" },
   { id: "evidence", label: "제안 근거" },
   { id: "data-demo", label: "데이터" },
 ];
@@ -53,34 +39,34 @@ const TOC = [
  * 서버 컴포넌트다 — mock JSON은 서버에서만 읽히고 브라우저 번들에 실리지 않는다.
  * 차트만 `"use client"`(Recharts는 브라우저 전용)이며 이미 가공된 작은 배열만 props로 받는다.
  *
- * 정보 구조는 **존 4개 + 데이터 검증**으로 가른다 — 담당자의 질문 순서가 곧 존 순서다:
- *   ① 현황(#overview)      지금 어떤 상태인가 — KPI 4장 + 지역별 현재 상태(탐색 진입점)
- *   ② 추이·분포(#trends)   어떻게 변해왔나 — 전체 지역 기준의 시간·공간 축
- *   ③ 지역 상세(#region-detail)  이 지역은 왜 그런가 — 선택 지역만의 드릴다운(틴트 컨테이너)
- *   ④ 제안 근거(#evidence) 그래서 어디에 처방하나 — 1·2단계 스코어 + 접힌 배경·주의
- * 존 하나 = 모집단 하나(전체 ↔ 선택 지역)라, 기준이 바뀌는 지점이 곧 존 경계다 —
- * 예전처럼 "상단 지표는 전체 기준입니다" 설명 문단으로 때우지 않는다.
+ * **페이지 하나 = 모집단 하나.** 이 화면의 모든 값은 6개 지역 전체 기준이고,
+ * 지역 한 곳으로 좁힌 값(업종 구성·시간 패턴)은 전부 `/dashboard/region`에 있다.
+ * 예전에는 두 모집단이 한 페이지에 번갈아 나와(전체 → 선택 지역 → 다시 전체) 스크롤
+ * 위치마다 기준을 다시 판단해야 했다 — 그 경계를 페이지로 끌어올린 것이 이 구조다.
+ *
+ * 남은 세 존은 담당자의 질문 순서를 따른다:
+ *   ① 현황(#overview)      지금 어떤 상태인가 — KPI 4장 + 지역별 현재 상태(상세로 가는 진입점)
+ *   ② 추이·분포(#trends)   어떻게 변해왔나 — 월별 흐름·지역/업종 분포·스케일 비교
+ *   ③ 제안 근거(#evidence) 그래서 어디에 처방하나 — 1·2단계 스코어 + 접힌 배경·주의
+ * 1·2단계 스코어가 여기 남는 이유: 모집단이 6개 지역 전체(순위표·후보 풀)이고,
+ * 진단에서 처방으로 이어지는 근거가 진단과 같은 화면에 있어야 감사 가능하다(절대 규칙 5).
  * 정책 운영 KPI(카드 상태값)는 소비 데이터가 아니므로 추진 경과 리포트(/tracking#kpi)로 옮겼다.
  */
 export default async function DashboardPage({
   searchParams,
 }: {
-  searchParams: Promise<{ region?: string; demo?: string }>;
+  searchParams: Promise<{ demo?: string }>;
 }) {
   const sp = await searchParams;
-  const selectedRegion = REGIONS.includes(sp.region as (typeof REGIONS)[number])
-    ? (sp.region as (typeof REGIONS)[number])
-    : null;
   // `report`는 운영 KPI가 /tracking으로 옮겨 가면서 전용 안내가 없어졌다 — 알 수 없는 값과
   // 같이 취급되어 기본 화면이 뜬다 (SideNav의 DASHBOARD_DEMO_ITEMS와 짝).
   const demo = sp.demo === "merchant" || sp.demo === "data" ? sp.demo : null;
 
-  const [d, cand, risk, usageLedger, usageDaily] = await Promise.all([
+  const [d, cand, risk, usageLedger] = await Promise.all([
     api.dashboard(),
     api.candidates(),
     api.riskSignal(),
     api.usageMonthly(),
-    api.usageDaily(),
   ]);
 
   // 음수/0·빈 배열 방어 (F5 검증 항목) — 데이터가 없으면 차트 대신 안내 문구를 낸다
@@ -97,8 +83,7 @@ export default async function DashboardPage({
     visitors: m.visitors,
     uses: m.local_uses,
   }));
-  // 지역 고정 순서로 정렬 — 값 순 정렬은 하지 않는다(색·순서 고정 원칙, 13 §5).
-  // 지역 필터로 좁히지도 않는다 — 추이·분포 존은 항상 전체 지역 기준이다 (존=모집단 원칙).
+  // 지역 고정 순서로 정렬 — 값 순 정렬은 하지 않는다(색·순서 고정 원칙, 13 §5)
   const regionBars = REGIONS.map((r) => {
     const row = (d.region_share ?? []).find((x) => x.region === r);
     return {
@@ -122,38 +107,6 @@ export default async function DashboardPage({
 
   // 소표본 보호 고지 — 원장 쪽 값이 정본이고, 구형 산출물에는 아예 없을 수 있어 둘 다 가드한다
   const privacy = usageLedger.privacy_meta ?? d.privacy_meta ?? null;
-  const privacyK = privacy?.k ?? 5;
-
-  // 지역 드릴다운 파생값 — 지역을 선택했을 때만 계산·렌더한다 (원장은 서버에서만 읽는다)
-  const ledgerRows = usageLedger.usage ?? [];
-  const ledgerMonths = usageLedger.months ?? [];
-  const regionDonut = selectedRegion
-    ? regionCategoryShare(ledgerRows, selectedRegion)
-    : { shares: [], suppressed: [] };
-  // 지역 월 합계는 억제 영향이 없는 monthly_by_region을 1순위로 읽는다 — 원장 셀만 더하면
-  // 비공개 셀만큼 비어 실제보다 낮게 그려진다 (regionMonthlyTrend 주석 참고)
-  const regionTrend = selectedRegion
-    ? regionMonthlyTrend(ledgerRows, ledgerMonths, selectedRegion, d.monthly_by_region ?? [])
-    : { points: [], basis: "ledger" as const };
-  const regionShifts = selectedRegion ? topCategoryShifts(ledgerRows, ledgerMonths, selectedRegion) : [];
-  // 비공개 업종 목록 — 도넛·추이·상세 표 세 곳이 같은 문장을 쓰도록 여기서 한 번만 만든다
-  const hiddenLabel = regionDonut.suppressed.join(" · ");
-  const hasHidden = regionDonut.suppressed.length > 0;
-  // 라벨과 계산이 같은 창 정의를 쓰도록 regionAnalysis가 한 곳에서 만든다 (6개월 미만이면 null)
-  const shiftWindow = shiftWindowLabel(ledgerMonths);
-  // 일·요일 축 (usage_daily — 피드백 ⑦). 관측 집계라 전망 문구·근사 배지 대상이 아니다 (설계 08-08)
-  const weekdayBars = selectedRegion ? regionWeekdayAverages(usageDaily, selectedRegion) : [];
-  const weekdayInsight = selectedRegion ? regionWeekdayInsight(usageDaily, selectedRegion) : null;
-  // 전 지역 기준선 — 지역 리듬이 "다르다"는 말은 비교 대상이 화면에 함께 있어야 성립한다
-  const overallWeekday = selectedRegion ? overallWeekdayInsight(usageDaily) : null;
-  const categoryWeekdays = selectedRegion ? regionCategoryWeekdays(usageDaily, selectedRegion) : [];
-  // 요일 축은 산출물이 달라(usage_daily) 억제 여부를 따로 읽는다 — 두 파일이 어긋나도 화면은 각자 사실대로 말한다
-  const hiddenWeekdayLabel = categoryWeekdays
-    .filter((r) => r.suppressed)
-    .map((r) => r.category)
-    .join(" · ");
-  const dailySeries = selectedRegion ? regionDailySeries(usageDaily, selectedRegion) : [];
-  const dailyPeriod = usageDaily.period;
 
   return (
     <AdminShell dashboard={d}>
@@ -161,8 +114,8 @@ export default async function DashboardPage({
         <PageHeader
           icon="chart"
           eyebrow="진단"
-          title="지역 소비 분석"
-          lede="석탄산업전환지역(구 폐광지역) 4개 시군(정선·태백·영월·삼척 도계읍)에서 하이원포인트(강원랜드 방문객이 적립해 지역 가맹점에서 쓰는 포인트) 소비가 어디에 얼마나 몰려 있는지 본다. 이 화면의 값이 확충 제안의 정량 출발점이다."
+          title="전체 지역 현황"
+          lede="석탄산업전환지역(구 폐광지역) 4개 시군(정선·태백·영월·삼척 도계읍)에서 하이원포인트(강원랜드 방문객이 적립해 지역 가맹점에서 쓰는 포인트) 소비가 어디에 얼마나 몰려 있는지 본다. 이 화면의 값은 모두 6개 지역 전체 기준이며, 지역 한 곳으로 좁혀 보려면 각 지역 카드의 상세 분석으로 들어간다. 이 화면의 값이 확충 제안의 정량 출발점이다."
         >
           <p className="u-note mt-2 flex flex-wrap items-center gap-x-2">
             <Icon name="database" size={13} />
@@ -172,9 +125,9 @@ export default async function DashboardPage({
 
         <DashboardToc items={TOC} />
 
-        {/* ══ 존 ① 현황 — 전체 그림 먼저: KPI 4장 + 지역별 현재 상태(탐색 진입점) ══ */}
+        {/* ══ 존 ① 현황 — 전체 그림 먼저: KPI 4장 + 지역별 현재 상태(상세 진입점) ══ */}
         <section id="overview" aria-label="현황" className="flex scroll-mt-32 flex-col gap-6">
-          <GroupHeading note="전체 지역 기준 — 원천 데이터에서 바로 계산한 값">현황</GroupHeading>
+          <GroupHeading note="원천 데이터에서 바로 계산한 값">현황</GroupHeading>
           {/* alignDivider: 증감 배지가 있는 카드(전환율·사용 건수)와 없는 카드(집중도·분산도)가
               한 행에 섞여 있어, 구분선을 하단 정렬로 통일한다 — 이 4장에만 적용 */}
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
@@ -225,11 +178,11 @@ export default async function DashboardPage({
           </div>
 
           {/* 6개 지역 비교표가 첫 조망이다 — 여기서 이상한 지역을 발견하고 카드의 상세 링크로
-              지역 상세 존에 진입하는 것이 이 페이지의 기본 탐색 동선이다 */}
+              지역 상세 분석 화면에 진입하는 것이 이 페이지의 기본 탐색 동선이다 */}
           <Section
             icon="map"
             title="지역별 현재 상태"
-            desc="6개 지역을 같은 기준으로 나란히 비교한다. 누적 사용 건수·전체 비중·최근 월 흐름·1단계 진단 순위를 함께 표시한다."
+            desc="6개 지역을 같은 기준으로 나란히 비교한다. 누적 사용 건수·전체 비중·최근 월 흐름·1단계 진단 순위를 함께 표시한다. 지역 한 곳의 업종 구성·시간 패턴은 카드의 상세 분석에서 본다."
           >
             <RegionStatusGrid
               shares={d.region_share ?? []}
@@ -241,9 +194,9 @@ export default async function DashboardPage({
           </Section>
         </section>
 
-        {/* ══ 존 ② 추이 · 분포 — 전체 지역 기준의 시간·공간 축 ══ */}
+        {/* ══ 존 ② 추이 · 분포 — 시간·공간 축 ══ */}
         <section id="trends" aria-label="추이와 분포" className="flex scroll-mt-32 flex-col gap-6">
-          <GroupHeading note="전체 지역 기준 — 월별 흐름과 분포">추이 · 분포</GroupHeading>
+          <GroupHeading note="월별 흐름과 분포">추이 · 분포</GroupHeading>
           <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
             <Section
               icon="trend"
@@ -312,306 +265,7 @@ export default async function DashboardPage({
           </Section>
         </section>
 
-        {/* ══ 존 ③ 지역 상세 — 여기서만 모집단이 "선택 지역"으로 바뀐다.
-            존 전체를 라벤더 틴트 컨테이너 하나로 감싸 경계를 색면으로 말하고,
-            지역 필터도 자기가 지배하는 영역의 머리인 이 존 헤더에 둔다 ══ */}
-        <section id="region-detail" aria-label="지역 상세 분석" className="scroll-mt-32">
-          <div className="rounded-3xl border border-lavender-200 bg-lavender-50/70 p-4 sm:p-5">
-            <div className="flex flex-wrap items-center gap-x-3 gap-y-2 px-0.5">
-              <h2 className="text-[13px] font-bold uppercase tracking-[0.12em] text-admin-text-muted">
-                지역 상세 분석
-              </h2>
-              {selectedRegion ? (
-                <span className="inline-flex items-center gap-1.5 rounded-full bg-admin-primary px-2.5 py-1 text-[11px] font-bold text-white">
-                  <Icon name="pin" size={12} />
-                  {selectedRegion} 기준
-                </span>
-              ) : (
-                <span className="u-note">지역을 고르면 이 영역이 그 지역 기준으로 열립니다</span>
-              )}
-              <span aria-hidden className="h-px min-w-8 flex-1 bg-lavender-200" />
-            </div>
-
-            <div className="mt-3">
-              <RegionFilter selectedRegion={selectedRegion} />
-            </div>
-
-            {selectedRegion ? (
-              <div className="mt-4 flex flex-col gap-6">
-                {/* ── 소그룹 A: 업종 구성 ─────────────────────────── */}
-                <GroupHeading note="지역×업종×월 원장에서 집계 — 원 업종 분류 기준">
-                  업종 구성
-                </GroupHeading>
-                <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-                  <Section
-                    icon="scatter"
-                    title={`${selectedRegion} 업종 구성`}
-                    badge={hasHidden ? <PrivacyBadge note={privacy?.note} k={privacyK} /> : null}
-                    desc="전 기간 누적 사용 건수를 표시 6분류로 집계했다."
-                  >
-                    {regionDonut.shares.length ? (
-                      <>
-                        <CategoryDonut data={regionDonut.shares} height={240} />
-                        {/* 억제 업종을 말없이 빼면 "그 업종 소비가 없다"로 읽힌다 — 뺀 사실과 이유를 밝힌다 */}
-                        {hasHidden ? (
-                          <p className="u-note mt-3 border-t border-admin-border pt-2.5">
-                            가맹점 {privacyK}곳 미만인 업종({hiddenLabel})은 개별 사업자가 역산될 수 있어
-                            건수를 비공개 처리했고, 이 도넛과 총 건수에서도 뺐습니다 — 여기 비중은 값이
-                            공개된 {regionDonut.shares.length}개 업종의 합을 100%로 본 값이라 지역 전체
-                            소비와 다릅니다. 지역 전체 규모는 아래 시간 패턴의 월별 추이에서 보십시오.
-                          </p>
-                        ) : null}
-                      </>
-                    ) : (
-                      <EmptyChart />
-                    )}
-                  </Section>
-                  <Section
-                    icon="report"
-                    title={`${selectedRegion} 상위 업종 상세`}
-                    badge={hasHidden ? <PrivacyBadge note={privacy?.note} k={privacyK} /> : null}
-                    desc={`누적 사용 건수 상위 업종을 원 업종 분류 그대로 보여준다.${shiftWindow ? ` 증감은 ${shiftWindow}한 값이다.` : ""}`}
-                  >
-                    {regionShifts.length ? (
-                      <>
-                        <div className="u-scroll-x">
-                          <table className="u-table min-w-[520px]">
-                            <thead>
-                              <tr>
-                                <th scope="col">업종</th>
-                                <th scope="col" className="text-right">누적 사용</th>
-                                <th scope="col" className="text-right">지역 내 비중</th>
-                                <th scope="col" className="text-right">최근 3개월</th>
-                                <th scope="col" className="text-right">직전 대비</th>
-                              </tr>
-                            </thead>
-                            <tbody>
-                              {regionShifts.map((s) =>
-                                // 억제 업종은 행을 지우지 않는다 — 사라지면 "소비가 없는 업종"으로 읽힌다
-                                s.suppressed ? (
-                                  <tr key={s.category}>
-                                    <td className="font-medium">{s.category}</td>
-                                    <td
-                                      colSpan={4}
-                                      className="text-right text-admin-text-muted"
-                                      title={privacy?.note ?? undefined}
-                                    >
-                                      표본 보호로 비공개
-                                    </td>
-                                  </tr>
-                                ) : (
-                                  <tr key={s.category}>
-                                    <td className="font-medium">{s.category}</td>
-                                    <td className="text-right tabular-nums">{num(s.count)}건</td>
-                                    <td className="text-right tabular-nums text-admin-text-muted">
-                                      {ratioPct(s.share)}
-                                    </td>
-                                    <td className="text-right tabular-nums text-admin-text-muted">
-                                      {num(s.recent)}건
-                                    </td>
-                                    <td className="text-right font-semibold tabular-nums">
-                                      {s.changePct === null ? (
-                                        <span className="font-normal text-admin-text-muted">비교 불가</span>
-                                      ) : (
-                                        // 0자리 반올림이면 ±0.x%가 "▲0%"로 찍혀 화살표와 크기가 모순된다
-                                        signed(s.changePct, "%", 1)
-                                      )}
-                                    </td>
-                                  </tr>
-                                ),
-                              )}
-                            </tbody>
-                          </table>
-                        </div>
-                        {hasHidden ? (
-                          <p className="u-note mt-3 border-t border-admin-border pt-2.5">
-                            가맹점 {privacyK}곳 미만인 업종은 개별 사업자가 역산될 수 있어 건수를 비공개
-                            처리했습니다. 지역 내 비중은 값이 공개된 업종의 합을 분모로 계산한 값입니다.
-                          </p>
-                        ) : null}
-                        <p className="u-note mt-3 border-t border-admin-border pt-2.5">
-                          {USAGE_REGION_FOOTNOTE}
-                        </p>
-                      </>
-                    ) : (
-                      <EmptyChart />
-                    )}
-                  </Section>
-                </div>
-
-                {/* ── 소그룹 B: 시간 패턴 (월·요일·일 — usage_daily는 피드백 ⑦) ── */}
-                <GroupHeading note="월·요일·일 축에서 본 소비 리듬 — 관측 집계라 전망 문구 대상이 아니다">
-                  시간 패턴
-                </GroupHeading>
-                <Section
-                  icon="trend"
-                  title={`${selectedRegion} 월별 사용 추이`}
-                  badge={hasHidden ? <PrivacyBadge note={privacy?.note} k={privacyK} /> : null}
-                  desc="월별 하이원포인트 사용 건수 합계."
-                >
-                  {regionTrend.points.some((p) => p.value > 0) ? (
-                    <>
-                      <LineTrend data={regionTrend.points} unit="건" />
-                      {hasHidden ? (
-                        <p className="u-note mt-3 border-t border-admin-border pt-2.5">
-                          {regionTrend.basis === "dashboard"
-                            ? `비공개 셀(${hiddenLabel})을 빼고 더하면 이 지역 합계가 실제보다 낮게 보이므로, 이 추이는 셀 비공개 이전 원값 기준 지역 합계로 그렸습니다. 대신 이 지역의 월 합계만 ${privacy?.aggregate_rounding.unit ?? 100}단위로 반올림해 발행하므로 각 점에 ±${Math.round((privacy?.aggregate_rounding.unit ?? 100) / 2)}건의 표기 오차가 있습니다.`
-                            : `비공개 셀(${hiddenLabel})이 빠져 있어 이 추이는 지역 전체 소비보다 낮습니다 — 값이 공개된 업종만 더한 합계입니다.`}
-                        </p>
-                      ) : null}
-                    </>
-                  ) : (
-                    <EmptyChart />
-                  )}
-                </Section>
-
-                <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-                  <Section
-                    icon="calendar"
-                    title={`${selectedRegion} 요일별 사용 패턴`}
-                    desc={`요일별 하루 평균 사용 건수 — ${dailyPeriod.start.slice(0, 4)}년 ${dailyPeriod.days}일 일 단위 집계.`}
-                  >
-                    {weekdayBars.length ? (
-                      <>
-                        {weekdayInsight ? (
-                          <p className="mb-2 rounded-lg bg-admin-primary-soft px-3 py-2 text-[13px] text-admin-text">
-                            <span className="font-semibold">{weekdayInsight.maxLabel}요일</span>이 하루
-                            평균 <span className="font-semibold tabular-nums">{num(weekdayInsight.maxAvg)}건</span>으로
-                            가장 많다
-                            {weekdayInsight.weekendVsWeekdayPct === null
-                              ? "."
-                              : ` — 주말 하루 평균은 주중 대비 ${signed(weekdayInsight.weekendVsWeekdayPct, "%", 1)}.`}
-                          </p>
-                        ) : null}
-                        {overallWeekday ? (
-                          <p className="u-note mb-2">
-                            전 지역 기준: {overallWeekday.maxLabel}요일 하루 평균{" "}
-                            <span className="font-semibold tabular-nums">{num(overallWeekday.maxAvg)}건</span>
-                            {overallWeekday.minLabel && overallWeekday.maxVsMinPct !== null
-                              ? ` (최저 ${overallWeekday.minLabel}요일 대비 ${signed(overallWeekday.maxVsMinPct ?? 0, "%", 1)})`
-                              : ""}
-                            . 지역마다 몰리는 요일이 다릅니다.
-                          </p>
-                        ) : null}
-                        <BarRank data={weekdayBars} unit="건" height={236} />
-                        {/* 옆 표의 공개 업종만 더하면 이 막대에 못 미친다 — 두 값이 어긋나 보이지 않게 밝힌다 */}
-                        {hiddenWeekdayLabel ? (
-                          <p className="u-note mt-3 border-t border-admin-border pt-2.5">
-                            이 막대는 지역 일별 집계에서 만든 지역 전체 합계라 비공개 업종
-                            ({hiddenWeekdayLabel})까지 포함합니다 — 오른쪽 업종별 표의 공개 업종을
-                            더한 값보다 큽니다.
-                          </p>
-                        ) : null}
-                      </>
-                    ) : (
-                      <EmptyChart />
-                    )}
-                  </Section>
-                  <Section
-                    icon="list"
-                    title={`${selectedRegion} 업종별 요일 패턴`}
-                    badge={hiddenWeekdayLabel ? <PrivacyBadge note={privacy?.note} k={privacyK} /> : null}
-                    desc="표시 6분류별로 사용이 가장 몰리는 요일과 주중·주말 하루 평균을 비교한다."
-                  >
-                    {categoryWeekdays.length ? (
-                      <div className="u-scroll-x">
-                        <table className="u-table min-w-[420px]">
-                          <thead>
-                            <tr>
-                              <th scope="col">업종</th>
-                              <th scope="col" className="text-right">최대 요일</th>
-                              <th scope="col" className="text-right">주중 하루 평균</th>
-                              <th scope="col" className="text-right">주말 하루 평균</th>
-                              <th scope="col" className="text-right">주말 - 주중</th>
-                            </tr>
-                          </thead>
-                          <tbody>
-                            {categoryWeekdays.map((row) =>
-                              // 문구는 위 상위 업종 표와 같은 것을 쓴다 — 같은 셀을 화면마다 달리 부르지 않는다
-                              row.suppressed ? (
-                                <tr key={row.category}>
-                                  <td className="font-medium">{row.category}</td>
-                                  <td
-                                    colSpan={4}
-                                    className="text-right text-admin-text-muted"
-                                    title={privacy?.note ?? undefined}
-                                  >
-                                    표본 보호로 비공개
-                                  </td>
-                                </tr>
-                              ) : (
-                                <tr key={row.category}>
-                                  <td className="font-medium">{row.category}</td>
-                                  <td className="text-right">{row.maxLabel}</td>
-                                  <td className="text-right tabular-nums text-admin-text-muted">
-                                    {num(row.weekdayAvg)}건
-                                  </td>
-                                  <td className="text-right tabular-nums text-admin-text-muted">
-                                    {num(row.weekendAvg)}건
-                                  </td>
-                                  <td className="text-right font-semibold tabular-nums">
-                                    {row.weekendVsWeekdayPct === null ? (
-                                      <span className="font-normal text-admin-text-muted">비교 불가</span>
-                                    ) : (
-                                      signed(row.weekendVsWeekdayPct, "%", 1)
-                                    )}
-                                  </td>
-                                </tr>
-                              ),
-                            )}
-                          </tbody>
-                        </table>
-                      </div>
-                    ) : (
-                      <EmptyChart />
-                    )}
-                    {hiddenWeekdayLabel ? (
-                      <p className="u-note mt-3 border-t border-admin-border pt-2.5">
-                        가맹점 {privacyK}곳 미만인 업종({hiddenWeekdayLabel})은 요일 축에서도 건수를
-                        비공개 처리했습니다. 공개 업종 값은 차분으로 되살아나지 않도록{" "}
-                        {privacy?.aggregate_rounding.unit ?? 100} 단위로 반올림해 발행합니다.
-                      </p>
-                    ) : null}
-                  </Section>
-                </div>
-
-                <Section
-                  icon="trend"
-                  title={`${selectedRegion} 일별 사용 추이`}
-                  desc="일별 사용 건수(옅은 선)와 7일 이동평균(진한 선) — 주말 파동과 계절 흐름이 함께 보인다."
-                >
-                  {dailySeries.length ? (
-                    <>
-                      <DailyTrend data={dailySeries} />
-                      <p className="u-note mt-3 border-t border-admin-border pt-2.5">
-                        {USAGE_REGION_FOOTNOTE}
-                      </p>
-                    </>
-                  ) : (
-                    <EmptyChart />
-                  )}
-                </Section>
-              </div>
-            ) : (
-              /* 존 자체는 항상 이 자리에 있다 — 선택에 따라 통째로 나타났다 사라지면
-                 페이지의 심상 지도가 흔들린다. 미선택 시에는 안내 카드 하나만 둔다. */
-              <div className="mt-4 rounded-2xl border border-dashed border-lavender-200 bg-admin-surface px-4 py-8 text-center">
-                <span className="mx-auto flex h-11 w-11 items-center justify-center rounded-full bg-lavender-100 text-lavender-700">
-                  <Icon name="pin" size={20} />
-                </span>
-                <p className="mt-3 text-[15px] font-semibold text-admin-text">
-                  아직 선택한 지역이 없습니다
-                </p>
-                <p className="mx-auto mt-1.5 max-w-xl break-keep text-[13px] leading-6 text-admin-text-muted">
-                  위 필터나 현황의 지역 카드에서 지역을 고르면 그 지역의 업종 구성·월별 추이·상위
-                  업종·요일과 일별 패턴이 여기에 열립니다. (예: 진단 1위 영월군)
-                </p>
-              </div>
-            )}
-          </div>
-        </section>
-
-        {/* ══ 존 ④ 제안의 정량 근거 — 관측값이 아니라 파생 스코어 층위 ══ */}
+        {/* ══ 존 ③ 제안의 정량 근거 — 관측값이 아니라 파생 스코어 층위 ══ */}
         <section id="evidence" aria-label="제안의 정량 근거" className="flex scroll-mt-32 flex-col gap-6">
           <GroupHeading note="AI 제안이 딛고 선 정량 값 — 순위는 화면에서 감추지 않는다">
             제안의 정량 근거
@@ -815,8 +469,7 @@ export default async function DashboardPage({
         </section>
 
         {/* ══ 데이터 검증 — 분석이 아니라 "무엇으로 계산했는가"의 확인 영역.
-            SideNav의 `데이터 활용 정보` 메뉴가 이 앵커(#data-demo)를 가리킨다.
-            장기적으로는 별도 라우트 분리 후보(네비 재편 기록 참고) ══ */}
+            SideNav의 `데이터 활용 정보` 메뉴가 이 앵커(#data-demo)를 가리킨다 ══ */}
         <Section
           id="data-demo"
           icon="database"
@@ -828,7 +481,7 @@ export default async function DashboardPage({
               icon="database"
               title="데이터 관리 데모"
               description={`현재 화면은 ${d.period_note} 데이터를 기준으로 그려집니다. 원천 파일을 바꾸는 대신, 어떤 데이터가 의사결정에 쓰였는지 확인합니다.`}
-              steps={["푸터의 원천 데이터 출처를 확인합니다.", "기준 시점과 산출일을 확인합니다.", "수치 이상 시 지역 소비 분석과 원천 파일을 함께 점검합니다."]}
+              steps={["푸터의 원천 데이터 출처를 확인합니다.", "기준 시점과 산출일을 확인합니다.", "수치 이상 시 전체 지역 현황과 원천 파일을 함께 점검합니다."]}
             />
           ) : null}
           <div className="rounded-xl bg-admin-surface-sunken px-3.5 py-3 text-xs leading-5 text-admin-text-muted">
@@ -868,13 +521,5 @@ export default async function DashboardPage({
         </Section>
       </div>
     </AdminShell>
-  );
-}
-
-function EmptyChart() {
-  return (
-    <div className="flex h-[180px] items-center justify-center rounded-xl border border-dashed border-admin-border bg-admin-surface-sunken text-[13px] text-admin-text-muted">
-      표시할 데이터가 없습니다
-    </div>
   );
 }
