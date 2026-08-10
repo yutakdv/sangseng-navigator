@@ -56,15 +56,18 @@ export function RegionalMapSection({ statuses }: { statuses: RegionStatus[] }) {
 
   return (
     <div>
-      <div className="rounded-2xl border border-admin-border bg-admin-surface-sunken/40 p-3 sm:p-5">
-        <RegionalMap
-          selectedId={selected?.id ?? null}
-          onRegionSelect={(region) => {
-            triggerRef.current = document.activeElement;
-            setSelected(region);
-            setOpen(true);
-          }}
-        />
+      {/* 지도 상자 — 테두리·틴트 없이 흰 면. 폭 80%(가운데 정렬)로 여백을 둔다 */}
+      <div className="rounded-2xl bg-[#ffffff] p-3 sm:p-5">
+        <div className="mx-auto w-full sm:w-4/5">
+          <RegionalMap
+            selectedId={selected?.id ?? null}
+            onRegionSelect={(region) => {
+              triggerRef.current = document.activeElement;
+              setSelected(region);
+              setOpen(true);
+            }}
+          />
+        </div>
         <p className="mt-2 flex items-center gap-1.5 px-1 text-[11px] text-admin-text-muted">
           <Icon name="info" size={12} />
           실제 행정구역 경계 기반 · 정선군은 고한읍·사북읍을 제외한 잔여 지역, 삼척시는
