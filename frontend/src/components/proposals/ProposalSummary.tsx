@@ -44,7 +44,7 @@ export function ProposalSummary({
   const isExpansion = card.type === "EXPANSION";
 
   const title = (
-    <h2 className="mt-2 max-w-3xl break-keep text-[24px] font-bold leading-[1.3] tracking-[-0.03em] text-lavender-950 sm:text-[30px]">
+    <h2 className="mt-2 break-keep text-[24px] font-bold leading-[1.3] tracking-[-0.03em] text-lavender-950 sm:text-[30px]">
       {titleHref ? (
         <Link href={titleHref} className="after:absolute after:inset-0 after:content-['']">
           {card.title}
@@ -71,7 +71,7 @@ export function ProposalSummary({
         {isExpansion ? "가맹점 확충 제안" : "인센티브 정책 제안"}
       </p>
       {title}
-      <p className="mt-3 max-w-3xl break-keep text-sm leading-7 text-admin-text-soft">
+      <p className="mt-3 break-keep text-sm leading-7 text-admin-text-soft">
         {card.ai.comparison}
       </p>
 

@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 import { Icon, type IconName } from "@/components/Icon";
+import { sentenceLines } from "@/lib/sentences";
 
 /**
  * 본문 패널 (docs/plan/13 §6).
@@ -13,7 +14,6 @@ export function Section({
   icon,
   badge,
   desc,
-  wideDesc = false,
   right,
   children,
   id,
@@ -22,11 +22,6 @@ export function Section({
   icon?: IconName;
   badge?: ReactNode;
   desc?: ReactNode;
-  /**
-   * 설명의 최대 폭 제한(max-w-3xl)을 푼다. 기본 제한은 긴 문단의 행길이를 읽기 좋게
-   * 묶는 장치인데, 한 문장이 제한 폭보다 조금 길어 공간이 남는데도 두 줄로 꺾일 때만 켠다.
-   */
-  wideDesc?: boolean;
   right?: ReactNode;
   children: ReactNode;
   id?: string;
@@ -45,13 +40,10 @@ export function Section({
               <h2 className="u-h2">{title}</h2>
               {badge}
             </div>
+            {/* 폭 제한 없음 — 패널이 이미 폭을 정한다 (PageHeader의 lede와 같은 규칙) */}
             {desc ? (
-              <p
-                className={`mt-1.5 break-keep text-[13px] leading-[1.6] text-admin-text-muted ${
-                  wideDesc ? "" : "max-w-3xl"
-                }`}
-              >
-                {desc}
+              <p className="mt-1.5 break-keep text-[13px] leading-[1.6] text-admin-text-muted">
+                {sentenceLines(desc)}
               </p>
             ) : null}
           </div>

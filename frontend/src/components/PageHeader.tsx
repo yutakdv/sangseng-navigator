@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 import { Icon, type IconName } from "@/components/Icon";
+import { sentenceLines } from "@/lib/sentences";
 
 /**
  * 화면 제목 블록 (docs/plan/13 §6).
@@ -12,7 +13,6 @@ export function PageHeader({
   eyebrow,
   title,
   lede,
-  wideLede = false,
   badge,
   actions,
   children,
@@ -22,12 +22,6 @@ export function PageHeader({
   eyebrow?: string;
   title: string;
   lede?: ReactNode;
-  /**
-   * 설명의 최대 폭 제한(max-w-3xl)을 푼다. 기본 제한은 긴 문단의 행길이를 읽기 좋게 묶는
-   * 장치인데, 한 문장이 제한 폭을 조금 넘어 공간이 남는데도 접힐 때만 켠다
-   * (Section의 `wideDesc`와 같은 규칙).
-   */
-  wideLede?: boolean;
   /** 제목 옆 고지 배지 (`근사 지표` 등) */
   badge?: ReactNode;
   /** 오른쪽 액션 (카드 생성 버튼 등) */
@@ -54,9 +48,10 @@ export function PageHeader({
             </div>
           </div>
         </div>
-        {lede ? (
-          <p className={`u-lede mt-2.5 ${wideLede ? "" : "max-w-3xl"}`}>{lede}</p>
-        ) : null}
+        {/* 폭 제한을 걸지 않는다 — 페이지 컨테이너(max-w-6xl·5xl)가 이미 행길이를 정한다.
+            여기에 max-w를 한 번 더 두면 오른쪽에 공간이 남는데도 문장이 중간에서 접혀,
+            문장이 끝나서가 아니라 상자가 좁아서 줄이 바뀌는 것처럼 보인다. */}
+        {lede ? <p className="u-lede mt-2.5">{sentenceLines(lede)}</p> : null}
         {children}
       </div>
       {actions ? <div className="shrink-0">{actions}</div> : null}

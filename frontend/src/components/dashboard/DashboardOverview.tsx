@@ -131,11 +131,11 @@ export function DashboardOverview({
               <span className="block">{operatorGreeting}</span>
               오늘 결정할 사안을 확인합니다
             </h1>
-            <p className="mt-2.5 max-w-2xl break-keep text-sm leading-7 text-admin-text-soft sm:text-[15px]">
+            <p className="mt-2.5 break-keep text-sm leading-7 text-admin-text-soft sm:text-[15px]">
               강원랜드 하이원포인트(방문객이 적립해 지역 가맹점에서 쓰는 포인트)의 소비가
               석탄산업전환지역(구 폐광지역) 4개 시군 어디에 쏠렸는지 진단하고, 이번 분기 가맹점 확충과 인센티브를 결정합니다.
             </p>
-            <p className="mt-1.5 max-w-2xl break-keep text-[13px] leading-6 text-admin-text-muted">
+            <p className="mt-1.5 break-keep text-[13px] leading-6 text-admin-text-muted">
               AI 제안은 결론이 아닙니다 — 근거와 예상 효과를 상세에서 확인한 뒤 담당자가 결정합니다.
               포인트 적립률·발행액은 그대로 두고, 이미 적립된 포인트의 지역 사용만 다룹니다.
             </p>
@@ -149,7 +149,7 @@ export function DashboardOverview({
               // 종료시켜 하이드레이션이 깨진다(HTML은 <p> 안에 <ul>을 허용하지 않는다).
               <div
                 data-tour="impact-hero"
-                className="mt-3 flex max-w-2xl flex-wrap items-center gap-2 break-keep text-[15px] leading-relaxed text-admin-text"
+                className="mt-3 flex flex-wrap items-center gap-2 break-keep text-[15px] leading-relaxed text-admin-text"
               >
                 <span>
                   지역 전환율을 <strong className="font-bold">1%p</strong> 끌어올리면 연간 지역 사용이

@@ -145,7 +145,6 @@ export default async function DashboardPage({
           <Section
             icon="map"
             title="지역별 현재 상태"
-            wideDesc
             desc="실제 행정구역 경계 지도에서 지역을 고르면 누적 사용 건수·전체 비중·최근 월 흐름·1단계 진단 순위가 열린다. 지역 한 곳의 업종 구성·시간 패턴은 카드의 상세 분석에서 본다."
           >
             <RegionalMapSection
@@ -446,7 +445,7 @@ export default async function DashboardPage({
                   막대로 그리면 "차이가 있는 것처럼" 보이므로(설명 문구와 모순) 수치 나열 + 요약 문장만 쓴다 */}
               <div className="rounded-xl border border-admin-border p-4">
                 <h3 className="u-h3">운영 2년 미만 사업자 비중</h3>
-                <p className="u-note mt-1.5 max-w-3xl break-keep">
+                <p className="u-note mt-1.5 break-keep">
                   국세청 사업자등록 데이터 기준 — 지역 상권의 배경 정보다. 4개 시군 편차가 0.5%p
                   수준이라 지역 간 비교나 순위 근거로는 쓰지 않는다.
                 </p>
@@ -486,7 +485,7 @@ export default async function DashboardPage({
               {stability !== null && stability !== undefined ? (
                 <div className="rounded-xl border border-admin-border p-4">
                   <h3 className="u-h3">추천 순위 안정도 · 해석 주의</h3>
-                  <p className="u-note mt-1.5 max-w-3xl break-keep">{STABILITY_NOTE}</p>
+                  <p className="u-note mt-1.5 break-keep">{STABILITY_NOTE}</p>
                   <div className="mt-3 flex items-baseline gap-1.5">
                     <span className="text-[32px] font-bold leading-none tabular-nums text-admin-text">
                       {stability}
