@@ -137,7 +137,10 @@ export function DashboardOverview({
                 화면에 그리는 숫자는 impact_meta.per_pp_additional_uses 하나뿐이다. 구형 응답에는
                 필드가 없을 수 있어 가드로 감싼다. */}
             {dashboard.impact_meta ? (
-              <p
+              // <p>가 아니라 <div>다 — 애초에 flex 컨테이너로 쓰고 있어 의미상으로도 맞고,
+              // 안의 SourceChip 팝오버가 <ul>을 그려 <p> 자식으로 두면 브라우저가 <p>를 조기
+              // 종료시켜 하이드레이션이 깨진다(HTML은 <p> 안에 <ul>을 허용하지 않는다).
+              <div
                 data-tour="impact-hero"
                 className="mt-3 flex max-w-2xl flex-wrap items-center gap-2 break-keep text-[15px] leading-relaxed text-admin-text"
               >
@@ -162,7 +165,7 @@ export function DashboardOverview({
                   version={datasetVersion()}
                   privacy={dashboard.privacy_meta}
                 />
-              </p>
+              </div>
             ) : null}
           </div>
 
