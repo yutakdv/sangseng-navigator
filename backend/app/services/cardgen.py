@@ -182,10 +182,14 @@ def _weekday_signal(target: dict) -> dict | None:
     avg = [round(c / d, 1) for c, d in zip(counts, days)]
     weekday_avg = sum(counts[:5]) / sum(days[:5])          # 인덱스 0~4 = 월~금 (dayofweek 계약)
     weekend_avg = sum(counts[5:]) / sum(days[5:])
+    # 요일 라벨(usage_daily.json weekday_labels)도 페이로드로 그대로 나가는 표시값이다 — 길이 검증
+    # (`len(labels) != 7`)은 이미 위에서 원본으로 끝났으므로, 여기서는 표시용 사본만 따로 만든다.
+    # 인덱스 순서를 그대로 보존하므로 avg/최대값 계산과는 무관하다.
+    clean_labels = [_clean_external(label) for label in labels]
     return {
         "집계_대상": scope,
-        "요일별_하루평균_건수": dict(zip(labels, avg)),
-        "최대_요일": labels[max(range(7), key=lambda i: avg[i])],
+        "요일별_하루평균_건수": dict(zip(clean_labels, avg)),
+        "최대_요일": clean_labels[max(range(7), key=lambda i: avg[i])],
         "주중_대비_주말_배율": round(weekend_avg / weekday_avg, 2) if weekday_avg else None,
         "출처": "하이원포인트 사용현황 일 단위 집계 (2025년 365일)",
     }
@@ -199,7 +203,10 @@ def _build_inputs(cands: list, cards: list, selected_target: dict) -> dict:
         eup = (c.get("target") or {}).get("eup")
         if (c.get("status") == "approved" and c.get("type") == "EXPANSION" and eup
                 and _is_recent(c, cutoff)):
-            adopted[eup] = adopted.get(eup, 0) + 1
+            # 카드에 저장된 target.eup은 정제 전 원본이다(카드 생성 시 candidates.json 값을 그대로
+            # 복사) — rejected(⑤)와 동일하게 페이로드로 나가는 키만 정제한다 (리뷰 지적: B2 비대칭).
+            eup_display = _clean_external(eup)
+            adopted[eup_display] = adopted.get(eup_display, 0) + 1
     rejected = [                                        # ⑤ 같은 타깃의 rejected 이력 (최근 창 안)
         {"타깃": f"{_clean_external((c.get('target') or {}).get('eup'))} "
                 f"{_clean_external((c.get('target') or {}).get('category'))}",
@@ -209,6 +216,11 @@ def _build_inputs(cands: list, cards: list, selected_target: dict) -> dict:
         risk = dataload.load("risk_signal")             # ⑥ 참고용 — 없으면 컷 (07 문서 B4)
     except FileNotFoundError:
         risk = []
+    # dataload.load는 lru_cache로 같은 객체를 계속 돌려주므로(다른 라우트도 공유) 원본을 그대로
+    # mutate하지 않고 표시용 사본만 만든다. sigungu는 통계청 시군구 4종 고정값이라 실위험은
+    # 낮지만(보고서 §4·6 근거) 페이로드로 그대로 나가는 값이라 일관되게 정제한다.
+    risk = [{**r, "sigungu": _clean_external(r["sigungu"])} if isinstance(r, dict) and "sigungu" in r else r
+            for r in risk]
     # 후보 상호명·읍명·업종명은 소진공 상가정보 등 외부 원본에서 온 자유 텍스트다 — LLM 입력에
     # 실기 전에 격리 블록 탈출 토큰을 지운다(B2). 정량 순위·Score 등 서버 산출 수치는 그대로 둔다.
     target_eup = _clean_external(selected_target["eup"])
@@ -561,11 +573,16 @@ def _generate_incentive(cards: list) -> tuple[dict, bool]:
     try:
         dash = dataload.load("dashboard")
         rates = [m["rate"] for m in dash["conversion"]["monthly"]]
+        # dashboard.json도 lru_cache 공유 객체라 mutate하지 않고 표시용 사본만 만든다
+        # (risk_signal과 동일한 이유 — _build_inputs 위 주석 참고).
+        region_share = [{**r, "region": _clean_external(r["region"])}
+                        if isinstance(r, dict) and "region" in r else r
+                        for r in dash["region_share"]]
         payload = {
             "페이백_시나리오(팀_설정_가정)": SCENARIOS,
             "지역_전환율_근사지표(%)": {"최근": dash["conversion"]["headline_rate"],
                                  "월별_범위": [min(rates), max(rates)]},
-            "지역별_사용_비중": dash["region_share"],
+            "지역별_사용_비중": region_share,
         }
         out = llm.generate_json(
             prompts.INCENTIVE_PROMPT,
