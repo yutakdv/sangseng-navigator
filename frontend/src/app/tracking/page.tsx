@@ -291,12 +291,12 @@ export default async function TrackingPage({
                   어느 쪽이 정본인지 흐려지고, 이 목록의 주인공인 카드가 아래로 밀린다. */}
               <ul className="flex flex-col gap-3">
                 {rows.map((card) => (
-                  /* 카드 한 장 — 테두리 대신 면 한 단(surface-sunken)으로 갈린다. 예전에는
-                     테두리 상자 안에 `다음 행동` 라벤더 바(링), 우측 `실행 기록` 상자(링),
-                     그 안의 접이 패널까지 상자가 세 겹이었고 라벤더 면이 카드마다 깔려
-                     정작 무엇을 눌러야 하는지 묻혔다. 지금은 가로 실선 두 개로만 나눈다:
+                  /* 카드 한 장 — 바깥 테두리는 그대로 두고 **안쪽** 상자만 걷어냈다. 예전에는
+                     이 테두리 안에 `다음 행동` 라벤더 바(링)와 우측 `실행 기록` 상자(링)가
+                     또 있어 상자가 세 겹이었고, 라벤더 면이 카드마다 깔려 정작 무엇을 눌러야
+                     하는지 묻혔다. 지금은 가로 실선 두 개로만 나눈다:
                      [머리: 식별·상태·조작] / [다음 행동] / [더 보기]. */
-                  <li key={card.id} className="rounded-xl bg-admin-surface-sunken p-4">
+                  <li key={card.id} className="rounded-xl border border-admin-border p-4">
                     <div className="flex flex-col gap-4 sm:flex-row sm:items-start">
                       <div className="min-w-0 flex-1">
                         <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
@@ -426,7 +426,7 @@ export default async function TrackingPage({
                               </summary>
                               {/* 타임라인의 점은 ring-4 ring-admin-surface로 세로선을 끊는다 —
                                   배경이 sunken이면 그 링이 떠 보이므로 surface 위에 얹는다 */}
-                              <div className="mt-2 rounded-xl border border-admin-border bg-admin-surface p-3">
+                              <div className="mt-2 rounded-xl bg-admin-surface-sunken p-3">
                                 {entry && !entry.failed ? (
                                   <ProgressRecordTimeline
                                     records={entry.records}
@@ -616,7 +616,7 @@ function DoneNote({ card }: { card: Card }) {
   const href = region ? `/widget?${new URLSearchParams({ region })}` : "/widget";
 
   return (
-    <div className="mt-3 rounded-xl bg-state-good-bg px-3.5 py-3 ring-1 ring-inset ring-state-good-line">
+    <div className="mt-3 rounded-xl bg-state-good-bg px-3.5 py-3">
       <p className="flex items-start gap-2 break-keep text-[13px] leading-5 text-admin-text">
         <Icon name="check" size={15} strokeWidth={2} className="mt-0.5 text-state-good" />
         <span>

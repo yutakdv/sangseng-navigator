@@ -44,10 +44,10 @@ export function RankTrace({ card, size = "sm" }: { card: Card; size?: "sm" | "md
 
   return (
     <div
-      className={`flex flex-wrap items-center gap-x-3 gap-y-2 rounded-xl px-3 py-2.5 ring-1 ring-inset ${
-        adjusted
-          ? "bg-admin-primary-soft ring-admin-primary-line"
-          : "bg-admin-surface-sunken ring-admin-border"
+      // 테두리(ring) 없이 면 한 단으로만 구분한다 — 이 블록은 늘 다른 카드·패널 안에 들어가
+      // 링을 두르면 상자가 두 겹이 된다 (조정 카드는 라벤더 면이 그 사실을 이미 말한다)
+      className={`flex flex-wrap items-center gap-x-3 gap-y-2 rounded-xl px-3 py-2.5 ${
+        adjusted ? "bg-admin-primary-soft" : "bg-admin-surface-sunken"
       }`}
     >
       <RankBox
