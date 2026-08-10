@@ -10,7 +10,7 @@
 2. 대기하는 동안: **파일데이터 3종 다운로드** → `data/raw/` — §2 (✅ 확보 완료)
 3. Kakao REST 키 발급 (5분) — §3
 4. LLM 키 발급 (5분) — §4
-5. AWS CLI + SAM CLI 셋업 — §5
+5. AWS CLI + Docker 셋업 — §5
 6. GitHub 초기 커밋 (현재 커밋 0개 — **커밋이 있어야 Vercel Import 가능**) + **FE 팀원
    콜라보레이터 초대** (Private 단계에서는 초대 없이 clone 불가) — 제출 시 Public 전환
    전제이므로 첫 커밋부터 키·개인정보 금지 (12 문서 §4)
@@ -135,8 +135,8 @@ cp "바이브코딩캠프_파일데이터/국세청_사업자현황_존속연수
 | 액세스 키 발급 | https://console.aws.amazon.com → IAM → [사용자] → 본인 사용자 → [보안 자격 증명] 탭 → [액세스 키 만들기] → 용도 "CLI" 선택 |
 | CLI 설정 | 터미널 `aws configure` → Access Key ID / Secret / 리전 `ap-northeast-2` / 출력 `json` |
 | 확인 | `aws sts get-caller-identity` 가 계정 번호를 출력하면 성공 |
-| SAM CLI | `brew install aws-sam-cli` → `sam --version` 확인 |
-| CARDS_TABLE | 1차 배포(`infra/deploy-backend.sh`) 후 출력되는 Outputs의 `CardsTable` 값을 `.env`의 `CARDS_TABLE=`에 붙여넣기 |
+| Docker | Docker Desktop 실행 → `docker info` 성공 (ARM64 이미지 빌드에 필요) |
+| CARDS_TABLE | foundation 스택이 `sangseng-cards` 로 고정 생성한다 — `.env` 는 비워 두면 된다 |
 
 > IAM 사용자 권한: 캠프 기간에는 `AdministratorAccess`로 진행해도 무방(개인 계정·기간 한정).
 > 종료 후 액세스 키 비활성화.
@@ -147,7 +147,7 @@ cp "바이브코딩캠프_파일데이터/국세청_사업자현황_존속연수
 |---|---|
 | 가입 | https://vercel.com → **Continue with GitHub** (레포 접근 권한 부여) |
 | 프로젝트 생성 | [Add New] > [Project] → 이 레포 선택 → **Root Directory를 `frontend`로 변경** → Deploy |
-| 환경변수 | 프로젝트 [Settings] > [Environment Variables] → `NEXT_PUBLIC_API_BASE` = SAM Outputs의 `ApiUrl` (Production·Preview 모두 체크) → 저장 후 [Redeploy] |
+| 환경변수 | 프로젝트 [Settings] > [Environment Variables] → `NEXT_PUBLIC_API_BASE` = service 스택 Outputs의 `ApiUrl`(끝 슬래시 없이) (Production·Preview 모두 체크) → 저장 후 [Redeploy] |
 | 확인 | 발급된 `https://<project>.vercel.app` 접속 |
 
 ## 7. FE 팀원 준비물
@@ -173,7 +173,7 @@ cp "바이브코딩캠프_파일데이터/국세청_사업자현황_존속연수
   전환 순간 공개되므로, 아래 원칙은 처음 커밋부터 적용한다
 - `기획서_V.I.B.E.pdf`는 대표자 휴대전화 번호 포함 — **커밋 금지** (.gitignore 등재됨)
 - 코드·커밋·mock JSON에 API 키 절대 포함 금지 (.env만)
-- Lambda로 올라가는 키는 LLM 키뿐 — SAM 파라미터(NoEcho)로 주입 (09 문서).
+- 컨테이너로 올라가는 키는 LLM 키와 변경 API 토큰뿐 — SSM Parameter Store SecureString 으로 주입 (09 문서).
   공공데이터·지오코딩 키는 파이프라인(로컬)에서만 사용되므로 AWS에 올라가지 않는다
 - 키가 실수로 커밋되면: 즉시 해당 키 재발급(로테이션) 후 이력 정리
 
@@ -182,6 +182,6 @@ cp "바이브코딩캠프_파일데이터/국세청_사업자현황_존속연수
 - [ ] `.env`의 ★ 항목 전부 채워짐 (`DATA_GO_KR_API_KEY`, `KAKAO_REST_API_KEY`, `OPENAI_API_KEY`)
 - [ ] 오픈 API 3건 활용신청 **승인** 상태 확인
 - [x] `data/raw/` 3종 파일 존재 + COLMAP 채움 (§2 실측 완료)
-- [ ] `aws sts get-caller-identity` / `sam --version` 성공
+- [ ] `aws sts get-caller-identity --profile sangseng` / `docker info` 성공
 - [ ] Vercel 프로젝트 연결 + 빈 배포 성공
 - [ ] GitHub 초기 커밋 완료 (`main`에 계획 문서·데이터 → 이후 `feat/*` 브랜치 규칙 적용)

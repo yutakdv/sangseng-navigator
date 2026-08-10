@@ -22,7 +22,7 @@
   **담당자 승인**(Action Card) → 추진 상태 트래킹 → 방문객 위젯 반영.
   공급 측(가맹점 확충 카드) + 수요 측(페이백 인센티브 카드)의 양면 설계
 - 팀: 2인 (데이터·백엔드·AI·인프라 1인 + 프론트엔드 1인), 2박 3일, AI 코딩 도구 활용
-- 기술: Next.js(Vercel) + FastAPI(AWS Lambda 서버리스) + DynamoDB + Python 파이프라인 + LLM(설명 생성 전용)
+- 기술: Next.js(Vercel) + FastAPI(AWS ECS Fargate) + DynamoDB + Python 파이프라인 + LLM(설명 생성 전용)
 
 ### 반드시 지킬 표현 규칙 (심사 대응 — 위반 시 감점 사유)
 
@@ -179,7 +179,7 @@
 - 테스트 71건 통과 · LLM 장애 시에도 규칙 기반 폴백으로 데모 완주(폴백 사실을 화면에 정직 표기).
 
 **S17. 아키텍처·운영 비용**
-- 스택 다이어그램: Vercel(FE) + API Gateway/Lambda/DynamoDB 온디맨드(BE) + 정적 산출
+- 스택 다이어그램: Vercel(FE, 서울) + API Gateway/VPC Link/내부 ALB/ECS Fargate/DynamoDB(BE) + 정적 산출
   JSON 서빙 + LLM API.
 - 비용: 서버리스 프리티어로 **월 $1 미만**(실비용은 LLM 호출뿐) — [캡처] Billing.
 - 재현성: 원본 CSV·API 캐시·산출 JSON 전부 레포에 커밋, 클린 체크아웃에서 산출 재현

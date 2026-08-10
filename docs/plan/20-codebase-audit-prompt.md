@@ -62,7 +62,7 @@ Claude Code는 컨텍스트가 차면 자동 요약하는데, 요약은 `file:li
 4. 함수·컴포넌트가 존재한다는 이유만으로 동작한다고 판단하지 않는다. 호출부를 찾아라.
 5. 확인 불가한 항목은 "정상"이 아니라 **검증 불가(NOT VERIFIED)** 로 분류한다.
 6. **먼저 전체 분석을 끝낸다. 코드 수정부터 시작하지 않는다.** (수정은 사용자 승인 후 별도 단계)
-7. 위험 작업 금지: `infra/deploy-backend.sh` 실행(AWS 배포), `npx vercel --prod`,
+7. 위험 작업 금지: `infra/scripts/deploy.sh` 실행(AWS 배포), `npx vercel --prod`,
    실제 LLM 유료 호출 반복, `data/processed/` 덮어쓰기(`pipeline/run_all.py`),
    `seed_demo.py --reset` 을 사용자 데모 중에 실행하는 것.
 8. **체크포인트 의무 (가장 중요한 절차 규칙).**
@@ -91,14 +91,14 @@ sangseng-navigator/
 ├── frontend/          Next.js 16.3.0 (App Router) + React 18.3.1 + TS 5.9 + Tailwind 3.4
 │                      + Recharts 2.15.4 + maplibre-gl 4.7.1 + Kakao Maps JS(스크립트 로드)
 │                      배포: Vercel (정적 export 아님, 서버 컴포넌트 + Server Actions)
-├── backend/           FastAPI + Mangum(Lambda) / Python 3.12
+├── backend/           FastAPI + uvicorn (ECS Fargate) / Python 3.12
 │   ├── app/main.py            진입점 · CORS · GZip · no-store 미들웨어 · /api/health · handler
 │   ├── app/routes/            dashboard.py · cards.py · progress.py · widget.py · kpi.py
 │   ├── app/services/          cardgen.py · simulate.py · workflow.py · progress_records.py
 │   │                          · progress_report.py · season.py
 │   ├── app/db.py              Cards 테이블 CRUD(조건부 업데이트·ConcurrentUpdate)
 │   ├── app/progress_db.py     ProgressRecords 테이블 + GSI 2개 + 카드 투영(TransactWrite)
-│   ├── app/dataload.py        정적 JSON 로딩 단일 창구 (Lambda: app/data/, 로컬: ../../data/processed/)
+│   ├── app/dataload.py        정적 JSON 로딩 단일 창구 (컨테이너: app/data/, 로컬: ../../data/processed/)
 │   ├── app/llm.py             generate_json(system,user,schema) — provider 분기 유일 지점
 │   ├── app/prompts.py · security.py · clock.py
 │   ├── seed_demo.py · local_init.py · Dockerfile · pytest.ini
@@ -108,7 +108,7 @@ sangseng-navigator/
 ├── data/raw/          공공데이터 원본 CSV (하이원포인트 사용현황 · 국세청 100대 생활업종 · 존속연수)
 ├── data/processed/    dashboard · eup_scores · candidates · merchants · usage_daily
 │                      · usage_monthly · risk_signal · sensitivity (8개 JSON, 커밋됨)
-├── infra/             template.yaml(SAM) · deploy-backend.sh
+├── infra/             config.sh · cloudformation/{foundation,service}.yaml · scripts/*.sh
 ├── scripts/           sync-mocks.sh   (data/processed → frontend/src/mocks 동기화)
 ├── docker-compose.yml dynamodb(8001:8000) · seed(one-shot) · backend(8000:8000)
 │                      · frontend(${FRONTEND_PORT:-3100}:3000)
@@ -136,7 +136,7 @@ sangseng-navigator/
 |---|---|---|---|
 | A. Docker 통합 (개발 표준) | `docker compose up -d` | `NEXT_PUBLIC_API_BASE=http://backend:8000` | DynamoDB Local + `data/processed` 마운트 |
 | B. FE mock 단독 | `FRONTEND_API_BASE= docker compose up` 또는 `cd frontend && npm run dev` | 빈 값 | `frontend/src/mocks/*.json` + `mocks/store.ts` |
-| C. 배포 | Vercel(FE) + SAM→Lambda/HTTP API(BE) | Vercel env의 API Gateway URL | Lambda 번들 `app/data/` + DynamoDB |
+| C. 배포 | Vercel(FE) + ECS Fargate/내부 ALB/HTTP API(BE) | Vercel env의 API Gateway URL | 이미지에 구운 `app/data/` + DynamoDB |
 
 각 모드에 대해 다음을 검증한다.
 
@@ -153,9 +153,9 @@ sangseng-navigator/
   (`DATA_GO_KR_API_KEY`, `KAKAO_REST_API_KEY`, `VWORLD_API_KEY`, `LLM_PROVIDER`, `OPENAI_API_KEY`,
   `OPENAI_MODEL`, `ANTHROPIC_API_KEY`, `ANTHROPIC_MODEL`, `AWS_REGION`, `CARDS_TABLE`,
   `PROGRESS_RECORDS_TABLE`, `ALLOWED_ORIGINS`, `DEMO_READ_ONLY`, `MUTATION_API_TOKEN`,
-  `RESERVED_CONCURRENCY`, `NEXT_PUBLIC_API_BASE`, `API_MUTATION_TOKEN`, `NEXT_PUBLIC_DEMO_READ_ONLY`,
+  `DESIRED_COUNT`, `ON_DEMAND_BASE_COUNT`, `NEXT_PUBLIC_API_BASE`, `API_MUTATION_TOKEN`, `NEXT_PUBLIC_DEMO_READ_ONLY`,
   `NEXT_PUBLIC_KAKAO_MAP_KEY`, `NEXT_PUBLIC_OPERATOR_NAME`, `NEXT_PUBLIC_OPERATOR_TEAM`)
-  각각에 대해 **① 어디서 읽는가 ② 미설정 시 동작(폴백/장애) ③ docker-compose·SAM 파라미터에 전달되는가**를 표로 만든다.
+  각각에 대해 **① 어디서 읽는가 ② 미설정 시 동작(폴백/장애) ③ docker-compose·CloudFormation 파라미터에 전달되는가**를 표로 만든다.
   `.env.example`에만 있고 아무도 안 읽는 키, 코드가 읽는데 `.env.example`에 없는 키를 모두 찾아낸다.
 
 ---
@@ -306,8 +306,8 @@ POST /api/cards/generate
    폴백 카드가 나온다면 **화면이 "AI 생성"이라고 말하는가** — 즉 규칙상 허위 표시 위험이 있는가?
    폴백임을 사용자·심사자가 구분할 수 있는 신호가 응답/화면에 있는가?
 2. LLM 응답에 **스키마 검증**이 있는가? 필수 필드 누락·타입 오류·JSON 파싱 실패 시 경로는?
-3. **타임아웃 / 재시도 / 총 소요 상한**이 있는가? Lambda `Timeout: 30`(SAM Globals)과의 관계는?
-   30초를 넘기면 API Gateway/Lambda 중 어디서 먼저 끊기고, FE는 그 실패를 어떻게 표시하는가?
+3. **타임아웃 / 재시도 / 총 소요 상한**이 있는가? API Gateway HTTP API 통합 타임아웃 30초(증액 불가)와의 관계는?
+   30초를 넘기면 게이트웨이가 504로 끊는데, FE는 그 실패를 어떻게 표시하는가?
 4. `llm.py:redact`가 로그에서 무엇을 가리는가 — 프롬프트에 실린 데이터가 CloudWatch에 남는가?
 5. **AI가 조정한 순위와 원 Score 순위가 함께 응답에 실리는가** (절대 규칙 5).
    `OriginalRankingTable` / `RankTrace`가 그 필드를 실제로 렌더하는지까지 확인.
@@ -334,16 +334,16 @@ POST /api/cards/generate
   사전순=시간순을 보장하는지(`recorded_at_key` 생성 로직), `report_bucket` 파티션 편중(월 단위 핫 파티션).
 - `Policies`: `DynamoDBCrudPolicy` 2개 + `TransactWriteItems` 명시.
   → 코드가 쓰는 API 중 정책이 커버하지 않는 것(예: GSI Query는 커버됨, `DescribeTable`/`CreateTable`은?)을 확인.
-  특히 `progress_db.ensure_table` / `clear_table`이 **Lambda 런타임에서 호출되면 권한 부족**이다 — 호출 경로 추적.
-- 마이그레이션 개념이 없다(SAM이 곧 스키마). `local_init.py` / `seed_demo.py`가 만드는 테이블 정의와
+  특히 `progress_db.ensure_table` / `clear_table`이 **태스크 역할 권한으로는 부족**하다 — 호출 경로 추적.
+- 마이그레이션 개념이 없다(CloudFormation 이 곧 스키마). `local_init.py` / `seed_demo.py`가 만드는 테이블 정의와
   `template.yaml` 정의가 **필드·인덱스 단위로 동일한지** 대조한다. 다르면 로컬에선 되고 배포에선 깨진다.
 
 **정적 JSON 계층**
 
 - `dataload.load(name)` 단일 창구 원칙이 지켜지는지 (`open()`/`json.load`가 다른 곳에 있는지 grep).
-- `_load_versioned`의 버전/캐시 전략과 Lambda 콜드스타트 시 로드 비용(merchants 330KB 등).
+- `_load_versioned`의 버전/캐시 전략과 컨테이너 기동 시 로드 비용(merchants 330KB 등).
 - 경로 폴백(`app/data/` ↔ `../../data/processed/`)이 3개 실행 모드 모두에서 성립하는지.
-  **`backend/app/data/`는 현재 비어 있다** — 배포 시 `deploy-backend.sh`가 복사하는지 확인하고,
+  **`backend/app/data/`는 현재 비어 있다** — 배포 시 `build-and-push.sh`가 복사하는지 확인하고,
   복사 누락 시 `/api/health`의 `data_loaded:false`가 이를 잡아내는지 검증한다.
 - `REQUIRED_DATASETS`(dashboard·eup_scores·candidates·merchants)와 실제 라우트가 읽는 데이터셋 목록이
   일치하는지 — health가 OK인데 특정 라우트만 500나는 구멍이 있는지.
@@ -370,11 +370,11 @@ FE Server Action / 서버 컴포넌트
   16개 엔드포인트 전부에 대해 **가드 유무 표**를 만든다. 무방비 상태의 변경 엔드포인트가 하나라도 있으면 CRITICAL.
 - `MUTATION_API_TOKEN`이 **미설정일 때** 가드가 열리는가 닫히는가 (fail-open이면 CRITICAL).
   docker-compose 기본값 `local-dev-token`이 배포로 새는 경로가 있는가.
-- `DEMO_READ_ONLY=true`(SAM 기본값)일 때 6개 Server Action 전부가 막히는가 —
+- `DEMO_READ_ONLY`(CloudFormation 파라미터, 기본값 없음 = 배포자가 반드시 명시)가 true 일 때 6개 Server Action 전부가 막히는가 —
   `actions.ts`의 `isDemoReadOnly` 조기 반환과 BE `security.demo_read_only()` **이중 가드**가 모두 있는지.
   한쪽만 있으면 우회 경로를 기술한다.
-- **CORS 2중 구성**: `main.py`의 `ALLOWED_ORIGINS`(`*` 금지 가드 있음, Lambda에서 기본값 빈 문자열)와
-  SAM `HttpApi.CorsConfiguration`(기본값 `https://configure-me.invalid`).
+- **CORS 는 앱 한 층뿐**: `main.py`의 `ALLOWED_ORIGINS`(`*` 금지 가드 있음, 배포 기본값 빈 목록).
+  API Gateway 에는 CORS 설정을 두지 않는다 — 모든 호출이 Vercel 서버에서 오는 서버-대-서버다.
   두 층의 값이 어긋날 때의 증상을 기술하고, 배포 스크립트가 둘을 함께 넘기는지 확인.
 - **시크릿 위생 (제출 시 저장소 Public 전환 예정 — 12 문서 §4)**
   - 레포 루트에 **`.env` 실파일이 존재**한다. `.gitignore`에 확실히 잡혀 있는지 확인.
@@ -411,14 +411,14 @@ FE Server Action / 서버 컴포넌트
 - `backend/Dockerfile` / `frontend/Dockerfile`: 베이스 이미지, 의존성 설치, 실행 커맨드,
   `.dockerignore` 누락으로 `node_modules`/`.next`가 빌드 컨텍스트에 딸려가는지.
 - compose 볼륨: `./backend/app:/app/app`(rw, 핫리로드) vs seed의 `:ro`,
-  `./data/processed:/app/app/data:ro`가 **Lambda 번들과 동일 경로**를 재현하는지.
+  `./data/processed:/app/app/data:ro`가 **ECS 이미지와 동일 경로**를 재현하는지.
   `/app/node_modules`·`/app/.next` 익명 볼륨이 의존성 변경 시 stale해지는 문제.
 - healthcheck 전무 → `depends_on`만으로 순서 보장이 되는지, seed 재시도 루프가 그 공백을 실제로 메우는지.
 - `restart` 정책 부재(seed만 `"no"`) — 컨테이너 사망 시 무음 실패.
-- SAM: `Timeout: 30` / `MemorySize: 512` / `ReservedConcurrency: 5` / 로그 보존 7일이
+- CloudFormation: 태스크 `Cpu: 256` / `Memory: 512` / `StopTimeout: 60` / 스테이지 스로틀링(rate 10, burst 20) / 로그 보존 7일이
   LLM 호출 시간·정적 JSON 로드 메모리에 충분한지. `CodeUri: ../backend`가 `tests/`·`.pytest_cache`까지
   번들에 싣는지(패키지 크기·콜드스타트).
-- `infra/deploy-backend.sh`를 **읽기만** 하고: 데이터 복사 단계, 파라미터 전달(특히 `AllowedOrigins`,
+- `infra/scripts/*.sh` 를 **읽기만** 하고: 데이터 복사 단계, 파라미터 전달(특히 `AllowedOrigins`,
   `MutationApiToken`, `DemoReadOnly`), 실패 시 롤백 여부를 확인한다. **실행 금지.**
 - **CI/CD 부재**: `.github/`가 없다. lint/test/타입체크가 자동 실행되지 않는 리스크를 명시하고,
   최소 워크플로 제안(§16 P2)을 준비한다.
@@ -546,7 +546,7 @@ cd frontend && npm run build                  # Vercel 빌드 재현 (시간 걸
 curl -s localhost:8000/api/health | python -m json.tool
 ```
 
-**금지**: `infra/deploy-backend.sh`, `npx vercel --prod`, `pipeline/run_all.py`(산출물 덮어씀),
+**금지**: `infra/scripts/deploy.sh`, `npx vercel --prod`, `pipeline/run_all.py`(산출물 덮어씀),
 `seed_demo.py --reset`(데모 상태 파괴), LLM 유료 호출 반복, `docker compose down -v`.
 
 실행 결과는 **원문 출력을 근거로 인용**한다. 실행하지 못한 항목은 "미실행"으로 남기고 추정하지 않는다.
@@ -654,7 +654,7 @@ Production Ready  : /10
 | Phase | 다루는 섹션 | 작업 | 체크포인트 파일 (Phase 종료 시 필수 작성) |
 |---|---|---|---|
 | **1. 지도 그리기** | §1~§5 | `get_architecture` → 레포 구조 → 기능 인벤토리 초안 → Frontend 전수 → Backend 전수 | `docs/audit/_wip/01-inventory.md` — 기능 인벤토리 표 + 라우트/엔드포인트/컴포넌트 전수 목록 (사용처 포함)<br>`docs/audit/_wip/02-api-matrix.md` — 16개 엔드포인트 × FE 호출부 × 05 문서 × types **4자 대조** 결과 |
-| **2. 계층 파고들기** | §6~§10, §14 | AI/LLM → 데이터 계층(DDB·정적 JSON·파이프라인) → 보안·시크릿 이력 → Infra/Docker/SAM → 안전 명령 실행 검증 | `docs/audit/_wip/03-ai-data.md` — LLM 호출 경로·폴백·스키마검증 + DDB 스키마/쿼리 + 파이프라인 산출물 소비처<br>`docs/audit/_wip/04-security-infra.md` — 가드 유무 표 16행 + 시크릿 이력 검사 원문 + 포트/볼륨/SAM 정합성<br>`docs/audit/_wip/05-exec-log.md` — §14 명령별 **출력 원문 발췌** 및 미실행 항목 |
+| **2. 계층 파고들기** | §6~§10, §14 | AI/LLM → 데이터 계층(DDB·정적 JSON·파이프라인) → 보안·시크릿 이력 → Infra/Docker/CloudFormation → 안전 명령 실행 검증 | `docs/audit/_wip/03-ai-data.md` — LLM 호출 경로·폴백·스키마검증 + DDB 스키마/쿼리 + 파이프라인 산출물 소비처<br>`docs/audit/_wip/04-security-infra.md` — 가드 유무 표 16행 + 시크릿 이력 검사 원문 + 포트/볼륨/CloudFormation 정합성<br>`docs/audit/_wip/05-exec-log.md` — §14 명령별 **출력 원문 발췌** 및 미실행 항목 |
 | **3. 판정과 조립** | §11~§13, §15~§17 | 테스트 갭 → E2E 5대 플로우 → 절대 규칙 6개 매트릭스 → 누락 영역 재탐색 → 최종 보고서 | `docs/audit/_wip/06-e2e-rules.md` — 플로우 A~E 단절 지점 + 절대 규칙 매트릭스<br>**최종** `docs/audit/AUDIT-<YYYYMMDD>.md` |
 
 **Phase 시작 시**: `docs/audit/_wip/` 를 먼저 확인한다. 기존 파일이 있으면 읽고 이어서 하며, 같은 영역을 재탐색하지 않는다.

@@ -22,10 +22,10 @@
 | 요구사항 | 현 계획의 대응 | 비고 |
 |---|---|---|
 | 정적 데이터 방식 권장 ("필요한 데이터를 미리 CSV/JSON으로 저장소에 포함") | 파이프라인이 `data/processed/*.json` 사전 계산 → 커밋 → BE 서빙 + FE mock 동일 원천 (02 문서) | **권장 해결 방법을 그대로 구현한 구조** — 심사 Q&A에서 명시할 것 |
-| API 인증키를 소스코드에 노출 금지 (Public 저장소 경고) | 공공데이터·지오코딩 키는 파이프라인(로컬) 전용, Lambda에는 LLM 키만 SAM NoEcho 파라미터 (02·04 문서) | §4의 커밋 이력 검사 필수 |
+| API 인증키를 소스코드에 노출 금지 (Public 저장소 경고) | 공공데이터·지오코딩 키는 파이프라인(로컬) 전용, LLM 키·변경 토큰은 SSM Parameter Store SecureString 으로만 주입 (02·04 문서) | §4의 커밋 이력 검사 필수 |
 | 로그인 없이 접속 가능 | 인증 없음 (담당자 화면 = 공개 데모, 02 문서) | Vercel Password Protection **끄기** 확인 |
 | CORS/Mixed Content 차단 주의 | FE→API Gateway는 https + CORS 허용 구성 (09 문서) | 심사 기간에는 CORS `*` 유지 판단 (09 §5) |
-| 배포 중단 없이 심사 기간 유지, sleep 주의 | Vercel(정적·sleep 없음) + Lambda(상시, 콜드스타트만 존재) | §5 심사 기간 운영 모드 |
+| 배포 중단 없이 심사 기간 유지, sleep 주의 | Vercel(sleep 없음) + ECS Fargate(상시 가동, 콜드스타트 없음) | §5 심사 기간 운영 모드 |
 
 ## 3. 산출물 정보 — 제출 양식 문안 (확정본)
 
@@ -66,12 +66,12 @@
 
 | 리스크 | 내용 | 대응 (구현 시점) |
 |---|---|---|
-| Lambda 콜드스타트 | 첫 접속 API 응답 1~3초 지연 → "데이터 안 나옴"으로 오인 가능 | ① FE 로딩 스켈레톤 필수(F9) ② 여유 시 EventBridge `rate(5 minutes)` → `/api/health` 핑 워밍 룰을 SAM에 추가 (월 ~8.6천 호출, 프리티어 내 $0) (Phase 6) |
+| Fargate Spot 용량 부족 | 기존 태스크는 계속 돌아 서비스는 안 끊기지만 **배포가 완료되지 않는다** | ① 심사 기간에는 `ON_DEMAND_BASE_COUNT=1` 로 최소 1대를 온디맨드 확보(09 §5.5) ② 배포 스크립트가 rolloutState 로 잡아 실패시킨다 |
 | 데모 상태 오염 | 공개 URL이므로 심사위원이 승인/반려 클릭 → seed 서사(고정해 둔 "Score 2위 → 1순위 제안" pending 카드)가 소실될 수 있음 | `seed_demo.py --reset`을 (a) 발표·심사 시작 직전 수동 실행, (b) 여유 시 EventBridge 스케줄(매시)로 자동 리셋 (B4 시드 스크립트 확장, Phase 6) |
-| LLM 호출 남용/비용 | 공개 URL에서 카드 생성·시뮬레이션 버튼 반복 클릭 가능 | ① generate는 pending 중복 가드가 이미 사실상 rate limit (05 §8) ② gpt-4o-mini 고정 + Billing $1 알림 ③ 여유 시 Lambda `ReservedConcurrentExecutions: 5` (Phase 6, 선택) |
+| LLM 호출 남용/비용 | 공개 URL에서 카드 생성·시뮬레이션 버튼 반복 클릭 가능 | ① generate는 pending 중복 가드가 이미 사실상 rate limit (05 §8) ② gpt-4o-mini 고정 + Billing $1 알림 ③ API Gateway 스테이지 스로틀링(rate 10 / burst 20)이 인프라 상한 (09 §8) |
 | FE만 살고 BE가 죽는 경우 | API 장애 시 화면 공백 → 심사 탈락급 리스크 | `lib/api.ts` 구조상 `NEXT_PUBLIC_API_BASE` 미설정 빌드는 mock(실데이터 사본)으로 동작 — **비상시 env 제거 후 Redeploy가 최후 폴백** (mock도 강원랜드 실데이터 산출물이므로 "데이터 정상 표시" 요건 충족) |
 | 마감 후 커밋 무효 | "제출 마감 이후 커밋은 심사에 반영되지 않을 수 있음" | 마감 전 최종 커밋에 `git tag submission-final` + 이후 main 동결 (핫픽스는 심사 영향 없음을 전제로만) |
-| 배포가 일정 후반 1회로 몰림 | 개발 중 AWS 미배포 결정(09 §4)으로 첫 실배포가 마감 직전 | ① `sam validate`·`build`는 사전 통과(리스크 절반 해소) ② IAM 정책은 배포 **전날까지** 부착 ③ 최종 배포에 반나절 버퍼 배정 ④ 실패 시 localhost 데모 백업(11 문서 §4) |
+| 배포가 일정 후반 1회로 몰림 | 개발 중 AWS 미배포 결정(09 §4)으로 첫 실배포가 마감 직전 | ① CloudFormation `validate-template`·`cfn-lint` 는 사전 통과(리스크 절반 해소) ② IAM 정책은 배포 **전날까지** 부착 ③ 최종 배포에 반나절 버퍼 배정 ④ 실패 시 localhost 데모 백업(11 문서 §4) |
 | 휴대폰 접속 | 체크리스트에 "휴대폰에서도 열리는지" 명시 | 13 문서 §8 반응형 최소선 + Phase 6 리허설에 모바일 실기기 1회 포함 (기존 계획 유지·강화) |
 
 ## 6. 제출 전 최종 체크리스트 (안내문 원문 + 프로젝트 특화)
@@ -93,7 +93,7 @@
 - [ ] `seed_demo.py --reset`으로 데모 초기 상태 복원 후 제출
 - [ ] 대표 스크린샷 1장 캡처·제출 (허브 화면, §1)
 - [ ] `git tag submission-final` + main 동결 (§5)
-- [ ] 심사 기간 중 `sam delete` 금지 — AWS 철거(09 §6)는 **심사·전시 종료 후**로 연기
+- [ ] 심사 기간 중 `./infra/scripts/teardown.sh` 금지 — AWS 철거(09 §6)는 **심사·전시 종료 후**로 연기
 - [ ] Billing 알림 $1 활성 상태 확인
 
 ## 7. 타 문서 연동
