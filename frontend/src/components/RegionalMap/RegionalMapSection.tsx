@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { Icon } from "@/components/Icon";
 import { RegionalMap } from "@/components/RegionalMap/RegionalMap";
-import { MAP_REGIONS, type MapRegion } from "@/components/RegionalMap/regions";
+import { type MapRegion } from "@/components/RegionalMap/regions";
 import { RegionStatusCard, type RegionStatus } from "@/components/RegionStatusCard";
 
 /**
@@ -58,25 +58,6 @@ export function RegionalMapSection({ statuses }: { statuses: RegionStatus[] }) {
         )}
       </div>
 
-      {/* 지도를 쓸 수 없는 환경(스크린리더 목록 탐색 등)을 위한 지역 바로가기 —
-          시각적으로는 지도 아래 칩 한 줄이고, 기능적으로는 같은 선택 동작이다 */}
-      <div className="flex flex-wrap gap-1.5 lg:col-span-2">
-        {MAP_REGIONS.map((region) => (
-          <button
-            key={region.id}
-            type="button"
-            aria-pressed={selected?.id === region.id}
-            onClick={() => setSelected(region)}
-            className={`rounded-full px-2.5 py-1 text-[11px] font-semibold transition-colors ${
-              selected?.id === region.id
-                ? "bg-lavender-100 text-lavender-700 ring-1 ring-inset ring-admin-primary-line"
-                : "bg-admin-surface-sunken text-admin-text-muted hover:text-admin-text"
-            }`}
-          >
-            {region.label}
-          </button>
-        ))}
-      </div>
     </div>
   );
 }
