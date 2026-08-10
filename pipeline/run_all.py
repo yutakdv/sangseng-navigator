@@ -21,6 +21,7 @@ STEPS = [
     ("P8 가중치 민감도", "p8_sensitivity.py"),
     ("P5 진단 지표", "p5_metrics.py"),           # ranking_stability = P8 top3_stable_ratio×100
     ("P7 국세청 파생지표", "p7_risk.py"),
+    ("P9 셀 부하", "p9_cell_load.py"),
 ]
 
 

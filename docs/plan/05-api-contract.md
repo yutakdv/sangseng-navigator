@@ -607,6 +607,7 @@ LLM 호출이 실패하거나 애초에 호출하지 않은 카드도 **똑같�
 | `sensitivity.json` | `{"combos": 25, "top3_stable_ratio": 0.88, "detail": [...]}` | 발표 슬라이드 |
 | `usage_monthly.json` | 월×지역×업종 원자료 집계 (재계산·검증용) | pipeline, simulate, **FE 지역 드릴다운(정적 import)** |
 | `usage_daily.json` | 일·요일 축 집계 — 요일×표시6분류(지역별+전체) 누적, 지역별 일 총건수 시계열 | **FE 지역 드릴다운 요일 섹션(정적 import)**, BE(카드 생성 AI 입력 ⑧) |
+| `cell_load.json` | (지역×표시업종) 셀별 가맹점 이용 부하 지수 — 최근 3개월 평균 월 거래 건수 ÷ 셀 가맹점 수 (건수 기반 추정치, k=5 미만 셀은 억제) | **FE 셀 탐색 시뮬레이터(정적 import)**, pipeline(A3 억제 검증 입력) |
 
 - `risk_signal.json` 표시 주의: 실측 4개 시군이 **14.6~15.1%로 최대 편차 0.5%p**라 지역 간 비교
   근거가 못 된다. 화면에 노출할 때 **'위험' 라벨·경고색·순위 정렬을 쓰지 않고**
@@ -621,6 +622,14 @@ LLM 호출이 실패하거나 애초에 호출하지 않은 카드도 **똑같�
   다름 — 소비처가 전부 6분류 단위). BE는 카드 생성 AI 입력 ⑧(타깃 요일 패턴, 참고용)에만 읽고
   파일이 없으면 해당 입력을 생략한다. 상세 스키마·결정 배경은
   `docs/superpowers/specs/2026-08-08-daily-weekday-analysis-design.md`.
+- `cell_load.json`은 **BE 엔드포인트 없이** FE가 mock 사본을 정적 import 해 셀 탐색 시뮬레이터
+  (Task C2)에 쓴다 — mock/실API 모드 모두 동일 파일. `pipeline/p9_cell_load.py`(P9) 산출이며,
+  원본 CSV에 금액 컬럼이 없어 금액 기반 한도 소진율 대신 **건수 기반 추정치**를 쓴다: 부하 지수 =
+  최근 3개월(`window_months`) 평균 월 거래 건수 ÷ 셀 가맹점 수. `thresholds.high`/`thresholds.low`는
+  억제되지 않은 셀의 `load_index` 상·하위 사분위수이며 `cells[].tier`(`high`/`mid`/`low`)를 가른다.
+  가맹점 5곳 미만(`k_anonymity`) 셀은 `suppressed: true`이고 `monthly_uses_avg`·`load_index`가
+  `null`, `tier`는 `"suppressed"`다(k-익명성 보호 — Task A3가 검증). **화면에 노출할 때는 절대 규칙 7
+  에 따라 모든 화면에 `추정치` 배지와 산식 툴팁을 함께 표기해야 한다.**
 
 FE mock 동기화: 레포 루트에서 `./scripts/sync-mocks.sh` — 위 산출 JSON을 `frontend/src/mocks/`로
 복사하고, `candidates.json`은 `GET /api/candidates`와 같은 병합 응답 형태로 생성한다.

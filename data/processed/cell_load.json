@@ -1,0 +1,322 @@
+{
+  "base_month": "2025-12",
+  "window_months": [
+    "2025-10",
+    "2025-11",
+    "2025-12"
+  ],
+  "method_note": "부하 지수 = 최근 3개월 평균 월 거래 건수 ÷ 셀 가맹점 수. 원본 데이터가 건수 기준이라 금액 기반 한도 소진율은 산출하지 않는다(추정치).",
+  "k_anonymity": 5,
+  "thresholds": {
+    "high": 34.0,
+    "low": 14.2
+  },
+  "cells": [
+    {
+      "eup": "고한읍",
+      "category": "기타",
+      "merchants": 28,
+      "monthly_uses_avg": 401.0,
+      "load_index": 14.3,
+      "tier": "mid",
+      "suppressed": false
+    },
+    {
+      "eup": "고한읍",
+      "category": "소매점",
+      "merchants": 60,
+      "monthly_uses_avg": 1129.3,
+      "load_index": 18.8,
+      "tier": "mid",
+      "suppressed": false
+    },
+    {
+      "eup": "고한읍",
+      "category": "숙박업",
+      "merchants": 40,
+      "monthly_uses_avg": 1092.7,
+      "load_index": 27.3,
+      "tier": "mid",
+      "suppressed": false
+    },
+    {
+      "eup": "고한읍",
+      "category": "음식점",
+      "merchants": 108,
+      "monthly_uses_avg": 3452.7,
+      "load_index": 32.0,
+      "tier": "mid",
+      "suppressed": false
+    },
+    {
+      "eup": "고한읍",
+      "category": "카페",
+      "merchants": 11,
+      "monthly_uses_avg": 149.3,
+      "load_index": 13.6,
+      "tier": "low",
+      "suppressed": false
+    },
+    {
+      "eup": "고한읍",
+      "category": "편의점",
+      "merchants": 16,
+      "monthly_uses_avg": 1324.0,
+      "load_index": 82.8,
+      "tier": "high",
+      "suppressed": false
+    },
+    {
+      "eup": "사북읍",
+      "category": "기타",
+      "merchants": 41,
+      "monthly_uses_avg": 593.7,
+      "load_index": 14.5,
+      "tier": "mid",
+      "suppressed": false
+    },
+    {
+      "eup": "사북읍",
+      "category": "소매점",
+      "merchants": 71,
+      "monthly_uses_avg": 2844.0,
+      "load_index": 40.1,
+      "tier": "high",
+      "suppressed": false
+    },
+    {
+      "eup": "사북읍",
+      "category": "숙박업",
+      "merchants": 42,
+      "monthly_uses_avg": 1792.0,
+      "load_index": 42.7,
+      "tier": "high",
+      "suppressed": false
+    },
+    {
+      "eup": "사북읍",
+      "category": "음식점",
+      "merchants": 110,
+      "monthly_uses_avg": 6992.3,
+      "load_index": 63.6,
+      "tier": "high",
+      "suppressed": false
+    },
+    {
+      "eup": "사북읍",
+      "category": "카페",
+      "merchants": 5,
+      "monthly_uses_avg": 292.3,
+      "load_index": 58.5,
+      "tier": "high",
+      "suppressed": false
+    },
+    {
+      "eup": "사북읍",
+      "category": "편의점",
+      "merchants": 15,
+      "monthly_uses_avg": 1252.0,
+      "load_index": 83.5,
+      "tier": "high",
+      "suppressed": false
+    },
+    {
+      "eup": "삼척시",
+      "category": "기타",
+      "merchants": 32,
+      "monthly_uses_avg": 506.7,
+      "load_index": 15.8,
+      "tier": "mid",
+      "suppressed": false
+    },
+    {
+      "eup": "삼척시",
+      "category": "소매점",
+      "merchants": 40,
+      "monthly_uses_avg": 689.3,
+      "load_index": 17.2,
+      "tier": "mid",
+      "suppressed": false
+    },
+    {
+      "eup": "삼척시",
+      "category": "음식점",
+      "merchants": 44,
+      "monthly_uses_avg": 950.7,
+      "load_index": 21.6,
+      "tier": "mid",
+      "suppressed": false
+    },
+    {
+      "eup": "삼척시",
+      "category": "카페",
+      "merchants": 8,
+      "monthly_uses_avg": 45.7,
+      "load_index": 5.7,
+      "tier": "low",
+      "suppressed": false
+    },
+    {
+      "eup": "삼척시",
+      "category": "편의점",
+      "merchants": 5,
+      "monthly_uses_avg": 126.3,
+      "load_index": 25.3,
+      "tier": "mid",
+      "suppressed": false
+    },
+    {
+      "eup": "영월군",
+      "category": "기타",
+      "merchants": 15,
+      "monthly_uses_avg": 197.0,
+      "load_index": 13.1,
+      "tier": "low",
+      "suppressed": false
+    },
+    {
+      "eup": "영월군",
+      "category": "소매점",
+      "merchants": 32,
+      "monthly_uses_avg": 630.3,
+      "load_index": 19.7,
+      "tier": "mid",
+      "suppressed": false
+    },
+    {
+      "eup": "영월군",
+      "category": "음식점",
+      "merchants": 27,
+      "monthly_uses_avg": 397.0,
+      "load_index": 14.7,
+      "tier": "mid",
+      "suppressed": false
+    },
+    {
+      "eup": "영월군",
+      "category": "카페",
+      "merchants": 2,
+      "monthly_uses_avg": null,
+      "load_index": null,
+      "tier": "suppressed",
+      "suppressed": true
+    },
+    {
+      "eup": "영월군",
+      "category": "편의점",
+      "merchants": 4,
+      "monthly_uses_avg": null,
+      "load_index": null,
+      "tier": "suppressed",
+      "suppressed": true
+    },
+    {
+      "eup": "정선군",
+      "category": "기타",
+      "merchants": 52,
+      "monthly_uses_avg": 732.3,
+      "load_index": 14.1,
+      "tier": "low",
+      "suppressed": false
+    },
+    {
+      "eup": "정선군",
+      "category": "소매점",
+      "merchants": 57,
+      "monthly_uses_avg": 1123.0,
+      "load_index": 19.7,
+      "tier": "mid",
+      "suppressed": false
+    },
+    {
+      "eup": "정선군",
+      "category": "숙박업",
+      "merchants": 40,
+      "monthly_uses_avg": 831.7,
+      "load_index": 20.8,
+      "tier": "mid",
+      "suppressed": false
+    },
+    {
+      "eup": "정선군",
+      "category": "음식점",
+      "merchants": 107,
+      "monthly_uses_avg": 2591.0,
+      "load_index": 24.2,
+      "tier": "mid",
+      "suppressed": false
+    },
+    {
+      "eup": "정선군",
+      "category": "카페",
+      "merchants": 14,
+      "monthly_uses_avg": 160.0,
+      "load_index": 11.4,
+      "tier": "low",
+      "suppressed": false
+    },
+    {
+      "eup": "정선군",
+      "category": "편의점",
+      "merchants": 14,
+      "monthly_uses_avg": 727.0,
+      "load_index": 51.9,
+      "tier": "high",
+      "suppressed": false
+    },
+    {
+      "eup": "태백시",
+      "category": "기타",
+      "merchants": 144,
+      "monthly_uses_avg": 1932.0,
+      "load_index": 13.4,
+      "tier": "low",
+      "suppressed": false
+    },
+    {
+      "eup": "태백시",
+      "category": "소매점",
+      "merchants": 211,
+      "monthly_uses_avg": 3854.3,
+      "load_index": 18.3,
+      "tier": "mid",
+      "suppressed": false
+    },
+    {
+      "eup": "태백시",
+      "category": "숙박업",
+      "merchants": 13,
+      "monthly_uses_avg": 140.3,
+      "load_index": 10.8,
+      "tier": "low",
+      "suppressed": false
+    },
+    {
+      "eup": "태백시",
+      "category": "음식점",
+      "merchants": 216,
+      "monthly_uses_avg": 3627.3,
+      "load_index": 16.8,
+      "tier": "mid",
+      "suppressed": false
+    },
+    {
+      "eup": "태백시",
+      "category": "카페",
+      "merchants": 22,
+      "monthly_uses_avg": 200.3,
+      "load_index": 9.1,
+      "tier": "low",
+      "suppressed": false
+    },
+    {
+      "eup": "태백시",
+      "category": "편의점",
+      "merchants": 33,
+      "monthly_uses_avg": 1491.7,
+      "load_index": 45.2,
+      "tier": "high",
+      "suppressed": false
+    }
+  ]
+}
