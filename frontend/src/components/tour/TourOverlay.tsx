@@ -59,10 +59,15 @@ function TourOverlayInner() {
   const [anchorMissing, setAnchorMissing] = useState(false);
 
   // 첫 방문 자동 시작 — 허브(/)에 tour 파라미터 없이 들어왔고, 이전에 끝낸 적이 없을 때 1회.
+  // 기존 쿼리(?type=·?selected= 등)는 보존한다 — 자동 시작이 사용자가 고른 화면 상태를 지우면 안 된다.
   useEffect(() => {
     if (pathname !== "/" || searchParams.get("tour")) return;
     try {
-      if (!window.localStorage.getItem(DONE_KEY)) router.replace("/?tour=1");
+      if (!window.localStorage.getItem(DONE_KEY)) {
+        const params = new URLSearchParams(searchParams.toString());
+        params.set("tour", "1");
+        router.replace(`/?${params.toString()}`);
+      }
     } catch {
       // localStorage 접근 불가(시크릿/프라이빗 모드 등) — 자동 시작만 건너뛰고 조용히 넘어간다
     }
@@ -168,9 +173,23 @@ function TourOverlayInner() {
     rect !== null && typeof window !== "undefined" && rect.bottom > window.innerHeight - CARD_RESERVE_PX;
   const cardStyle = overlapsCardZone ? { bottom: Math.max(12, window.innerHeight - rect!.top + 12) } : undefined;
 
+  // 조작 허용 스텝(TourStep.interactive — 지금은 5단계 하나)에서는 오버레이가 아래 화면의 클릭·드래그를
+  // 통과시킨다. `pointer-events`는 상속되는 속성이라 루트에 `pointer-events-none`을 주면 딤(bg-black/…)도
+  // 함께 클릭을 놓아 준다 — 딤을 지우지 않고도 아래 슬라이더를 직접 움직일 수 있다. 설명 카드에만
+  // `pointer-events-auto`로 되살려 "다음"·"닫기"는 그대로 눌린다.
+  // 딤 농도도 이 스텝에서만 낮춘다: 조작 대상(β 슬라이더)과 판정 결과를 50% 검정 너머로 읽게 하면
+  // 정작 보여 주려는 반전 장면이 어두워진다.
+  // 조작이 열린 동안에는 화면이 실제로 모달이 아니므로 aria-modal도 함께 내린다.
+  const interactive = Boolean(step.interactive);
+
   return (
-    <div className="fixed inset-0 z-[100]" role="dialog" aria-modal="true" aria-label={`가이드 투어 ${stepIndex + 1}/${TOUR_STEPS.length}`}>
-      <div className="absolute inset-0 bg-black/50" aria-hidden="true" />
+    <div
+      className={`fixed inset-0 z-[100] ${interactive ? "pointer-events-none" : ""}`}
+      role="dialog"
+      aria-modal={interactive ? undefined : true}
+      aria-label={`가이드 투어 ${stepIndex + 1}/${TOUR_STEPS.length}`}
+    >
+      <div className={`absolute inset-0 ${interactive ? "bg-black/30" : "bg-black/50"}`} aria-hidden="true" />
       {rect ? (
         <div
           aria-hidden="true"
@@ -186,7 +205,7 @@ function TourOverlayInner() {
 
       <div
         style={cardStyle}
-        className="fixed inset-x-3 bottom-3 z-[101] mx-auto flex flex-col gap-3 rounded-2xl bg-admin-surface p-4 shadow-card-hover ring-1 ring-inset ring-admin-border sm:inset-x-auto sm:bottom-6 sm:left-1/2 sm:w-[380px] sm:max-w-[calc(100vw-24px)] sm:-translate-x-1/2 sm:p-5">
+        className="pointer-events-auto fixed inset-x-3 bottom-3 z-[101] mx-auto flex flex-col gap-3 rounded-2xl bg-admin-surface p-4 shadow-card-hover ring-1 ring-inset ring-admin-border sm:inset-x-auto sm:bottom-6 sm:left-1/2 sm:w-[380px] sm:max-w-[calc(100vw-24px)] sm:-translate-x-1/2 sm:p-5">
         <span className="w-fit rounded-full bg-admin-primary-soft px-2.5 py-1 text-xs font-bold tabular-nums text-admin-primary">
           {stepIndex + 1} / {TOUR_STEPS.length}
         </span>

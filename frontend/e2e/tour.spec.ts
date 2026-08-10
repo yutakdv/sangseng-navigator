@@ -30,6 +30,18 @@ async function expectCardInViewport(page: Page) {
 
 const escapeRegExp = (s: string): string => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
+type Box = { x: number; y: number; width: number; height: number };
+
+/** 두 사각형이 실제로 겹치는지 — 1px은 서브픽셀 반올림 허용치. */
+function overlaps(a: Box, b: Box): boolean {
+  return (
+    a.x < b.x + b.width - 1 &&
+    b.x < a.x + a.width - 1 &&
+    a.y < b.y + b.height - 1 &&
+    b.y < a.y + a.height - 1
+  );
+}
+
 test.describe("가이드 투어 — 버튼 클릭만으로 6단계 완주", () => {
   test("1→2→3→4→5→6→완료", async ({ page }) => {
     await page.goto("/?tour=1");
@@ -110,11 +122,85 @@ test.describe("가이드 투어 — 버튼 클릭만으로 6단계 완주", () =
   });
 });
 
+/**
+ * 5단계는 본문이 "슬라이더를 한 칸 올려 보세요"라고 **화면 조작을 지시**하는 유일한 스텝이다
+ * (TourStep.interactive). 오버레이가 그 조작을 삼키면 심사위원은 이 출품작의 창의성 대표 장면인
+ * 처방 반전을 한 번도 보지 못한 채 다음 화면으로 넘어간다 — 그래서 "실제로 움직여 실제로 뒤집히는가"를
+ * 직접 확인한다. 반대로 다른 스텝의 차단은 유지돼야 한다(2단계 링크를 직접 누르면 ?tour=3이 붙지 않아
+ * 투어가 조용히 끊긴다).
+ */
+test.describe("5단계 반전 장면 — 투어 중에도 조작이 통과한다", () => {
+  test("β 슬라이더를 실제로 움직이면 처방이 공급 측으로 뒤집힌다", async ({ page }) => {
+    await page.goto("/incentive?preset=flip&tour=5");
+
+    const dialog = tourDialog(page);
+    await expect(dialog).toBeVisible();
+    await expect(dialog).toContainText("5 / 6");
+
+    const flipCard = page.locator('[data-tour="flip"]');
+    const slider = page.locator("#cell-explorer-beta");
+    await expect(slider).toBeVisible();
+    // 딥링크(?preset=flip)는 반전 **직전** 상태로 들어온다 — 아직은 수요 측 처방이어야 한다
+    await expect(slider).toHaveValue("0.25");
+    await expect(flipCard).toContainText("수요 측 우선");
+
+    // 실제 포인터 클릭이다. 오버레이가 클릭을 삼키면 Playwright의 hit-target 검사가 여기서
+    // "intercepts pointer events"로 실패한다 — C1 회귀를 잡는 핵심 지점이다.
+    await slider.click({ timeout: 5_000 });
+    const beta = Number(await slider.inputValue());
+    expect(beta, `슬라이더 조작이 화면에 닿지 않았습니다(값이 ${beta}에 머무름)`).toBeGreaterThanOrEqual(0.3);
+
+    // 그리고 실제로 처방이 뒤집혀야 한다 — 조작만 되고 판정이 그대로면 시연 가치가 없다
+    await expect(flipCard).toContainText("공급 측 우선 — 가맹점 확충");
+    await expect(flipCard).toContainText("가맹점 확충이 먼저입니다");
+
+    // 투어는 계속 5단계로 살아 있어야 한다(조작이 투어를 끊지 않는다)
+    await expect(dialog).toContainText("5 / 6");
+
+    // 반전 판정이 투어 안내 카드에 가려지면 "뒤집혔다"를 볼 수 없다 — 좌표로 확인한다
+    const verdict = flipCard.getByText("공급 측 우선 — 가맹점 확충");
+    await expect(verdict).toBeInViewport();
+    const verdictBox = await verdict.boundingBox();
+    const cardBox = await tourCard(page).boundingBox();
+    expect(verdictBox, "반전 판정 배지의 boundingBox를 가져오지 못했습니다").not.toBeNull();
+    expect(cardBox, "투어 안내 카드의 boundingBox를 가져오지 못했습니다").not.toBeNull();
+    expect(
+      overlaps(verdictBox!, cardBox!),
+      `투어 안내 카드가 반전 판정을 가립니다 — 판정 y=${verdictBox!.y}~${verdictBox!.y + verdictBox!.height}, 카드 y=${cardBox!.y}~${cardBox!.y + cardBox!.height}`,
+    ).toBe(false);
+  });
+
+  test("2단계에서는 오버레이가 아래 화면 클릭을 계속 막는다", async ({ page }) => {
+    await page.goto("/?tour=2");
+    await expect(tourDialog(page)).toContainText("2 / 6");
+
+    const anchorLink = page.locator('[data-tour="first-proposal"]');
+    await expect(anchorLink).toBeVisible();
+    // 하이라이트된 링크를 직접 누르면 ?tour=3이 붙지 않아 투어가 조용히 끊긴다 — 막혀 있어야 정상이다.
+    const blocked = await anchorLink
+      .click({ timeout: 2_000 })
+      .then(() => false)
+      .catch(() => true);
+    expect(
+      blocked,
+      "2단계에서 하이라이트된 링크가 직접 클릭됐습니다 — 이동은 '다음' 버튼으로만 일어나야 투어가 이어집니다",
+    ).toBe(true);
+    await expect(page).toHaveURL(/tour=2/);
+  });
+});
+
 test.describe("첫 방문 자동 시작 · 재시작", () => {
   test("빈 localStorage로 허브에 들어오면 투어가 자동으로 시작된다", async ({ page }) => {
     await page.goto("/");
     await page.waitForURL(/tour=1/);
     await expect(tourDialog(page)).toBeVisible();
+  });
+
+  test("자동 시작이 기존 쿼리(?type=)를 버리지 않는다", async ({ page }) => {
+    await page.goto("/?type=INCENTIVE");
+    await page.waitForURL(/tour=1/);
+    const url = new URL(page.url());
+    expect(url.searchParams.get("type"), "자동 시작이 기존 쿼리(?type=)를 지워 버렸습니다").toBe("INCENTIVE");
   });
 
   test("완료 표시(sn-tour-done)가 있으면 자동으로 시작하지 않는다", async ({ page }) => {

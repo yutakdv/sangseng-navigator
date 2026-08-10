@@ -25,19 +25,29 @@ export type TourStep = {
    * 요소가 없습니다"로 빠지는 대신 항상 무언가를 하이라이트하기 위한 안전망이다.
    */
   fallbackAnchor?: string;
+  /**
+   * true면 이 스텝에서만 오버레이가 아래 화면의 조작을 통과시킨다(딤·루트가 클릭을 먹지 않는다).
+   * **본문이 화면 조작을 지시하는 스텝에만** 켠다 — 5단계는 β 슬라이더를 직접 움직여 처방이 뒤집히는
+   * 것을 보여 주는 장면이라 조작을 막으면 본문이 거짓이 된다.
+   *
+   * 나머지 스텝은 끈 채로 둔다. 특히 2단계는 하이라이트된 링크를 직접 클릭하면 `?tour=3`이 붙지 않아
+   * 투어가 조용히 끊기므로 통과시키면 안 된다 — 이동은 반드시 "다음" 버튼으로만 한다.
+   */
+  interactive?: boolean;
 };
 
 export const TOUR_STEPS: TourStep[] = [
   { path: "/", anchor: "impact-hero", title: "무엇을 얼마나 바꾸나",
-    body: "전환율 1%p 개선의 연간 효과를 서버 계산값으로 보여줍니다. 모든 숫자는 출처 칩에서 역추적됩니다." },
+    body: "전환율 1%p 개선의 연간 효과를 서버 계산값으로 보여줍니다. 이 숫자는 옆의 출처 칩에서 어떤 공공데이터를 썼는지 바로 확인할 수 있습니다." },
   { path: "/", anchor: "first-proposal", title: "이번 분기 제안",
-    body: "AI가 아니라 서버가 대상을 확정합니다. 클릭해 근거를 보세요.", nextHrefFromAnchor: true },
+    body: "AI가 아니라 서버가 대상을 확정합니다. '다음'을 누르면 그 근거 화면으로 이동합니다.", nextHrefFromAnchor: true },
   { path: "/proposals/", anchor: "dissent", title: "반대 관점",
     body: "AI가 스스로 제안을 반박합니다 — 승인 전 확인 장치입니다." },
   { path: "/proposals/", anchor: "decision", title: "담당자 승인",
     body: "AI는 제안만, 확정은 담당자가 합니다. (지금 누르지 않아도 됩니다)" },
-  { path: "/incentive?preset=flip", anchor: "flip", title: "반전 장면",
-    body: "β 슬라이더를 한 칸 올려 보세요 — 부하가 높은 셀에서는 처방이 확충으로 뒤집힙니다." },
+  // 유일하게 조작을 열어 두는 스텝(interactive) — 본문이 "직접 올려 보세요"라고 지시하기 때문이다.
+  { path: "/incentive?preset=flip", anchor: "flip", title: "반전 장면", interactive: true,
+    body: "이 단계에서는 화면을 직접 만질 수 있습니다. 민감도 가정(β) 슬라이더를 한 칸 올려 보세요 — 부하가 높은 셀에서는 처방이 페이백에서 가맹점 확충으로 뒤집힙니다. 확정이 아니라 의사결정 근거를 견줘 보는 자리입니다." },
   // 앵커 우선순위: 페이백 배너(widget-payback)가 있으면 그것을, 없으면(예: 승인된 페이백이 없는
   // 데모 시드) 항상 렌더되는 "추천 가맹점" 섹션(widget-recommendations)을 대신 가리킨다 — 두 경우
   // 모두 본문이 사실이어야 하므로 "담당자 결정이 반영된다"는 공통 사실만 말한다(v4.1 D3b).
