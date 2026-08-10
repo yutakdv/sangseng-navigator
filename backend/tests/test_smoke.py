@@ -306,8 +306,8 @@ def test_candidates_merges_scores_and_merchants():
 def test_risk_signal_serves_artifact_verbatim():
     """05 §1 — 대시보드 요인 카드(13 §2-15)가 쓰는 under2y_ratio의 서빙 경로.
 
-    `sync-mocks.sh`가 같은 파일을 FE mock으로 복사하므로 응답은 산출 JSON과 **완전히 같아야** 한다
-    (감싸거나 필드를 더하면 mock 모드와 실 API 모드가 갈린다 — 05 §6 mock 원천 단일화).
+    응답은 산출 JSON과 **완전히 같아야** 한다 — 감싸거나 필드를 더하면 파이프라인 산출물과
+    API 응답이 서로 다른 형태가 된다 (05 §6).
     """
     res = client.get("/api/risk-signal")
     assert res.status_code == 200

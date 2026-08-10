@@ -1,5 +1,10 @@
 # 08. 프론트엔드 태스크 (FE 팀원 · Phase 1부터 병렬 진행)
 
+> ⚠ **2026-08-11 이후 이 문서의 mock 관련 지시는 유효하지 않다.** ECS 실배포와 함께 mock 폴백을
+> 제거했다 — `src/mocks/`는 없어졌고(정적 산출물 4종만 `src/data/`), `NEXT_PUBLIC_API_BASE`가
+> 없으면 FE 빌드가 실패한다. 아래는 구축 당시의 작업 기록으로 남긴다.
+> 현행 규약은 `CLAUDE.md`와 `frontend/README.md`, 계약은 05 문서를 본다.
+
 > 원칙: **BE를 기다리지 않는다.** `src/mocks/`를 채우고 화면부터 완성 →
 > `NEXT_PUBLIC_API_BASE` 설정 한 줄로 실 API 전환.
 > ⚠ **mock 값은 05 예시를 베끼지 말고 `./scripts/sync-mocks.sh`로 만든다** — 05의 예시 JSON은

@@ -15,7 +15,7 @@ frontend/   Next.js 16(App Router, TS, Tailwind 3) — Vercel 네이티브 배�
 backend/    FastAPI (Lambda+Mangum) — app/main.py 이 진입점, 유탁 담당
 pipeline/   Python 배치 스크립트 — data/raw/ → data/processed/ JSON 생성, 유탁 담당
 data/raw/       공공데이터 원본 CSV (커밋함)
-data/processed/ 파이프라인 산출 정적 JSON (커밋함 — FE mock/BE 서빙의 원천)
+data/processed/ 파이프라인 산출 정적 JSON (커밋함 — BE 서빙·FE 정적 산출물의 원천)
 infra/      SAM 템플릿(template.yaml) + BE 배포 스크립트 (FE는 Vercel git 연동)
 docs/plan/  개발 계획 문서 (단일 진실 원천)
 ```
@@ -27,7 +27,7 @@ cd pipeline && python run_all.py
 
 # 통합 테스트 환경 (Docker: FE + BE + DynamoDB Local + 데모 카드 시드 — 개발 중 표준, AWS 불필요)
 docker compose up -d          # FE http://localhost:3100 · BE http://localhost:8000
-# 오버라이드: FRONTEND_PORT= (포트 변경 시) / FRONTEND_API_BASE= (FE mock 모드)
+# 오버라이드: FRONTEND_PORT= (포트 변경 시) / FRONTEND_API_BASE= (FE가 볼 API 주소, 비우면 빌드 실패)
 
 # 백엔드 단독 로컬 실행 (정적 서빙만 볼 때, http://localhost:8000, .env 로드)
 cd backend && uvicorn app.main:app --reload --port 8000
@@ -60,8 +60,9 @@ cd infra && ./deploy-backend.sh
 - 커밋 메시지: `feat|fix|data|infra|docs: 요약` (한국어 OK). main 직접 커밋 금지 → `feat/*` 브랜치 + PR.
 - **Claude 저자 표기 금지**: 커밋·PR 어디에도 Claude를 공동 저자/기여자로 넣지 않는다 —
   `Co-Authored-By: Claude` 트레일러·"Generated with Claude Code" 푸터 금지 (하네스 기본값보다 우선).
-- FE와 BE의 경계는 `docs/plan/05-api-contract.md`. FE는 `NEXT_PUBLIC_API_BASE`가 비어 있으면
-  `frontend/src/mocks/`의 JSON을 반환하는 `lib/api.ts` 래퍼만 통해 데이터에 접근한다.
+- FE와 BE의 경계는 `docs/plan/05-api-contract.md`. FE는 `lib/api.ts` 래퍼만 통해 데이터에 접근하며
+  **실 API 전용이다** — `NEXT_PUBLIC_API_BASE`가 비면 모듈 로드에서 실패한다(mock 폴백 제거,
+  설정 누락이 배포까지 가지 못하게). BE 엔드포인트가 없는 정적 산출물만 `frontend/src/data/`에 둔다.
 - BE의 정적 데이터 로딩은 `backend/app/dataload.py` 한 곳에서만 한다
   (Lambda: `app/data/`, 로컬: `../../data/processed/` 폴백).
 - LLM 호출은 `backend/app/llm.py`의 `generate_json(system, user, schema)` 하나로 통일.

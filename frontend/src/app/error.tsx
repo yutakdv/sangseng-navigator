@@ -10,12 +10,9 @@ import Link from "next/link";
  * 심사위원에게는 서비스가 고장 난 것으로 보이므로, ① 무슨 일인지 ② 다시 시도할 수 있다는 것
  * ③ 첫 요청은 원래 느릴 수 있다는 것을 한 화면에서 알린다.
  *
- * ⚠ 이 파일은 `"use client"`다 — **`@/lib/api`를 import 하지 않는다.** 그 모듈은 mock JSON
- *   (merchants 330KB 포함)을 정적 import 하므로 여기서 `isMockMode`를 끌어오면 mock 전체가
- *   에러 화면 번들에 실린다. 같은 판정을 env로 직접 한다 —
- *   `NEXT_PUBLIC_*`는 빌드 시 문자열로 인라인되므로 클라이언트에서 그대로 읽을 수 있다.
+ * ⚠ 이 파일은 `"use client"`다 — **`@/lib/api`를 import 하지 않는다.** 그 모듈은 정적 JSON
+ *   (usage_monthly 등)을 import 하므로 여기서 끌어오면 에러 화면 번들에 함께 실린다.
  */
-const isMockMode = !process.env.NEXT_PUBLIC_API_BASE;
 
 export default function Error({
   error,
@@ -56,9 +53,7 @@ export default function Error({
         </h1>
 
         <p className="mt-2.5 break-keep text-[15px] leading-7 text-admin-text-soft">
-          {isMockMode
-            ? "화면을 그리는 중 문제가 생겼습니다. 다시 시도하면 대개 정상으로 돌아옵니다."
-            : "데이터 서버 응답을 받지 못했습니다. 일시적인 네트워크 문제일 수 있으니 다시 시도해 주세요."}
+          데이터 서버 응답을 받지 못했습니다. 일시적인 네트워크 문제일 수 있으니 다시 시도해 주세요.
         </p>
 
         <div className="mt-6 flex flex-wrap gap-2">
