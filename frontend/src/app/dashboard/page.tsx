@@ -124,7 +124,7 @@ export default async function DashboardPage({
           icon="chart"
           eyebrow="진단"
           title="지역 소비 분석"
-          lede="폐광지역 4개 시군(정선·태백·영월·삼척 도계읍)에서 하이원포인트(강원랜드 방문객이 적립해 지역 가맹점에서 쓰는 포인트) 소비가 어디에 얼마나 몰려 있는지 본다. 이 화면의 값이 확충 제안의 정량 출발점이다."
+          lede="석탄산업전환지역(구 폐광지역) 4개 시군(정선·태백·영월·삼척 도계읍)에서 하이원포인트(강원랜드 방문객이 적립해 지역 가맹점에서 쓰는 포인트) 소비가 어디에 얼마나 몰려 있는지 본다. 이 화면의 값이 확충 제안의 정량 출발점이다."
         >
           <p className="u-note mt-2 flex flex-wrap items-center gap-x-2">
             <Icon name="database" size={13} />
