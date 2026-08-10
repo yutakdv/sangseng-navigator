@@ -612,6 +612,10 @@ export default async function DashboardPage({
             shares={d.region_share ?? []}
             monthlyByRegion={d.monthly_by_region ?? []}
             ranking={eupRanking}
+            /* candidates 조회 실패를 "순위 없음"·"진단 대상 아님"으로 렌더하지 않게 한다 —
+               같은 화면 아래 "1단계 지역 진단" 섹션이 같은 데이터에 대해 실패를 밝히므로,
+               두 블록이 같은 사실을 다르게 말하면 안 된다 */
+            rankingUnavailable={cand === null}
             selectedRegions={cand?.selected_eups ?? []}
             onlyRegion={selectedRegion}
           />
