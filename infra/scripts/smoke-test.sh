@@ -57,8 +57,11 @@ log_ok "무토큰 $NO_TOKEN / 유토큰 $WITH_TOKEN"
 log_step "5. DynamoDB Gateway Endpoint 실사용 확인 (P0)"
 # 태스크에 퍼블릭 IP 가 있어서 엔드포인트가 잘못 연결돼도 DynamoDB 호출은 IGW 경유로
 # 그냥 성공한다 — 장애가 안 나서 더 위험하다. 라우트 주입을 직접 본다.
+# ⚠ JMESPath 로 거르지 않는다 — prefix list 가 없는 일반 라우트는 이 필드가 null 이라
+#   starts_with(null, 'pl-') 에서 CLI 가 InvalidType 으로 죽는다(라우트 유무와 무관하게 실패).
 PL="$(aws_ ec2 describe-route-tables --filters "Name=tag:Name,Values=sangseng-public" \
-  --query "RouteTables[0].Routes[?starts_with(DestinationPrefixListId, 'pl-')].GatewayId" --output text)"
+  --query "RouteTables[0].Routes[].[DestinationPrefixListId,GatewayId]" --output text \
+  | awk '$1 ~ /^pl-/ { print $2 }')"
 [ -n "$PL" ] && [ "$PL" != "None" ] \
   || die "public 라우트 테이블에 DynamoDB prefix list 경로가 없습니다 — '프라이빗 경로' 주장이 성립하지 않습니다."
 log_ok "$PL"
