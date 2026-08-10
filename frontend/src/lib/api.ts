@@ -41,6 +41,16 @@ import usageMonthlyJson from "@/data/usage_monthly.json";
 // 끝 슬래시를 떼어 `${BASE}${path}`가 `//api/...`로 조립되는 것을 막는다 (그러면 전부 404다).
 const BASE = (process.env.NEXT_PUBLIC_API_BASE ?? "").trim().replace(/\/+$/, "");
 
+/**
+ * 담당자 전용 조회·변경에 실어 보내는 공유 Bearer 토큰.
+ *
+ * 이름이 두 가지인 역사: BE와 루트 `.env`는 `MUTATION_API_TOKEN`, FE와 docker-compose는
+ * `API_MUTATION_TOKEN`을 쓴다(compose가 값을 옮겨 담아 로컬에서는 차이가 드러나지 않는다).
+ * 실배포에서 실제로 이름을 바꿔 넣어 담당자 조회가 전부 401이 됐고, 화면에는 "권한이 필요합니다"
+ * 만 떠서 원인이 보이지 않았다 — 어느 이름으로 넣어도 동작하게 해 이 함정을 없앤다.
+ */
+const MUTATION_TOKEN = process.env.API_MUTATION_TOKEN ?? process.env.MUTATION_API_TOKEN;
+
 if (!BASE) {
   // 모듈 로드 시점에 죽인다 — 설정이 빠진 빌드가 배포까지 가지 못하게 한다.
   throw new Error(
@@ -85,10 +95,9 @@ async function fail(res: Response, path: string): Promise<never> {
 }
 
 async function get<T>(path: string): Promise<T> {
-  const internalToken = process.env.API_MUTATION_TOKEN;
   const res = await fetch(`${BASE}${path}`, {
     cache: "no-store",
-    headers: internalToken ? { Authorization: `Bearer ${internalToken}` } : undefined,
+    headers: MUTATION_TOKEN ? { Authorization: `Bearer ${MUTATION_TOKEN}` } : undefined,
     // BE가 거부가 아니라 무응답으로 매달리면 스켈레톤이 무한 지속된다 — 네트워크 지연의
     // 여유를 두고 끊어 error.tsx의 "다시 시도" 화면으로 회복시킨다.
     signal: AbortSignal.timeout(10_000),
@@ -110,12 +119,11 @@ async function postWithStatus<T>(
   path: string,
   body: unknown,
 ): Promise<{ data: T; status: number }> {
-  const mutationToken = process.env.API_MUTATION_TOKEN;
   const res = await fetch(`${BASE}${path}`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
-      ...(mutationToken ? { Authorization: `Bearer ${mutationToken}` } : {}),
+      ...(MUTATION_TOKEN ? { Authorization: `Bearer ${MUTATION_TOKEN}` } : {}),
     },
     body: JSON.stringify(body ?? {}),
     // generate는 LLM 재시도까지 최대 24.5초. API Gateway HTTP API의 통합 타임아웃이 30초
