@@ -120,10 +120,31 @@ export default async function DashboardPage({
 
         <DashboardTabs view={view} />
 
-        {/* ══ 뷰 ① 현황 — 전체 그림 먼저: KPI 4장 + 지역별 현재 상태(상세 진입점) ══ */}
+        {/* ══ 뷰 ① 현황 — 지역별 현재 상태(개별 지역) → 진단 지표(전체 합산) 순서.
+            지역 여섯 곳을 먼저 훑고 그 값들이 합쳐진 지표를 보는 흐름이라, 지표 4장이
+            "앞의 여섯 카드를 요약한 값"으로 읽힌다. 지표를 먼저 두면 그 숫자가 어느
+            모집단에서 나왔는지 모른 채 읽게 된다 ══ */}
         {view === "overview" ? (
         <section aria-label="현황" className="flex flex-col gap-6">
           <GroupHeading note="원천 데이터에서 바로 계산한 값">현황</GroupHeading>
+
+          {/* 6개 지역 비교표가 첫 조망이다 — 여기서 이상한 지역을 발견하고 카드의 상세 링크로
+              지역 상세 분석 화면에 진입하는 것이 이 페이지의 기본 탐색 동선이다 */}
+          <Section
+            icon="map"
+            title="지역별 현재 상태"
+            desc="6개 지역을 같은 기준으로 나란히 비교한다. 누적 사용 건수·전체 비중·최근 월 흐름·1단계 진단 순위를 함께 표시한다. 지역 한 곳의 업종 구성·시간 패턴은 카드의 상세 분석에서 본다."
+          >
+            <RegionStatusGrid
+              shares={d.region_share ?? []}
+              monthlyByRegion={d.monthly_by_region ?? []}
+              ranking={eupRanking}
+              selectedRegions={cand.selected_eups ?? []}
+              withDetailLink
+            />
+          </Section>
+
+          <GroupHeading note="위 6개 지역을 합산한 전체 기준 값">진단 지표</GroupHeading>
           {/* alignDivider: 증감 배지가 있는 카드(전환율·사용 건수)와 없는 카드(집중도·분산도)가
               한 행에 섞여 있어, 구분선을 하단 정렬로 통일한다 — 이 4장에만 적용 */}
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
@@ -173,21 +194,6 @@ export default async function DashboardPage({
             />
           </div>
 
-          {/* 6개 지역 비교표가 첫 조망이다 — 여기서 이상한 지역을 발견하고 카드의 상세 링크로
-              지역 상세 분석 화면에 진입하는 것이 이 페이지의 기본 탐색 동선이다 */}
-          <Section
-            icon="map"
-            title="지역별 현재 상태"
-            desc="6개 지역을 같은 기준으로 나란히 비교한다. 누적 사용 건수·전체 비중·최근 월 흐름·1단계 진단 순위를 함께 표시한다. 지역 한 곳의 업종 구성·시간 패턴은 카드의 상세 분석에서 본다."
-          >
-            <RegionStatusGrid
-              shares={d.region_share ?? []}
-              monthlyByRegion={d.monthly_by_region ?? []}
-              ranking={eupRanking}
-              selectedRegions={cand.selected_eups ?? []}
-              withDetailLink
-            />
-          </Section>
           <NextViewLink view={view} />
         </section>
         ) : null}
