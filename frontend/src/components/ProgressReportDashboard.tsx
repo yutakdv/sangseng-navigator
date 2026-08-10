@@ -159,7 +159,7 @@ export function ProgressReportDashboard({
         {report.cards_without_records > 0 || unrecorded.length > 0 ? (
           <div
             id="unrecorded"
-            className="mt-4 scroll-mt-28 rounded-xl bg-state-notice-bg px-3.5 py-3 ring-1 ring-inset ring-state-notice-line"
+            className="mt-4 scroll-mt-28 rounded-xl bg-state-notice-bg px-3.5 py-3"
           >
             <p className="flex items-start gap-2 text-xs font-bold leading-5 text-state-notice">
               <Icon name="info" size={14} className="mt-0.5" />
@@ -454,7 +454,7 @@ function DistributionLayer({ layer }: { layer: WorkflowLayer }) {
   const holdCount = layer.counts["보류"] ?? 0;
 
   return (
-    <div className="rounded-xl border border-admin-border bg-admin-surface-sunken px-3 py-3">
+    <div className="rounded-xl bg-admin-surface-sunken px-3 py-3">
       <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
         <h3 className="text-[13px] font-bold text-admin-text">{layer.title}</h3>
         <span className="text-[11px] text-admin-text-muted">
