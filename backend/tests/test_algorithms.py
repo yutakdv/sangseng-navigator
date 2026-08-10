@@ -39,6 +39,37 @@ def test_simulation_rejects_empty_merchant_denominator():
         simulate.expected_monthly_count(_usage(), [], "영월군", "카페")
 
 
+def test_llm_clients_disable_sdk_internal_retries(monkeypatch):
+    """llm.py의 지연 예산(timeout × attempts)은 SDK 내부 재시도가 꺼져 있어야 성립한다.
+
+    anthropic/openai SDK는 기본 max_retries=2로 타임아웃·429·5xx를 자체 재시도하므로,
+    막지 않으면 앱 레벨 시도 1회가 timeout×3까지 늘어나 Lambda 30초 예산을 넘고
+    규칙 기반 폴백에 도달하기 전에 함수가 죽는다 (llm.py RETRY_BACKOFF_SECONDS 주석).
+    """
+    import anthropic as anthropic_sdk
+    import openai as openai_sdk
+
+    from app import llm
+
+    captured = {}
+
+    def _fake_client(name):
+        def ctor(**kwargs):
+            captured[name] = kwargs
+            raise RuntimeError("네트워크 호출 전 중단")
+        return ctor
+
+    monkeypatch.setattr(anthropic_sdk, "Anthropic", _fake_client("anthropic"))
+    monkeypatch.setattr(openai_sdk, "OpenAI", _fake_client("openai"))
+
+    for provider in ("anthropic", "openai"):
+        monkeypatch.setenv("LLM_PROVIDER", provider)
+        with pytest.raises(llm.LLMError):
+            llm.generate_json("s", "u", {"type": "object"}, attempts=1)
+        assert captured[provider].get("max_retries") == 0, (
+            f"{provider} 클라이언트가 max_retries=0 없이 생성됨 — SDK 내부 재시도가 살아 있다")
+
+
 def test_dataload_refreshes_when_processed_file_changes(tmp_path, monkeypatch):
     monkeypatch.setattr(dataload, "CANDIDATE_DIRS", [tmp_path])
     path = tmp_path / "sample.json"

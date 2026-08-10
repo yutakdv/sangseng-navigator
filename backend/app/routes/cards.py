@@ -124,7 +124,11 @@ def decide(
             cid,
             body.decision,
             initial_progress=initial_progress,
-            selected_rate=body.selected_rate if card.get("type") == "INCENTIVE" else None,
+            # 승인 시점에만 저장 (05 §2 — pending/반려 상태에서는 null). 반려·보류 경로는
+            # 위 RATES 검증 분기를 지나지 않으므로, 여기서 걸러야 무검증 값이 저장되지 않는다.
+            selected_rate=(body.selected_rate
+                           if card.get("type") == "INCENTIVE" and body.decision == "approved"
+                           else None),
         )
     except db.ConcurrentUpdate:
         raise HTTPException(status_code=409, detail="다른 요청이 먼저 카드 결정을 변경했습니다. 새로고침 후 다시 시도하세요") from None

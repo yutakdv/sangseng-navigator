@@ -8,6 +8,9 @@ log = logging.getLogger(__name__)
 RETRY_BACKOFF_SECONDS = 0.5
 # 재시도 사이 고정 대기. 최악 지연 = cardgen timeout 12s × 2회 + backoff 0.5s = 24.5s < Lambda 30s
 # (09 문서 Timeout: 30, cardgen.LLM_TIMEOUT=12). 마지막 시도 뒤에는 대기하지 않는다.
+# ⚠ 이 예산은 SDK 내부 재시도가 꺼져 있어야 성립한다 — 두 SDK 모두 기본 max_retries=2로
+# 타임아웃·429·5xx를 자체 재시도해, 막지 않으면 앱 시도 1회가 timeout×3(≈37.5s)까지 늘어나
+# 폴백 도달 전에 Lambda가 죽는다. 그래서 아래 클라이언트 생성에 max_retries=0을 명시한다.
 
 # 인증 실패 응답에는 SDK가 부분 마스킹한 키가 그대로 들어 있다
 # (예: "Incorrect API key provided: sk-proj-****ABCD"). 로그·트레이스백에 남기지 않는다.
@@ -50,7 +53,7 @@ def generate_json(system: str, user: str, schema: dict, schema_name: str = "resu
         try:
             if provider == "anthropic":
                 import anthropic
-                client = anthropic.Anthropic()
+                client = anthropic.Anthropic(max_retries=0)   # 재시도는 이 함수의 attempts가 전담 (위 예산 주석)
                 extra = {"timeout": timeout} if timeout is not None else {}
                 # timeout 미지정(None)이면 SDK 기본 타임아웃(NotGiven)을 그대로 쓴다 —
                 # 명시적으로 timeout=None을 넘기면 SDK가 "타임아웃 없음(무한 대기)"으로 해석한다.
@@ -68,7 +71,7 @@ def generate_json(system: str, user: str, schema: dict, schema_name: str = "resu
             else:
                 # 기본: openai
                 from openai import OpenAI
-                client = OpenAI()
+                client = OpenAI(max_retries=0)   # 재시도는 이 함수의 attempts가 전담 (위 예산 주석)
                 # timeout 미지정(None)이면 with_options를 거치지 않고 SDK 기본 타임아웃을 유지한다 —
                 # with_options(timeout=None)을 호출하면 "타임아웃 없음(무한 대기)"으로 바뀌어 버린다.
                 if timeout is not None:

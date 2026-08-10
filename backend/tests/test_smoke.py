@@ -646,6 +646,19 @@ def test_incentive_approval_requires_selected_rate():
     assert exp.get("selected_rate") is None
 
 
+def test_incentive_rejection_ignores_selected_rate():
+    """05 §2 — selected_rate는 **승인 시점에만** 저장된다 (pending/반려 상태에서는 null).
+
+    반려·보류 경로는 RATES(3|5|7) 검증 분기를 지나지 않으므로, body에 실려 온 값을
+    그대로 저장하면 범위 밖 값(999)까지 무검증으로 영구 잔존한다(반려 카드는 재결정 불가).
+    """
+    res = client.post("/api/cards/INC-001/decision",
+                      json={"decision": "rejected", "selected_rate": 999})
+    assert res.status_code == 200
+    assert res.json()["card"]["selected_rate"] is None
+    assert client.get("/api/cards/INC-001").json()["card"]["selected_rate"] is None
+
+
 def test_incentive_scenarios_survive_decimal_round_trip():
     """05 §8 숫자 직렬화 — 읽기-수정-쓰기를 반복해도 delta_pp가 float로 남는다 ([1.0, 2.0] → [1, 2] 방지).
 

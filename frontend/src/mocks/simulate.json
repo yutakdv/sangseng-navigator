@@ -1,7 +1,7 @@
 {
   "simulation": {
     "current_index": 42.5,
-    "projected_index": 42.5,
+    "projected_index": 42.4,
     "delta_pp": [0.1, 0.1],
     "expected_monthly_count": 19.7,
     "expected_monthly_range": [19.5, 19.9],

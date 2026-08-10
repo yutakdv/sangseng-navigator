@@ -72,6 +72,10 @@ Base URL: 로컬 `http://localhost:8000` / 배포 후 API Gateway URL. 경로 �
 
 - `category_share`: 전 기간 누적 건수를 위 표시 6분류로 롤업한 업종 도넛용 배열
   (`category`는 13 §5 고정 순서, 롤업 정본은 `category_map.py`의 매핑 ① `HIGHONE_TO_DISPLAY`, `share` 합=1.0)
+- `growth.mom_pct`: **전월 대비 "일평균" 사용 건수 증감률(%)** — `월 건수 ÷ 그 달의 일수`로 만든
+  일평균끼리 비교한다 (`pipeline/p5_metrics.py`). 월 길이(28~31일) 편향을 제거하는 정의라 단순
+  월합 증감과 **부호가 다를 수 있다** — 실데이터 2025-12는 월합 기준 +1.5%인데 일평균 기준 −1.8%다.
+  화면 라벨은 "전월 일평균"으로 표기해 "총 사용 건수가 줄었다"로 오독되지 않게 한다.
 - `growth.qoq_pp`: **지역 전환율의 전분기 대비 변화(%p)** — 분기는 데이터 최신 월(2025-12) 기준
   최근 3개월(2025-10~12) vs 직전 3개월(2025-07~09)이며, 분기 전환율은
   3개월 건수 합 ÷ 3개월 **입장 연인원(교대 합산)** 합 × 100
@@ -116,8 +120,9 @@ Base URL: 로컬 `http://localhost:8000` / 배포 후 API Gateway URL. 경로 �
   (OSRM 공개 라우팅 API로 사전 계산, 소수 1자리. 호출 실패 시 두 필드 모두 `null`).
   ⚠ **공개 라우팅 API 추정치이며 비포장·임도(track) 구간이 포함될 수 있다** — 실측 도로 대장이
   아니다. 절대 수치로 인용하지 말고 **후보 간 상대 비교**(어느 쪽이 시간상 가까운가)에만 쓴다.
-  실제로 CAND-001은 11.0km·50.8분(평균 13km/h)으로, 나머지 후보(45~64km/h)와 달리 임도 경유로
-  추정된다. 화면·발표에서는 **소요시간 중심**으로 말하고 거리 수치를 단정하지 않는다.
+  실제로 CAND-001(영월군 음식점)은 직선 9.4km인데 도로는 28.4km·35.2분으로 직선의 3배가 나온다 —
+  산악 지형에서 직선거리 기반 `proximity`가 실제 접근성과 크게 어긋날 수 있음을 보여주는 실측 사례다.
+  화면·발표에서는 **소요시간 중심**으로 말하고 거리 수치를 단정하지 않는다.
   `proximity`는 **직선거리** 기반이라 산악 지형에서 실제 접근성과 역전될 수 있다 — 그 한계를
   우리가 먼저 드러내려고 병기하는 참고 필드다. **순위 산식에는 들어가지 않으며**(가중치·정렬 불변),
   FE도 이 값으로 재정렬하지 않는다. 도로 경로 검증은 별도 과제라 순위 반영은 로드맵으로 둔다.
@@ -190,20 +195,20 @@ Base URL: 로컬 `http://localhost:8000` / 배포 후 API Gateway URL. 경로 �
   "candidate_verification": {
     "status": "unverified",
     "checks": [
-      {"key": "business_status", "label": "영업 상태", "status": "unverified"},
-      {"key": "membership_eligibility", "label": "가맹 자격", "status": "unverified"},
-      {"key": "participation_intent", "label": "사업자 참여 의향", "status": "unverified"},
-      {"key": "visitor_fit", "label": "관광객 이용 적합성", "status": "unverified"},
-      {"key": "settlement_integration", "label": "정산 연동 가능성", "status": "unverified"}
+      {"key": "영업 상태", "label": "영업 상태", "status": "unverified"},
+      {"key": "가맹 자격", "label": "가맹 자격", "status": "unverified"},
+      {"key": "사업자 참여 의향", "label": "사업자 참여 의향", "status": "unverified"},
+      {"key": "관광객 이용 적합성", "label": "관광객 이용 적합성", "status": "unverified"},
+      {"key": "정산 연동 가능성", "label": "정산 연동 가능성", "status": "unverified"}
     ],
     "note": "후보 접촉·검토 시작은 가맹 확정이 아니며, 적격성 확인과 가맹 심사를 별도로 거칩니다"
   },
   "operations": {
     "owner": null,
     "target_date": null,
-    "estimated_cost": null,
+    "expected_cost": null,
     "contact_result": null,
-    "ineligibility_reason": null,
+    "ineligible_reason": null,
     "actual_outcome": null
   },
   "version": 0,
@@ -223,10 +228,17 @@ Base URL: 로컬 `http://localhost:8000` / 배포 후 API Gateway URL. 경로 �
   **후보 접촉·검토 시작을 승인했다는 뜻**이며 가맹 확정이 아니다
 - `progress`: EXPANSION은 `후보 접촉·검토 시작` → `적격성 확인` → `가맹 심사` → `추진중` → `완료`,
   그리고 어느 단계에서나 `보류`. INCENTIVE는 `검토중` | `추진중` | `보류` | `완료`를 유지한다
-- `candidate_verification.checks[].status`: `unverified` | `verified` | `failed`. 다섯 필수 항목이 모두
+- `candidate_verification.checks[]`는 `{key, label, status}`이며 `key`·`label`은 같은 **한글 항목명**이다
+  (영업 상태 · 가맹 자격 · 사업자 참여 의향 · 관광객 이용 적합성 · 정산 연동 가능성 —
+  정본은 `services/workflow.REQUIRED_ELIGIBILITY_CHECKS`). `checks[].status`: `unverified` | `verified` |
+  `failed`. 상위 `candidate_verification.status`는 서버 계산값 `unverified` | `verified` |
+  `ineligible`(하나라도 failed)이다. 다섯 필수 항목이 모두
   `verified`가 아니면 `적격성 확인` 이후 단계와 `완료`를 선택할 수 없다. 하나라도 `failed`면 카드의
   사용자 표시 상태는 `부적격 또는 반려`이며 재검토 전 최종 상태로 이동하지 않는다
-- **AI 사실성 경계:** LLM은 `ai_rank_target` 선택과 비정량 리스크 초안에만 관여한다. 사용자에게
+- **AI 사실성 경계:** 제안 대상은 LLM 호출 **전에** 서버가 결정론적으로 확정한다(가용 후보 중 최고
+  Score — `grounding.selection_method: "deterministic_highest_available_score"`). LLM은 비교 설명과
+  비정량 리스크 초안 작성에만 관여하며, LLM이 출력한 `ai_rank_target`은 서버 확정 대상과의 대조
+  검증에만 쓰고 폐기한다. 사용자에게
   보이는 후보명·Score·순위·진행 상태·도로 소요시간·비교 문장은 서버가 구조화 데이터로 다시 만든다.
   `ai.grounding.status=verified`는 이 재검증을 통과했다는 뜻이지 후보 사업자의 적격성이 확인됐다는 뜻은
   아니다. 후자는 `candidate_verification.status=unverified`에서 별도로 관리한다.
@@ -310,7 +322,7 @@ LLM 호출이 실패하거나 애초에 호출하지 않은 카드도 **똑같�
   "ai": {
     "adjusted": false,
     "comparison": "세 시나리오 모두 이미 적립된 하이원포인트를 지역 가맹점에서 결제할 때만 리워드가 붙는 사용 단계 설계로, 콤프 발행액 증액은 수반하지 않습니다. 3%는 재원 부담이 가장 낮지만 개선폭이 0.5~1.0%p로 제한적이고, 7%는 2.0~3.0%p로 가장 크지만 재원 부담도 함께 커집니다. 5%는 개선폭 1.0~2.0%p·재원 부담 중간으로, 분기 내 효과 확인과 재원 방어를 동시에 노리는 절충안입니다.",
-    "reasons": ["적립이 아닌 사용 단계 정책 — 지역 가맹점 결제분에 한정해 리워드가 붙으므로 콤프 발행액(적립)은 늘지 않고 게임 참여 유인과도 무관", "지역 전환율이 월별 17~23%대에서 오르내려 저점 월을 방어할 수요 측 유인이 필요", "사용 건수가 사북읍·태백시에 절반 이상 몰려 있어 특정 지역 한정이 아닌 전 지역 공통 적용이 지역 균형에 유리", "페이백률이 높을수록 효과와 재원 부담이 함께 커지는 트레이드오프가 뚜렷"],
+    "reasons": ["적립이 아닌 사용 단계 정책 — 지역 가맹점 결제분에 한정해 리워드가 붙으므로 콤프 발행액(적립)은 늘지 않고 게임 참여 유인과도 무관", "지역 전환율이 월별 17~23%대에서 오르내려 저점 월을 방어할 수요 측 유인이 필요", "사용 건수가 사북읍·태백시에 절반 이상 몰려 있어 특정 지역 한정이 아닌 전 지역 공통 적용이라 지역 균형을 왜곡하지 않음", "페이백률이 높을수록 효과와 재원 부담이 함께 커지는 트레이드오프가 뚜렷"],
     "risks": ["재원 확보는 예산 부서의 별도 승인 사항", "기존 포인트 적립·할인 약관과의 중복 적용 여부 확인 필요", "실제 자동 지급 시스템 연동은 미구현(로드맵)"],
     "expected_effect": "5% 적용 시 지역 전환율 약 1.0~2.0%p 개선 예상 (가정 기반 전망이며 실제와 다를 수 있음)",
     "original_ranking": null
@@ -339,8 +351,8 @@ LLM 호출이 실패하거나 애초에 호출하지 않은 카드도 **똑같�
 | GET | `/api/cards/{id}` | 단건 | — | `{"card": Card}` |
 | POST | `/api/cards/generate` | 스코어링+AI로 카드 생성 | `{"type": "EXPANSION"}` 또는 `{"type": "INCENTIVE"}` | `{"card": Card}` — 신규 201, 동일 타깃 pending 중복 시 기존 카드 200 (§8) |
 | POST | `/api/cards/{id}/decision` | 담당자 결정. EXPANSION의 `approved` 표시는 **후보 접촉·검토 시작** | `{"decision": "approved"\|"rejected"\|"held", "selected_rate": 3\|5\|7}` — `selected_rate`는 **INCENTIVE 카드를 approved할 때만 필수**, 그 외 생략 | `{"card": Card}` |
-| POST | `/api/cards/{id}/verification` | EXPANSION 후보 적격성 5항목 저장 | `{"checks": [{"key": "business_status", "status": "verified"}, ...], "note": "..."}` | `{"card": Card}` |
-| POST | `/api/cards/{id}/progress` | 추진 상태 변경 (approved만 가능) | `{"progress": "후보 접촉·검토 시작"\|"적격성 확인"\|"가맹 심사"\|"추진중"\|"보류"\|"완료"}` (INCENTIVE는 기존 4단계) | `{"card": Card}` |
+| POST | `/api/cards/{id}/verification` | EXPANSION 후보 적격성 5항목 저장 | `{"checks": [{"label": "영업 상태", "status": "verified"}, ...]}` — `label`은 위 한글 항목명 5종, `note`는 서버가 결과에 따라 생성(요청으로 받지 않음) | `{"card": Card}` |
+| POST | `/api/cards/{id}/progress` | 추진 상태 변경 (approved만 가능) | `{"progress": "후보 접촉·검토 시작"\|"적격성 확인"\|"가맹 심사"\|"추진중"\|"보류"\|"완료"}` (INCENTIVE는 기존 4단계) | `{"card": Card, "record": ProgressRecord, "created": bool}` — 상태 변경이 `quick_status` 추진 기록도 함께 남긴다 |
 | POST | `/api/cards/{id}/simulate` | 가맹 전환 시 예상 효과 (반사실 재계산+LLM). **🔒 인증 필수 · 읽기 계산이라 `DEMO_READ_ONLY` 차단 대상이 아니다** (§8) | — | 아래 |
 | POST | `/api/cards/{id}/progress-records` | 추진 기록 저장(상태 전이 + 근거 메모 + 실측 관측값). 상태 변경과 감사 기록을 한 트랜잭션으로 남긴다 | 아래 `ProgressRecord 입력` | `{"card": Card, "record": ProgressRecord, "created": true}` — 신규 201, 같은 `idempotency_key` 재전송이면 기존 기록 200 |
 | GET | `/api/cards/{id}/progress-records` | 한 카드의 추진 기록 타임라인 (최신순). **🔒 인증 필수** | 쿼리: `limit`(1~100, 기본 50) · `cursor` | `{"records": [ProgressRecord], "next_cursor": string\|null}` · 토큰 없으면 401 |
@@ -364,6 +376,8 @@ LLM 호출이 실패하거나 애초에 호출하지 않은 카드도 **똑같�
     "projected_index": 42.5,
     "delta_pp": [0.0, 0.1],
     "expected_monthly_count": 62.4,
+    "expected_monthly_range": [58.9, 66.0],
+    "uncertainty_method": "최근 3개월 월별 가맹점당 건수 25~75 분위수",
     "estimate_basis": "대상 지역·업종의 최근 3개월 가맹점당 평균",
     "base_month": "2025-12",
     "effect_assessment": "미미",
@@ -381,7 +395,9 @@ LLM 호출이 실패하거나 애초에 호출하지 않은 카드도 **똑같�
   화면은 이 값으로 설명 출처 칩을 띄운다 — 폴백인데 "AI가 썼다"고 말하지 않기 위한 필드다.
 
 - `expected_monthly_count`는 반사실 계산에 더한 예상 월 이용 건수, `estimate_basis`는 3단계 폴백 중
-  실제 적용 근거, `base_month`는 전망의 기준월이다. FE는 효과 지수만 보여주지 말고 세 값을 함께 보여
+  실제 적용 근거, `base_month`는 전망의 기준월이다. `expected_monthly_range`는 예상 건수의 관측 기반
+  범위(폴백 표본의 최근 3개월 월별 가맹점당 건수 25~75 분위수 — `delta_pp` 구간의 원천),
+  `uncertainty_method`는 그 산출 방법 라벨이다. FE는 효과 지수만 보여주지 말고 세 값을 함께 보여
   “0.0%p”가 계산 실패인지 규모가 작은 정상 결과인지 구분하게 한다.
 - `effect_assessment`는 `개선|심화|혼재|미미`이며 `decision_note`는 승인 권고가 아니라 담당자가 다음에
   확인할 사항을 제시한다. `미미` 또는 최대 변화폭 0.1%p 이하는 보류도 정상 선택지라고 명시한다.
@@ -491,16 +507,21 @@ LLM 호출이 실패하거나 애초에 호출하지 않은 카드도 **똑같�
 
 ```json
 {
-  "adoption_rate": 0.5,
+  "adoption_rate": 0.67,
   "execution_rate": 0.5,
+  "avg_decision_hours": 1.2,
   "avg_approval_hours": 1.2,
   "regional_balance_index": 80,
-  "counts": {"total": 4, "pending": 1, "approved": 2, "rejected": 1, "held": 0, "done": 1}
+  "counts": {"total": 4, "pending": 1, "approved": 2, "rejected": 1, "held": 0, "decided": 3, "done": 1}
 }
 ```
 
-- 채택률 = approved / 전체, 실행 전환율 = (추진중+완료) / approved
-- 평균 승인 소요 = avg(decided_at − created_at)
+- 채택률 = approved / **결정 완료(approved+rejected+held)** — 승인 대기 카드는 아직 채택 여부가
+  정해지지 않았으므로 분모에서 제외한다(결정 카드 0건이면 `null`). 위 예시는 결정 3건 중 승인 2건 = 0.67.
+  실행 전환율 = (추진중+완료) / approved
+- 평균 의사결정 소요 `avg_decision_hours` = avg(decided_at − created_at). `avg_approval_hours`는
+  이전 소비자 호환용 별칭(같은 값)이며 신규 화면은 `avg_decision_hours`를 쓴다.
+  `counts.decided`는 결정 완료 카드 수(= 채택률 분모)
 - 지역 균형지수 = 승인 EXPANSION 카드의 6지역 분포에 **지역 소비 집중도와 동일한 정규화 지수**(0~100)를
   적용해 `100 − 집중도`. **완전 균등 = 100, 한 지역 몰림(완전 편중) = 0**.
   §1 `concentration.index`와 같은 자를 쓰므로 진단 지표와 나란히 읽을 수 있다
@@ -510,7 +531,8 @@ LLM 호출이 실패하거나 애초에 호출하지 않은 카드도 **똑같�
   지역도 0건으로 포함해 위 산식으로 계산하고, 결과는 반올림한 정수. 지표 특성상 승인 카드가
   여러 지역에 쌓일수록 상승한다 (승인 1장 = `0`, 서로 다른 2개 지역 = `20` — 데모 초반의 낮은 값은
   정상 동작이며, 위 예시의 `80`은 여러 지역에 고루 쌓인 상태를 가정한 값이다)
-- `avg_approval_hours`의 집계 대상은 **`decided_at`이 있는 모든 카드**(approved+rejected+held) —
+- `avg_decision_hours`(= 별칭 `avg_approval_hours`)의 집계 대상은 **`decided_at`이 있는 모든 카드**
+  (approved+rejected+held) —
   "의사결정 소요 시간"이라는 지표 의미에 맞춘 정의. `decided_at − created_at`의 평균을 소수 1자리로 반올림
 
 ## 4. 방문객 위젯
@@ -557,17 +579,21 @@ LLM 호출이 실패하거나 애초에 호출하지 않은 카드도 **똑같�
 ```json
 {
   "ok": true,
+  "demo_read_only": false,
   "data_loaded": true,
   "datasets": {"dashboard": true, "eup_scores": true, "candidates": true,
                "merchants": true, "risk_signal": true}
 }
 ```
 
-- `datasets`: 산출 JSON 5종의 로드 성공 여부(각 `true`/`false`). `dashboard` 하나만 보면 나머지
+- `datasets`: 산출 JSON 5종의 로드 성공 여부(각 `true`/`false` — 파일 누락뿐 아니라 JSON 파손도
+  `false`). `dashboard` 하나만 보면 나머지
   결손을 놓치므로 개별로 보고한다 (배포 후 `deploy-backend.sh`의 data 복사 누락 진단용)
 - `data_loaded`: **필수 4종**(`dashboard`·`eup_scores`·`candidates`·`merchants`)의 AND.
   `risk_signal`은 07 문서 B4 ⑥에서 "없으면 컷"인 선택 입력이라 `datasets`에만 싣고 AND에서는 뺀다
-- 기존 키 `ok`·`data_loaded`는 형태·의미 그대로다 — `datasets`만 추가되었다
+- `demo_read_only`: `DEMO_READ_ONLY` 환경변수 상태 — FE가 읽기 전용 배너·버튼 잠금을 서버 설정과
+  맞추는 데 쓴다
+- 기존 키 `ok`·`data_loaded`는 형태·의미 그대로다 — `datasets`·`demo_read_only`가 추가되었다
 
 ## 6. 파이프라인 산출 JSON (data/processed/) 스키마
 
@@ -609,17 +635,22 @@ FE mock 동기화: 레포 루트에서 `./scripts/sync-mocks.sh` — 위 산출 
 - 상태 변경 이력은 `events` 리스트 속성에 append: `{"at": iso8601, "action": "approved" | "progress:완료" | ...}`
 - decision/progress/verification은 DynamoDB conditional update 한 번에 상태·이벤트·`version`을 함께 갱신한다.
   같은 이전 상태에서 출발한 동시 요청 중 하나만 성공하고 나머지는 도메인 `409`가 된다
+- **추진 기록 테이블**: `sangseng-progress-records`(SAM `ProgressRecordsTable`) — PK `record_id`(S).
+  GSI ① `card-recorded-at-index`(`card_id`, `recorded_at_key`) = 카드별 타임라인 조회,
+  GSI ② `report-bucket-recorded-at-index`(`report_bucket`, `recorded_at_key`) = 기간 리포트 집계.
+  기록 저장과 카드 투영(progress·`completed_at`·version)은 `TransactWriteItems`로 원자 커밋한다
+  (`app/progress_db.py`·`services/progress_records.py`)
 
 ## 8. 동작 규칙·엣지 케이스 (FE·BE 공통 합의)
 
 | 상황 | 규칙 |
 |---|---|
 | 카드 ID 생성 | `AC-`(EXPANSION)/`INC-`(INCENTIVE) + 3자리 순번. 타입별 내부 counter item을 DynamoDB `ADD`로 원자 증가시킨다. 최초 1회만 기존 최대 ID로 counter를 초기화하고, 카드 `PutItem`에도 `attribute_not_exists(id)` 조건을 걸어 기존 항목 덮어쓰기를 이중 방지한다 |
-| EXPANSION generate 중복 | 동일 `(target.eup, target.category)`에 `승인 대기` 또는 진행 중 업무가 있으면 새 Work Item 후보에서 제외한다. LLM이 기존 pending 타깃을 선택하면 새 카드를 만들지 않고 **기존 카드를 200으로 반환**한다. 승인된 업무가 진행 중인 타깃을 다른 카드로 다시 제안하지 않는다. INCENTIVE는 기존대로 pending 카드를 동시에 1장만 허용한다. |
-| generate 시 제안 가능한 신규 후보가 없음 | 전 후보에 승인 대기 또는 진행 중인 업무가 있으면 `409 {"detail": "모든 후보에 승인 대기 또는 진행 중인 업무가 있어 새로 제안할 후보가 없습니다"}`. LLM 장애가 아니라 정상적인 도메인 신호이므로 규칙 기반 fallback으로 넘기지 않는다. |
+| EXPANSION generate 중복 | 동일 `(target.eup, target.category)`에 `승인 대기` 또는 진행 중 업무가 있으면 새 Work Item 후보에서 제외한다(대상 선택은 서버 결정론 — LLM은 관여하지 않는다). 직전 60초 안에 알고리즘이 만든 pending 카드가 있으면(재클릭·재전송) 그 카드를 **200으로 반환**한다. 승인된 업무가 진행 중인 타깃을 다른 카드로 다시 제안하지 않는다. INCENTIVE는 기존대로 pending 카드를 동시에 1장만 허용한다. |
+| generate 시 제안 가능한 신규 후보가 없음 | 가용 후보 0건일 때 두 갈래: ① **승인 대기 EXPANSION 카드가 남아 있으면 최신 pending 카드를 200으로 반환** — 후보 소진의 가장 흔한 원인이 "방금 이 버튼이 만든 pending 카드"라서, 409만 주면 두 번째 클릭에서 대표 AI 기능이 죽은 것처럼 보인다. ② pending도 없이 전부 진행 중이면 `409 {"detail": "제안할 수 있는 신규 후보가 없습니다 (전 후보에 승인 대기 또는 진행 중인 업무가 있음)"}`. LLM 장애가 아니라 정상적인 도메인 신호이므로 규칙 기반 fallback으로 넘기지 않으며, 가용성 판정은 LLM 호출 **전**에 한다. |
 | `simulate`를 INCENTIVE 카드에 호출 | `400 {"detail": "INCENTIVE 카드는 scenarios를 사용합니다"}` — 시뮬레이션은 EXPANSION 전용 |
 | `simulate` 타깃 `eup`이 집계 6개 지역 밖 | `400 {"detail": "집계 대상 지역이 아닙니다: <eup> (대상: 고한읍, 사북읍, 정선군, 태백시, 영월군, 삼척시)"}` — 지역 분포에 더할 자리가 없어 조용히 `delta 0`을 내면 "효과 없음"과 구분되지 않는다 |
-| INCENTIVE 승인 시 `selected_rate` 누락/범위 밖 | `400 {"detail": "selected_rate(3|5|7)가 필요합니다"}`. EXPANSION decision에 온 `selected_rate`는 무시. 이 400만은 상태 전이 확인(409) **뒤**에 온다 — pending이 아니라 애초에 결정할 수 없는 카드의 body를 먼저 따질 이유가 없다 |
+| INCENTIVE 승인 시 `selected_rate` 누락/범위 밖 | `400 {"detail": "selected_rate(3|5|7)가 필요합니다"}`. EXPANSION decision에 온 `selected_rate`는 무시하고, **반려·보류에 실려 온 값도 무시한다**(저장하지 않음 — `selected_rate`는 승인 시점에만 확정). 이 400만은 상태 전이 확인(409) **뒤**에 온다 — pending이 아니라 애초에 결정할 수 없는 카드의 body를 먼저 따질 이유가 없다 |
 | 적격성 미확인 EXPANSION의 최종 단계 요청 | `409 {"detail": ...}` — 다섯 항목 검증 전에는 `적격성 확인`·`가맹 심사`·`추진중`·`완료`로 이동할 수 없다 |
 | 잘못된 상태 전이·동시 요청 | `409 {"detail": ...}` — 예: pending이 아닌 카드에 decision, approved가 아닌 카드에 progress, 같은 이전 상태를 조건으로 한 중복 요청의 패자 |
 | 공개 데모 mutation | `DEMO_READ_ONLY=true`이면 카드 상태를 바꾸는 POST 5종(generate/decision/verification/progress/progress-records)을 `403`으로 차단한다. 인증·권한 도입 시 이 공통 mutation dependency에 연결한다. **`simulate`는 차단 대상이 아니다** — 상태를 바꾸지 않는 읽기 계산이라 읽기 전용 모드에서도 200이며, Bearer 토큰만 요구한다(§2 인증). FE도 같은 경계를 따른다: `actions.ts`의 변경 액션 5개는 `isDemoReadOnly`에서 조기 403을 반환하고 `simulateAction`은 반환하지 않는다 |

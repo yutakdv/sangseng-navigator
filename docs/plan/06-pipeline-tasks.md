@@ -54,12 +54,21 @@ def grade(index):
     return "높음" if index >= 66 else ("보통" if index >= 33 else "낮음")
 
 def hhi_dispersion_index(counts):
-    """업종별 소비 분산도 = (1 - HHI) 0~100."""
+    """업종별 소비 분산도 = 정규화된 (1 - HHI) 0~100.
+
+    표시 업종 수 n일 때 1-HHI의 이론상 최댓값은 1-1/n — 이 값으로 나눠야 업종 수와
+    무관한 0~100 지수가 된다 (P5의 `(1-HHI)/(1-1/6)`과 같은 식). 호출부는 누락 업종도
+    0으로 채운 고정 표시 분류를 넘긴다. 정본 구현은 `pipeline/common.py`(음수 가드 포함).
+    """
+    if not counts:
+        return 0
     total = sum(counts)
-    if total == 0:
+    n = len(counts)
+    if total == 0 or n <= 1:
         return 0
     hhi = sum((c / total) ** 2 for c in counts)
-    return round((1 - hhi) * 100)
+    normalized = (1 - hhi) / (1 - 1 / n)
+    return round(min(1.0, max(0.0, normalized)) * 100)
 ```
 
 ---
@@ -143,7 +152,9 @@ COLMAP = {
 - [ ] 지역 전환율: `월별 6개 지역 건수 합 ÷ 월별 총 입장 연인원 × 100`, `is_proxy: true` 고정
       + `proxy_note` 고정 문구(05 §1). 분모는 교대(1부/2부/3부) 합산이라 **입장객 수가 아니라
       입장 연인원**이며, 강원랜드·언론의 **금액 기준** 지역 사용 비율(2024년 28.5%)과는 다른 지표다
-- [ ] 전월 대비 증감(`growth.mom_pct`) 계산 → **05 문서 §1 스키마 그대로** `dashboard.json` 저장
+- [ ] 전월 대비 **일평균** 건수 증감(`growth.mom_pct` = `월 건수 ÷ 월 일수`끼리 비교 — 월 길이
+      편향 제거, 단순 월합과 부호가 다를 수 있음. 정의는 05 §1) 계산 → **05 문서 §1 스키마 그대로**
+      `dashboard.json` 저장
 - [ ] **검증:** `dashboard.json`을 FE mock 디렉토리에 복사해 대시보드 화면이 그대로 렌더되는지 (FE 팀원과 크로스체크)
 
 ### Task P6: 2단계 스코어링 (`p6_scoring.py`)
@@ -213,4 +224,10 @@ COLMAP = {
       **미구현 스크립트는 `[skip]` 로그 후 건너뛴다** (빈 스텁을 만들면 "성공"으로 오집계되므로
       파일 미존재 = 미구현으로 취급 — 구현된 단계의 실패는 원칙대로 즉시 중단)
 - [ ] 완료 시 `data/processed/` 목록·파일 크기 출력
-- [ ] **검증:** 클린 체크아웃에서 `python run_all.py` 한 번으로 전체 재현
+- [x] **검증(범위 확정 — 클린 체크아웃 재현은 P3 제외):** `geocode.json`은 공통 원칙 1의 예외로
+      커밋하지 않으므로(12 문서 §4) 새 체크아웃에는 지오코딩 캐시가 없다 — `KAKAO_REST_API_KEY`
+      없이는 P3가 중단되고, 키가 있어도 재지오코딩 결과(카카오 응답 변동)가 커밋본
+      `merchants.json`과 달라져 이후 P6 후보까지 변동할 수 있다. **재현성은 커밋된
+      `merchants.json`이 담보하며**(공통 원칙 1), P1·P2·P4~P8은 커밋된 raw·api_cache만으로
+      결정론 재현된다(2026-08-09 감사에서 raw 독립 재계산으로 전 지표 일치 확인).
+      전체 재실행이 필요하면 `.env`에 카카오 키를 넣고 돌리되 `merchants.json` diff를 확인할 것

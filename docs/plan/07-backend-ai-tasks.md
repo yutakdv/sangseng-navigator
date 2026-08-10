@@ -177,18 +177,22 @@ def _to_ddb(v):
     return v
 
 
-def put_card(card: dict): _table.put_item(Item=_to_ddb(card))
+def put_card(card: dict): _table.put_item(Item=_to_ddb(card))          # 시드·테스트 전용
 def get_card(cid: str): return _clean(_table.get_item(Key={"id": cid}).get("Item"))
-def list_cards(): return [_clean(i) for i in _table.scan().get("Items", [])]
+def list_cards():
+    # Scan 1MB 페이지를 LastEvaluatedKey로 끝까지 순회하고(05 §7), counter 내부 레코드는 숨긴다
+    return [_clean(i) for i in _scan_all() if not str(i.get("id", "")).startswith("__counter__#")]
 
 
 def next_card_id(prefix: str) -> str:
-    """AC-/INC- + 3자리 순번 — 기존 ID의 **최대 순번 + 1** (05 문서 §8).
+    """AC-/INC- + 3자리 순번을 **원자적 counter**로 발급한다 (05 문서 §8).
 
     개수+1이 아닌 이유: 카드가 삭제되거나 비순차 ID(AC-901 등)가 섞이면 개수+1이 이미 쓰인
-    ID를 만들어 put_card 가 기존 카드를 조용히 덮어쓴다.
-    Scan 기반이라 동시 generate 경합은 그대로 남지만 데모 규모에서는 무시한다.
+    ID를 만들어 기존 카드를 덮어쓸 수 있다. 최초 1회만 기존 최대값으로 counter를 초기화하고,
+    이후에는 DynamoDB ADD를 사용해 동시 generate 요청도 서로 다른 번호를 받는다.
+    (신규 저장은 create_card가 `attribute_not_exists(id)` 조건으로 덮어쓰기를 이중 방지한다.)
     """
+    counter_id = f"__counter__#{prefix.rstrip('-')}"
     mx = 0
     for c in list_cards():
         cid = c["id"]
@@ -198,7 +202,23 @@ def next_card_id(prefix: str) -> str:
             mx = max(mx, int(cid[len(prefix):]))
         except ValueError:              # 순번이 아닌 접미사는 건너뛴다
             continue
-    return f"{prefix}{mx + 1:03d}"
+    try:
+        _table.put_item(
+            Item={"id": counter_id, "sequence": mx},
+            ConditionExpression="attribute_not_exists(#id)",
+            ExpressionAttributeNames={"#id": "id"},
+        )
+    except ClientError as exc:
+        if not _is_conditional_failure(exc):
+            raise
+    result = _table.update_item(
+        Key={"id": counter_id},
+        UpdateExpression="ADD #sequence :one",
+        ExpressionAttributeNames={"#sequence": "sequence"},
+        ExpressionAttributeValues={":one": 1},
+        ReturnValues="UPDATED_NEW",
+    )
+    return f"{prefix}{int(result['Attributes']['sequence']):03d}"
 ```
 
 초판에서 바뀐 곳과 근거 — 백엔드 감사 반영분:
@@ -207,7 +227,10 @@ def next_card_id(prefix: str) -> str:
   `db.KST`·`db.now_iso` 호출부(`seed_demo.py`·tests)는 그대로 동작한다
 - **`_clean`의 Decimal 판정**: 정수값 float(예: `1.0`)를 int로 내리지 않도록 저장 표기 기준으로 바꿈
   (05 §8 숫자 직렬화 행 — `delta_pp`가 `[1, 2]`로 무너지는 것 방지)
-- **`next_card_id`가 개수+1 → 최대 순번+1**: 개수+1은 이미 존재하는 ID를 다시 만들어 덮어쓴다
+- **`next_card_id`가 개수+1 → 원자 counter**: 개수+1은 이미 존재하는 ID를 다시 만들어 덮어쓴다.
+  이후 동시 generate 경합까지 막도록 counter item의 DynamoDB `ADD` 원자 증가로 발전했다(05 §8) —
+  최초 1회만 기존 최대 순번으로 초기화하고, `create_card`의 `attribute_not_exists(id)` 조건이
+  덮어쓰기를 이중 방지한다. counter 레코드(`__counter__#AC` 등)는 `list_cards`가 숨긴다
 
 상태 전이 규칙 (`routes/cards.py`) — 05 문서 §8 에러 규칙 준수:
 - `decision`: `pending`에서만 허용(아니면 409). `approved`면 `progress="검토중"` + `decided_at` 기록
@@ -234,6 +257,9 @@ log = logging.getLogger(__name__)
 RETRY_BACKOFF_SECONDS = 0.5
 # 재시도 사이 고정 대기. 최악 지연 = cardgen timeout 12s × 2회 + backoff 0.5s = 24.5s < Lambda 30s
 # (09 문서 Timeout: 30, cardgen.LLM_TIMEOUT=12). 마지막 시도 뒤에는 대기하지 않는다.
+# ⚠ 이 예산은 SDK 내부 재시도가 꺼져 있어야 성립한다 — 두 SDK 모두 기본 max_retries=2로
+# 타임아웃·429·5xx를 자체 재시도해, 막지 않으면 앱 시도 1회가 timeout×3(≈37.5s)까지 늘어나
+# 폴백 도달 전에 Lambda가 죽는다. 그래서 아래 클라이언트 생성에 max_retries=0을 명시한다.
 
 # 인증 실패 응답에는 SDK가 부분 마스킹한 키가 그대로 들어 있다
 # (예: "Incorrect API key provided: sk-proj-****ABCD"). 로그·트레이스백에 남기지 않는다.
@@ -250,10 +276,16 @@ class LLMError(Exception):
 
 def generate_json(system: str, user: str, schema: dict, schema_name: str = "result",
                    timeout: float | None = None, attempts: int = 2) -> dict:
-    """attempts 는 총 시도 횟수 — 기본 2(최초+재시도 1회)로 기존 호출부 동작은 그대로다.
-    지연 상한이 중요한 호출부(위젯 blurb)만 attempts=1 로 재시도를 끄고 fallback 으로 넘긴다.
+    """attempts 는 총 시도 횟수 — 기본 2(최초+재시도 1회).
+    현재 호출부(cardgen 카드 생성·cards.simulate)는 모두 기본값을 쓴다. 위젯 추천 문구는 LLM을
+    쓰지 않고 결정론 문구만 반환하므로(routes/widget.py `_fallback_blurb`) 여기 해당하지 않는다.
+    지연 상한이 더 중요한 호출부가 생기면 attempts=1 로 재시도를 끄고 fallback 으로 넘긴다.
     """
     provider = os.environ.get("LLM_PROVIDER", "openai")
+    if provider not in {"openai", "anthropic"}:
+        # 오타를 OpenAI로 조용히 처리하면 배포 환경에서 의도하지 않은 provider·키를 사용한다.
+        # 호출부는 LLMError를 받아 규칙 기반 fallback으로 전환하므로 사용자 흐름은 끊기지 않는다.
+        raise LLMError(f"Unsupported LLM_PROVIDER: {provider}")
     model = (os.environ.get("ANTHROPIC_MODEL", "claude-sonnet-5") if provider == "anthropic"
              else os.environ.get("OPENAI_MODEL", "gpt-4o-mini"))
     attempts = max(1, attempts)     # 0 이하면 아래 raise last_exc 가 None을 raise 하므로 최소 1회는 돈다
@@ -263,7 +295,7 @@ def generate_json(system: str, user: str, schema: dict, schema_name: str = "resu
         try:
             if provider == "anthropic":
                 import anthropic
-                client = anthropic.Anthropic()
+                client = anthropic.Anthropic(max_retries=0)   # 재시도는 이 함수의 attempts가 전담 (위 예산 주석)
                 # timeout 미지정(None)이면 SDK 기본 타임아웃을 그대로 쓴다 — 명시적으로 None을
                 # 넘기면 SDK가 "타임아웃 없음(무한 대기)"으로 해석한다.
                 extra = {"timeout": timeout} if timeout is not None else {}
@@ -281,7 +313,7 @@ def generate_json(system: str, user: str, schema: dict, schema_name: str = "resu
             else:
                 # 기본: openai
                 from openai import OpenAI
-                client = OpenAI()
+                client = OpenAI(max_retries=0)   # 재시도는 이 함수의 attempts가 전담 (위 예산 주석)
                 if timeout is not None:     # with_options(timeout=None)은 "무한 대기"가 된다
                     client = client.with_options(timeout=timeout)
                 resp = client.chat.completions.create(
@@ -305,10 +337,15 @@ def generate_json(system: str, user: str, schema: dict, schema_name: str = "resu
 ```
 
 초판에서 바뀐 곳과 근거 — 백엔드 감사 반영분:
-- **재시도가 `attempts` 인자로 명시**(기본 2 = 최초+1회). 위젯 blurb만 `attempts=1`로 재시도를 꺼
-  체감 지연 상한을 지킨다 (05 §8 위젯 LLM 실패 행)
+- **재시도가 `attempts` 인자로 명시**(기본 2 = 최초+1회). 현재 호출부는 전부 기본값 —
+  위젯 blurb는 2026-08-08 확정으로 LLM을 아예 쓰지 않는다 (05 §4 결정론 문구)
 - **`RETRY_BACKOFF_SECONDS = 0.5` backoff 추가** — 즉시 재시도는 rate limit을 그대로 다시 맞는다.
   최악 지연이 Lambda Timeout 30s 안에 들어오는 계산을 상수 옆에 병기
+- **SDK 내부 재시도 차단(`max_retries=0`, 2026-08-09 감사 반영)** — 두 SDK 모두 기본 max_retries=2로
+  타임아웃·429·5xx를 자체 재시도해, 막지 않으면 위 예산 계산이 깨진다(앱 시도 1회 = timeout×3).
+  재시도는 이 함수의 `attempts` 루프가 전담한다 (`tests/test_algorithms.py`가 회귀 방지)
+- **`LLM_PROVIDER` 오타는 즉시 `LLMError`** — 조용히 openai로 폴백하면 배포 환경에서 의도하지 않은
+  provider·키를 쓴다. 호출부의 규칙 기반 fallback이 이어받아 사용자 흐름은 끊기지 않는다
 - **호출 1건당 로그 1줄**(성공·실패 모두, provider·model·schema·소요시간) — 심사 기간에 키 만료·
   쿼터 초과를 알아챌 유일한 흔적이자 발표 Q&A("AI 응답 몇 초") 근거
 - **`timeout` 인자**: 호출부별 상한(cardgen 12초 / simulate 8초 / 위젯 5초). `None`이면 SDK 기본값을
@@ -356,10 +393,15 @@ AI 입력 스키마 (기획안 §2-2 그대로):
 | 4~5월, 10~11월 | `간절기 — 트레킹·행사 수요` | 하늘길 등 |
 | 그 외 | `평시` | — |
 
-`prompts.py`의 시스템 프롬프트는 **기획안 발표 공개용 원문**을 그대로 사용한다
-(규칙: 조정 시 근거 제시 / 상위 2개 후보 비교 필수 / 추진중·완료 중복 제안 금지 /
-3분기 연속 1순위면 형평성 하향 가능 / 원 Score 순위 항상 출력 / 리스크 ≥1개 /
-추측은 "예상"·"가능성" 표기 / ⑥은 진단 참고용 — 가맹점 확충 외 실행 제안 금지).
+`prompts.py`의 시스템 프롬프트는 기획안 §2-2 원문을 **역할 축소 방향으로 개정한 현행본**이다
+(전문은 부록 A-1). 원문은 LLM에게 "순위 조정 여부 판단"을 맡겼지만, 현행은 **서버가 제안 대상을
+결정론으로 확정하고 LLM은 비교 설명·비정량 리스크만 작성**한다 — 절대 규칙 4(제안만)·5(원 순위
+병기)를 프롬프트 준수가 아니라 구조로 보장하기 위한 개정이다(05 §2 AI 사실성 경계,
+`grounding.selection_method: "deterministic_highest_available_score"`). 원문의 "3분기 연속 1순위
+형평성 하향" 재량 조항은 제거됐고, "원 Score 순위 항상 출력"은 서버가 `original_ranking`으로 상시
+병기한다. 유지된 규칙: 리스크 ≥1개 / 추측은 "예상"·"가능성" 표기 / 위험 신호는 진단 참고용 —
+가맹점 확충 외 실행 제안 금지 / Gini·HHI 용어 출력 금지(절대 규칙 1) 명문화.
+**발표에서 프롬프트를 인용할 때는 부록 A-1의 현행 전문을 쓴다.**
 
 출력 JSON 스키마(= 05 문서 Card.ai 필드):
 ```python
@@ -378,7 +420,8 @@ CARD_AI_SCHEMA = {
 }
 ```
 
-- [ ] `POST /api/cards/generate {"type":"EXPANSION"}`: 입력 ①~⑥ 조립 → LLM → Card 생성(`status=pending`, ID는 `db.next_card_id`) → DDB
+- [ ] `POST /api/cards/generate {"type":"EXPANSION"}`: 입력 ①~⑦ 조립(+서버 확정 대상 = 프롬프트 입력 2)
+      → LLM(설명 생성) → Card 생성(`status=pending`, ID는 `db.next_card_id`) → DDB
 - [ ] 중복 가드: 동일 `(type, target)`의 pending 카드가 있으면 기존 카드 반환 (05 문서 §8).
       LLM 호출 자체를 건너뛰는 것은 **가용 후보 전원이 이미 pending 카드를 가진 경우**뿐 —
       "최상위 후보에 pending이 있으면 즉시 반환"으로 넓히면 시드의 pending 카드(AC-002) 때문에
@@ -426,43 +469,54 @@ CARD_AI_SCHEMA = {
 
 ---
 
-## 부록 A. 프롬프트 전문 (`prompts.py` — 발표 공개용 원문)
+## 부록 A. 프롬프트 전문 (`prompts.py` 현행 미러 — 발표 인용용)
 
-### A-1. Action Card 조정 제안 시스템 프롬프트 (기획안 §2-2 원문)
+> 이 부록은 `backend/app/prompts.py`의 **현행 전문 미러**다. 코드가 바뀌면 여기도 함께 갱신한다
+> (2026-08-09 감사에서 구판 방치가 확인되어 동기화 — 발표에서 인용하는 프롬프트는 항상 이 현행본).
+
+### A-1. Action Card 설명 생성 시스템 프롬프트 (현행)
 
 ```
 당신은 강원랜드 지역상생팀의 정책 보조 AI입니다.
-아래 입력을 모두 참고하여 이번 분기 확충 우선순위를 검토하고,
-후보 순위를 조정할지 여부를 판단하세요.
+서버의 검증된 정량 알고리즘이 이번 분기 확충 대상을 이미 선택했습니다.
+대상을 바꾸거나 새 사실·수치를 만들지 말고, 담당자가 검토할 비교 설명과 비정량 리스크만 작성하세요.
 
 입력:
 1. 후보 Score와 순위 (2단계 스코어링 결과, 변경 불가한 기준선)
-2. 각 후보의 현재 추진 상태(검토중/추진중/보류/완료)
-3. 계절성 신호(현재 월, 다가오는 성수기 여부)
-4. 최근 4분기 지역별 Action Card 채택 이력(형평성 확인용)
-5. 최근 정책 이력(같은 지역·업종이 최근에 반려된 적 있는지)
-6. (있으면) 국세청 사업자현황 기반 시군구별 지역경제 위험 신호
+2. 서버가 확정한 제안 대상과 선택 규칙
+3. 각 후보의 현재 추진 상태(검토중/추진중/보류/완료)
+4. 계절성 신호(현재 월, 다가오는 성수기 여부)
+5. 최근 4분기 지역별 Action Card 채택 이력(검토 참고용)
+6. 최근 정책 이력(같은 지역·업종이 최근에 반려된 적 있는지)
+7. (있으면) 국세청 사업자현황 기반 시군구별 지역경제 위험 신호
    (운영 2년 미만 사업자 비중 — 참고용 진단 지표, 실행 대상 아님)
+8. (있으면) 타깃 지역·업종의 요일별 사용 패턴
+   (하이원포인트 사용현황 일 단위 집계 — 참고용)
 
 규칙:
-- 순위를 조정하려면 반드시 근거를 함께 제시할 것
-- 상위 2개 후보를 반드시 비교해, 왜 한쪽이 이번 분기에 더 적합한지 서술할 것
-- "추진 상태=추진중/완료"인 항목은 중복 제안하지 말 것
-- 특정 지역이 최근 3분기 연속 1순위였다면, 형평성을 이유로 순위를 낮출 수 있음(근거 명시)
-- 조정 여부와 무관하게 원래 Score 순위는 항상 함께 출력할 것
+- ai_rank_target에는 서버가 확정한 제안 대상을 글자 그대로 출력할 것
+- 후보 순위나 대상을 임의로 조정하지 말 것
+- 상위 후보와 확정 대상을 비교하되, 입력에 있는 Score·상태·도로 시간만 근거로 쓸 것
 - 실행상 예상되는 리스크·유의사항을 최소 1개 이상 제시할 것
 - 확정된 사실이 아닌 추측은 "예상" 또는 "가능성"으로 명시할 것
-- 입력 6(지역경제 위험 신호)은 참고용 진단 지표일 뿐, 이를 근거로
+- 입력 7(지역경제 위험 신호)은 참고용 진단 지표일 뿐, 이를 근거로
   하이원포인트 가맹점 확충 외의 실행을 제안하지 말 것
+- 입력 8(요일 패턴)은 참고용 — 방문 수요가 몰리는 요일에 대한 리스크·유의사항
+  서술에만 쓰고, 순위·대상 조정의 근거로 쓰지 말 것. 입력에 없는 요일 수치를 만들지 말 것
+- 지니·Gini·HHI·허핀달 같은 지수 명칭을 출력에 쓰지 말 것 — 화면 용어는 "지역 소비 집중도"·"업종별 소비 분산도"뿐이다
 ```
 
+> **개정 이력**: 기획안 §2-2 원문은 LLM이 "순위 조정 여부"를 판단하는 조정 허용형(입력 6개)이었다.
+> 대상 선택을 서버 결정론으로 옮기면서(B4 본문) 역할 축소형(입력 8개 — 서버 확정 대상·요일 패턴
+> 추가)으로 개정했고, "3분기 연속 형평성 하향" 재량 조항을 제거했으며, Gini/HHI 출력 금칙(절대
+> 규칙 1)을 명문화했다. 원문이 요구한 "원 Score 순위 항상 출력"은 서버가 `original_ranking`으로
+> 상시 병기한다(절대 규칙 5).
+>
 > 출력 형식은 프롬프트 텍스트가 아니라 **구조화 출력 스키마(`CARD_AI_SCHEMA`)로 강제**한다
 > (기획안의 "출력 형식: JSON {순위, 조정여부, ...}" 줄을 스키마로 구현한 것).
-> user 메시지에는 입력 ①~⑥을 JSON으로 직렬화해 전달한다.
->
-> 시스템 프롬프트는 **발표 공개용 원문이라 수정하지 않는다.** 원문이 열거한 추진 상태 4종
+> user 메시지에는 입력 1~8을 JSON으로 직렬화해 전달한다. 프롬프트가 열거한 추진 상태 4종
 > (검토중/추진중/보류/완료) 밖의 값(`없음`=해당 타깃에 카드가 아직 없음, `승인 대기`=pending 카드 있음)이
-> 입력 ②에 실제로 나오므로, 그 뜻풀이는 **user 메시지의 `작성_지침`**에 싣는다.
+> 입력 3에 실제로 나오므로, 그 뜻풀이는 **user 메시지의 `작성_지침`**에 싣는다.
 
 ### A-2. 정책 시뮬레이션 설명 프롬프트 (B5)
 
@@ -487,6 +541,8 @@ CARD_AI_SCHEMA = {
 - 각 시나리오의 예상 지역 전환율 개선폭(입력으로 준 가정치)과 재원 부담을 비교할 것
 - 페이백률이 높을수록 효과와 재원 부담이 함께 커지는 트레이드오프를 명시할 것
 - 지역 균형을 해치지 않도록 특정 지역 한정이 아닌 전체 지역 공통 적용을 우선 제안할 것
+- 전 지역 공통 적용의 효과는 개선이나 악화가 아닌 중립으로 표현할 것. "지역 균형에 유리"처럼
+  분포가 좋아진다고 단정하지 말고 "지역 균형을 왜곡하지 않음"이라고 쓸 것
 - 리스크에 반드시 포함: 재원 확보는 예산 부서 별도 승인 사항, 기존 약관과의 중복 확인 필요,
   실제 자동 지급 시스템 연동은 미구현(로드맵)
 - 개선폭 수치가 실측 없는 팀 설정 가정(탄력성) 기반임을 명시할 것

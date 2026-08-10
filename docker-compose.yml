@@ -16,7 +16,8 @@ services:
     command: -jar DynamoDBLocal.jar -inMemory -sharedDb
     ports: ["8001:8000"]
 
-  # 데모 카드 3장 시드 (11 문서 §1 '사전 상태'). 1회 실행 후 종료하는 one-shot 서비스다.
+  # 데모 시드 (11 문서 §1 '사전 상태') — 카드 5장(데모 3 + 분기 이력 2) + 추진 기록 9건.
+  # 1회 실행 후 종료하는 one-shot 서비스다.
   # dynamodb 가 -inMemory 라 컨테이너가 재시작되면 테이블 자체가 사라진다 —
   # 그래서 매 `up` 마다 --reset 으로 다시 만드는 게 맞다 (데모 중 만든 카드는 초기화된다).
   seed:
