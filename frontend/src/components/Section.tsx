@@ -1,6 +1,5 @@
 import type { ReactNode } from "react";
 import { Icon, type IconName } from "@/components/Icon";
-import { sentenceLines } from "@/lib/sentences";
 
 /**
  * 본문 패널 (docs/plan/13 §6).
@@ -43,7 +42,7 @@ export function Section({
             {/* 폭 제한 없음 — 패널이 이미 폭을 정한다 (PageHeader의 lede와 같은 규칙) */}
             {desc ? (
               <p className="mt-1.5 break-keep text-[13px] leading-[1.6] text-admin-text-muted">
-                {sentenceLines(desc)}
+                {desc}
               </p>
             ) : null}
           </div>

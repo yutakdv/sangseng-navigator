@@ -1,6 +1,5 @@
 import type { ReactNode } from "react";
 import { Icon, type IconName } from "@/components/Icon";
-import { sentenceLines } from "@/lib/sentences";
 
 /**
  * 허브 전용 패널 (docs/plan/13 §6 · 17 §3.1 — T2 근거면).
@@ -62,7 +61,7 @@ export function Panel({
           </div>
           {desc ? (
             <p className="mt-1.5 break-keep text-[13px] leading-[1.65] text-admin-text-muted">
-              {sentenceLines(desc)}
+              {desc}
             </p>
           ) : null}
         </div>
