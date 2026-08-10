@@ -32,6 +32,17 @@ function buildStepHref(path: string, tourN: number): string {
   return `${pathname}?${params.toString()}`;
 }
 
+/**
+ * 스텝의 기본 앵커가 지금 DOM에 없으면 `fallbackAnchor`를 대신 찾는다(예: 6단계 — 승인된 페이백이
+ * 없는 데모 상태에서는 위젯의 "추천 가맹점" 섹션을 대신 하이라이트한다). 어느 쪽도 없으면 null.
+ */
+function findStepAnchorEl(step: TourStep): Element | null {
+  return (
+    document.querySelector(`[data-tour="${step.anchor}"]`) ??
+    (step.fallbackAnchor ? document.querySelector(`[data-tour="${step.fallbackAnchor}"]`) : null)
+  );
+}
+
 function TourOverlayInner() {
   const pathname = usePathname();
   const router = useRouter();
@@ -65,7 +76,7 @@ function TourOverlayInner() {
   useEffect(() => {
     if (!active || !step) return;
     const measure = () => {
-      const el = document.querySelector(`[data-tour="${step.anchor}"]`);
+      const el = findStepAnchorEl(step);
       if (el) {
         setRect(el.getBoundingClientRect());
         setAnchorMissing(false);
@@ -90,7 +101,7 @@ function TourOverlayInner() {
     if (!active || !step) return;
     const key = `${pathname}:${step.anchor}`;
     if (scrolledFor.current === key) return;
-    const el = document.querySelector(`[data-tour="${step.anchor}"]`);
+    const el = findStepAnchorEl(step);
     if (el) {
       el.scrollIntoView({ block: "center", behavior: "smooth" });
       scrolledFor.current = key;

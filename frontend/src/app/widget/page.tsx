@@ -212,7 +212,13 @@ export default async function WidgetPage({ searchParams }: { searchParams: Promi
         </div>
 
         <div className="px-5 pb-5 sm:px-8 sm:pb-8">
-          <div className="flex items-baseline justify-between gap-2">
+          {/* 투어 6단계 대체 앵커 — 페이백 배너(widget-payback)가 없는 데모 상태에서도 이 제목 줄은
+              추천 0건일 때조차 항상 렌더된다 (tourSteps.ts fallbackAnchor). 앵커를 목록 전체가 아니라
+              이 작은 제목 줄에만 붙이는 이유: TourOverlay가 앵커를 `scrollIntoView({block:"center"})`로
+              화면 가운데 오게 스크롤하는데, 앵커가 가맹점 카드 그리드 전체처럼 뷰포트보다 훨씬 크면
+              "중앙 정렬"의 결과로 앵커 상단이 뷰포트 한참 위로 올라가 안내 카드까지 화면 밖으로
+              밀려난다(실측: 데스크톱 -570px, 모바일 -1321px). 제목 줄은 항상 작아 이 문제가 없다. */}
+          <div data-tour="widget-recommendations" className="flex items-baseline justify-between gap-2">
             <h2 className="text-[17px] font-bold text-admin-text">추천 가맹점</h2>
             <span className="rounded-full bg-visitor-primary-soft px-2 py-0.5 text-xs font-semibold text-visitor-primary">
               {recommendations.length} / {total}곳

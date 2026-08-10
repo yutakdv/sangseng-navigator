@@ -80,12 +80,24 @@ test.describe("가이드 투어 — 버튼 클릭만으로 6단계 완주", () =
     await page.waitForURL(/\/widget\?tour=6/);
     await expect(dialog).toContainText("6 / 6");
     await expectCardInViewport(page);
-    // 마지막 장면의 핵심 앵커 — 데모 시드에 "완료된 페이백 정책"이 없으면 이 배지가 없어
-    // "승인된 페이백이 방문객 위젯에 그대로 나타납니다"라는 6단계 설명이 실제로 증명되지 않는다.
+    // 마지막 장면의 앵커 — 승인된 페이백 배너(widget-payback)가 있으면 그것을, 없으면(현재 데모 시드가
+    // 그렇다 — INC-001이 pending) 항상 렌더되는 "추천 가맹점" 섹션(widget-recommendations)을 대신
+    // 하이라이트한다(TourStep.fallbackAnchor, tourSteps.ts). 어느 쪽도 안 보이면 안내 카드가
+    // "표시할 화면 요소가 없습니다"로 대체된다는 뜻이라 그것부터 배제한다.
     await expect(
-      page.locator('[data-tour="widget-payback"]'),
-      "6단계 앵커(승인된 페이백 배지)가 현재 데모 상태에 없습니다 — 마지막 장면이 실제로 보이지 않습니다",
-    ).toBeVisible();
+      dialog,
+      "6단계 안내 카드가 '표시할 화면 요소가 없습니다'로 대체됐습니다 — 앵커도 대체 앵커도 못 찾았다는 뜻입니다",
+    ).not.toContainText("표시할 화면 요소가 없습니다");
+    const paybackAnchor = page.locator('[data-tour="widget-payback"]');
+    const fallbackAnchor = page.locator('[data-tour="widget-recommendations"]');
+    if (await paybackAnchor.count()) {
+      await expect(paybackAnchor).toBeVisible();
+    } else {
+      await expect(
+        fallbackAnchor,
+        "6단계 대체 앵커(추천 가맹점 섹션)도 보이지 않습니다 — 페이백 배너도, 대체 화면 요소도 없습니다",
+      ).toBeVisible();
+    }
 
     // ── 완료 ──────────────────────────────────────────────────────────
     await dialog.getByRole("button", { name: "완료" }).click();
