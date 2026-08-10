@@ -58,6 +58,15 @@ Base URL: 로컬 `http://localhost:8000` / 배포 후 API Gateway URL. 경로 �
     "annual_visitors": 2478656,
     "per_pp_additional_uses": 24787,
     "note": "지역 전환율(근사 지표) 1%p 개선 시 연간 지역 사용 건수 추가분 추정 = 연간 입장 연인원 × 1%. 건수 기준이며 금액 환산은 포함하지 않는다. 가정 기반 전망이며 실제와 다를 수 있음."
+  },
+  "privacy_meta": {
+    "k": 5,
+    "suppressed_cells": [
+      {"eup": "영월군", "category": "카페"},
+      {"eup": "영월군", "category": "편의점"}
+    ],
+    "aggregate_rounding": {"unit": 100},
+    "note": "가맹점 5곳 미만 셀의 건수는 비공개. 합계는 100 단위 반올림으로 차분 복원 정밀도를 낮춤(완전 차단은 아님). 비율·순위·스코어는 반올림 전 원값으로 계산됨."
   }
 }
 ```
@@ -96,6 +105,18 @@ Base URL: 로컬 `http://localhost:8000` / 배포 후 API Gateway URL. 경로 �
   화면에 노출하는 숫자는 `per_pp_additional_uses`(연간 입장 연인원 × 1%, 반올림) 하나뿐이며
   `annual_local_uses`·`annual_visitors`는 근거 표기용이다. `note`는 고정 설명 문구로, 배지만으로는
   막지 못하는 오인을 막기 위해 **그대로** 노출한다(요약·의역 금지).
+- `privacy_meta`: 발행 직전 마지막 파이프라인 단계(`pipeline/p10_privacy.py`, P10)가 붙이는
+  소표본 보호 메타데이터 — `usage_monthly.json`·`dashboard.json` 양쪽에 실린다(스키마 동일).
+  `k`(=5) 미만 가맹점 셀은 `suppressed_cells`에 나열되며, `usage_monthly.usage`에서 해당
+  (지역×업종) 셀 값이 `null`로 비공개 처리된다. `dashboard.json`은 값을 비공개하지 않는 대신
+  차분 복원(다른 합계와의 차로 비공개 셀 값을 역산하는 것)을 어렵게 하기 위해 **영향받는
+  합계만** `aggregate_rounding.unit`(=100) 단위로 반올림한다 — `monthly_by_region`의 영향
+  지역 열, `region_share`·`category_share`의 영향 항목 `count`가 대상이다. **`rate`·`share`·
+  `headline_rate`·스코어·`impact_meta`는 반올림 전 원값을 그대로 유지**한다(P10은 발행값만
+  가공하고, 진단·스코어링은 이미 원값으로 끝난 뒤 실행되므로 자동 보장). `note`는 고정 설명
+  문구이며 화면에 노출할 때 요약·의역하지 않는다. 억제 대상 원본 근거는 `cell_load.json`의
+  `suppressed`/`tier: "suppressed"`(P9가 이미 표시)와 같다 — P10은 이를 검증만 하고 다시
+  계산하지 않는다.
 
 ### `GET /api/candidates`
 지도·카드 상세용 스코어링 결과 (`eup_scores.json` + `candidates.json` 병합).
@@ -619,7 +640,7 @@ LLM 호출이 실패하거나 애초에 호출하지 않은 카드도 **똑같�
 | `merchants.json` | §1 `merchants` 배열 (지오코딩·주소 포함) | BE(candidates, 위젯) |
 | `risk_signal.json` | `[{"sigungu": "정선군", "under2y_ratio": 0.1507}]` | BE(카드 생성 AI 입력 ⑥, `GET /api/risk-signal`), FE mock |
 | `sensitivity.json` | `{"combos": 25, "top3_stable_ratio": 0.88, "detail": [...]}` | 발표 슬라이드 |
-| `usage_monthly.json` | 월×지역×업종 원자료 집계 (재계산·검증용) | pipeline, simulate, **FE 지역 드릴다운(정적 import)** |
+| `usage_monthly.json` | 월×지역×업종 원자료 집계 (재계산·검증용) — `k<5` 셀 건수는 P10이 `null`로 억제, `privacy_meta` 동반 | pipeline, simulate, **FE 지역 드릴다운(정적 import)** |
 | `usage_daily.json` | 일·요일 축 집계 — 요일×표시6분류(지역별+전체) 누적, 지역별 일 총건수 시계열 | **FE 지역 드릴다운 요일 섹션(정적 import)**, BE(카드 생성 AI 입력 ⑧) |
 | `cell_load.json` | (지역×표시업종) 셀별 가맹점 이용 부하 지수 — 최근 3개월 평균 월 거래 건수 ÷ 셀 가맹점 수 (건수 기반 추정치, k=5 미만 셀은 억제) | **FE 셀 탐색 시뮬레이터(정적 import)**, pipeline(A3 억제 검증 입력) |
 
@@ -631,6 +652,17 @@ LLM 호출이 실패하거나 애초에 호출하지 않은 카드도 **똑같�
   드릴다운(업종 구성·월별 추이·상위 업종)에 쓴다 — 분기 배치 산출물이라 양 모드 데이터가 동일하다.
   표시 6분류 롤업은 `pipeline/category_map.py`의 `HIGHONE_TO_DISPLAY`가 정본이며
   `frontend/src/lib/regionAnalysis.ts`가 이를 복제한다(파이프라인 변경 시 함께 수정).
+- `usage_monthly.json`의 소표본 억제: `pipeline/p10_privacy.py`(P10, `run_all.py` STEPS 마지막
+  단계)가 발행 직전 `merchants.json` 기준 (지역×표시업종) 가맹점 수 `n<5`인 셀을 찾아
+  `usage.*[eup]`을 `null`로 바꾼다(2026-08-10 기준 실측 대상: 영월군 카페·영월군 편의점).
+  `usage_monthly.json`·`dashboard.json` 최상위에 `privacy_meta`가 함께 실린다 — 상세 규칙은 §1
+  `privacy_meta` 문단 참고. `null` 셀을 순회·합산하는 소비 코드(BE `simulate.py`)는 `or 0` 가드로
+  건너뛰어야 한다(정적 스코어링·진단은 P10 이전 단계에서 이미 원값으로 끝나 영향 없음). **알려진
+  한계**: `simulate.py`의 반사실 재계산(`GET .../simulate`)은 요청마다 `usage_monthly.json`을
+  다시 읽어 6지역 분포를 즉석 계산하므로, 억제된 셀은 `or 0`으로 0 취급된다 — 정적 산출물(위)과
+  달리 이 라이브 계산의 `current_index`/`projected_index`는 억제 전 원값과 달라질 수 있고,
+  타깃이 억제 셀(영월군 카페·편의점) 자체면 `expected_monthly_count`가 0으로 나온다(A3 자체
+  구현 보고서 §우려사항 참고 — 후속 과제).
 - `usage_daily.json`도 같은 이유로 **BE 엔드포인트 없이** FE 정적 import(드릴다운 "요일·일별
   패턴" 섹션). 요일 축은 파이프라인이 표시 6분류로 **사전 롤업**해 싣는다(월 원장의 18종 유지와
   다름 — 소비처가 전부 6분류 단위). BE는 카드 생성 AI 입력 ⑧(타깃 요일 패턴, 참고용)에만 읽고

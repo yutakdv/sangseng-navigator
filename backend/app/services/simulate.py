@@ -73,7 +73,7 @@ def _avg_monthly(rows: list, recent: list, eups: list, category: str | None = No
             continue
         if category is not None and HIGHONE_TO_DISPLAY.get(row["category"], "기타") != category:
             continue
-        total += sum(row.get(e, 0) for e in eups)
+        total += sum(row.get(e) or 0 for e in eups)
     return total / len(recent)
 
 
@@ -108,7 +108,7 @@ def _monthly_per_merchant_samples(
             if (selected_category is not None
                     and HIGHONE_TO_DISPLAY.get(row["category"], "기타") != selected_category):
                 continue
-            total += sum(row.get(region, 0) for region in eups)
+            total += sum(row.get(region) or 0 for region in eups)
         samples.append(total / denominator)
     return samples, step
 
@@ -170,7 +170,7 @@ def simulate_expansion(usage: dict, merchants: list, eup: str, category: str) ->
     for row in usage["usage"]:
         if row["month"] == latest:
             for r in REGIONS:
-                dist[r] += row.get(r, 0)
+                dist[r] += row.get(r) or 0   # A3: 소표본 억제로 None 셀 존재(row.get(r, 0)만으론 못 거름)
     current = concentration_index([dist[r] for r in REGIONS])
     samples, step = _monthly_per_merchant_samples(usage, merchants, eup, category)
     expected = sum(samples) / len(samples)

@@ -890,12 +890,29 @@ def test_simulate_does_not_hand_indices_to_the_llm(monkeypatch):
     assert str(sim["projected_index"]) not in serialized
 
 
-def test_simulate_reports_no_change_without_claiming_a_direction(fake_llm):
+def test_simulate_reports_no_change_without_claiming_a_direction(fake_llm, monkeypatch):
     """변화가 없는 구간(delta [0.0, 0.0])은 방향을 붙이지 않고 LLM에도 맡기지 않는다.
 
-    시드 카드 AC-001의 타깃(영월군 음식점)은 소수점 첫째 자리에서 변화가 없다.
-    부호로만 판정하면 "약 0.0~0.0%p 상승(집중 심화)"처럼 없는 변화를 단정하게 된다.
+    시드 카드 AC-001의 타깃은 영월군 음식점. "변화 없음" 자체는 실데이터의 우연한 소수점
+    정렬이 아니라 **해당 지역·업종의 과거 사용 이력이 0이라 예상 추가 건수가 0**이라는
+    구조적 조건에서 나와야 하므로, 여기서는 그 조건을 usage_monthly에 직접 구성해 결정론적으로
+    만든다(A3 소표본 억제 도입 이후 실데이터 값이 흔들려 하드코딩 좌표가 깨졌다 — 이 파일
+    상단 원칙대로 실데이터 우연값에 기대지 않는다).
     """
+    real_load = dataload.load
+
+    def _zero_food_history(name):
+        if name != "usage_monthly":
+            return real_load(name)
+        months = ["2025-01", "2025-02", "2025-03"]
+        rows = []
+        for month in months:
+            row = dict.fromkeys(simulate.REGIONS, 50)
+            row["영월군"] = 0    # 타깃(영월군·음식점) 과거 이력 0 → 예상 추가 건수 0 → 지수 불변
+            rows.append({"month": month, "category": "일반음식점업", **row})
+        return {"months": months, "base_month": "2025-03", "usage": rows}
+
+    monkeypatch.setattr(dataload, "load", _zero_food_history)
     sim = client.post("/api/cards/AC-001/simulate").json()["simulation"]
 
     assert sim["delta_pp"] == [0.0, 0.0]                        # 전제: 변화 없는 구간
