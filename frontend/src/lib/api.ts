@@ -16,6 +16,7 @@ import type {
   Card,
   CandidatesResponse,
   CardProgress,
+  CellLoad,
   CardStatus,
   CardType,
   Dashboard,
@@ -33,7 +34,9 @@ import type {
   WidgetResponse,
 } from "@/types";
 import { ApiError } from "@/lib/errors";
+import cellLoadJson from "@/mocks/cell_load.json";
 import dashboardMock from "@/mocks/dashboard.json";
+import manifestJson from "@/mocks/manifest.json";
 import usageDailyMock from "@/mocks/usage_daily.json";
 import usageMonthlyMock from "@/mocks/usage_monthly.json";
 import candidatesMock from "@/mocks/candidates.json";
@@ -45,6 +48,25 @@ const BASE = process.env.NEXT_PUBLIC_API_BASE;
 
 /** 실 API 모드인지 — 화면에서 "mock 데이터" 고지를 띄울 때 쓴다 */
 export const isMockMode = !BASE;
+
+/**
+ * 파이프라인 산출물 스냅샷 버전 — `mocks/manifest.json`(A4)은 실 API/mock 모드와 무관하게
+ * 같은 값을 돌려주는 정적 메타다. usageMonthly·usageDaily와 같은 이유로 정적 import한다
+ * (:133-134 주석 참조). SourceChip 팝오버에서 "이 숫자가 어느 데이터 스냅샷에서 왔는지"를 밝힌다.
+ */
+export function datasetVersion(): string {
+  return (manifestJson as { dataset_version: string }).dataset_version;
+}
+
+/**
+ * 셀(지역×표시업종) 가맹점 이용 부하 — 파이프라인 P9 산출물. usageMonthly와 같은 이유로
+ * BE 엔드포인트가 없는 정적 데이터라 실 API 모드에서도 정적 import한다.
+ * 동기 함수다: 셀 탐색기는 서버 컴포넌트에서 값을 읽어 클라이언트로 props로 내려보낸다
+ * (이 파일을 "use client"에서 import하면 mock 전체가 브라우저 번들에 실린다 — 위 주석 참조).
+ */
+export function cellLoad(): CellLoad {
+  return cellLoadJson as CellLoad;
+}
 
 /**
  * 비2xx → `ApiError(status, detail)`. 에러 본문은 계약상 `{"detail": "메시지"}`다 (05 머리말).

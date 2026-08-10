@@ -26,6 +26,7 @@ if os.environ.get("DYNAMO_ENDPOINT"):       # DynamoDB Local은 자격증명 "�
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))   # backend/ 밖에서 실행해도 app import
 from app import db, progress_db  # noqa: E402  (환경변수 세팅 뒤에 import해야 boto3 리소스가 올바로 붙는다)
+from app.services import cardgen  # noqa: E402  (B1 — 시드 카드의 dissent 고정 문구를 그대로 재사용)
 
 TABLE_NAME = os.environ.get("CARDS_TABLE") or "sangseng-cards"   # 빈 문자열 방어 — db.py 와 동일
 
@@ -59,6 +60,7 @@ GROUNDING = {
     "narrative_status": "rule_based",
     "selection_method": "deterministic_highest_available_score",
     "explanation_source": "rule_seed",
+    "dissent_source": "rule_based",      # B1 — 시드 카드는 AI 호출이 없으므로 항상 rule_based
     "source": "structured",
     "checks": ["target", "score", "rank", "progress", "road_time"],
 }
@@ -68,9 +70,14 @@ INCENTIVE_GROUNDING = {
     "narrative_status": "rule_based",
     "selection_method": "fixed_scenarios_3_5_7",
     "explanation_source": "rule_seed",
+    "dissent_source": "rule_based",      # B1
     "source": "structured",
     "checks": ["scenarios", "mandatory_risks", "assumption_note"],
 }
+# B1 — 반대 의견(dissent) 3항. 시드 카드는 AI 호출 없이 고정된 규칙 문구이므로 실제 카드 생성 경로
+# (cardgen)의 폴백·인센티브 문구를 그대로 재사용해 화면·문서 문구가 갈리지 않게 한다.
+EXPANSION_DISSENT = list(cardgen.DISSENT_FALLBACK)
+INCENTIVE_DISSENT = list(cardgen.INCENTIVE_DISSENT)
 # 시드 카드의 설명 문구는 사람이 실데이터로 검증해 고정한 값이다 — AI가 만든 문장이 아니므로
 # "AI는 …사용했습니다" 문장을 쓰면 화면이 거짓을 말하게 된다 (05 §2 grounding).
 SEED_NARRATIVE_NOTE = ("대상은 서버의 정량 규칙이 선택했고, 이 설명 문구는 실데이터로 사전 검증한 "
@@ -157,6 +164,7 @@ def demo_cards() -> list:
                 "영업 상태·가맹 자격·관광객 이용 적합성은 승인 전 별도 확인 필요",
             ],
             "expected_effect": "영월군 음식점 후보의 가맹 전환 효과는 카드 상세의 반사실 시뮬레이션과 사업자 적격성 확인 후 판단해야 합니다 (가정 기반 전망이며 실제와 다를 수 있음)",
+            "dissent": EXPANSION_DISSENT,
             "grounding": GROUNDING,
             "original_ranking": ORIGINAL_RANKING,
         },
@@ -197,6 +205,7 @@ def demo_cards() -> list:
                 "영업 상태·가맹 자격·관광객 이용 적합성은 승인 전 별도 확인 필요",
             ],
             "expected_effect": "영월군 소매점 후보의 가맹 전환 효과는 카드 상세의 반사실 시뮬레이션과 사업자 적격성 확인 후 판단해야 합니다 (가정 기반 전망이며 실제와 다를 수 있음)",
+            "dissent": EXPANSION_DISSENT,
             "grounding": GROUNDING,
             "original_ranking": ORIGINAL_RANKING,
         },
@@ -232,6 +241,7 @@ def demo_cards() -> list:
                 "실제 자동 지급 시스템 연동은 미구현(로드맵)",
             ],
             "expected_effect": "5% 적용 시 지역 전환율 약 1.0~2.0%p 개선 예상 (가정 기반 전망이며 실제와 다를 수 있음)",
+            "dissent": INCENTIVE_DISSENT,
             "grounding": INCENTIVE_GROUNDING,
             "original_ranking": None,
         },
@@ -304,6 +314,7 @@ def _history_card(cid: str, category: str, rank: int, score: float, gap: float,
                 "삼척시는 도계읍(하이원포인트 지역가맹 대상지역)만 대상이라 후보 표본이 작음",
             ],
             "expected_effect": f"삼척시 {category} 후보의 가맹 전환 효과는 카드 상세의 반사실 시뮬레이션과 사업자 적격성 확인 후 판단해야 합니다 (가정 기반 전망이며 실제와 다를 수 있음)",
+            "dissent": EXPANSION_DISSENT,
             "grounding": GROUNDING,
             "original_ranking": ORIGINAL_RANKING,
         },

@@ -7,7 +7,12 @@ import type { Card, Simulation } from "@/types";
  * 애초에 사람이 실데이터로 검증해 고정한 문구다. 그 사실을 화면에서 감추면 "AI가 한 일"을
  * 과장하게 되므로 세 종류를 항상 갈라 놓는다 (절대 규칙 4의 연장 — AI는 제안만 한다).
  */
-export type NarrativeSourceKind = "ai" | "ai_partial" | "rule_fallback" | "rule_reference";
+export type NarrativeSourceKind =
+  | "ai"
+  | "ai_partial"
+  | "ai_unverified"
+  | "rule_fallback"
+  | "rule_reference";
 
 /** 칩 라벨과 툴팁 고지 문구 — 화면에서 문자열을 새로 쓰지 말고 이 상수를 쓴다 (13 §9) */
 export const NARRATIVE_SOURCE_TEXT: Record<NarrativeSourceKind, { label: string; note: string }> = {
@@ -18,6 +23,10 @@ export const NARRATIVE_SOURCE_TEXT: Record<NarrativeSourceKind, { label: string;
   ai_partial: {
     label: "AI 생성 · 수치만 서버 고정",
     note: "3·5·7% 시나리오와 개선폭은 서버가 고정한 값이고, 비교 문장과 근거 문구는 AI가 쓴 원문 그대로입니다. 재검증할 후보명·순위·도로 시간이 없는 카드라 확충 카드의 '서버 검증됨'과 구분합니다.",
+  },
+  ai_unverified: {
+    label: "AI 생성(미검증)",
+    note: "반대 관점 3항은 AI가 작성한 문장이며, 후보명·Score·순위처럼 서버가 정본 데이터로 다시 검증하는 필드가 아닙니다. 내용은 참고용으로 읽고 승인 여부는 담당자가 판단합니다.",
   },
   rule_fallback: {
     label: "규칙 기반 설명(AI 응답 없음)",
@@ -56,3 +65,20 @@ export const cardNarrativeSource = (card: Card): NarrativeSourceKind | null =>
 
 export const simulationNarrativeSource = (sim: Simulation): NarrativeSourceKind | null =>
   fold(sim.narrative_source);
+
+/**
+ * 반대 관점(dissent) 전용 출처 판정 — `explanation_source`와는 다른 축이다 (05 §2, C3).
+ *
+ * `rule_based`는 INCENTIVE 카드가 시나리오·개선폭을 서버 고정 가정으로 두어 애초에 LLM을
+ * 부르지 않은 경우다(실패가 아니라 설계). "AI 응답을 받지 못해"(rule_fallback)가 아니라
+ * "AI 호출 없이 서버 규칙으로 작성"(rule_reference) 쪽 의미가 맞아 그 칩을 그대로 쓴다.
+ */
+function foldDissent(source?: string): NarrativeSourceKind | null {
+  if (source === "llm") return "ai_unverified";
+  if (source === "rule_fallback") return "rule_fallback";
+  if (source === "rule_based") return "rule_reference";
+  return null;
+}
+
+export const dissentSourceOf = (card: Card): NarrativeSourceKind | null =>
+  foldDissent(card.ai.grounding?.dissent_source);

@@ -209,14 +209,16 @@ def simulate_card(
     try:
         usage = dataload.load("usage_monthly")
         merchants = dataload.load("merchants")      # §1 merchants 배열 — 요청 시점 로드
+        dashboard = dataload.load("dashboard")      # A3 후속: dist 정본 — usage 셀 합산의 억제 왜곡 회피
     except FileNotFoundError as exc:
         raise HTTPException(status_code=503, detail=f"{exc}.json이 아직 생성되지 않았습니다") from exc
     if not merchants:       # 폴백 체인 3단계 분모(전체 가맹점 수) 0 방지 — 빈 산출물도 미준비로 본다
         raise HTTPException(status_code=503, detail="merchants.json에 가맹점이 없습니다")
     target = card.get("target") or {}
     try:
-        result = simulate.simulate_expansion(usage, merchants, target.get("eup"), target.get("category"))
-    except ValueError as exc:       # 집계 6지역 밖 타깃 — 계산 자체가 성립하지 않는 요청이라 400
+        result = simulate.simulate_expansion(
+            usage, merchants, target.get("eup"), target.get("category"), dashboard=dashboard)
+    except ValueError as exc:       # 집계 6지역 밖 타깃·소표본 억제 타깃 — 계산이 성립하지 않는 요청 400
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
     # narrative에 '예상'·'가정'이 항상 포함되도록 입력에 지침을 싣고, 누락 시 fallback으로 대체.
@@ -233,8 +235,13 @@ def simulate_card(
         # 집중도 지수 두 값(현재·예상)은 일부러 싣지 않는다 — 변화폭이 0.05%p여도 지수 표기가
         # 한 눈금 움직이는 구간이 있어, 두 값을 주면 LLM이 "43에서 42로 1포인트 개선"처럼
         # delta_pp와 10배 어긋난 문장을 쓴다(실측). 판단에 필요한 건 방향과 폭뿐이다.
+        # result['eup']은 simulate.simulate_expansion이 REGIONS 화이트리스트로 이미 검증했지만
+        # (통과 못 하면 위에서 ValueError→400), category는 그런 검증이 없다 — 카드 target.category는
+        # 카드 생성 시 candidates.json 값을 정제 없이 그대로 저장한다(cardgen.py의 adopted와 같은
+        # 경로). 새 모듈을 만들지 않고 cardgen의 헬퍼를 그대로 재사용한다.
         user_payload = {
-            "대상": f"{result['eup']} {result['category']} 업종 신규 가맹점 1곳",
+            "대상": f"{cardgen._clean_external(result['eup'])} "
+                   f"{cardgen._clean_external(result['category'])} 업종 신규 가맹점 1곳",
             "예상 변화(부호 해석 완료)": direction,
             "신규 가맹점 예상 월 이용 건수(가정치)": result["expected_monthly_count"],
             "관측 기반 예상 월 이용 건수 범위": result["expected_monthly_range"],
@@ -243,8 +250,10 @@ def simulate_card(
                       "집중도 지수 값을 지어내지 말 것. '예상'과 '가정' 두 단어를 반드시 포함할 것"),
         }
         try:
-            out = llm.generate_json(prompts.SIMULATE_PROMPT, json.dumps(user_payload, ensure_ascii=False),
-                                    NARRATIVE_SCHEMA, schema_name="narrative", timeout=8)
+            out = llm.generate_json(
+                prompts.SIMULATE_PROMPT,
+                f"<data>\n{json.dumps(user_payload, ensure_ascii=False)}\n</data>",
+                NARRATIVE_SCHEMA, schema_name="narrative", timeout=8)
             narrative = out.get("narrative")
         except Exception:
             log.warning("simulate narrative LLM 실패 — 규칙 기반 문구로 대체 (card=%s)", cid, exc_info=True)

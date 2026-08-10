@@ -73,7 +73,7 @@ def _avg_monthly(rows: list, recent: list, eups: list, category: str | None = No
             continue
         if category is not None and HIGHONE_TO_DISPLAY.get(row["category"], "기타") != category:
             continue
-        total += sum(row.get(e, 0) for e in eups)
+        total += sum(row.get(e) or 0 for e in eups)
     return total / len(recent)
 
 
@@ -108,7 +108,7 @@ def _monthly_per_merchant_samples(
             if (selected_category is not None
                     and HIGHONE_TO_DISPLAY.get(row["category"], "기타") != selected_category):
                 continue
-            total += sum(row.get(region, 0) for region in eups)
+            total += sum(row.get(region) or 0 for region in eups)
         samples.append(total / denominator)
     return samples, step
 
@@ -126,6 +126,31 @@ def _percentile(values: list[float], quantile: float) -> float:
         return ordered[lower]
     fraction = position - lower
     return ordered[lower] * (1 - fraction) + ordered[upper] * fraction
+
+
+def _region_totals_from_dashboard(dashboard: dict | None, latest: str) -> dict[str, int] | None:
+    """dashboard.json의 `monthly_by_region`에서 기준월 6지역 합계를 뽑는다 (A3 후속 — 15 문서 §5 T12 폴백
+    체인과는 무관, `dist`의 출처만 바꾼다).
+
+    usage_monthly.json은 소표본 억제(P10)로 일부 셀이 null이라, 이를 `or 0`으로 가드하면 억제된
+    지역의 합계가 실제보다 낮게 잡힌다(실측: 2025-12 영월군 1,552 → usage 합산 1,223, -21%).
+    반면 dashboard.json의 `monthly_by_region`은 값을 숨기지 않고 영향받는 열만 100단위로
+    반올림하므로(±50 오차) 더 정확한 근사다 — `privacy_meta` 문단 참고.
+
+    기준월 행이 없거나 6지역 중 하나라도 숫자가 아니면 `None`(호출부가 usage 셀 합산으로 폴백).
+    """
+    if not dashboard:
+        return None
+    row = next((r for r in dashboard.get("monthly_by_region", []) if r.get("month") == latest), None)
+    if row is None:
+        return None
+    totals = {}
+    for r in REGIONS:
+        v = row.get(r)
+        if not isinstance(v, (int, float)):
+            return None
+        totals[r] = v
+    return totals
 
 
 def expected_monthly_count(usage: dict, merchants: list, eup: str, category: str) -> tuple[float, int]:
@@ -153,7 +178,9 @@ def _round_pp(x: float) -> float:
     return r + 0.0 if r == 0 else r
 
 
-def simulate_expansion(usage: dict, merchants: list, eup: str, category: str) -> dict:
+def simulate_expansion(
+    usage: dict, merchants: list, eup: str, category: str, dashboard: dict | None = None
+) -> dict:
     """반사실 재계산 — 05 §2 simulate 응답 수치의 원천.
 
     기준월 지역 분포에서 타깃 읍 건수에 예상 월 건수를 더해 지수를 재계산한다.
@@ -161,16 +188,32 @@ def simulate_expansion(usage: dict, merchants: list, eup: str, category: str) ->
     (current−projected) 범위다. 데이터 변동을 쓰므로 임의의 ±30% 가정은 사용하지 않는다.
 
     집계 대상 6개 지역 밖의 eup은 조용히 delta 0을 내지 않고 `ValueError` (라우트가 400으로 변환)
-    — 지수 분포에 더할 자리가 없어 "효과 없음"과 구분되지 않기 때문.
+    — 지수 분포에 더할 자리가 없어 "효과 없음"과 구분되지 않기 때문. 타깃 자체가 소표본 억제
+    셀(k=5 미만)이어도 같은 이유로 `ValueError`를 낸다 — 억제로 진짜 0 취급되면 "예상 효과
+    없음"과 "표본이 없어 계산 불가"가 구분되지 않는다(A3 후속 — 실측 시 영월군 편의점 타깃이
+    거짓 0을 냈다).
+
+    `dashboard`는 선택 인자다. 기준월 `dist`(6지역 분포)를 dashboard.json의 `monthly_by_region`
+    (억제 영향이 없는 정본)에서 가져오고, 없거나 불완전하면 usage 셀 합산으로 폴백한다
+    (`_region_totals_from_dashboard` 참고) — 소표본 억제가 라이브 재계산을 왜곡하던 문제(A3 후속)의
+    수정. `concentration_index`·분위수 계산·분모 폴백 체인(15 문서 §5 T12)은 그대로다.
     """
     if eup not in REGIONS:
         raise ValueError(f"집계 대상 지역이 아닙니다: {eup} (대상: {', '.join(REGIONS)})")
+    suppressed_cells = (usage.get("privacy_meta") or {}).get("suppressed_cells") or []
+    if any(c.get("eup") == eup and c.get("category") == category for c in suppressed_cells):
+        k = (usage.get("privacy_meta") or {}).get("k", 5)
+        raise ValueError(f"표본 보호(k={k})로 이 셀의 예상 효과는 산출하지 않습니다: {eup} {category}")
     latest = _base_month(usage)
-    dist = {r: 0 for r in REGIONS}
-    for row in usage["usage"]:
-        if row["month"] == latest:
-            for r in REGIONS:
-                dist[r] += row.get(r, 0)
+    region_totals = _region_totals_from_dashboard(dashboard, latest)
+    if region_totals is not None:
+        dist = dict(region_totals)
+    else:
+        dist = {r: 0 for r in REGIONS}
+        for row in usage["usage"]:
+            if row["month"] == latest:
+                for r in REGIONS:
+                    dist[r] += row.get(r) or 0   # A3: 소표본 억제로 None 셀 존재(row.get(r, 0)만으론 못 거름)
     current = concentration_index([dist[r] for r in REGIONS])
     samples, step = _monthly_per_merchant_samples(usage, merchants, eup, category)
     expected = sum(samples) / len(samples)

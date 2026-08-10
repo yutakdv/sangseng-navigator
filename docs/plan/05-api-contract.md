@@ -22,7 +22,7 @@ Base URL: 로컬 `http://localhost:8000` / 배포 후 API Gateway URL. 경로 �
   "conversion": {
     "headline_rate": 3.2,
     "is_proxy": true,
-    "proxy_note": "분자=지역 사용 건수, 분모=입장 연인원(교대 합산)으로 단위가 달라 비율이 아닌 근사 지표입니다. 강원랜드가 공개한 금액 기준 지역 사용 비율(2024년 28.5%)과는 다른 지표입니다.",
+    "proxy_note": "분자=지역 사용 건수, 분모=입장 연인원(교대 합산)으로 단위가 달라 비율이 아닌 근사 지표입니다. 강원랜드가 공개한 금액 기준 지역 사용 비율(2024년 29.4%)과는 다른 지표입니다.",
     "monthly": [
       {"month": "2025-01", "local_uses": 12450, "visitors": 385200, "rate": 3.2}
     ]
@@ -51,7 +51,23 @@ Base URL: 로컬 `http://localhost:8000` / 배포 후 API Gateway URL. 경로 �
   ],
   "growth": {"mom_pct": -2.1, "qoq_pp": -0.4},
   "ranking_stability": null,
-  "ai_stability": null
+  "ai_stability": null,
+  "impact_meta": {
+    "basis": "count",
+    "annual_local_uses": 507628,
+    "annual_visitors": 2478656,
+    "per_pp_additional_uses": 24787,
+    "note": "지역 전환율(근사 지표) 1%p 개선 시 연간 지역 사용 건수 추가분 추정 = 연간 입장 연인원 × 1%. 건수 기준이며 금액 환산은 포함하지 않는다. 가정 기반 전망이며 실제와 다를 수 있음."
+  },
+  "privacy_meta": {
+    "k": 5,
+    "suppressed_cells": [
+      {"eup": "영월군", "category": "카페"},
+      {"eup": "영월군", "category": "편의점"}
+    ],
+    "aggregate_rounding": {"unit": 100},
+    "note": "가맹점 5곳 미만 셀의 건수는 비공개. 합계는 100 단위 반올림으로 차분 복원 정밀도를 낮춤(완전 차단은 아님). 비율·순위·스코어는 반올림 전 원값으로 계산됨."
+  }
 }
 ```
 
@@ -63,10 +79,10 @@ Base URL: 로컬 `http://localhost:8000` / 배포 후 API Gateway URL. 경로 �
   - 분모는 "입장객 수"가 아니라 **입장 연인원(교대 합산)**이다. 강원랜드 일자별 카지노 입장객 API는
     하루를 영업 교대(1부/2부/3부) 최대 3행으로 주며 P2가 이를 합산하므로, 같은 사람이 교대를 넘겨
     머무르면 중복 계수된다. `monthly[].visitors`의 라벨도 "입장 연인원"으로 표기할 것
-  - 우리 지표(건수÷연인원 ≈ **연인원 1인당 0.21건**)와 강원랜드·언론이 쓰는 **금액 기준** 지역 사용
-    비율(2024년 콤프 발생액 1,242.33억 중 지역 354.8억 = 28.5%)은 **종류가 다른 지표**다.
-    자릿수가 비슷해 같은 값의 다른 추정치로 오인되기 쉬우므로 화면·발표 어디서도 "강원랜드 공식
-    지역 사용 비율"과 나란히 놓고 비교하지 않는다
+  - 우리 지표(건수÷연인원 ≈ **연인원 1인당 0.21건**)와 강원랜드가 쓰는 **금액 기준** 지역 사용
+    비율(2024년 하이원포인트 지역 사용금액 355억 원, 지역사용률 29.4% — 강원랜드 2024년도
+    지속가능경영보고서)은 **종류가 다른 지표**다. 자릿수가 비슷해 같은 값의 다른 추정치로
+    오인되기 쉬우므로 화면·발표 어디서도 "강원랜드 공식 지역 사용 비율"과 나란히 놓고 비교하지 않는다
 업종 표시 롤업: 대시보드·위젯의 업종 표시는 13 문서 §5의 6분류(카페·음식점·편의점·숙박업·소매점·기타)로
 롤업하며, 하이원 18종·소진공 대분류(`indsLclsNm`)와의 매핑 정본은 `pipeline/category_map.py` 하나다.
 
@@ -82,6 +98,25 @@ Base URL: 로컬 `http://localhost:8000` / 배포 후 API Gateway URL. 경로 �
 - `ranking_stability`: P8 민감도 분석 `sensitivity.json`의 `top3_stable_ratio × 100`
   (정수, "추천 순위 안정도" 타일). AI 모델 품질 지표가 아니다. P8 실행 전에는 `null`.
   `ai_stability`는 이전 소비자 호환용 별칭이며 신규 화면은 사용하지 않는다
+- `impact_meta`: "지역 전환율 1%p 개선 = 연간 지역 사용 건수 몇 건 추가" 임팩트 헤드라인의
+  역추적 가능한 원천(`pipeline/p5_metrics.py`의 `build_impact_meta`, `conversion.monthly`의
+  겹치는 월 합산). **건수 기준 고정**(`basis: "count"`) — 강원랜드 공개 금액 기준 지역 사용 비율
+  (2024년 29.4%)과는 종류가 다른 별개 지표라 금액 환산을 포함하지 않는다(README·발표 전용).
+  화면에 노출하는 숫자는 `per_pp_additional_uses`(연간 입장 연인원 × 1%, 반올림) 하나뿐이며
+  `annual_local_uses`·`annual_visitors`는 근거 표기용이다. `note`는 고정 설명 문구로, 배지만으로는
+  막지 못하는 오인을 막기 위해 **그대로** 노출한다(요약·의역 금지).
+- `privacy_meta`: 발행 직전 마지막 파이프라인 단계(`pipeline/p10_privacy.py`, P10)가 붙이는
+  소표본 보호 메타데이터 — `usage_monthly.json`·`dashboard.json` 양쪽에 실린다(스키마 동일).
+  `k`(=5) 미만 가맹점 셀은 `suppressed_cells`에 나열되며, `usage_monthly.usage`에서 해당
+  (지역×업종) 셀 값이 `null`로 비공개 처리된다. `dashboard.json`은 값을 비공개하지 않는 대신
+  차분 복원(다른 합계와의 차로 비공개 셀 값을 역산하는 것)을 어렵게 하기 위해 **영향받는
+  합계만** `aggregate_rounding.unit`(=100) 단위로 반올림한다 — `monthly_by_region`의 영향
+  지역 열, `region_share`·`category_share`의 영향 항목 `count`가 대상이다. **`rate`·`share`·
+  `headline_rate`·스코어·`impact_meta`는 반올림 전 원값을 그대로 유지**한다(P10은 발행값만
+  가공하고, 진단·스코어링은 이미 원값으로 끝난 뒤 실행되므로 자동 보장). `note`는 고정 설명
+  문구이며 화면에 노출할 때 요약·의역하지 않는다. 억제 대상 원본 근거는 `cell_load.json`의
+  `suppressed`/`tier: "suppressed"`(P9가 이미 표시)와 같다 — P10은 이를 검증만 하고 다시
+  계산하지 않는다.
 
 ### `GET /api/candidates`
 지도·카드 상세용 스코어링 결과 (`eup_scores.json` + `candidates.json` 병합).
@@ -184,12 +219,18 @@ Base URL: 로컬 `http://localhost:8000` / 배포 후 API Gateway URL. 경로 �
       "narrative_status": "ai_generated_unverified",
       "selection_method": "deterministic_highest_available_score",
       "explanation_source": "llm",
+      "dissent_source": "llm",
       "source": "structured",
       "checks": ["target", "score", "rank", "progress", "road_time"]
     },
     "original_ranking": [
       {"rank": 1, "candidate": "고한읍 편의점", "score": 0.59},
       {"rank": 2, "candidate": "사북읍 카페", "score": 0.57}
+    ],
+    "dissent": [
+      "기준월(2025-12) 이후 소비 패턴이 변했다면 근거 수치가 현재와 다를 가능성이 있습니다.",
+      "가맹점 이용 부하는 건수 기반 추정치라 실제 매출·수요 여력과 다를 가능성이 있습니다.",
+      "계절성(겨울 성수기 등)에 따라 제안 시점과 실행 시점의 수요가 다를 가능성이 있습니다."
     ]
   },
   "candidate_verification": {
@@ -242,6 +283,17 @@ Base URL: 로컬 `http://localhost:8000` / 배포 후 API Gateway URL. 경로 �
   보이는 후보명·Score·순위·진행 상태·도로 소요시간·비교 문장은 서버가 구조화 데이터로 다시 만든다.
   `ai.grounding.status=verified`는 이 재검증을 통과했다는 뜻이지 후보 사업자의 적격성이 확인됐다는 뜻은
   아니다. 후자는 `candidate_verification.status=unverified`에서 별도로 관리한다.
+- **반대 의견(`ai.dissent`):** 정확히 문자열 3개 배열이며, "이 제안이 틀릴 수 있는 이유"만 담는다 —
+  제안을 방어하는 문장이 아니라 반박하는 문장이다. **반대 의견도 AI 산출물이며 정본 수치만
+  인용한다** — 입력에 없는 사실을 지어내지 않고, 추측은 "~가능성" 표현으로 쓴다(절대 규칙 4의
+  연장: AI는 제안만 하고, 그 제안에 대한 반박까지 함께 제시해 담당자 승인을 돕는다). 별도 LLM
+  호출을 추가하지 않고 카드 생성 호출의 `CARD_AI_SCHEMA`에 얹은 필드라, 폴백·grounding 재생성
+  경로를 EXPANSION/INCENTIVE 본문과 그대로 공유한다. LLM이 문자열 3개가 아닌 값을 주면
+  서버가 고정 규칙 문구로 대체하고 그 사실을 `ai.grounding.dissent_source`에 남긴다
+  (`llm` | `rule_fallback` | `rule_based` — 의미는 아래 `explanation_source` 표와 같은 축이며,
+  INCENTIVE는 시나리오 자체가 서버 고정값이라 LLM이 관여하지 않으므로 항상 `rule_based`다).
+  구형 카드(이 필드 도입 이전에 생성·시드된 카드)에는 `dissent`가 없을 수 있다 — 화면은
+  `undefined`/누락을 옵셔널로 다루고 없으면 반대 관점 섹션을 그리지 않는다.
 - 후보 적격성 확인 전 생성 카드의 `confidence`는 최대 `중`이다. `상`은 영업 상태·가맹 자격·참여 의향
   등 운영 검증을 저장하고 감사할 수 있게 된 뒤에만 허용한다.
 - `INCENTIVE` 타입은 `target`/`score_rank`/`ai_rank` 대신 `scenarios` + `selected_rate` 사용:
@@ -300,6 +352,15 @@ LLM 호출이 실패하거나 애초에 호출하지 않은 카드도 **똑같�
 
 - `ai.reasons`의 출처 문장도 이 값과 **일치해야 한다**. 폴백인데 "AI는 비정량 리스크 문구 생성에만
   사용했습니다"를 그대로 실으면 필드와 문장이 서로 다른 말을 하게 된다.
+- `ai.grounding.dissent_source`는 `ai.dissent`(반대 의견 3항)만의 출처다. `explanation_source`와
+  갈라지는 이유는, INCENTIVE는 본문 설명(`explanation_source`)은 LLM이 쓸 수 있어도 반대 의견은
+  시나리오가 서버 고정값이라 애초에 LLM에 맡기지 않기 때문이다.
+
+  | `dissent_source` | 언제 |
+  |---|---|
+  | `llm` | LLM이 문자열 3개를 그대로 반환해 채택 (EXPANSION) |
+  | `rule_fallback` | LLM 호출 실패·문자열 3개 형식 미달 — 서버 고정 문구(`cardgen.DISSENT_FALLBACK`)로 대체 (EXPANSION) |
+  | `rule_based` | LLM을 애초에 호출하지 않음 — INCENTIVE(시나리오 고정)와 데모 시드·mock 카드 |
 - **INCENTIVE는 예외**: 시나리오 3/5/7%와 `delta_pp`가 서버 고정값이라
   `status: "partial"` · `numeric_status: "fixed_by_server"` · `selection_method: "fixed_scenarios_3_5_7"`을
   쓴다. EXPANSION용 "검증됨" 배너를 그대로 재사용하지 않는다(검증 대상 자체가 다르다) —
@@ -325,7 +386,12 @@ LLM 호출이 실패하거나 애초에 호출하지 않은 카드도 **똑같�
     "reasons": ["적립이 아닌 사용 단계 정책 — 지역 가맹점 결제분에 한정해 리워드가 붙으므로 콤프 발행액(적립)은 늘지 않고 게임 참여 유인과도 무관", "지역 전환율이 월별 17~23%대에서 오르내려 저점 월을 방어할 수요 측 유인이 필요", "사용 건수가 사북읍·태백시에 절반 이상 몰려 있어 특정 지역 한정이 아닌 전 지역 공통 적용이라 지역 균형을 왜곡하지 않음", "페이백률이 높을수록 효과와 재원 부담이 함께 커지는 트레이드오프가 뚜렷"],
     "risks": ["재원 확보는 예산 부서의 별도 승인 사항", "기존 포인트 적립·할인 약관과의 중복 적용 여부 확인 필요", "실제 자동 지급 시스템 연동은 미구현(로드맵)"],
     "expected_effect": "5% 적용 시 지역 전환율 약 1.0~2.0%p 개선 예상 (가정 기반 전망이며 실제와 다를 수 있음)",
-    "original_ranking": null
+    "original_ranking": null,
+    "dissent": [
+      "전 지역 공통 페이백이라 지역별 소비 여건 차이를 반영하지 못할 가능성이 있습니다.",
+      "페이백률-전환율 관계는 실측 없는 팀 설정 가정이라 실제 효과가 다를 가능성이 있습니다.",
+      "지역 전환율은 근사 지표라 개선 폭이 금액 기준 성과와 다를 가능성이 있습니다."
+    ]
   },
   "scenarios": [
     {"rate": 3, "delta_pp": [0.5, 1.0], "budget_note": "재원 부담 낮음"},
@@ -340,6 +406,8 @@ LLM 호출이 실패하거나 애초에 호출하지 않은 카드도 **똑같�
 }
 ```
 
+- INCENTIVE의 `dissent`는 `grounding.dissent_source: "rule_based"`로 고정된다 — 시나리오·개선폭이
+  서버 고정 가정이라 LLM이 반대 의견 생성에도 관여하지 않는다(`cardgen.INCENTIVE_DISSENT`).
 - INCENTIVE의 `ai`는 EXPANSION과 **동일 스키마를 재사용**하며 순위 필드(`original_ranking`)만 `null`이다
   (`comparison`=시나리오 비교문, `reasons`=권고 근거, `risks`=A-3 프롬프트의 필수 리스크 3종).
 
@@ -408,6 +476,14 @@ LLM 호출이 실패하거나 애초에 호출하지 않은 카드도 **똑같�
 - `projected_index`는 재계산 원시값의 독립 반올림이 아니라 **`round(current) − round(Δ평균)` 파생값**이다
   (2026-08-08 개정) — 세 값을 따로 반올림하면 "42.5 → 42.5인데 0.1%p 개선" 같은 자기모순 문장이
   나온다. 표시 이동폭(current−projected)은 항상 `delta_pp` 범위 안에 떨어진다
+- `current_index`의 기준월 6지역 분포(`dist`)는 **`dashboard.json`의 `monthly_by_region`을 우선**
+  사용한다(2026-08-10 A3 후속 개정). `usage_monthly.json`은 P10 소표본 억제로 일부 셀이 `null`이라
+  셀 합산으로 `dist`를 만들면 억제 지역의 총량이 실제보다 낮게 잡힌다(실측: 영월군 기준월 총량이
+  1,552 → 셀 합산 1,223, −21%). `dashboard.json`의 `monthly_by_region`은 값 자체를 숨기지 않고
+  영향받는 열만 100단위로 반올림하므로(오차 ±50) 더 정확한 근사다. `dashboard`에 해당 기준월 행이
+  없거나 6지역 중 하나라도 값이 없으면 기존 usage 셀 합산으로 **조용히 폴백**한다(`backend/app/
+  services/simulate.py`의 `_region_totals_from_dashboard`). 분모 폴백 체인(15 문서 §5 T12)·
+  `concentration_index` 산식 자체는 바뀌지 않았다 — `dist`의 출처만 바뀌었다
 - `delta_pp`는 `[낮은 값, 높은 값]`이고 **부호 있는 %p**다(양수 = 집중도 하락 = 개선).
   **FE는 소수 1자리로 포맷을 고정한다** — 저장소 왕복 과정에서 `1.0`이 `1`로 돌아올 여지가 있어
   자릿수를 값에 맡기지 않는다
@@ -423,6 +499,13 @@ LLM 호출이 실패하거나 애초에 호출하지 않은 카드도 **똑같�
   - `-0.0`은 내보내지 않는다(반올림 결과가 음의 0이면 `0.0`으로 정규화 — 화면에 "-0.0%p"가 찍히는 것 방지)
   - LLM에는 **집중도 지수 두 값을 주지 않는다**(방향과 폭만 전달) — 주면 "43에서 42로 1포인트 개선"처럼
     `delta_pp`와 어긋난 문장을 쓴다. 생성된 문구가 계산 방향과 반대면(개선↔심화) 양방향 모두 규칙 기반 문구로 대체한다
+
+- **타깃이 소표본 억제 셀(k=5 미만) 자체면 `simulate`는 계산하지 않고 `400`을 낸다**
+  (2026-08-10 A3 후속 개정) — 판정 근거는 `usage_monthly.json`의 `privacy_meta.suppressed_cells`
+  (하드코딩 없음). 억제된 셀은 타깃 읍×업종의 과거 이용 이력 자체가 `null`이라, 이를 그대로
+  계산하면 `expected_monthly_count`가 **진짜 0**으로 나와 "예상 효과 없음"과 "표본이 없어 계산
+  불가"가 구분되지 않는다 — 집계 6개 지역 밖 타깃을 조용히 delta 0으로 내지 않는 기존 규칙(위)과
+  같은 이유·같은 방식(`ValueError` → 라우트가 400)이다. 아래 동작 규칙 표 참고
 
 ### 추진 기록 (`progress-records`) · 경과 리포트 (`progress-report`)
 
@@ -572,6 +655,15 @@ LLM 호출이 실패하거나 애초에 호출하지 않은 카드도 **똑같�
 
 ## 5. 기타
 
+### 데이터셋 버전 헤더 (`X-Dataset-Version`)
+
+모든 `/api/*` 응답에 `X-Dataset-Version: <base_month>.<해시8자리>`(예: `2025-12.a1b2c3d4`) 헤더가
+실린다 — 화면이 지금 어느 데이터셋 산출로 만들어졌는지 심사위원이 확인하는 용도(Task C1 출처 칩이
+표시). 값의 원천은 `data/processed/manifest.json`의 `dataset_version`이며, 파이프라인(`run_all.py`)이
+매 실행 끝에 산출 JSON 전체의 sha256을 모아 생성한다(§6 참고). `manifest.json`이 없는(구 데이터)
+환경에서는 헤더가 생략될 뿐 응답 자체는 정상 200이다. CORS `expose_headers`에 등록돼 있어 브라우저
+JS(`fetch(...).headers.get("X-Dataset-Version")`)에서도 읽을 수 있다.
+
 | 메서드 | 경로 | 응답 |
 |---|---|---|
 | GET | `/api/health` | `{"ok": true, "data_loaded": true, "datasets": {...}}` |
@@ -582,15 +674,17 @@ LLM 호출이 실패하거나 애초에 호출하지 않은 카드도 **똑같�
   "demo_read_only": false,
   "data_loaded": true,
   "datasets": {"dashboard": true, "eup_scores": true, "candidates": true,
-               "merchants": true, "risk_signal": true}
+               "merchants": true, "risk_signal": true, "manifest": true}
 }
 ```
 
-- `datasets`: 산출 JSON 5종의 로드 성공 여부(각 `true`/`false` — 파일 누락뿐 아니라 JSON 파손도
+- `datasets`: 산출 JSON 6종의 로드 성공 여부(각 `true`/`false` — 파일 누락뿐 아니라 JSON 파손도
   `false`). `dashboard` 하나만 보면 나머지
   결손을 놓치므로 개별로 보고한다 (배포 후 `deploy-backend.sh`의 data 복사 누락 진단용)
 - `data_loaded`: **필수 4종**(`dashboard`·`eup_scores`·`candidates`·`merchants`)의 AND.
-  `risk_signal`은 07 문서 B4 ⑥에서 "없으면 컷"인 선택 입력이라 `datasets`에만 싣고 AND에서는 뺀다
+  `risk_signal`은 07 문서 B4 ⑥에서 "없으면 컷"인 선택 입력이라 `datasets`에만 싣고 AND에서는 뺀다.
+  `manifest`도 마찬가지로 버전 표시용 부가 정보라 `datasets`에만 싣고 AND에서는 뺀다(A4) —
+  없어도 `/api/*` 응답 자체는 정상이고 `X-Dataset-Version` 헤더만 생략된다
 - `demo_read_only`: `DEMO_READ_ONLY` 환경변수 상태 — FE가 읽기 전용 배너·버튼 잠금을 서버 설정과
   맞추는 데 쓴다
 - 기존 키 `ok`·`data_loaded`는 형태·의미 그대로다 — `datasets`·`demo_read_only`가 추가되었다
@@ -605,8 +699,10 @@ LLM 호출이 실패하거나 애초에 호출하지 않은 카드도 **똑같�
 | `merchants.json` | §1 `merchants` 배열 (지오코딩·주소 포함) | BE(candidates, 위젯) |
 | `risk_signal.json` | `[{"sigungu": "정선군", "under2y_ratio": 0.1507}]` | BE(카드 생성 AI 입력 ⑥, `GET /api/risk-signal`), FE mock |
 | `sensitivity.json` | `{"combos": 25, "top3_stable_ratio": 0.88, "detail": [...]}` | 발표 슬라이드 |
-| `usage_monthly.json` | 월×지역×업종 원자료 집계 (재계산·검증용) | pipeline, simulate, **FE 지역 드릴다운(정적 import)** |
+| `usage_monthly.json` | 월×지역×업종 원자료 집계 (재계산·검증용) — `k<5` 셀 건수는 P10이 `null`로 억제, `privacy_meta` 동반 | pipeline, simulate, **FE 지역 드릴다운(정적 import)** |
 | `usage_daily.json` | 일·요일 축 집계 — 요일×표시6분류(지역별+전체) 누적, 지역별 일 총건수 시계열 | **FE 지역 드릴다운 요일 섹션(정적 import)**, BE(카드 생성 AI 입력 ⑧) |
+| `cell_load.json` | (지역×표시업종) 셀별 가맹점 이용 부하 지수 — 최근 3개월 평균 월 거래 건수 ÷ 셀 가맹점 수 (건수 기반 추정치, k=5 미만 셀은 억제) | **FE 셀 탐색 시뮬레이터(정적 import)**, pipeline(A3 억제 검증 입력) |
+| `manifest.json` | 산출 JSON 전체(자기 자신 제외)의 sha256·바이트 수 + `dataset_version`(`<base_month>.<해시8자리>`) — 파이프라인을 다시 돌리면 `generated_at`·해시가 바뀌어 매번 값이 갱신된다 | BE(모든 `/api/*` 응답의 `X-Dataset-Version` 헤더), FE(Task C1 출처 칩) |
 
 - `risk_signal.json` 표시 주의: 실측 4개 시군이 **14.6~15.1%로 최대 편차 0.5%p**라 지역 간 비교
   근거가 못 된다. 화면에 노출할 때 **'위험' 라벨·경고색·순위 정렬을 쓰지 않고**
@@ -616,11 +712,43 @@ LLM 호출이 실패하거나 애초에 호출하지 않은 카드도 **똑같�
   드릴다운(업종 구성·월별 추이·상위 업종)에 쓴다 — 분기 배치 산출물이라 양 모드 데이터가 동일하다.
   표시 6분류 롤업은 `pipeline/category_map.py`의 `HIGHONE_TO_DISPLAY`가 정본이며
   `frontend/src/lib/regionAnalysis.ts`가 이를 복제한다(파이프라인 변경 시 함께 수정).
+- `usage_monthly.json`의 소표본 억제: `pipeline/p10_privacy.py`(P10, `run_all.py` STEPS 마지막
+  단계)가 발행 직전 `merchants.json` 기준 (지역×표시업종) 가맹점 수 `n<5`인 셀을 찾아
+  `usage.*[eup]`을 `null`로 바꾼다(2026-08-10 기준 실측 대상: 영월군 카페·영월군 편의점).
+  `usage_monthly.json`·`dashboard.json` 최상위에 `privacy_meta`가 함께 실린다 — 상세 규칙은 §1
+  `privacy_meta` 문단 참고. `null` 셀을 순회·합산하는 소비 코드(BE `simulate.py`)는 `or 0` 가드로
+  건너뛰어야 한다(정적 스코어링·진단은 P10 이전 단계에서 이미 원값으로 끝나 영향 없음).
+  **`simulate.py`의 라이브 재계산 보정(2026-08-10 A3 후속 개정)**: 초판에서는 `GET .../simulate`가
+  요청마다 `usage_monthly.json` 셀 합산으로 6지역 분포를 즉석 계산해, 억제된 셀이 있는 지역의
+  총량이 실제보다 최대 −21% 낮게 잡히고(영월군 실측) 타깃이 억제 셀 자체면 `expected_monthly_count`가
+  진짜 0으로 나오는 문제가 있었다. 지금은 (1) 6지역 분포를 `dashboard.json`의 `monthly_by_region`
+  (억제 영향 없는 정본, 반올림 오차만 ±50)에서 우선 가져오고 usage 셀 합산은 폴백으로만 쓰며,
+  (2) 타깃이 억제 셀 자체면 계산 대신 `400`을 낸다 — §2 `simulate` 응답 문단·동작 규칙 표(§8) 참고.
+  **남는 한계**: `dashboard.json`의 `monthly_by_region`도 100단위 반올림이라 `current_index`는
+  억제 전 원값과 최대 ±50건(→ 지수로는 통상 0.1%p 미만) 오차가 있을 수 있다 — 화면에는 이미
+  소수 1자리·"가정 기반 전망" 문구가 함께 나가므로 별도 배지는 추가하지 않는다.
 - `usage_daily.json`도 같은 이유로 **BE 엔드포인트 없이** FE 정적 import(드릴다운 "요일·일별
   패턴" 섹션). 요일 축은 파이프라인이 표시 6분류로 **사전 롤업**해 싣는다(월 원장의 18종 유지와
   다름 — 소비처가 전부 6분류 단위). BE는 카드 생성 AI 입력 ⑧(타깃 요일 패턴, 참고용)에만 읽고
   파일이 없으면 해당 입력을 생략한다. 상세 스키마·결정 배경은
   `docs/superpowers/specs/2026-08-08-daily-weekday-analysis-design.md`.
+- `cell_load.json`은 **BE 엔드포인트 없이** FE가 mock 사본을 정적 import 해 셀 탐색 시뮬레이터
+  (Task C2)에 쓴다 — mock/실API 모드 모두 동일 파일. `pipeline/p9_cell_load.py`(P9) 산출이며,
+  원본 CSV에 금액 컬럼이 없어 금액 기반 한도 소진율 대신 **건수 기반 추정치**를 쓴다: 부하 지수 =
+  최근 3개월(`window_months`) 평균 월 거래 건수 ÷ 셀 가맹점 수. `thresholds.high`/`thresholds.low`는
+  억제되지 않은 셀의 `load_index` 상·하위 사분위수이며 `cells[].tier`(`high`/`mid`/`low`)를 가른다.
+  가맹점 5곳 미만(`k_anonymity`) 셀은 `suppressed: true`이고 `monthly_uses_avg`·`load_index`가
+  `null`, `tier`는 `"suppressed"`다(k-익명성 보호 — Task A3가 검증). **화면에 노출할 때는 절대 규칙 7
+  에 따라 모든 화면에 `추정치` 배지와 산식 툴팁을 함께 표기해야 한다.**
+- `manifest.json`은 `run_all.py`가 STEPS 전체가 끝난 뒤(P10 프라이버시 억제가 `usage_monthly.json`·
+  `dashboard.json`을 마지막에 제자리 수정하므로, 그 이후에 떠야 해시가 최종 산출과 일치한다)
+  `data/processed/*.json`(자기 자신 제외)을 훑어 파일별 sha256·바이트 수를 기록하고, 그 해시들을
+  이어붙여 다시 sha256 한 값의 앞 8자리를 `base_month`(=`usage_monthly.json`의 `base_month`)에
+  붙여 `dataset_version`을 만든다. **BE 엔드포인트 없이** 모든 `/api/*` 응답의 `X-Dataset-Version`
+  헤더(§5)로만 노출되고, FE mock 사본(`frontend/src/mocks/manifest.json`)은 Task C1 출처 칩이
+  정적 import 해 같은 문자열을 표시한다. 원본 데이터가 그대로여도 재실행마다 `generated_at`이
+  바뀌므로, 이 파일에 의존하는 테스트는 특정 해시값이 아니라 `dataset_version`의 형태(접두사
+  `<base_month>.`)만 검증한다.
 
 FE mock 동기화: 레포 루트에서 `./scripts/sync-mocks.sh` — 위 산출 JSON을 `frontend/src/mocks/`로
 복사하고, `candidates.json`은 `GET /api/candidates`와 같은 병합 응답 형태로 생성한다.
@@ -650,6 +778,7 @@ FE mock 동기화: 레포 루트에서 `./scripts/sync-mocks.sh` — 위 산출 
 | generate 시 제안 가능한 신규 후보가 없음 | 가용 후보 0건일 때 두 갈래: ① **승인 대기 EXPANSION 카드가 남아 있으면 최신 pending 카드를 200으로 반환** — 후보 소진의 가장 흔한 원인이 "방금 이 버튼이 만든 pending 카드"라서, 409만 주면 두 번째 클릭에서 대표 AI 기능이 죽은 것처럼 보인다. ② pending도 없이 전부 진행 중이면 `409 {"detail": "제안할 수 있는 신규 후보가 없습니다 (전 후보에 승인 대기 또는 진행 중인 업무가 있음)"}`. LLM 장애가 아니라 정상적인 도메인 신호이므로 규칙 기반 fallback으로 넘기지 않으며, 가용성 판정은 LLM 호출 **전**에 한다. |
 | `simulate`를 INCENTIVE 카드에 호출 | `400 {"detail": "INCENTIVE 카드는 scenarios를 사용합니다"}` — 시뮬레이션은 EXPANSION 전용 |
 | `simulate` 타깃 `eup`이 집계 6개 지역 밖 | `400 {"detail": "집계 대상 지역이 아닙니다: <eup> (대상: 고한읍, 사북읍, 정선군, 태백시, 영월군, 삼척시)"}` — 지역 분포에 더할 자리가 없어 조용히 `delta 0`을 내면 "효과 없음"과 구분되지 않는다 |
+| `simulate` 타깃이 소표본 억제 셀(k=5 미만) 자체 | `400 {"detail": "표본 보호(k=5)로 이 셀의 예상 효과는 산출하지 않습니다: <eup> <category>"}` — 판정은 `usage_monthly.json`의 `privacy_meta.suppressed_cells` 기준(A3 후속) |
 | INCENTIVE 승인 시 `selected_rate` 누락/범위 밖 | `400 {"detail": "selected_rate(3|5|7)가 필요합니다"}`. EXPANSION decision에 온 `selected_rate`는 무시하고, **반려·보류에 실려 온 값도 무시한다**(저장하지 않음 — `selected_rate`는 승인 시점에만 확정). 이 400만은 상태 전이 확인(409) **뒤**에 온다 — pending이 아니라 애초에 결정할 수 없는 카드의 body를 먼저 따질 이유가 없다 |
 | 적격성 미확인 EXPANSION의 최종 단계 요청 | `409 {"detail": ...}` — 다섯 항목 검증 전에는 `적격성 확인`·`가맹 심사`·`추진중`·`완료`로 이동할 수 없다 |
 | 잘못된 상태 전이·동시 요청 | `409 {"detail": ...}` — 예: pending이 아닌 카드에 decision, approved가 아닌 카드에 progress, 같은 이전 상태를 조건으로 한 중복 요청의 패자 |

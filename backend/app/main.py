@@ -28,10 +28,10 @@ if not logging.getLogger().handlers:    # uvicorn·Lambda가 이미 붙인 핸�
     logging.basicConfig(level=LOG_LEVEL)
 logging.getLogger("app").setLevel(LOG_LEVEL)
 
-# health의 data_loaded 판정 대상 — risk_signal은 07 문서 B4 ⑥에서 "없으면 컷"인 선택 입력이라
-# datasets에만 싣고 AND 판정에서는 뺀다.
+# health의 data_loaded 판정 대상 — risk_signal은 07 문서 B4 ⑥에서 "없으면 컷"인 선택 입력이고
+# manifest는 X-Dataset-Version 헤더용 부가 정보(A4)라, 둘 다 datasets에만 싣고 AND 판정에서는 뺀다.
 REQUIRED_DATASETS = ("dashboard", "eup_scores", "candidates", "merchants")
-OPTIONAL_DATASETS = ("risk_signal",)
+OPTIONAL_DATASETS = ("risk_signal", "manifest")
 
 app = FastAPI(title="상생 나침반 API")
 # 미들웨어 순서 주의: Starlette는 **나중에 add한 것이 바깥**이다. CORS가 바깥이어야
@@ -42,6 +42,7 @@ app.add_middleware(
     allow_origins=ALLOWED_ORIGINS,
     allow_methods=["GET", "POST", "OPTIONS"],
     allow_headers=["Authorization", "Content-Type", "X-Request-ID"],
+    expose_headers=["X-Dataset-Version"],   # 없으면 브라우저 JS가 이 헤더를 못 읽는다 (05 §5)
 )
 
 
@@ -53,6 +54,25 @@ async def disable_api_cache(request: Request, call_next):
         response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
         response.headers["Pragma"] = "no-cache"
         response.headers["Expires"] = "0"
+    return response
+
+
+@app.middleware("http")
+async def dataset_version_header(request: Request, call_next):
+    """모든 /api/* 응답에 X-Dataset-Version을 실어 화면이 어느 데이터셋으로 만들어졌는지 보여준다
+    (05 §5, A4 — Task C1 출처 칩이 이 값을 화면에 표시한다).
+
+    manifest.json이 없거나(구 데이터 환경) 손상됐을 때도 응답 자체는 정상 200이어야 하므로,
+    health()가 같은 dataload.load() 호출에 대해 잡는 예외 범위(FileNotFoundError·JSONDecodeError)를
+    그대로 따르고, manifest는 있지만 dataset_version 키가 없는 기형 파일까지 대비해 KeyError도 잡는다.
+    """
+    from app import dataload
+    response = await call_next(request)
+    if request.url.path.startswith("/api/"):
+        try:
+            response.headers["X-Dataset-Version"] = dataload.load("manifest")["dataset_version"]
+        except (FileNotFoundError, json.JSONDecodeError, KeyError):
+            pass  # manifest 미생성·손상 환경에서도 응답은 정상
     return response
 
 

@@ -1,6 +1,6 @@
 import { Icon } from "@/components/Icon";
 import { NARRATIVE_SOURCE_TEXT, type NarrativeSourceKind } from "@/lib/aiSource";
-import { ASSUMPTION_NOTE } from "@/lib/constants";
+import { ASSUMPTION_NOTE, PRIVACY_NOTE } from "@/lib/constants";
 
 /**
  * 고지 배지 (docs/plan/13 §9 — 절대 규칙 2·3의 화면 구현).
@@ -39,6 +39,43 @@ export function AssumptionBadge() {
     >
       <Icon name="info" size={12} strokeWidth={2} />
       가정 기반 전망
+    </span>
+  );
+}
+
+/**
+ * `추정치` — 실측이 아니라 산식으로 만들어 낸 지표에 붙인다 (절대 규칙 7).
+ * 지금 대상은 "가맹점 이용 부하"다: 원본에 금액 컬럼이 없어 한도 소진율 대신 건수로 나눈 값이라,
+ * 값이 보이는 자리마다 배지 + **산식 툴팁**(note)을 함께 둔다. note는 요약 없이 그대로 넣는다.
+ */
+export function EstimateBadge({ note }: { note: string }) {
+  return (
+    <span
+      className={`${base} bg-state-notice-bg text-state-notice ring-state-notice-line`}
+      title={note}
+    >
+      <Icon name="info" size={12} strokeWidth={2} />
+      추정치
+    </span>
+  );
+}
+
+/**
+ * `소표본 보호 · k=5` — 가맹점 k곳 미만인 (지역×업종) 셀의 건수를 비공개 처리한 화면에 붙인다.
+ *
+ * 위 세 배지(근사 지표·가정 기반 전망·추정치)와 **다른 축의 고지**다: 저 셋은 "이 숫자를 곧이곧대로
+ * 읽지 마라"는 경고라 주의색 + ⓘ 아이콘으로 묶여 있는데, 이건 "값을 일부러 감췄고 그 이유가 있다"는
+ * 설계 고지다. 주의색을 같이 쓰면 세 배지의 무게가 희석되므로 중립 톤 + 방패 아이콘으로 가른다.
+ * `note`는 privacy_meta.note를 그대로 넘긴다 — 없으면 같은 문구인 PRIVACY_NOTE로 떨어진다.
+ */
+export function PrivacyBadge({ note, k = 5 }: { note?: string; k?: number }) {
+  return (
+    <span
+      className={`${base} bg-admin-surface-sunken text-admin-text-muted ring-admin-border`}
+      title={note ?? PRIVACY_NOTE}
+    >
+      <Icon name="shield" size={12} strokeWidth={2} />
+      소표본 보호 · k={k}
     </span>
   );
 }
@@ -128,7 +165,7 @@ export function GradeChip({ grade }: { grade: string }) {
 export function NarrativeSourceChip({ kind }: { kind: NarrativeSourceKind | null }) {
   if (!kind) return null;
   const { label, note } = NARRATIVE_SOURCE_TEXT[kind];
-  const byAi = kind === "ai" || kind === "ai_partial";
+  const byAi = kind === "ai" || kind === "ai_partial" || kind === "ai_unverified";
   const tone = byAi
     ? "bg-admin-primary-soft text-admin-primary ring-admin-primary-line"
     : "bg-admin-surface-sunken text-admin-text-muted ring-admin-border";

@@ -39,6 +39,55 @@ def test_simulation_rejects_empty_merchant_denominator():
         simulate.expected_monthly_count(_usage(), [], "영월군", "카페")
 
 
+def test_simulate_expansion_rejects_suppressed_target():
+    """A3 후속: 타깃이 privacy_meta.suppressed_cells에 있으면 거짓 0 대신 ValueError."""
+    usage = _usage()
+    usage["privacy_meta"] = {"k": 5, "suppressed_cells": [{"eup": "영월군", "category": "카페"}]}
+    merchants = [{"eup": "영월군", "category": "카페"}]
+    with pytest.raises(ValueError, match="표본 보호"):
+        simulate.simulate_expansion(usage, merchants, "영월군", "카페")
+
+
+def test_simulate_dist_uses_dashboard_region_totals_when_available():
+    """A3 후속: usage_monthly의 억제(null→0 가드)로 영월군 usage 합산이 실제보다 낮게 잡히므로,
+    dashboard.monthly_by_region(억제 영향 없는 정본)이 있으면 그 쪽 지역 합계를 우선 쓴다.
+
+    실데이터로 확인 — 값을 하드코딩하지 않고 두 소스(usage 합산 vs dashboard 정본)를 직접
+    비교해 dashboard가 실제로 반영됨을 증명한다(15 문서 §5 T12 폴백 체인·집중도 산식은 그대로).
+    """
+    usage = dataload.load("usage_monthly")
+    merchants = dataload.load("merchants")
+    dashboard = dataload.load("dashboard")
+    base_month = usage["base_month"]
+
+    usage_sum = sum(row.get("영월군") or 0 for row in usage["usage"] if row["month"] == base_month)
+    dash_total = next(r for r in dashboard["monthly_by_region"] if r["month"] == base_month)["영월군"]
+    assert dash_total > usage_sum, "억제로 usage 합산이 저평가되어 있어야 이 검증이 의미 있다"
+
+    without_dashboard = simulate.simulate_expansion(usage, merchants, "영월군", "음식점")
+    with_dashboard = simulate.simulate_expansion(usage, merchants, "영월군", "음식점", dashboard=dashboard)
+
+    assert with_dashboard["current_index"] != without_dashboard["current_index"]
+    # dashboard 쪽 영월군 총량이 더 크므로(usage 합산보다 활발) 영월군의 상대적 "쏠림 결핍"이
+    # 줄어 집중도 지수는 더 낮게(=덜 쏠린 것으로) 나와야 한다.
+    assert with_dashboard["current_index"] < without_dashboard["current_index"]
+
+
+def test_simulate_falls_back_to_usage_sum_when_dashboard_incomplete():
+    """dashboard.json에 기준월 행이 없거나 지역 키가 빠져 있으면 usage 셀 합산으로 폴백한다."""
+    usage = _usage()
+    merchants = [{"eup": "영월군", "category": "카페"}]
+    fallback_only = simulate.simulate_expansion(usage, merchants, "영월군", "카페")
+
+    no_month_row = {"monthly_by_region": [{"month": "2024-12", **dict.fromkeys(simulate.REGIONS, 1)}]}
+    missing_region_key = {"monthly_by_region": [
+        {"month": "2025-03", **{r: 1 for r in simulate.REGIONS if r != "영월군"}}
+    ]}
+    for dashboard in (None, {}, {"monthly_by_region": []}, no_month_row, missing_region_key):
+        result = simulate.simulate_expansion(usage, merchants, "영월군", "카페", dashboard=dashboard)
+        assert result["current_index"] == fallback_only["current_index"], dashboard
+
+
 def test_llm_clients_disable_sdk_internal_retries(monkeypatch):
     """llm.py의 지연 예산(timeout × attempts)은 SDK 내부 재시도가 꺼져 있어야 성립한다.
 

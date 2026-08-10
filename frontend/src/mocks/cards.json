@@ -29,12 +29,18 @@
           "영업 상태·가맹 자격·관광객 이용 적합성은 승인 전 별도 확인 필요"
         ],
         "expected_effect": "영월군 음식점 후보의 가맹 전환 효과는 카드 상세의 반사실 시뮬레이션과 사업자 적격성 확인 후 판단해야 합니다 (가정 기반 전망이며 실제와 다를 수 있음)",
+        "dissent": [
+          "기준월(2025-12) 이후 소비 패턴이 변했다면 근거 수치가 현재와 다를 가능성이 있습니다.",
+          "가맹점 이용 부하는 건수 기반 추정치라 실제 매출·수요 여력과 다를 가능성이 있습니다.",
+          "계절성(겨울 성수기 등)에 따라 제안 시점과 실행 시점의 수요가 다를 가능성이 있습니다."
+        ],
         "grounding": {
           "status": "verified",
           "numeric_status": "verified",
           "narrative_status": "rule_based",
           "selection_method": "deterministic_highest_available_score",
           "explanation_source": "rule_seed",
+          "dissent_source": "rule_based",
           "source": "structured",
           "checks": [
             "target",
@@ -166,12 +172,18 @@
           "영업 상태·가맹 자격·관광객 이용 적합성은 승인 전 별도 확인 필요"
         ],
         "expected_effect": "영월군 소매점 후보의 가맹 전환 효과는 카드 상세의 반사실 시뮬레이션과 사업자 적격성 확인 후 판단해야 합니다 (가정 기반 전망이며 실제와 다를 수 있음)",
+        "dissent": [
+          "기준월(2025-12) 이후 소비 패턴이 변했다면 근거 수치가 현재와 다를 가능성이 있습니다.",
+          "가맹점 이용 부하는 건수 기반 추정치라 실제 매출·수요 여력과 다를 가능성이 있습니다.",
+          "계절성(겨울 성수기 등)에 따라 제안 시점과 실행 시점의 수요가 다를 가능성이 있습니다."
+        ],
         "grounding": {
           "status": "verified",
           "numeric_status": "verified",
           "narrative_status": "rule_based",
           "selection_method": "deterministic_highest_available_score",
           "explanation_source": "rule_seed",
+          "dissent_source": "rule_based",
           "source": "structured",
           "checks": [
             "target",
@@ -290,12 +302,18 @@
           "실제 자동 지급 시스템 연동은 미구현(로드맵)"
         ],
         "expected_effect": "5% 적용 시 지역 전환율 약 1.0~2.0%p 개선 예상 (가정 기반 전망이며 실제와 다를 수 있음)",
+        "dissent": [
+          "전 지역 공통 페이백이라 지역별 소비 여건 차이를 반영하지 못할 가능성이 있습니다.",
+          "페이백률-전환율 관계는 실측 없는 팀 설정 가정이라 실제 효과가 다를 가능성이 있습니다.",
+          "지역 전환율은 근사 지표라 개선 폭이 금액 기준 성과와 다를 가능성이 있습니다."
+        ],
         "grounding": {
           "status": "partial",
           "numeric_status": "fixed_by_server",
           "narrative_status": "rule_based",
           "selection_method": "fixed_scenarios_3_5_7",
           "explanation_source": "rule_seed",
+          "dissent_source": "rule_based",
           "source": "structured",
           "checks": [
             "scenarios",
@@ -369,6 +387,11 @@
         ],
         "adjusted": true,
         "expected_effect": "삼척시 편의점 후보의 가맹 전환 효과는 카드 상세의 반사실 시뮬레이션과 사업자 적격성 확인 후 판단해야 합니다 (가정 기반 전망이며 실제와 다를 수 있음)",
+        "dissent": [
+          "기준월(2025-12) 이후 소비 패턴이 변했다면 근거 수치가 현재와 다를 가능성이 있습니다.",
+          "가맹점 이용 부하는 건수 기반 추정치라 실제 매출·수요 여력과 다를 가능성이 있습니다.",
+          "계절성(겨울 성수기 등)에 따라 제안 시점과 실행 시점의 수요가 다를 가능성이 있습니다."
+        ],
         "original_ranking": [
           {
             "rank": 1,
@@ -408,6 +431,7 @@
           ],
           "selection_method": "deterministic_highest_available_score",
           "explanation_source": "rule_seed",
+          "dissent_source": "rule_based",
           "source": "structured",
           "status": "verified"
         },
@@ -529,6 +553,11 @@
         ],
         "adjusted": true,
         "expected_effect": "삼척시 카페 후보의 가맹 전환 효과는 카드 상세의 반사실 시뮬레이션과 사업자 적격성 확인 후 판단해야 합니다 (가정 기반 전망이며 실제와 다를 수 있음)",
+        "dissent": [
+          "기준월(2025-12) 이후 소비 패턴이 변했다면 근거 수치가 현재와 다를 가능성이 있습니다.",
+          "가맹점 이용 부하는 건수 기반 추정치라 실제 매출·수요 여력과 다를 가능성이 있습니다.",
+          "계절성(겨울 성수기 등)에 따라 제안 시점과 실행 시점의 수요가 다를 가능성이 있습니다."
+        ],
         "original_ranking": [
           {
             "rank": 1,
@@ -568,6 +597,7 @@
           ],
           "selection_method": "deterministic_highest_available_score",
           "explanation_source": "rule_seed",
+          "dissent_source": "rule_based",
           "source": "structured",
           "status": "verified"
         },

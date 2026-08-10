@@ -80,10 +80,11 @@ EXPANSION_SOURCES = ["하이원포인트 사용현황", "가맹점 상세정보"
 SCENARIO_RATES = [3, 5, 7]
 MANDATORY_INCENTIVE_RISKS = ["예산", "약관", "미구현"]
 KST_OFFSET = "+09:00"                                       # 05 §8 시각 표기 — 모든 타임스탬프 KST
-# health의 산출물별 보고 대상 (05 §6 산출 JSON). risk_signal은 07 B4 ⑥ "없으면 컷"인 선택 입력이라
-# data_loaded(필수 AND) 판정에서 빠진다.
+# health의 산출물별 보고 대상 (05 §6 산출 JSON). risk_signal·manifest는 선택 입력이라
+# data_loaded(필수 AND) 판정에서 빠진다 (risk_signal=07 B4 ⑥ "없으면 컷", manifest=A4 버전 부가 정보).
 REQUIRED_DATASETS = ["dashboard", "eup_scores", "candidates", "merchants"]
-OPTIONAL_DATASET = "risk_signal"
+OPTIONAL_DATASET = "risk_signal"               # 개별 결손 시나리오 테스트용 대표값
+OPTIONAL_DATASETS_ALL = {OPTIONAL_DATASET, "manifest"}   # health()가 실제로 순회하는 선택 산출물 전체
 
 # ── LLM 목업 응답 (실호출 금지) ──
 FAKE_COMPARISON = "목업 비교문 — 1순위와 2순위를 비교한 문장입니다."
@@ -95,6 +96,7 @@ FAKE_AI = {
     "risks": ["목업 리스크 1"],
     "expected_effect": "목업 예상 효과",      # 고정 문구 없음 — 서버가 붙이는지 확인용
     "confidence": "상",
+    "dissent": ["반대1 가능성", "반대2 가능성", "반대3 가능성"],
 }
 FAKE_NARRATIVE = "목업 서술입니다. 가정에 기반한 예상 수치입니다."
 # 위젯 blurb 목업은 두지 않는다 — 위젯은 LLM을 호출하지 않고 routes/widget.py `_fallback_blurb`의
@@ -193,7 +195,7 @@ def test_health_reports_dataset_breakdown():
     body = res.json()
 
     assert body["ok"] is True and body["data_loaded"] is True
-    assert set(body["datasets"]) == set(REQUIRED_DATASETS) | {OPTIONAL_DATASET}
+    assert set(body["datasets"]) == set(REQUIRED_DATASETS) | OPTIONAL_DATASETS_ALL
     assert all(v is True for v in body["datasets"].values())    # 커밋된 data/processed 기준
 
 
@@ -228,7 +230,7 @@ def test_dashboard_returns_real_data():
     assert isinstance(conv["headline_rate"], (int, float)) and conv["headline_rate"] > 0
     assert conv["is_proxy"] is True                     # 절대 규칙 2 — 근사 지표 배지의 근거
     assert "입장 연인원" in conv["proxy_note"]           # 05 §1 — 배지만으로 못 막는 오인 차단 문구
-    assert "28.5%" in conv["proxy_note"]                # 금액 기준 공식 비율과 다른 지표임을 고지
+    assert "29.4%" in conv["proxy_note"]                # 금액 기준 공식 비율과 다른 지표임을 고지
     assert conv["monthly"] and all(
         {"month", "local_uses", "visitors", "rate"} <= set(m) for m in conv["monthly"])
 
@@ -357,11 +359,15 @@ def test_generate_hands_target_weekday_pattern_to_the_llm(monkeypatch):
 
     시드 상태의 확정 타깃(영월군 숙박업)은 하이원 실적 0인 공백 업종이라 읍 전 업종
     패턴 폴백이 **기본 경로**다 — 폴백 사실이 집계_대상 라벨에 명시되는지까지 본다.
+
+    읍 전 업종 합계는 업종 셀이 아니라 `daily_total`(지역 총합)에서 나와야 한다 — 소표본
+    억제(P10)로 영월군 카페·편의점 셀이 None이라, 셀을 더하면 읍 합계가 17% 낮아진다.
     """
     captured = {}
 
     def spy(system, user, schema, schema_name="result", timeout=None, attempts=2):
-        captured["payload"] = json.loads(user)
+        # B2: user 메시지가 <data>...</data>로 감싸이므로 안쪽 JSON만 파싱한다.
+        captured["payload"] = json.loads(user.split("<data>", 1)[1].rsplit("</data>", 1)[0])
         return dict(FAKE_AI)
 
     monkeypatch.setattr(llm, "generate_json", spy)
@@ -371,8 +377,12 @@ def test_generate_hands_target_weekday_pattern_to_the_llm(monkeypatch):
     daily = dataload.load("usage_daily")
     by_cat = daily["weekday_category"]["영월군"]
     assert sum(by_cat["숙박업"]) == 0 and "전 업종" in signal["집계_대상"]   # 폴백 경로가 기본
+    assert by_cat["편의점"] is None                                      # 억제 셀이 실제로 비어 있다
+    totals = cardgen.eup_weekday_totals(daily, "영월군", by_cat)
+    open_cells = [sum(c[i] for c in by_cat.values() if isinstance(c, list)) for i in range(7)]
+    assert sum(totals) > sum(open_cells)                                 # 억제분이 빠지지 않았다
     expected = {
-        label: round(sum(c[i] for c in by_cat.values()) / daily["weekday_days"][i], 1)
+        label: round(totals[i] / daily["weekday_days"][i], 1)
         for i, label in enumerate(daily["weekday_labels"])
     }
     assert signal["요일별_하루평균_건수"] == expected                     # 입력에 없는 수치를 만들지 않는다
@@ -384,7 +394,8 @@ def test_generate_survives_missing_usage_daily(monkeypatch):
     captured = {}
 
     def spy(system, user, schema, schema_name="result", timeout=None, attempts=2):
-        captured["payload"] = json.loads(user)
+        # B2: user 메시지가 <data>...</data>로 감싸이므로 안쪽 JSON만 파싱한다.
+        captured["payload"] = json.loads(user.split("<data>", 1)[1].rsplit("</data>", 1)[0])
         return dict(FAKE_AI)
 
     monkeypatch.setattr(llm, "generate_json", spy)
@@ -532,6 +543,66 @@ def test_generate_incentive_builds_scenarios(fake_llm):
     assert card["ai"]["adjusted"] is False and card["ai"]["original_ranking"] is None
     for keyword in MANDATORY_INCENTIVE_RISKS:               # A-3 필수 리스크 3종 보충
         assert any(keyword in r for r in card["ai"]["risks"]), keyword
+
+
+# ── 3b. dissent(반대 의견) — 기존 카드 생성 호출의 CARD_AI_SCHEMA 확장 (B1) ──────────────
+
+
+def test_card_carries_three_dissent_points(fake_llm):
+    """LLM이 문자열 3개를 그대로 주면 그대로 채택하고 출처를 'llm'으로 남긴다."""
+    card = _generate("EXPANSION").json()["card"]
+    assert card["ai"]["dissent"] == FAKE_AI["dissent"]
+    assert len(card["ai"]["dissent"]) == 3
+    assert card["ai"]["grounding"]["dissent_source"] == "llm"
+
+
+def test_dissent_falls_back_when_llm_is_down(monkeypatch):
+    """LLM 호출 자체가 실패하면 dissent도 고정 규칙 문구로 대체된다 (explanation_source와 같은 결)."""
+    _break_llm(monkeypatch)
+    card = _generate("EXPANSION").json()["card"]
+    assert card["ai"]["dissent"] == list(cardgen.DISSENT_FALLBACK)
+    assert card["ai"]["grounding"]["dissent_source"] == "rule_fallback"
+
+
+def test_dissent_falls_back_when_llm_returns_wrong_shape(monkeypatch):
+    """LLM 호출은 성공했지만 dissent가 문자열 3개가 아니면(개수 부족·빈 문자열) 규칙 문구로 대체된다.
+
+    explanation_source 자체는 'llm'로 남는다 — 실패한 것은 dissent 필드의 내용 가드뿐이다.
+    """
+    def spy(system, user, schema, schema_name="result", timeout=None, attempts=2):
+        return {**FAKE_AI, "dissent": ["딱 하나뿐인 반대 의견"]}
+
+    monkeypatch.setattr(llm, "generate_json", spy)
+    card = _generate("EXPANSION").json()["card"]
+    assert card["ai"]["dissent"] == list(cardgen.DISSENT_FALLBACK)
+    assert card["ai"]["grounding"]["dissent_source"] == "rule_fallback"
+    assert card["ai"]["grounding"]["explanation_source"] == "llm"      # 본문 설명은 LLM 응답을 그대로 채택
+
+    def spy_blank(system, user, schema, schema_name="result", timeout=None, attempts=2):
+        return {**FAKE_AI, "dissent": ["", "  ", "정상 문장"]}
+
+    monkeypatch.setattr(llm, "generate_json", spy_blank)
+    card = _generate("EXPANSION").json()["card"]
+    assert card["ai"]["dissent"] == list(cardgen.DISSENT_FALLBACK)
+    assert card["ai"]["grounding"]["dissent_source"] == "rule_fallback"
+
+
+def test_incentive_card_has_rule_based_dissent(fake_llm):
+    """INCENTIVE는 시나리오가 서버 고정값이라 dissent도 LLM에 맡기지 않고 항상 규칙 기반이다."""
+    assert client.post("/api/cards/INC-001/decision", json={"decision": "rejected"}).status_code == 200
+    card = _generate("INCENTIVE").json()["card"]
+    assert card["ai"]["dissent"] == list(cardgen.INCENTIVE_DISSENT)
+    assert len(card["ai"]["dissent"]) == 3
+    assert card["ai"]["grounding"]["dissent_source"] == "rule_based"
+
+
+def test_demo_seed_cards_carry_rule_based_dissent():
+    """시드 3장도 dissent를 갖추고 있어야 mock 패리티·C3 섹션이 첫 화면부터 보인다."""
+    for cid in ("AC-001", "AC-002", "INC-001"):
+        card = client.get(f"/api/cards/{cid}").json()["card"]
+        assert len(card["ai"]["dissent"]) == 3
+        assert all(isinstance(d, str) and d.strip() for d in card["ai"]["dissent"])
+        assert card["ai"]["grounding"]["dissent_source"] == "rule_based"
 
 
 def test_expansion_card_admits_the_explanation_is_rule_based_when_llm_fails(monkeypatch):
@@ -876,7 +947,8 @@ def test_simulate_does_not_hand_indices_to_the_llm(monkeypatch):
     captured = {}
 
     def spy(system, user, schema, schema_name="result", timeout=None, attempts=2):
-        captured["payload"] = json.loads(user)
+        # B2: user 메시지가 <data>...</data>로 감싸이므로 안쪽 JSON만 파싱한다.
+        captured["payload"] = json.loads(user.split("<data>", 1)[1].rsplit("</data>", 1)[0])
         return {"narrative": FAKE_NARRATIVE}
 
     monkeypatch.setattr(llm, "generate_json", spy)
@@ -890,12 +962,29 @@ def test_simulate_does_not_hand_indices_to_the_llm(monkeypatch):
     assert str(sim["projected_index"]) not in serialized
 
 
-def test_simulate_reports_no_change_without_claiming_a_direction(fake_llm):
+def test_simulate_reports_no_change_without_claiming_a_direction(fake_llm, monkeypatch):
     """변화가 없는 구간(delta [0.0, 0.0])은 방향을 붙이지 않고 LLM에도 맡기지 않는다.
 
-    시드 카드 AC-001의 타깃(영월군 음식점)은 소수점 첫째 자리에서 변화가 없다.
-    부호로만 판정하면 "약 0.0~0.0%p 상승(집중 심화)"처럼 없는 변화를 단정하게 된다.
+    시드 카드 AC-001의 타깃은 영월군 음식점. "변화 없음" 자체는 실데이터의 우연한 소수점
+    정렬이 아니라 **해당 지역·업종의 과거 사용 이력이 0이라 예상 추가 건수가 0**이라는
+    구조적 조건에서 나와야 하므로, 여기서는 그 조건을 usage_monthly에 직접 구성해 결정론적으로
+    만든다(A3 소표본 억제 도입 이후 실데이터 값이 흔들려 하드코딩 좌표가 깨졌다 — 이 파일
+    상단 원칙대로 실데이터 우연값에 기대지 않는다).
     """
+    real_load = dataload.load
+
+    def _zero_food_history(name):
+        if name != "usage_monthly":
+            return real_load(name)
+        months = ["2025-01", "2025-02", "2025-03"]
+        rows = []
+        for month in months:
+            row = dict.fromkeys(simulate.REGIONS, 50)
+            row["영월군"] = 0    # 타깃(영월군·음식점) 과거 이력 0 → 예상 추가 건수 0 → 지수 불변
+            rows.append({"month": month, "category": "일반음식점업", **row})
+        return {"months": months, "base_month": "2025-03", "usage": rows}
+
+    monkeypatch.setattr(dataload, "load", _zero_food_history)
     sim = client.post("/api/cards/AC-001/simulate").json()["simulation"]
 
     assert sim["delta_pp"] == [0.0, 0.0]                        # 전제: 변화 없는 구간
@@ -911,10 +1000,16 @@ def test_simulate_never_emits_negative_zero():
     """round(-0.001, 1)은 -0.0이라 그대로 실으면 화면에 "-0.0%p"가 찍힌다 (simulate._round_pp)."""
     usage, merchants = dataload.load("usage_monthly"), dataload.load("merchants")
     categories = sorted({m["category"] for m in merchants})
+    # A3 후속: 소표본 억제 타깃은 simulate_expansion이 ValueError로 거부한다 —
+    # 그 경로는 test_simulate_rejects_suppressed_target_cell이 따로 검증하므로 여기선 건너뛴다.
+    suppressed = {(c["eup"], c["category"])
+                  for c in (usage.get("privacy_meta") or {}).get("suppressed_cells", [])}
 
     seen_zero = False
     for eup in simulate.REGIONS:
         for category in categories:
+            if (eup, category) in suppressed:
+                continue
             for value in simulate.simulate_expansion(usage, merchants, eup, category)["delta_pp"]:
                 assert not (value == 0 and math.copysign(1, value) < 0), f"{eup} {category}: -0.0"
                 seen_zero = seen_zero or value == 0
@@ -927,6 +1022,22 @@ def test_simulate_error_paths():
     _put_expansion("AC-910", "서울시", "카페")                                # 집계 6지역 밖 타깃
     res = client.post("/api/cards/AC-910/simulate")
     assert res.status_code == 400 and "집계 대상 지역이 아닙니다" in res.json()["detail"]
+
+
+def test_simulate_rejects_suppressed_target_cell():
+    """A3 후속: 타깃이 소표본 억제 셀(k=5 미만) 자체면 거짓 0 대신 400으로 명시 거부한다.
+
+    판정 근거는 usage_monthly.json의 privacy_meta.suppressed_cells(p10 정본)이며 하드코딩하지
+    않는다 — 억제 대상이 바뀌어도 이 테스트는 그대로 유효하다.
+    """
+    usage = dataload.load("usage_monthly")
+    eup, category = next(
+        (c["eup"], c["category"]) for c in usage["privacy_meta"]["suppressed_cells"])
+    _put_expansion("AC-921", eup, category)
+    res = client.post("/api/cards/AC-921/simulate")
+    assert res.status_code == 400
+    detail = res.json()["detail"]
+    assert "표본 보호" in detail and f"{eup} {category}" in detail
 
 
 # ── 6. KPI ──────────────────────────────────────────────────────────────
@@ -1111,3 +1222,13 @@ def test_llm_rejects_unknown_provider(monkeypatch):
 
     with pytest.raises(llm.LLMError, match="Unsupported LLM_PROVIDER: opena1"):
         REAL_GENERATE_JSON("system", "user", {"type": "object"}, attempts=1)
+
+
+# ── A4: 데이터셋 버전 헤더 ────────────────────────────────────────────────
+
+def test_api_responses_carry_dataset_version_header():
+    """05 §5 — 모든 /api/* 응답에 X-Dataset-Version이 실려 화면이 어느 데이터로 만들어졌는지 드러난다."""
+    res = client.get("/api/dashboard")
+    assert res.status_code == 200
+    version = res.headers.get("X-Dataset-Version")
+    assert version and version.startswith("2025-12."), version

@@ -1,0 +1,43 @@
+{
+  "dataset_version": "2025-12.fdcbd442",
+  "base_month": "2025-12",
+  "generated_at": "2026-08-10T16:45:12+00:00",
+  "files": {
+    "candidates.json": {
+      "sha256": "fe4179a7319f5db959aaaa7945e0e42f8baab15beb6cbe2adea145d06b03b23e",
+      "bytes": 3219
+    },
+    "cell_load.json": {
+      "sha256": "385675829810e9477663450881122fe91dbf2bf879afb6d82e8e86466c2bc1b1",
+      "bytes": 7160
+    },
+    "dashboard.json": {
+      "sha256": "f42fe830e33560d6107bea110cd16e569125b4bed5b5d7c90ef9d82717779af5",
+      "bytes": 8052
+    },
+    "eup_scores.json": {
+      "sha256": "3039a01cda143e9a5c2abc7dcffb62f78c653d2adaf51f14e1afccb90c418848",
+      "bytes": 1053
+    },
+    "merchants.json": {
+      "sha256": "931db80a9dddfa2a67c7386af8ff591809add2d05095b2f8697f2546bacb6d90",
+      "bytes": 330920
+    },
+    "risk_signal.json": {
+      "sha256": "0167757cef99c3b344ca65191ce5ea278ec25688d21d57dd3bb60fe351213e5b",
+      "bytes": 260
+    },
+    "sensitivity.json": {
+      "sha256": "1f5b376ac34a9e7013abba03e0018549994d2fa01a0d2b9af0a7d67fa34816ca",
+      "bytes": 43504
+    },
+    "usage_daily.json": {
+      "sha256": "8c29d48b1cdea726e01e91905c9f7642d8e5e8da453bd88b4bc49bc84d7065b0",
+      "bytes": 136513
+    },
+    "usage_monthly.json": {
+      "sha256": "104b7a9a686d411eb72d9faae696a1013b18c068bb6812664ce5cedbe55f7bc4",
+      "bytes": 47844
+    }
+  }
+}

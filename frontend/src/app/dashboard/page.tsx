@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { AdminShell } from "@/components/AdminShell";
-import { GradeChip, ProxyBadge } from "@/components/Badge";
+import { GradeChip, PrivacyBadge, ProxyBadge } from "@/components/Badge";
 import { Icon } from "@/components/Icon";
 import { KpiCard } from "@/components/KpiCard";
 import { PageHeader } from "@/components/PageHeader";
@@ -100,12 +100,25 @@ export default async function DashboardPage({
   const riskAvg = riskPcts.length ? riskPcts.reduce((a, b) => a + b, 0) / riskPcts.length : 0;
   const stability = d.ranking_stability ?? d.ai_stability;
 
+  // 소표본 보호 고지 — 원장 쪽 값이 정본이고, 구형 산출물에는 아예 없을 수 있어 둘 다 가드한다
+  const privacy = usageLedger.privacy_meta ?? d.privacy_meta ?? null;
+  const privacyK = privacy?.k ?? 5;
+
   // 지역 드릴다운 파생값 — 지역을 선택했을 때만 계산·렌더한다 (원장은 서버에서만 읽는다)
   const ledgerRows = usageLedger.usage ?? [];
   const ledgerMonths = usageLedger.months ?? [];
-  const regionDonut = selectedRegion ? regionCategoryShare(ledgerRows, selectedRegion) : [];
-  const regionTrend = selectedRegion ? regionMonthlyTrend(ledgerRows, ledgerMonths, selectedRegion) : [];
+  const regionDonut = selectedRegion
+    ? regionCategoryShare(ledgerRows, selectedRegion)
+    : { shares: [], suppressed: [] };
+  // 지역 월 합계는 억제 영향이 없는 monthly_by_region을 1순위로 읽는다 — 원장 셀만 더하면
+  // 비공개 셀만큼 비어 실제보다 낮게 그려진다 (regionMonthlyTrend 주석 참고)
+  const regionTrend = selectedRegion
+    ? regionMonthlyTrend(ledgerRows, ledgerMonths, selectedRegion, d.monthly_by_region ?? [])
+    : { points: [], basis: "ledger" as const };
   const regionShifts = selectedRegion ? topCategoryShifts(ledgerRows, ledgerMonths, selectedRegion) : [];
+  // 비공개 업종 목록 — 도넛·추이·상세 표 세 곳이 같은 문장을 쓰도록 여기서 한 번만 만든다
+  const hiddenLabel = regionDonut.suppressed.join(" · ");
+  const hasHidden = regionDonut.suppressed.length > 0;
   // 라벨과 계산이 같은 창 정의를 쓰도록 regionAnalysis가 한 곳에서 만든다 (6개월 미만이면 null)
   const shiftWindow = shiftWindowLabel(ledgerMonths);
   // 일·요일 축 (usage_daily — 피드백 ⑦). 관측 집계라 전망 문구·근사 배지 대상이 아니다 (설계 08-08)
@@ -114,6 +127,11 @@ export default async function DashboardPage({
   // 전 지역 기준선 — 지역 리듬이 "다르다"는 말은 비교 대상이 화면에 함께 있어야 성립한다
   const overallWeekday = selectedRegion ? overallWeekdayInsight(usageDaily) : null;
   const categoryWeekdays = selectedRegion ? regionCategoryWeekdays(usageDaily, selectedRegion) : [];
+  // 요일 축은 산출물이 달라(usage_daily) 억제 여부를 따로 읽는다 — 두 파일이 어긋나도 화면은 각자 사실대로 말한다
+  const hiddenWeekdayLabel = categoryWeekdays
+    .filter((r) => r.suppressed)
+    .map((r) => r.category)
+    .join(" · ");
   const dailySeries = selectedRegion ? regionDailySeries(usageDaily, selectedRegion) : [];
   const dailyPeriod = usageDaily.period;
 
@@ -124,7 +142,7 @@ export default async function DashboardPage({
           icon="chart"
           eyebrow="진단"
           title="지역 소비 분석"
-          lede="폐광지역 4개 시군(정선·태백·영월·삼척 도계읍)에서 하이원포인트(강원랜드 방문객이 적립해 지역 가맹점에서 쓰는 포인트) 소비가 어디에 얼마나 몰려 있는지 본다. 이 화면의 값이 확충 제안의 정량 출발점이다."
+          lede="석탄산업전환지역(구 폐광지역) 4개 시군(정선·태백·영월·삼척 도계읍)에서 하이원포인트(강원랜드 방문객이 적립해 지역 가맹점에서 쓰는 포인트) 소비가 어디에 얼마나 몰려 있는지 본다. 이 화면의 값이 확충 제안의 정량 출발점이다."
         >
           <p className="u-note mt-2 flex flex-wrap items-center gap-x-2">
             <Icon name="database" size={13} />
@@ -309,10 +327,22 @@ export default async function DashboardPage({
               <Section
                 icon="scatter"
                 title={`${selectedRegion} 업종 구성`}
+                badge={hasHidden ? <PrivacyBadge note={privacy?.note} k={privacyK} /> : null}
                 desc="전 기간 누적 사용 건수를 표시 6분류로 집계했다."
               >
-                {regionDonut.length ? (
-                  <CategoryDonut data={regionDonut} height={240} />
+                {regionDonut.shares.length ? (
+                  <>
+                    <CategoryDonut data={regionDonut.shares} height={240} />
+                    {/* 억제 업종을 말없이 빼면 "그 업종 소비가 없다"로 읽힌다 — 뺀 사실과 이유를 밝힌다 */}
+                    {hasHidden ? (
+                      <p className="u-note mt-3 border-t border-admin-border pt-2.5">
+                        가맹점 {privacyK}곳 미만인 업종({hiddenLabel})은 개별 사업자가 역산될 수 있어
+                        건수를 비공개 처리했고, 이 도넛과 총 건수에서도 뺐습니다 — 여기 비중은 값이
+                        공개된 {regionDonut.shares.length}개 업종의 합을 100%로 본 값이라 지역 전체
+                        소비와 다릅니다. 지역 전체 규모는 오른쪽 월별 추이에서 보십시오.
+                      </p>
+                    ) : null}
+                  </>
                 ) : (
                   <EmptyChart />
                 )}
@@ -320,10 +350,20 @@ export default async function DashboardPage({
               <Section
                 icon="trend"
                 title={`${selectedRegion} 월별 사용 추이`}
+                badge={hasHidden ? <PrivacyBadge note={privacy?.note} k={privacyK} /> : null}
                 desc="월별 하이원포인트 사용 건수 합계."
               >
-                {regionTrend.some((p) => p.value > 0) ? (
-                  <LineTrend data={regionTrend} unit="건" />
+                {regionTrend.points.some((p) => p.value > 0) ? (
+                  <>
+                    <LineTrend data={regionTrend.points} unit="건" />
+                    {hasHidden ? (
+                      <p className="u-note mt-3 border-t border-admin-border pt-2.5">
+                        {regionTrend.basis === "dashboard"
+                          ? `비공개 셀(${hiddenLabel})을 빼고 더하면 이 지역 합계가 실제보다 낮게 보이므로, 이 추이는 셀 비공개 이전 원값 기준 지역 합계로 그렸습니다. 대신 이 지역의 월 합계만 ${privacy?.aggregate_rounding.unit ?? 100}단위로 반올림해 발행하므로 각 점에 ±${Math.round((privacy?.aggregate_rounding.unit ?? 100) / 2)}건의 표기 오차가 있습니다.`
+                          : `비공개 셀(${hiddenLabel})이 빠져 있어 이 추이는 지역 전체 소비보다 낮습니다 — 값이 공개된 업종만 더한 합계입니다.`}
+                      </p>
+                    ) : null}
+                  </>
                 ) : (
                   <EmptyChart />
                 )}
@@ -332,6 +372,7 @@ export default async function DashboardPage({
             <Section
               icon="report"
               title={`${selectedRegion} 상위 업종 상세`}
+              badge={hasHidden ? <PrivacyBadge note={privacy?.note} k={privacyK} /> : null}
               desc={`누적 사용 건수 상위 업종을 원 업종 분류 그대로 보여준다.${shiftWindow ? ` 증감은 ${shiftWindow}한 값이다.` : ""}`}
             >
               {regionShifts.length ? (
@@ -348,29 +389,49 @@ export default async function DashboardPage({
                         </tr>
                       </thead>
                       <tbody>
-                        {regionShifts.map((s) => (
-                          <tr key={s.category}>
-                            <td className="font-medium">{s.category}</td>
-                            <td className="text-right tabular-nums">{num(s.count)}건</td>
-                            <td className="text-right tabular-nums text-admin-text-muted">
-                              {ratioPct(s.share)}
-                            </td>
-                            <td className="text-right tabular-nums text-admin-text-muted">
-                              {num(s.recent)}건
-                            </td>
-                            <td className="text-right font-semibold tabular-nums">
-                              {s.changePct === null ? (
-                                <span className="font-normal text-admin-text-muted">비교 불가</span>
-                              ) : (
-                                // 0자리 반올림이면 ±0.x%가 "▲0%"로 찍혀 화살표와 크기가 모순된다
-                                signed(s.changePct, "%", 1)
-                              )}
-                            </td>
-                          </tr>
-                        ))}
+                        {regionShifts.map((s) =>
+                          // 억제 업종은 행을 지우지 않는다 — 사라지면 "소비가 없는 업종"으로 읽힌다
+                          s.suppressed ? (
+                            <tr key={s.category}>
+                              <td className="font-medium">{s.category}</td>
+                              <td
+                                colSpan={4}
+                                className="text-right text-admin-text-muted"
+                                title={privacy?.note ?? undefined}
+                              >
+                                표본 보호로 비공개
+                              </td>
+                            </tr>
+                          ) : (
+                            <tr key={s.category}>
+                              <td className="font-medium">{s.category}</td>
+                              <td className="text-right tabular-nums">{num(s.count)}건</td>
+                              <td className="text-right tabular-nums text-admin-text-muted">
+                                {ratioPct(s.share)}
+                              </td>
+                              <td className="text-right tabular-nums text-admin-text-muted">
+                                {num(s.recent)}건
+                              </td>
+                              <td className="text-right font-semibold tabular-nums">
+                                {s.changePct === null ? (
+                                  <span className="font-normal text-admin-text-muted">비교 불가</span>
+                                ) : (
+                                  // 0자리 반올림이면 ±0.x%가 "▲0%"로 찍혀 화살표와 크기가 모순된다
+                                  signed(s.changePct, "%", 1)
+                                )}
+                              </td>
+                            </tr>
+                          ),
+                        )}
                       </tbody>
                     </table>
                   </div>
+                  {hasHidden ? (
+                    <p className="u-note mt-3 border-t border-admin-border pt-2.5">
+                      가맹점 {privacyK}곳 미만인 업종은 개별 사업자가 역산될 수 있어 건수를 비공개
+                      처리했습니다. 지역 내 비중은 값이 공개된 업종의 합을 분모로 계산한 값입니다.
+                    </p>
+                  ) : null}
                   <p className="u-note mt-3 border-t border-admin-border pt-2.5">
                     {USAGE_REGION_FOOTNOTE}
                   </p>
@@ -410,6 +471,14 @@ export default async function DashboardPage({
                       </p>
                     ) : null}
                     <BarRank data={weekdayBars} unit="건" height={236} />
+                    {/* 옆 표의 공개 업종만 더하면 이 막대에 못 미친다 — 두 값이 어긋나 보이지 않게 밝힌다 */}
+                    {hiddenWeekdayLabel ? (
+                      <p className="u-note mt-3 border-t border-admin-border pt-2.5">
+                        이 막대는 지역 일별 집계에서 만든 지역 전체 합계라 비공개 업종
+                        ({hiddenWeekdayLabel})까지 포함합니다 — 오른쪽 업종별 표의 공개 업종을
+                        더한 값보다 큽니다.
+                      </p>
+                    ) : null}
                   </>
                 ) : (
                   <EmptyChart />
@@ -418,6 +487,7 @@ export default async function DashboardPage({
               <Section
                 icon="list"
                 title={`${selectedRegion} 업종별 요일 패턴`}
+                badge={hiddenWeekdayLabel ? <PrivacyBadge note={privacy?.note} k={privacyK} /> : null}
                 desc="표시 6분류별로 사용이 가장 몰리는 요일과 주중·주말 하루 평균을 비교한다."
               >
                 {categoryWeekdays.length ? (
@@ -433,31 +503,52 @@ export default async function DashboardPage({
                         </tr>
                       </thead>
                       <tbody>
-                        {categoryWeekdays.map((row) => (
-                          <tr key={row.category}>
-                            <td className="font-medium">{row.category}</td>
-                            <td className="text-right">{row.maxLabel}</td>
-                            <td className="text-right tabular-nums text-admin-text-muted">
-                              {num(row.weekdayAvg)}건
-                            </td>
-                            <td className="text-right tabular-nums text-admin-text-muted">
-                              {num(row.weekendAvg)}건
-                            </td>
-                            <td className="text-right font-semibold tabular-nums">
-                              {row.weekendVsWeekdayPct === null ? (
-                                <span className="font-normal text-admin-text-muted">비교 불가</span>
-                              ) : (
-                                signed(row.weekendVsWeekdayPct, "%", 1)
-                              )}
-                            </td>
-                          </tr>
-                        ))}
+                        {categoryWeekdays.map((row) =>
+                          // 문구는 위 상위 업종 표와 같은 것을 쓴다 — 같은 셀을 화면마다 달리 부르지 않는다
+                          row.suppressed ? (
+                            <tr key={row.category}>
+                              <td className="font-medium">{row.category}</td>
+                              <td
+                                colSpan={4}
+                                className="text-right text-admin-text-muted"
+                                title={privacy?.note ?? undefined}
+                              >
+                                표본 보호로 비공개
+                              </td>
+                            </tr>
+                          ) : (
+                            <tr key={row.category}>
+                              <td className="font-medium">{row.category}</td>
+                              <td className="text-right">{row.maxLabel}</td>
+                              <td className="text-right tabular-nums text-admin-text-muted">
+                                {num(row.weekdayAvg)}건
+                              </td>
+                              <td className="text-right tabular-nums text-admin-text-muted">
+                                {num(row.weekendAvg)}건
+                              </td>
+                              <td className="text-right font-semibold tabular-nums">
+                                {row.weekendVsWeekdayPct === null ? (
+                                  <span className="font-normal text-admin-text-muted">비교 불가</span>
+                                ) : (
+                                  signed(row.weekendVsWeekdayPct, "%", 1)
+                                )}
+                              </td>
+                            </tr>
+                          ),
+                        )}
                       </tbody>
                     </table>
                   </div>
                 ) : (
                   <EmptyChart />
                 )}
+                {hiddenWeekdayLabel ? (
+                  <p className="u-note mt-3 border-t border-admin-border pt-2.5">
+                    가맹점 {privacyK}곳 미만인 업종({hiddenWeekdayLabel})은 요일 축에서도 건수를
+                    비공개 처리했습니다. 공개 업종 값은 차분으로 되살아나지 않도록{" "}
+                    {privacy?.aggregate_rounding.unit ?? 100} 단위로 반올림해 발행합니다.
+                  </p>
+                ) : null}
               </Section>
             </div>
             <Section
@@ -715,6 +806,37 @@ export default async function DashboardPage({
           <div className="rounded-xl bg-admin-surface-sunken px-3.5 py-3 text-xs leading-5 text-admin-text-muted">
             데이터 기준: <span className="font-semibold text-admin-text">{d.period_note}</span>
           </div>
+          {/* 소표본 보호 — 무엇을 왜 감췄는지 화면이 직접 밝히는 자리. 억제 사실을 숨기면
+              "데이터가 없다"와 구분되지 않아, 개인정보 보호 설계가 결함처럼 읽힌다 */}
+          {privacy ? (
+            <div className="mt-3 rounded-xl border border-admin-border p-3.5">
+              <div className="flex flex-wrap items-center gap-2">
+                <h3 className="u-h3">소표본 보호 · 비공개 처리 내역</h3>
+                <PrivacyBadge note={privacy.note} k={privacy.k} />
+              </div>
+              <p className="u-note mt-2">{privacy.note}</p>
+              {privacy.suppressed_cells.length ? (
+                <ul className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-admin-text-soft">
+                  {privacy.suppressed_cells.map((c) => (
+                    <li key={`${c.eup}-${c.category}`} className="flex items-baseline gap-1.5">
+                      <Icon name="shield" size={12} />
+                      <span>
+                        {c.eup} {c.category} — 건수 비공개
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              ) : (
+                <p className="u-note mt-2">현재 기준월에 비공개 처리된 셀은 없습니다.</p>
+              )}
+              <p className="u-note mt-2">
+                가맹점 {privacy.k}곳 미만인 (지역 × 업종) 칸은 건수를 그대로 내보내면 개별 사업자의
+                매출이 역산될 수 있어 값을 비웁니다. 화면은 이 칸을 0으로 그리지 않고 비공개로
+                표기하며, 영향받는 지역의 합계는 {privacy.aggregate_rounding.unit} 단위로 반올림해
+                발행합니다.
+              </p>
+            </div>
+          ) : null}
         </Section>
       </div>
     </AdminShell>

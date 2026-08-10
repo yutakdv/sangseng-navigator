@@ -17,12 +17,13 @@ from common import PROCESSED_DIR, REGIONS, gini, gini_to_index, grade, hhi_dispe
 # 05 §1 conversion.proxy_note — 배지만으로는 막지 못하는 오인을 본문으로 차단하는 고정 문구.
 # 분모는 "입장객 수"가 아니라 **입장 연인원**이다: 강원랜드 일자별 입장객 API가 하루를 영업 교대
 # (1부/2부/3부)로 나눠 주고 P2가 합산하므로 교대를 넘겨 머문 사람은 중복 계수된다.
-# 우리 값(건수÷연인원 ≈ 연인원 1인당 0.21건)과 강원랜드·언론의 **금액 기준** 지역 사용 비율
-# (2024년 콤프 발생액 1,242.33억 중 지역 354.8억 = 28.5%)은 종류가 다른 지표인데 자릿수가 비슷해
-# 같은 지표의 다른 추정치로 오인된다 — is_proxy 플래그만으로는 그 오인을 막지 못했다.
+# 우리 값(건수÷연인원 ≈ 연인원 1인당 0.21건)과 강원랜드의 **금액 기준** 지역 사용 비율
+# (2024년 지역 사용금액 355억 원, 지역사용률 29.4% — 강원랜드 2024년도 지속가능경영보고서)은
+# 종류가 다른 지표인데 자릿수가 비슷해 같은 지표의 다른 추정치로 오인된다 —
+# is_proxy 플래그만으로는 그 오인을 막지 못했다.
 PROXY_NOTE = (
     "분자=지역 사용 건수, 분모=입장 연인원(교대 합산)으로 단위가 달라 비율이 아닌 근사 지표입니다. "
-    "강원랜드가 공개한 금액 기준 지역 사용 비율(2024년 28.5%)과는 다른 지표입니다."
+    "강원랜드가 공개한 금액 기준 지역 사용 비율(2024년 29.4%)과는 다른 지표입니다."
 )
 
 
@@ -45,6 +46,21 @@ def quarter_rate(months, uses_by_month, visitors):
     if denominator <= 0:
         raise ValueError("분기 입장 연인원 합계가 0 이하입니다")
     return sum(uses_by_month[m] for m in months) / denominator * 100
+
+
+def build_impact_meta(monthly):
+    """지역 전환율 1%p 개선의 연간 효과(건수 기준). 화면 숫자는 전부 이 메타에서 역추적된다."""
+    annual_local = sum(m["local_uses"] for m in monthly)
+    annual_visitors = sum(m["visitors"] for m in monthly)
+    return {
+        "basis": "count",
+        "annual_local_uses": annual_local,
+        "annual_visitors": annual_visitors,
+        "per_pp_additional_uses": round(annual_visitors / 100),
+        "note": ("지역 전환율(근사 지표) 1%p 개선 시 연간 지역 사용 건수 추가분 추정 "
+                 "= 연간 입장 연인원 × 1%. 건수 기준이며 금액 환산은 포함하지 않는다. "
+                 "가정 기반 전망이며 실제와 다를 수 있음."),
+    }
 
 
 def main():
@@ -165,6 +181,7 @@ def main():
         "ranking_stability": ranking_stability,
         "ai_stability": ranking_stability,  # 이전 API 소비자 호환용 별칭
     }
+    out["impact_meta"] = build_impact_meta(conversion_monthly)
 
     path = PROCESSED_DIR / "dashboard.json"
     path.write_text(json.dumps(out, ensure_ascii=False, indent=2), encoding="utf-8")
