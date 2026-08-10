@@ -47,7 +47,11 @@ export function SourceChip({
       </button>
       <span
         role="tooltip"
-        className="invisible absolute left-0 top-full z-30 mt-1 w-64 rounded-lg border border-admin-border bg-admin-surface p-2.5 text-[12px] leading-relaxed text-admin-text-soft opacity-0 shadow-card transition-opacity group-hover:visible group-hover:opacity-100 group-focus-within:visible group-focus-within:opacity-100"
+        // 모바일(기본, <640px)에서는 버튼이 배지 줄 어디에 있든(줄바꿈 위치가 라벨 길이·뷰포트에 따라
+        // 달라진다) 팝오버가 화면 밖으로 나가면 안 되므로, 버튼 기준 절대 위치 대신 뷰포트 기준
+        // `fixed inset-x-3 bottom-3`로 고정한다(TourOverlay 카드와 같은 관용구 — 좌우를 모두 지정하면
+        // 폭이 뷰포트 너비를 절대 넘지 않는다). 640px 이상에서는 원래의 버튼 하단 앵커 방식으로 되돌린다.
+        className="invisible fixed inset-x-3 bottom-3 z-30 max-h-[70vh] overflow-y-auto rounded-lg border border-admin-border bg-admin-surface p-3 text-[12px] leading-relaxed text-admin-text-soft opacity-0 shadow-card-hover transition-opacity group-hover:visible group-hover:opacity-100 group-focus-within:visible group-focus-within:opacity-100 sm:absolute sm:inset-x-auto sm:bottom-auto sm:left-0 sm:top-full sm:mt-1 sm:w-64 sm:max-h-none sm:overflow-visible sm:p-2.5 sm:shadow-card"
       >
         <strong className="block text-admin-text">사용 데이터</strong>
         <ul className="mt-1 list-disc space-y-0.5 pl-4">
