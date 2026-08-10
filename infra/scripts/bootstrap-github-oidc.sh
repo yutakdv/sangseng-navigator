@@ -30,6 +30,24 @@ else
 fi
 
 log_step "2. 배포 역할 ($ROLE_NAME)"
+# ⚠ sub 클레임 형식이 두 가지다. GitHub 이 저장소에 **불변 subject**를 쓰면
+#   repo:<owner>@<ownerId>/<repo>@<repoId>:ref:... 형태로 발급되어 고전 형식과 다르다.
+#   형식이 어긋나면 AssumeRoleWithWebIdentity 가 "Not authorized" 로 거부되고
+#   원인이 로그에 드러나지 않는다. 둘 다 허용하되 **owner·repo·ref 는 그대로 고정**한다
+#   (와일드카드가 아니라 정확한 문자열 2개라 main 브랜치 제한은 유지된다).
+SUBS="repo:${GH_REPO}:ref:refs/heads/main"
+if command -v gh >/dev/null 2>&1; then
+  PREFIX="$(gh api "repos/${GH_REPO}/actions/oidc/customization/sub" --jq '.sub_claim_prefix' 2>/dev/null || true)"
+  if [ -n "$PREFIX" ] && [ "$PREFIX" != "null" ] && [ "$PREFIX" != "repo:${GH_REPO}" ]; then
+    SUBS="$SUBS
+${PREFIX}:ref:refs/heads/main"
+    log_ok "불변 subject 형식 감지: ${PREFIX}"
+  fi
+else
+  log_warn "gh CLI 가 없어 불변 subject 형식을 확인하지 못했습니다 — 인증이 거부되면 이 스크립트를 gh 설치 후 다시 실행하세요."
+fi
+SUB_JSON="$(printf '%s\n' "$SUBS" | sed 's/.*/"&"/' | paste -sd, -)"
+
 TRUST="$(mktemp)"
 cat > "$TRUST" <<JSON
 {
@@ -40,8 +58,10 @@ cat > "$TRUST" <<JSON
     "Action": "sts:AssumeRoleWithWebIdentity",
     "Condition": {
       "StringEquals": {
-        "token.actions.githubusercontent.com:aud": "sts.amazonaws.com",
-        "token.actions.githubusercontent.com:sub": "repo:${GH_REPO}:ref:refs/heads/main"
+        "token.actions.githubusercontent.com:aud": "sts.amazonaws.com"
+      },
+      "StringLike": {
+        "token.actions.githubusercontent.com:sub": [${SUB_JSON}]
       }
     }
   }]
