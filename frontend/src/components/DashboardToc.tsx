@@ -13,8 +13,8 @@ export type TocItem = { id: string; label: string };
  * 존 높이가 화면보다 훨씬 커서(드릴다운 존은 수천 px) 교차 비율 기반 판정이
  * 오히려 불안정하고, "기준선을 지난 마지막 존" 규칙이 결정적이다.
  *
- * sticky 오프셋(top)은 AdminShell 고정 헤더 높이와 짝이다 — 헤더 py·폰트·버튼을 바꾸면
- * 함께 조정 (`3분 체험` 버튼이 들어오며 53px → 61px로 이미 한 번 자랐다).
+ * 상단 고정 헤더가 사라지면서(AdminShell) 이 목차가 화면 맨 위에 붙는 유일한 요소가 됐다 —
+ * 오프셋을 0으로 되돌린다. 위에 다시 고정 요소를 두면 그 높이만큼 여기도 함께 조정해야 한다.
  */
 export function DashboardToc({ items }: { items: TocItem[] }) {
   const [activeId, setActiveId] = useState<string | null>(items[0]?.id ?? null);
@@ -23,8 +23,8 @@ export function DashboardToc({ items }: { items: TocItem[] }) {
     let frame = 0;
     const update = () => {
       frame = 0;
-      // 기준선: 고정 헤더(≈53px) + 목차 바 높이 + 여유. Section의 scroll-mt-28(112px)과 정합.
-      const line = 130;
+      // 기준선: 목차 바 높이(≈48px) + 여유. 상단 고정 헤더가 없어져 그만큼 낮췄다.
+      const line = 80;
       let current: string | null = null;
       for (const { id } of items) {
         const el = document.getElementById(id);
@@ -48,7 +48,7 @@ export function DashboardToc({ items }: { items: TocItem[] }) {
   return (
     <nav
       aria-label="지역 소비 분석 목차"
-      className="sticky top-[61px] z-10 -mx-1 flex gap-1 overflow-x-auto rounded-2xl border border-admin-border bg-admin-bg/90 p-1.5 backdrop-blur-xl"
+      className="sticky top-0 z-10 -mx-1 flex gap-1 overflow-x-auto rounded-2xl border border-admin-border bg-admin-bg/90 p-1.5 backdrop-blur-xl"
     >
       {items.map(({ id, label }) => {
         const active = id === activeId;

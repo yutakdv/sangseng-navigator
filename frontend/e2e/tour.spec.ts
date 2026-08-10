@@ -212,10 +212,11 @@ test.describe("첫 방문 자동 시작 · 재시작", () => {
     await expect(page.locator('[role="dialog"][aria-label*="가이드 투어"]')).toHaveCount(0);
   });
 
-  test("헤더 '3분 체험' 버튼으로 어디서든 재시작된다", async ({ page }) => {
+  test("사이드바 '3분 체험' 버튼으로 어디서든 재시작된다", async ({ page }) => {
     await page.addInitScript(() => window.localStorage.setItem("sn-tour-done", "1"));
     await page.goto("/tracking");
-    await page.getByRole("link", { name: "3분 체험" }).click();
+    // 같은 버튼이 모바일 상단 바·데스크톱 사이드바 바닥 두 자리에 있다 — 보이는 쪽을 누른다
+    await page.getByRole("link", { name: "3분 체험" }).filter({ visible: true }).first().click();
     await page.waitForURL(/\/\?tour=1/);
     await expect(tourDialog(page)).toBeVisible();
     await expect(tourDialog(page)).toContainText("1 / 6");

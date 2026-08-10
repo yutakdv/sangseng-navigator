@@ -46,8 +46,10 @@ export default async function HubPage({ searchParams }: { searchParams: Promise<
   // 판독 문장은 선택된 카드 기준으로 다시 뽑는다 (hero 고정이면 다른 카드를 골랐을 때 어긋난다)
   const evidence = composeEvidence(dashboard, candidates, selected);
 
+  // hideFreshnessBanner: 허브는 문서 머리말(기준 period_note)과 데이터 원천 블록이 기준월을
+  // 이미 두 번 싣는다 — 낡음 경고까지 배너로 세 번째 두지 않는다
   return (
-    <AdminShell dashboard={dashboard} hideSummary hideFreshnessBanner>
+    <AdminShell dashboard={dashboard} hideFreshnessBanner>
       {/* 3층을 DashboardOverview의 children으로 넣는다 — sticky 상태 바가 페이지 끝까지
           붙어 있으려면 1·2·3층이 그 바와 같은 부모 박스 안에 있어야 한다 */}
       <div className="mx-auto max-w-[1500px]">
