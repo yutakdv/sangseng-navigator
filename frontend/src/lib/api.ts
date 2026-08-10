@@ -34,6 +34,7 @@ import type {
 } from "@/types";
 import { ApiError } from "@/lib/errors";
 import dashboardMock from "@/mocks/dashboard.json";
+import manifestJson from "@/mocks/manifest.json";
 import usageDailyMock from "@/mocks/usage_daily.json";
 import usageMonthlyMock from "@/mocks/usage_monthly.json";
 import candidatesMock from "@/mocks/candidates.json";
@@ -45,6 +46,15 @@ const BASE = process.env.NEXT_PUBLIC_API_BASE;
 
 /** 실 API 모드인지 — 화면에서 "mock 데이터" 고지를 띄울 때 쓴다 */
 export const isMockMode = !BASE;
+
+/**
+ * 파이프라인 산출물 스냅샷 버전 — `mocks/manifest.json`(A4)은 실 API/mock 모드와 무관하게
+ * 같은 값을 돌려주는 정적 메타다. usageMonthly·usageDaily와 같은 이유로 정적 import한다
+ * (:133-134 주석 참조). SourceChip 팝오버에서 "이 숫자가 어느 데이터 스냅샷에서 왔는지"를 밝힌다.
+ */
+export function datasetVersion(): string {
+  return (manifestJson as { dataset_version: string }).dataset_version;
+}
 
 /**
  * 비2xx → `ApiError(status, detail)`. 에러 본문은 계약상 `{"detail": "메시지"}`다 (05 머리말).

@@ -15,9 +15,10 @@ import { ProgressSelect } from "@/components/ProgressSelect";
 import { RankTrace } from "@/components/RankTrace";
 import { Section } from "@/components/Section";
 import { SimulateButton } from "@/components/SimulateButton";
+import { SourceChip } from "@/components/SourceChip";
 import { WorkflowChip } from "@/components/StatusChip";
 import { BarRank } from "@/components/charts/BarRank";
-import { api } from "@/lib/api";
+import { api, datasetVersion } from "@/lib/api";
 import { eventLabel } from "@/lib/cardEvents";
 import { NARRATIVE_SOURCE_TEXT, cardNarrativeSource } from "@/lib/aiSource";
 import { ANCHOR, PRIMARY } from "@/lib/constants";
@@ -339,7 +340,21 @@ export default async function CardDetailPage({
           id="evidence"
           icon="sparkle"
           title="추천 근거와 리스크 설명"
-          badge={<NarrativeSourceChip kind={narrativeSource} />}
+          badge={
+            <>
+              <NarrativeSourceChip kind={narrativeSource} />
+              <SourceChip
+                label="하이원포인트 사용현황 외 2종"
+                datasets={[
+                  "하이원포인트 사용현황(월별)",
+                  "하이원포인트 가맹점 상세정보",
+                  "소상공인시장진흥공단 상가(상권)정보",
+                ]}
+                baseNote={dashboard.period_note}
+                version={datasetVersion()}
+              />
+            </>
+          }
           // 출처 문장은 상단 재검증 배너(1회)와 이 섹션의 출처 칩이 이미 진다 — 같은 문장을
           // 세 번째로 찍으면 "믿지 마라"가 지배 정서가 된다 (검토 §5-2 처방 3 · §0-3 #4)
           desc="서버가 진행 중인 업무가 없는 후보 중 후보 스코어 최상위를 결정론적으로 선택하고, 숫자·순위·상태는 정본 데이터로 다시 검증합니다."

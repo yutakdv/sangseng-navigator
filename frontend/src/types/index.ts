@@ -44,6 +44,26 @@ export interface Dashboard {
   ranking_stability?: number | null;
   /** 구형 응답 호환 별칭. 신규 화면은 ranking_stability를 우선한다. */
   ai_stability?: number | null;
+  /**
+   * 임팩트 히어로 근거 (v4.1 Phase 4). 옵셔널 — 구형 응답에는 없을 수 있어 화면은
+   * `data.impact_meta &&` 가드로 감싼다. 화면에 그리는 숫자는 `per_pp_additional_uses` 하나뿐이고
+   * 나머지 필드는 툴팁 근거 표기용이다.
+   */
+  impact_meta?: {
+    basis: "count";
+    annual_local_uses: number;
+    annual_visitors: number;
+    per_pp_additional_uses: number;
+    /** 요약·의역 금지 — 그대로 노출 */
+    note: string;
+  };
+  /** 소표본 셀 비공개·집계 반올림 고지 (v4.1 Phase 4·5, C2 셀 탐색기가 소비). 옵셔널. */
+  privacy_meta?: {
+    k: number;
+    suppressed_cells: { eup: string; category: string }[];
+    aggregate_rounding: { unit: number };
+    note: string;
+  };
 }
 
 /** 지역×업종×월 사용 건수 원장 행. 정선군 컬럼은 고한·사북 제외 잔여분, 삼척시는 도계읍 한정 (region_note) */

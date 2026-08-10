@@ -8,8 +8,9 @@ import { PaybackCycle } from "@/components/PaybackCycle";
 import { PolicyOutcomeGuide } from "@/components/PolicyOutcomeGuide";
 import { ScenarioTable } from "@/components/ScenarioTable";
 import { Section } from "@/components/Section";
+import { SourceChip } from "@/components/SourceChip";
 import { ProgressChip, StatusChip } from "@/components/StatusChip";
-import { api } from "@/lib/api";
+import { api, datasetVersion } from "@/lib/api";
 import { cardNarrativeSource } from "@/lib/aiSource";
 
 export const metadata: Metadata = { title: "인센티브 정책 · 상생 나침반" };
@@ -159,6 +160,13 @@ export default async function IncentivePage() {
                 <>
                   <AssumptionBadge />
                   {proxyBadge}
+                  <SourceChip
+                    label="하이원포인트 사용현황 외 1종"
+                    datasets={["하이원포인트 사용현황(월별)", "일자별 카지노 입장객"]}
+                    baseNote={dashboard.period_note}
+                    approx
+                    version={datasetVersion()}
+                  />
                 </>
               }
               desc="세 시나리오는 전 지역 공통 적용을 전제로 합니다. 개선폭은 단정하지 않고 범위로 적으며, 재원 부담은 정성 표기입니다(원천 데이터에 금액 필드가 없어 예산·ROI는 산출하지 않습니다). 지역 전환율은 분자(지역 사용 건수)와 분모(입장 연인원)의 단위가 달라 비율이 아닌 근사 지표입니다."

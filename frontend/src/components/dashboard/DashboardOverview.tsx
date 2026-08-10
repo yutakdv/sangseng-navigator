@@ -7,7 +7,8 @@ import { QuarterDiagnostics } from "@/components/dashboard/QuarterDiagnostics";
 import { StatusBar } from "@/components/dashboard/StatusBar";
 import { WorkQueue } from "@/components/dashboard/WorkQueue";
 import { ProposalSummary } from "@/components/proposals/ProposalSummary";
-import { isMockMode } from "@/lib/api";
+import { SourceChip } from "@/components/SourceChip";
+import { datasetVersion, isMockMode } from "@/lib/api";
 import { isExecutionStage, isStartStage, sampleQuality } from "@/lib/cardWorkflow";
 import { dataFreshness } from "@/lib/dataFreshness";
 import { operatorGreeting } from "@/lib/operator";
@@ -131,6 +132,37 @@ export function DashboardOverview({
               AI 제안은 결론이 아닙니다 — 근거와 예상 효과를 상세에서 확인한 뒤 담당자가 결정합니다.
               포인트 적립률·발행액은 그대로 두고, 이미 적립된 포인트의 지역 사용만 다룹니다.
             </p>
+
+            {/* 임팩트 히어로 — 심사위원이 30초 안에 "무엇을 얼마나 바꾸나"를 읽는 한 줄 (v4.1 Phase 4).
+                화면에 그리는 숫자는 impact_meta.per_pp_additional_uses 하나뿐이다. 구형 응답에는
+                필드가 없을 수 있어 가드로 감싼다. */}
+            {dashboard.impact_meta ? (
+              <p
+                data-tour="impact-hero"
+                className="mt-3 flex max-w-2xl flex-wrap items-center gap-2 break-keep text-[15px] leading-relaxed text-admin-text"
+              >
+                <span>
+                  지역 전환율을 <strong className="font-bold">1%p</strong> 끌어올리면 연간 지역 사용이
+                  약{" "}
+                  <strong
+                    className="font-bold text-admin-primary"
+                    title={dashboard.impact_meta.note}
+                  >
+                    +{(dashboard.impact_meta.per_pp_additional_uses / 10000).toFixed(1)}만 건
+                  </strong>{" "}
+                  늘어날 것으로 추정됩니다
+                </span>
+                <ProxyBadge note={dashboard.conversion.proxy_note} />
+                <AssumptionBadge />
+                <SourceChip
+                  label={`하이원포인트 사용현황 · ${freshness.sourceMonth ?? dashboard.period_note} 외 2종`}
+                  datasets={["하이원포인트 사용현황(월별)", "일자별 카지노 입장객", "가맹점 상세정보"]}
+                  baseNote={dashboard.period_note}
+                  approx
+                  version={datasetVersion()}
+                />
+              </p>
+            ) : null}
           </div>
 
           <div className="flex flex-col items-start gap-3 xl:shrink-0 xl:items-end">
