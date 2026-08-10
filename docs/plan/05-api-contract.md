@@ -689,6 +689,17 @@ JS(`fetch(...).headers.get("X-Dataset-Version")`)에서도 읽을 수 있다.
   맞추는 데 쓴다
 - 기존 키 `ok`·`data_loaded`는 형태·의미 그대로다 — `datasets`·`demo_read_only`가 추가되었다
 
+### `GET /api/health/ready`
+
+ALB 대상그룹 헬스체크 전용. 필수 산출물(dashboard·eup_scores·candidates·merchants)이
+하나라도 없으면 **503**을 반환한다.
+
+- 200: `{"ready": true}`
+- 503: `{"detail": "필수 산출물 누락: merchants"}`
+
+`/api/health`와 나뉘어 있다 — health는 결손을 **보고**하는 진단용(항상 200)이고,
+이 경로는 결손 이미지가 트래픽을 받지 못하게 **차단**하는 용도다.
+
 ## 6. 파이프라인 산출 JSON (data/processed/) 스키마
 
 | 파일 | 내용 | 주 소비처 |

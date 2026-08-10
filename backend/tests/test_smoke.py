@@ -220,6 +220,42 @@ def test_health_data_loaded_counts_required_datasets_only(monkeypatch):
     assert body["ok"] is True          # 엔드포인트 자체는 200 — 결손은 보고만 하고 죽지 않는다
 
 
+def test_health_ready_returns_200_when_all_required_datasets_present():
+    """ALB 대상그룹 전용 경로 — 정상 이미지에서는 200."""
+    res = client.get("/api/health/ready")
+    assert res.status_code == 200
+    assert res.json() == {"ready": True}
+
+
+def test_health_ready_returns_503_when_required_dataset_missing(monkeypatch):
+    """정적 JSON이 빠진 이미지가 healthy로 판정되면 서킷 브레이커가 롤백하지 못하고
+    고장난 버전이 무중단으로 전량 배포된다 — 그래서 이 경로는 반드시 실패해야 한다."""
+    real_load = dataload.load
+
+    def _load(name):
+        if name == "merchants":
+            raise FileNotFoundError(name)
+        return real_load(name)
+
+    monkeypatch.setattr(dataload, "load", _load)
+    res = client.get("/api/health/ready")
+    assert res.status_code == 503
+    assert "merchants" in res.json()["detail"]
+
+
+def test_health_ready_ignores_optional_dataset(monkeypatch):
+    """risk_signal은 '없으면 컷'인 선택 입력이라 ready를 내리지 않는다 (07 B4 ⑥)."""
+    real_load = dataload.load
+
+    def _load(name):
+        if name == OPTIONAL_DATASET:
+            raise FileNotFoundError(name)
+        return real_load(name)
+
+    monkeypatch.setattr(dataload, "load", _load)
+    assert client.get("/api/health/ready").status_code == 200
+
+
 def test_dashboard_returns_real_data():
     """05 §1 — 값이 아니라 구조·타입·범위로 검증 (실데이터는 파이프라인 재실행마다 바뀐다)."""
     res = client.get("/api/dashboard")

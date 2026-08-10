@@ -1,0 +1,21 @@
+# 빌드 컨텍스트 최소화 + 시크릿 유입 차단.
+# ⚠ .env 계열이 이미지에 들어가면 main.py의 load_dotenv가 실제로 로드한다.
+#   ECR 레이어는 삭제해도 남아 회수 수단이 키 로테이션뿐이다.
+.env
+.env.*
+*.pem
+*.key
+
+.venv/
+venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+.ruff_cache/
+
+tests/
+requirements-dev.txt
+local_init.py
+pytest.ini
+
+# app/data 는 빌드 직전 build-and-push.sh 가 채운다 — 제외하지 않는다.
