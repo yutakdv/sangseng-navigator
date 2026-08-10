@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 import { AdminShell } from "@/components/AdminShell";
 import { GradeChip, PrivacyBadge, ProxyBadge } from "@/components/Badge";
 import { DashboardToc } from "@/components/DashboardToc";
@@ -58,9 +59,9 @@ export default async function DashboardPage({
   searchParams: Promise<{ demo?: string }>;
 }) {
   const sp = await searchParams;
-  // `report`는 운영 KPI가 /tracking으로 옮겨 가면서 전용 안내가 없어졌다 — 알 수 없는 값과
-  // 같이 취급되어 기본 화면이 뜬다 (SideNav의 DASHBOARD_DEMO_ITEMS와 짝).
-  const demo = sp.demo === "merchant" || sp.demo === "data" ? sp.demo : null;
+  // 남은 데모 값은 `merchant` 하나다 — `report`는 운영 KPI와 함께 /tracking으로,
+  // `data`는 데이터 활용 정보(/data)로 옮겨 갔다 (SideNav의 DASHBOARD_DEMO_ITEMS와 짝).
+  const demo = sp.demo === "merchant" ? sp.demo : null;
 
   const [d, cand, risk, usageLedger] = await Promise.all([
     api.dashboard(),
@@ -468,56 +469,33 @@ export default async function DashboardPage({
           </details>
         </section>
 
-        {/* ══ 데이터 검증 — 분석이 아니라 "무엇으로 계산했는가"의 확인 영역.
-            SideNav의 `데이터 활용 정보` 메뉴가 이 앵커(#data-demo)를 가리킨다 ══ */}
+        {/* ══ 데이터 확인 — 본문은 전부 `데이터 활용 정보`(/data)로 옮겼다.
+            여기 남는 것은 "이 화면의 값이 어느 기준인가" 한 줄과 그리로 가는 길뿐이다.
+            출처·컬럼·체크섬·비공개 내역을 화면마다 되풀이하면 어느 쪽이 정본인지 흐려진다 ══ */}
         <Section
           id="data-demo"
           icon="database"
-          title="데이터 관리 · 출처와 기준"
-          desc="지표를 계산한 원천·기준 시점을 확인하는 영역입니다. 현재 버전은 원본 수정·적재 기능이 아니라 검증용 조회 화면입니다."
+          title="이 화면의 데이터 기준"
+          desc="지표를 계산한 원천·기준 시점·비공개 처리 내역은 데이터 활용 정보에서 한곳에 모아 확인합니다."
         >
-          {demo === "data" ? (
-            <MenuDemoGuide
-              icon="database"
-              title="데이터 관리 데모"
-              description={`현재 화면은 ${d.period_note} 데이터를 기준으로 그려집니다. 원천 파일을 바꾸는 대신, 어떤 데이터가 의사결정에 쓰였는지 확인합니다.`}
-              steps={["푸터의 원천 데이터 출처를 확인합니다.", "기준 시점과 산출일을 확인합니다.", "수치 이상 시 전체 지역 현황과 원천 파일을 함께 점검합니다."]}
-            />
-          ) : null}
           <div className="rounded-xl bg-admin-surface-sunken px-3.5 py-3 text-xs leading-5 text-admin-text-muted">
-            데이터 기준: <span className="font-semibold text-admin-text">{d.period_note}</span>
+            데이터 기준: <span className="font-semibold text-admin-text">{d.period_note}</span> · 산출일{" "}
+            <span className="font-semibold text-admin-text">{d.updated_at}</span>
           </div>
-          {/* 소표본 보호 — 무엇을 왜 감췄는지 화면이 직접 밝히는 자리. 억제 사실을 숨기면
-              "데이터가 없다"와 구분되지 않아, 개인정보 보호 설계가 결함처럼 읽힌다 */}
           {privacy ? (
-            <div className="mt-3 rounded-xl border border-admin-border p-3.5">
-              <div className="flex flex-wrap items-center gap-2">
-                <h3 className="u-h3">소표본 보호 · 비공개 처리 내역</h3>
-                <PrivacyBadge note={privacy.note} k={privacy.k} />
-              </div>
-              <p className="u-note mt-2">{privacy.note}</p>
-              {privacy.suppressed_cells.length ? (
-                <ul className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-admin-text-soft">
-                  {privacy.suppressed_cells.map((c) => (
-                    <li key={`${c.eup}-${c.category}`} className="flex items-baseline gap-1.5">
-                      <Icon name="shield" size={12} />
-                      <span>
-                        {c.eup} {c.category} — 건수 비공개
-                      </span>
-                    </li>
-                  ))}
-                </ul>
-              ) : (
-                <p className="u-note mt-2">현재 기준월에 비공개 처리된 셀은 없습니다.</p>
-              )}
-              <p className="u-note mt-2">
-                가맹점 {privacy.k}곳 미만인 (지역 × 업종) 칸은 건수를 그대로 내보내면 개별 사업자의
-                매출이 역산될 수 있어 값을 비웁니다. 화면은 이 칸을 0으로 그리지 않고 비공개로
-                표기하며, 영향받는 지역의 합계는 {privacy.aggregate_rounding.unit} 단위로 반올림해
-                발행합니다.
-              </p>
-            </div>
+            <p className="u-note mt-3 flex flex-wrap items-center gap-1.5">
+              <PrivacyBadge note={privacy.note} k={privacy.k} />
+              이 화면 일부 값은 가맹점 {privacy.k}곳 미만 셀 {privacy.suppressed_cells.length}개가
+              비공개 처리된 데이터로 그렸습니다.
+            </p>
           ) : null}
+          <Link
+            href="/data"
+            className="mt-3 inline-flex items-center gap-1.5 text-[13px] font-semibold text-admin-primary underline-offset-4 hover:underline"
+          >
+            데이터 활용 정보 — 공공데이터 6종·산출 버전·비공개 내역
+            <Icon name="arrowRight" size={14} strokeWidth={2} />
+          </Link>
         </Section>
       </div>
     </AdminShell>

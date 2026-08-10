@@ -39,12 +39,13 @@ type Item = {
 };
 
 /**
- * 사이드바에 자기 항목이 있는 대시보드 데모 화면. `지역 소비 분석`은 이 값들을 자기 것으로
+ * 사이드바에 자기 항목이 있는 대시보드 데모 화면. `지역 소비 분석`은 이 값을 자기 것으로
  * 보지 않고 넘겨준다 — 그러지 않으면 목록에서 먼저 나오는 `지역 소비 분석`이 항상 먼저
- * 걸려 `가맹점 후보`(하위)·`데이터 활용 정보`(별도 그룹)가 켜질 차례가 오지 않는다.
- * 여기 없는 `demo` 값(`report` 등)은 전용 항목이 없으므로 `지역 소비 분석`이 그대로 활성이다.
+ * 걸려 하위 `가맹점 후보`가 켜질 차례가 오지 않는다. 여기 없는 `demo` 값은 전용 항목이
+ * 없으므로 `지역 소비 분석`이 그대로 활성이다.
+ * (`data`는 데이터 활용 정보가 `/data`라는 자기 경로를 갖게 되면서 이 목록에서 빠졌다.)
  */
-const DASHBOARD_DEMO_ITEMS = ["merchant", "data"];
+const DASHBOARD_DEMO_ITEMS = ["merchant"];
 
 /** 순서가 아니라 담당자가 찾는 업무 객체로 묶는다. 실제 단계는 카드 안에서만 안내한다. */
 const GROUPS: { title: string; items: Item[] }[] = [
@@ -126,10 +127,9 @@ const GROUPS: { title: string; items: Item[] }[] = [
       {
         label: "데이터 활용 정보",
         icon: "database",
-        href: "/dashboard?demo=data#data-demo",
-        note: "지표 원천·기준 시점·비공개 내역",
-        desktopOnly: true,
-        match: (p, q) => p === "/dashboard" && q.get("demo") === "data",
+        href: "/data",
+        note: "공공데이터 6종·산출 버전·지표 정의",
+        match: (p) => p === "/data",
       },
     ],
   },

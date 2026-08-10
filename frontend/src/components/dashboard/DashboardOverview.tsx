@@ -363,29 +363,45 @@ export function DashboardOverview({
                 }}
               />
 
+              {/* 데이터 원천 — 첫 화면에서 "무엇으로 만든 서비스인가"는 즉시 보여야 하되,
+                  출처·컬럼·체크섬 같은 상세는 데이터 활용 정보(/data)가 정본이다.
+                  예전에는 여기 6줄을 늘어놓았는데, 그중 원본 링크가 달린 줄은 둘뿐이라
+                  나머지 넷은 "확인할 수 없는 목록"으로 남았다 — 요약과 진입로만 남긴다. */}
               <section className="rounded-card bg-admin-surface shadow-card">
                 <div className="flex items-center gap-2 border-b border-admin-border px-5 py-4">
                   <Icon name="database" size={16} className="text-admin-primary" />
                   <h2 className="text-[15px] font-bold text-admin-text">데이터 원천 · 공공데이터 6종</h2>
                 </div>
-                <div className="divide-y divide-admin-border px-5">
-                  <SourceRow
-                    label="하이원포인트 사용"
-                    value={freshness.label}
-                    href="https://www.data.go.kr/data/15106402/fileData.do"
-                  />
-                  <SourceRow
-                    label="하이원포인트 가맹점"
-                    value="실시간 API 갱신"
-                    href="https://www.data.go.kr/data/15133571/openapi.do"
-                  />
-                  <SourceRow label="상권 후보 원천" value="기준월 · 2026.06" />
-                  <SourceRow label="카지노 입장객 (전환율 분모)" value="교대 합산 연인원" />
-                  {/* 진단 참고용 배경 정보 — 순위·경고 뉘앙스를 붙이지 않는다 (절대 규칙 6) */}
-                  <SourceRow label="국세청 사업자현황 (존속연수별)" value="진단 참고용" />
-                  <SourceRow label="기상청 초단기실황" value="방문객 위젯 전용" />
+                <div className="px-5 py-4">
+                  <ul className="flex flex-wrap gap-1.5">
+                    {[
+                      "하이원포인트 사용현황",
+                      "하이원포인트 가맹점",
+                      "카지노 입장객",
+                      "상가(상권)정보",
+                      "국세청 사업자현황",
+                      "기상청 초단기실황",
+                    ].map((name) => (
+                      <li
+                        key={name}
+                        className="rounded-full bg-admin-surface-sunken px-2.5 py-1 text-[11px] font-semibold text-admin-text-soft"
+                      >
+                        {name}
+                      </li>
+                    ))}
+                  </ul>
+                  <p className="u-note mt-3">
+                    하이원포인트 사용현황 {freshness.label} 기준. 각 데이터의 원본 규모·실제 사용
+                    컬럼·산출물과 소표본 보호 내역은 데이터 활용 정보에서 확인합니다.
+                  </p>
+                  <Link
+                    href="/data"
+                    className="mt-3 inline-flex min-h-11 items-center gap-1.5 text-[13px] font-semibold text-admin-primary underline-offset-4 hover:underline"
+                  >
+                    데이터 활용 정보 열기
+                    <Icon name="arrowRight" size={14} strokeWidth={2} />
+                  </Link>
                 </div>
-                {/* 산출 시각·지역 소비 분석 링크는 상단 진단 블록이 이미 싣는다 — 여기서 반복하지 않는다 */}
               </section>
             </div>
           </div>
@@ -405,27 +421,5 @@ export function DashboardOverview({
         </Link>
       ) : null}
     </section>
-  );
-}
-
-function SourceRow({ label, value, href }: { label: string; value: string; href?: string }) {
-  const body = (
-    <>
-      <span className="text-xs text-admin-text-muted">{label}</span>
-      <span className="ml-auto text-right text-xs font-bold text-admin-text">{value}</span>
-      {href ? <Icon name="arrowUpRight" size={13} className="text-admin-primary" /> : null}
-    </>
-  );
-  return href ? (
-    <a
-      href={href}
-      target="_blank"
-      rel="noreferrer"
-      className="flex min-h-11 items-center gap-2 py-2 hover:text-admin-primary"
-    >
-      {body}
-    </a>
-  ) : (
-    <div className="flex min-h-11 items-center gap-2 py-2">{body}</div>
   );
 }
