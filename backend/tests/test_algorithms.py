@@ -91,32 +91,45 @@ def test_simulate_falls_back_to_usage_sum_when_dashboard_incomplete():
 def test_llm_clients_disable_sdk_internal_retries(monkeypatch):
     """llm.py의 지연 예산(timeout × attempts)은 SDK 내부 재시도가 꺼져 있어야 성립한다.
 
-    anthropic/openai SDK는 기본 max_retries=2로 타임아웃·429·5xx를 자체 재시도하므로,
-    막지 않으면 앱 레벨 시도 1회가 timeout×3까지 늘어나 Lambda 30초 예산을 넘고
-    규칙 기반 폴백에 도달하기 전에 함수가 죽는다 (llm.py RETRY_BACKOFF_SECONDS 주석).
+    openai SDK는 기본 max_retries=2로 타임아웃·429·5xx를 자체 재시도하므로, 막지 않으면
+    앱 레벨 시도 1회가 timeout×3까지 늘어나 API Gateway HTTP API의 통합 타임아웃 30초
+    (증액 불가) 예산을 넘고, 규칙 기반 폴백에 도달하기 전에 게이트웨이가 504로 끊는다.
     """
-    import anthropic as anthropic_sdk
     import openai as openai_sdk
 
     from app import llm
 
     captured = {}
 
-    def _fake_client(name):
-        def ctor(**kwargs):
-            captured[name] = kwargs
-            raise RuntimeError("네트워크 호출 전 중단")
-        return ctor
+    def ctor(**kwargs):
+        captured.update(kwargs)
+        raise RuntimeError("네트워크 호출 전 중단")
 
-    monkeypatch.setattr(anthropic_sdk, "Anthropic", _fake_client("anthropic"))
-    monkeypatch.setattr(openai_sdk, "OpenAI", _fake_client("openai"))
+    monkeypatch.setattr(openai_sdk, "OpenAI", ctor)
 
-    for provider in ("anthropic", "openai"):
-        monkeypatch.setenv("LLM_PROVIDER", provider)
-        with pytest.raises(llm.LLMError):
-            llm.generate_json("s", "u", {"type": "object"}, attempts=1)
-        assert captured[provider].get("max_retries") == 0, (
-            f"{provider} 클라이언트가 max_retries=0 없이 생성됨 — SDK 내부 재시도가 살아 있다")
+    with pytest.raises(llm.LLMError):
+        llm.generate_json("s", "u", {"type": "object"}, attempts=1)
+    assert captured.get("max_retries") == 0, (
+        "OpenAI 클라이언트가 max_retries=0 없이 생성됨 — SDK 내부 재시도가 살아 있다")
+
+
+def test_llm_does_not_read_provider_env(monkeypatch):
+    """provider 분기 제거 확인 — LLM_PROVIDER가 무엇이든 OpenAI 경로로만 간다."""
+    import openai as openai_sdk
+
+    from app import llm
+
+    monkeypatch.setenv("LLM_PROVIDER", "anthropic")
+    called = {"openai": False}
+
+    def ctor(**kwargs):
+        called["openai"] = True
+        raise RuntimeError("네트워크 호출 전 중단")
+
+    monkeypatch.setattr(openai_sdk, "OpenAI", ctor)
+    with pytest.raises(llm.LLMError):
+        llm.generate_json("s", "u", {"type": "object"}, attempts=1)
+    assert called["openai"], "LLM_PROVIDER=anthropic 인데 OpenAI 경로로 가지 않았다"
 
 
 def test_dataload_refreshes_when_processed_file_changes(tmp_path, monkeypatch):
