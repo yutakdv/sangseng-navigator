@@ -90,7 +90,11 @@ export default async function IncentivePage({
       }
       desc="이 카드는 전 지역 공통이라 지역별 소비 여건 차이를 담지 못합니다. 지역×업종 한 칸과 가정 두 개(민감도·페이백률)를 움직이면 처방 방향이 수요 측과 공급 측 중 어디로 기우는지 견줄 수 있습니다. 탐색 결과는 카드에 저장되지 않습니다."
     >
+      {/* 프리셋 유무가 바뀌면 리마운트한다 — 셀·민감도는 useState 초기값으로만 initial을 읽으므로,
+          /incentive 를 연 뒤 클라이언트 내비게이션으로 딥링크에 들어오면 key 없이는 기본값
+          (사북읍 편의점·0.30 = 이미 반전된 상태)이 그대로 남아 시연 장면이 사라진다 */}
       <CellExplorer
+        key={preset ? "flip" : "base"}
         data={cellLoad()}
         initial={preset}
         proxyNote={dashboard.conversion.proxy_note}
