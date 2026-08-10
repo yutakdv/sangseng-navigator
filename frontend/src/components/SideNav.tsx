@@ -2,7 +2,7 @@
 
 import { useEffect } from "react";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useSearchParams } from "next/navigation";
 import { Icon, type IconName } from "@/components/Icon";
 
 /**
@@ -24,13 +24,27 @@ type Item = {
   icon: IconName;
   href?: string;
   note: string;
-  /** 활성 판정. 없으면 href와 정확히 같은 경로일 때만 활성 */
-  match?: (pathname: string) => boolean;
+  /**
+   * 활성 판정. 없으면 href와 정확히 같은 경로일 때만 활성.
+   *
+   * 경로만으로는 부족해서 검색 파라미터도 함께 받는다 — 대시보드의 세 항목은 경로가 모두
+   * `/dashboard`로 같고 `?demo=`로만 갈린다. 해시(`#`)는 서버 렌더에 오지 않으므로 판정에 쓰지
+   * 않는다: `demo` 값이 이미 대상 섹션과 1:1이라 쿼리만으로 충분하다.
+   */
+  match?: (pathname: string, search: URLSearchParams) => boolean;
   /** 모바일 가로 스트립에서는 감춘다 — 좁은 화면에선 자리만 먹는 보조 진입점이다 */
   desktopOnly?: boolean;
   /** 이 화면 안에서만 쓰는 하위 작업. 연결선으로 부모와 묶어 그린다 */
   children?: Item[];
 };
+
+/**
+ * 사이드바에 자기 항목이 있는 대시보드 데모 화면. `지역 소비 분석`은 이 값들을 자기 것으로
+ * 보지 않고 넘겨준다 — 그러지 않으면 목록에서 먼저 나오는 `지역 소비 분석`이 항상 먼저
+ * 걸려 아래 두 항목이 켜질 차례가 오지 않는다. 여기 없는 `demo` 값(`report` 등)은 전용 항목이
+ * 없으므로 `지역 소비 분석`이 그대로 활성이다.
+ */
+const DASHBOARD_DEMO_ITEMS = ["merchant", "data"];
 
 /** 순서가 아니라 담당자가 찾는 업무 객체로 묶는다. 실제 단계는 카드 안에서만 안내한다. */
 const GROUPS: { title: string; items: Item[] }[] = [
@@ -77,7 +91,7 @@ const GROUPS: { title: string; items: Item[] }[] = [
         icon: "chart",
         href: "/dashboard",
         note: "지역·업종별 소비 신호 진단",
-        match: (p) => p === "/dashboard",
+        match: (p, q) => p === "/dashboard" && !DASHBOARD_DEMO_ITEMS.includes(q.get("demo") ?? ""),
       },
       {
         label: "가맹점 후보",
@@ -85,6 +99,7 @@ const GROUPS: { title: string; items: Item[] }[] = [
         href: "/dashboard?demo=merchant#merchant-candidates",
         note: "후보·기존 가맹점 원본 확인",
         desktopOnly: true,
+        match: (p, q) => p === "/dashboard" && q.get("demo") === "merchant",
       },
       {
         label: "데이터 출처",
@@ -92,6 +107,7 @@ const GROUPS: { title: string; items: Item[] }[] = [
         href: "/dashboard?demo=data#data-demo",
         note: "공개 최신본과 실시간 원천 상태",
         desktopOnly: true,
+        match: (p, q) => p === "/dashboard" && q.get("demo") === "data",
       },
     ],
   },
@@ -120,15 +136,20 @@ const flatten = (items: Item[]): Item[] =>
  * 현재 경로에 해당하는 항목은 **정확히 하나**여야 한다 — 처음 일치한 것만 활성으로 본다.
  * 하위가 활성일 때 부모까지 함께 켜지 않는다: 어디에 속한 화면인지는 연결선이 이미 말한다.
  */
-function activeLabelFor(pathname: string): string | null {
+function activeLabelFor(pathname: string, search: URLSearchParams): string | null {
   const all = [...flatten(GROUPS.flatMap((group) => group.items)), VISITOR];
-  const hit = all.find((item) => (item.match ? item.match(pathname) : item.href === pathname));
+  const hit = all.find((item) =>
+    item.match ? item.match(pathname, search) : item.href === pathname,
+  );
   return hit?.label ?? null;
 }
 
 export function SideNav() {
   const pathname = usePathname();
-  const activeLabel = activeLabelFor(pathname);
+  // 담당자 화면은 전부 force-dynamic이라 서버 렌더에서도 실제 쿼리가 들어온다 —
+  // 첫 페인트부터 올바른 항목이 켜지고, 활성 표시가 수화 뒤에 늦게 바뀌지 않는다.
+  const search = useSearchParams();
+  const activeLabel = activeLabelFor(pathname, search);
 
   // 다른 경로의 긴 섹션으로 이동할 때는 해시가 먼저 적용되고 본문이 나중에 수화될 수 있다.
   // 대상이 생길 때까지 짧게 재시도해 사이드바 메뉴가 URL만 바꾸고 멈추지 않게 한다.
