@@ -61,7 +61,7 @@ FRONTEND_API_BASE= docker compose up -d --force-recreate frontend
 
 **주소가 두 가지인 이유**: 페이지가 서버 컴포넌트라 `fetch`가 브라우저가 아니라 **Next 서버에서**
 일어난다. 컨테이너 안에서 도는 Next에게 `localhost:8000`은 자기 자신이라 `ECONNREFUSED`가 난다 —
-컴포즈 네트워크 이름 `http://backend:8000`을 써야 한다. 배포(Vercel + API Gateway)에서는 공개
+컴포즈 네트워크 이름 `http://backend:8000`을 써야 한다. 배포(Vercel + AWS ECS)에서는 공개
 URL 하나라 이 구분이 사라진다.
 
 데모 카드 3장은 compose의 `seed` 서비스가 매 기동마다 넣어 준다(DynamoDB Local이 `-inMemory`라
@@ -167,7 +167,7 @@ src/
 - **F3·F4·F6·F8 화면** — 자리표시자에 "이미 연결된 데이터"와 "남은 작업"을 적어 뒀다.
 - **지도** — 카드 상세(F4)는 MapLibre GL + OpenFreeMap을 사용하고, 방문객 위젯(F7)은 Kakao Maps JS를
   우선 사용한다. Kakao 키·도메인이 준비되지 않은 환경에서는 좌표 기반 지도형 fallback과 길찾기 링크를 보인다.
-- **로딩·에러 상태** — F9 항목. Lambda 콜드스타트 1~3초를 "고장"으로 오인하지 않게
+- **로딩·에러 상태** — F9 항목. 느린 응답을 "고장"으로 오인하지 않게
   스켈레톤 + 재시도 UI가 필요하다.
 - **모바일 실기기 확인** — 390px 뷰포트 기준으로 짰지만(모바일 프레임·`overflow-x-auto` 표 래퍼·
   차트 `min-w-0`) iPhone Safari 실기기 확인은 F9/Phase 6 리허설 항목으로 남아 있다.

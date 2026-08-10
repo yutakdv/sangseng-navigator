@@ -58,7 +58,7 @@ export default function Error({
         <p className="mt-2.5 break-keep text-[15px] leading-7 text-admin-text-soft">
           {isMockMode
             ? "화면을 그리는 중 문제가 생겼습니다. 다시 시도하면 대개 정상으로 돌아옵니다."
-            : "데이터 서버 응답을 받지 못했습니다. 서버가 깨어나는 중일 수 있습니다 — 첫 요청은 1~3초가 더 걸리므로, 다시 시도하면 대개 정상으로 표시됩니다."}
+            : "데이터 서버 응답을 받지 못했습니다. 일시적인 네트워크 문제일 수 있으니 다시 시도해 주세요."}
         </p>
 
         <div className="mt-6 flex flex-wrap gap-2">
