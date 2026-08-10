@@ -112,3 +112,23 @@ def health():
             "demo_read_only": security.demo_read_only(),
             "data_loaded": all(datasets[n] for n in REQUIRED_DATASETS),
             "datasets": datasets}
+
+
+@app.get("/api/health/ready")
+def health_ready():
+    """ALB 대상그룹 전용 준비 상태 — 필수 산출물이 하나라도 없으면 503.
+
+    /api/health와 나뉜 이유: health는 어느 산출물이 빠졌는지 보여주는 진단용이라 결손
+    시에도 200이어야 하고(05 §5 계약), 이 경로는 결손 이미지가 트래픽을 받지 못하게
+    막는 것이 목적이라 반드시 실패해야 한다. 둘을 합치면 진단이 막히거나 방어가 뚫린다.
+    """
+    from app import dataload
+    missing = []
+    for name in REQUIRED_DATASETS:
+        try:
+            dataload.load(name)
+        except (FileNotFoundError, json.JSONDecodeError):
+            missing.append(name)
+    if missing:
+        raise HTTPException(status_code=503, detail=f"필수 산출물 누락: {', '.join(missing)}")
+    return {"ready": True}
