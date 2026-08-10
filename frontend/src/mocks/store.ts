@@ -522,8 +522,9 @@ const generateIncentive = (): GeneratedCard => {
   if (!incentiveSeed) throw new ApiError(503, "mock 시드에 INCENTIVE 카드가 없습니다");
 
   const now = nowIso();
+  const seedClone = JSON.parse(JSON.stringify(incentiveSeed)) as Card;
   const card: Card = {
-    ...(JSON.parse(JSON.stringify(incentiveSeed)) as Card),
+    ...seedClone,
     id: nextCardId("INC-"),
     status: "pending",
     progress: null,
@@ -531,6 +532,11 @@ const generateIncentive = (): GeneratedCard => {
     created_at: now,
     decided_at: null,
     events: [{ at: now, action: "generated" }],
+    // 시드 JSON의 dissent 값이 우연히 INCENTIVE_DISSENT와 같아 지금까지는 눈에 띄지 않았지만,
+    // 시드가 바뀌면 조용히 어긋날 수 있었다. backend/app/services/cardgen.py(INCENTIVE는
+    // 시나리오·개선폭이 서버 고정 가정이라 dissent도 LLM에 맡기지 않고 항상 이 문구)와 똑같이
+    // 명시적으로 고정한다 — 시드 값에 기대지 않는다.
+    ai: { ...seedClone.ai, dissent: INCENTIVE_DISSENT },
   };
   cards = [card, ...cards];
   return { card, created: true };

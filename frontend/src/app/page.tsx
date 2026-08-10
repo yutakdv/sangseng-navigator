@@ -26,11 +26,16 @@ const isCardType = (value: string | undefined): value is CardType =>
 export default async function HubPage({ searchParams }: { searchParams: Promise<Search> }) {
   const params = await searchParams;
   const activeType = isCardType(params.type) ? params.type : null;
+  // 핵심 데이터는 dashboard(진단)와 cards(이 허브의 존재 이유인 Action Card 목록) 둘뿐이다 —
+  // 둘 중 하나라도 실패하면 에러 경계로 보내는 것이 정직하다. candidates(후보 목록·읍·시 스코어)와
+  // kpi(품질 배지·분기 진단 패널)는 보조 데이터라 실패해도 결정 흐름 자체는 살아야 한다.
+  // null은 composeEvidence/composeDashboardView·DashboardOverview가 "0건"이 아니라 "불러오지
+  // 못함"으로 구분해 표시한다(candidates는 rankingUnavailable 플래그로 전달).
   const [dashboard, { cards }, candidates, kpi] = await Promise.all([
     api.dashboard(),
     api.cards(),
-    api.candidates(),
-    api.kpi(),
+    api.candidates().catch(() => null),
+    api.kpi().catch(() => null),
   ]);
   const view = composeDashboardView(dashboard, cards, candidates, kpi, activeType);
 
@@ -55,6 +60,7 @@ export default async function HubPage({ searchParams }: { searchParams: Promise<
           inProgress={view.inProgress}
           completed={view.completed}
           ranking={evidence.ranking}
+          rankingUnavailable={evidence.rankingUnavailable}
           regionInsight={evidence.regionInsight}
           scoreTopLine={evidence.scoreTopLine}
           activeType={activeType}

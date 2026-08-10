@@ -25,12 +25,17 @@ import type { Card, Dashboard, EupScore } from "@/types";
 export function ProposalSummary({
   card,
   ranking,
+  rankingUnavailable = false,
   dashboard,
   leadBadge,
   titleHref,
 }: {
   card: Card;
   ranking: EupScore[];
+  /** true면 candidates 호출 실패로 ranking이 비어 있다 — "6개 지역 공통"(대상 지역 없음)과
+   * 혼동하지 않도록 ExpansionFacts가 "불러오지 못함"으로 갈라 표시한다. 허브(app/page.tsx)에서만
+   * candidates를 보조 데이터로 다루므로 상세(/proposals/[id])는 항상 기본값 false다. */
+  rankingUnavailable?: boolean;
   dashboard: Dashboard;
   /** 좌상단 첫 배지 자리 — 허브는 "오늘 검토 1순위", 상세는 "AI 제안 · 승인 전 검토 대상" */
   leadBadge?: React.ReactNode;
@@ -71,7 +76,12 @@ export function ProposalSummary({
       </p>
 
       {isExpansion ? (
-        <ExpansionFacts card={card} ranking={ranking} dashboard={dashboard} />
+        <ExpansionFacts
+          card={card}
+          ranking={ranking}
+          rankingUnavailable={rankingUnavailable}
+          dashboard={dashboard}
+        />
       ) : (
         <IncentiveFacts card={card} />
       )}
@@ -88,10 +98,12 @@ export function ProposalSummary({
 function ExpansionFacts({
   card,
   ranking,
+  rankingUnavailable = false,
   dashboard,
 }: {
   card: Card;
   ranking: EupScore[];
+  rankingUnavailable?: boolean;
   dashboard: Dashboard;
 }) {
   const targetRank = card.target ? ranking.find((row) => row.eup === card.target?.eup) : undefined;
@@ -106,7 +118,13 @@ function ExpansionFacts({
       <div className="mt-6 grid grid-cols-1 divide-y divide-lavender-100 border-y border-lavender-100 sm:grid-cols-3 sm:divide-x sm:divide-y-0">
         <MiniFact
           label="지역 근거"
-          value={targetRank ? `${targetRank.eup} 진단 ${targetRank.rank}위` : "6개 지역 공통"}
+          value={
+            targetRank
+              ? `${targetRank.eup} 진단 ${targetRank.rank}위`
+              : rankingUnavailable
+                ? "진단 순위를 불러오지 못함"
+                : "6개 지역 공통"
+          }
         />
         <MiniFact
           label="현재 비중"

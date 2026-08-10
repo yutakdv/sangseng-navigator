@@ -43,11 +43,20 @@ export default async function IncentivePage({
   searchParams: Promise<{ preset?: string | string[] }>;
 }) {
   // Next 15+ 에서 searchParams는 Promise다 — await 없이 접근하면 런타임 에러
-  const [sp, dashboard, { cards }] = await Promise.all([
+  //
+  // dashboard()는 AdminShell이 period_note를 무조건 읽으므로(널 불가) 핵심 데이터로 두고
+  // 감싸지 않는다 — 실패하면 에러 경계로 보내는 것이 정직하다. cards()는 이 화면의 콘텐츠(표시할
+  // INCENTIVE 카드 1장)이지만, 아래 렌더가 "카드가 아직 없다"는 빈 상태를 이미 갖추고 있어
+  // **그 상태와 혼동만 안 되면** 실패를 조용히 흡수할 수 있다. 그래서 실패(cardsFailed)와
+  // "정말 카드가 없음"을 별도로 구분한다 — 섞으면 카드가 있는데 못 불러온 상황에서 "허브에서
+  // 새로 만드세요" 안내가 나가 담당자를 오도한다(이미 있는 카드를 중복 생성하게 될 수 있다).
+  const [sp, dashboard, cardsResult] = await Promise.all([
     searchParams,
     api.dashboard(),
-    api.cards({ type: "INCENTIVE" }),
+    api.cards({ type: "INCENTIVE" }).catch(() => null),
   ]);
+  const cardsFailed = cardsResult === null;
+  const cards = cardsResult?.cards ?? [];
   const presetParam = Array.isArray(sp.preset) ? sp.preset[0] : sp.preset;
   // 진입값 0.25는 반전 임계(0.30)에서 슬라이더 한 칸(0.05) 아래다 — 세 수치가 맞물려 있다
   const preset =
@@ -114,7 +123,27 @@ export default async function IncentivePage({
           lede="공급 측(가맹점 확충)에 이어 수요 측 카드입니다. AI는 페이백률 3·5·7% 시나리오를 비교해 제시하고, 확정 페이백률은 담당자가 고른 값만 저장됩니다."
         />
 
-        {!card ? (
+        {cardsFailed ? (
+          <>
+          <Section
+            icon="warn"
+            title="인센티브 카드를 불러오지 못했습니다"
+            desc="일시적인 서버 응답 문제일 수 있습니다 — 카드가 없는 것이 아니라 조회에 실패했습니다."
+          >
+            <p className="u-body">
+              잠시 후 새로고침해 주세요. 계속되면 Action Card 허브에서 카드 목록을 다시 확인하세요.
+            </p>
+            <Link
+              href="/"
+              className="mt-4 inline-flex items-center gap-1.5 rounded-lg bg-admin-primary px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-admin-primary-strong"
+            >
+              Action Card 허브로 가기
+              <Icon name="arrowRight" size={15} strokeWidth={2} />
+            </Link>
+          </Section>
+          {explorerSection}
+          </>
+        ) : !card ? (
           <>
           <Section
             icon="gift"

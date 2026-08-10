@@ -54,13 +54,21 @@ export default async function DashboardPage({
     : null;
   const demo = sp.demo === "merchant" || sp.demo === "report" || sp.demo === "data" ? sp.demo : null;
 
+  // 이 페이지의 존재 이유(핵심 데이터)는 진단 지표 하나(d = api.dashboard())뿐이다 — 실패하면
+  // 에러 경계로 보내는 것이 정직하다("보조 데이터 하나가 화면 전체를 날리면 안 된다"는 원칙의
+  // 반대편: 핵심 데이터를 억지로 감춰 빈 화면을 그리는 것도 정직하지 않다). 나머지 다섯은
+  // 보조 데이터라 각자 실패해도 "지역 소비 분석"이라는 이 화면의 본 뜻은 그대로 성립한다 —
+  // KPI 타일(운영 지표) · 후보 목록(가맹점 확충 후보) · 국세청 위험 신호(배경 참고) ·
+  // 지역×업종×월 원장(드릴다운 전용) · 일별 사용량(요일 축 전용). null이 되면 아래에서
+  // 빈 배열(진짜 "데이터 없음")과 구분해 "불러오지 못했습니다"로 표시한다 — 0·빈 배열로
+  // 조용히 치환하지 않는다.
   const [d, kpi, cand, risk, usageLedger, usageDaily] = await Promise.all([
     api.dashboard(),
-    api.kpi(),
-    api.candidates(),
-    api.riskSignal(),
-    api.usageMonthly(),
-    api.usageDaily(),
+    api.kpi().catch(() => null),
+    api.candidates().catch(() => null),
+    api.riskSignal().catch(() => null),
+    api.usageMonthly().catch(() => null),
+    api.usageDaily().catch(() => null),
   ]);
 
   // 음수/0·빈 배열 방어 (F5 검증 항목) — 데이터가 없으면 차트 대신 안내 문구를 낸다
@@ -88,25 +96,27 @@ export default async function DashboardPage({
     };
   });
   const totalUses = (d.region_share ?? []).reduce((a, b) => a + b.count, 0);
-  const eupRanking = cand.eup_ranking ?? [];
+  const eupRanking = cand?.eup_ranking ?? [];
 
   // 2단계 표 주석용 — 포화도 0.00이 빈 값이 아니라 "반경 내 기존 가맹점 0곳"의 계산 결과임을 명시한다
   const saturationAllZero =
-    (cand.candidates ?? []).length > 0 &&
-    (cand.candidates ?? []).every((c) => c.saturation === 0 && c.nearby_merchants === 0);
+    (cand?.candidates ?? []).length > 0 &&
+    (cand?.candidates ?? []).every((c) => c.saturation === 0 && c.nearby_merchants === 0);
   // 배경 정보 요약용 — 편차 0.5%p 수준이라 막대로 차이를 그리지 않고 문장으로 말한다 (05 §6)
-  const riskPcts = risk.map((r) => r.under2y_ratio * 100);
+  // risk가 null(호출 실패)이면 빈 배열로 계산해 평균·편차를 0으로 만들지 않는다 — 아래 렌더에서
+  // risk === null을 따로 분기해 "0%"가 아니라 "불러오지 못함"으로 표시한다.
+  const riskPcts = (risk ?? []).map((r) => r.under2y_ratio * 100);
   const riskSpread = riskPcts.length ? Math.max(...riskPcts) - Math.min(...riskPcts) : 0;
   const riskAvg = riskPcts.length ? riskPcts.reduce((a, b) => a + b, 0) / riskPcts.length : 0;
   const stability = d.ranking_stability ?? d.ai_stability;
 
   // 소표본 보호 고지 — 원장 쪽 값이 정본이고, 구형 산출물에는 아예 없을 수 있어 둘 다 가드한다
-  const privacy = usageLedger.privacy_meta ?? d.privacy_meta ?? null;
+  const privacy = usageLedger?.privacy_meta ?? d.privacy_meta ?? null;
   const privacyK = privacy?.k ?? 5;
 
   // 지역 드릴다운 파생값 — 지역을 선택했을 때만 계산·렌더한다 (원장은 서버에서만 읽는다)
-  const ledgerRows = usageLedger.usage ?? [];
-  const ledgerMonths = usageLedger.months ?? [];
+  const ledgerRows = usageLedger?.usage ?? [];
+  const ledgerMonths = usageLedger?.months ?? [];
   const regionDonut = selectedRegion
     ? regionCategoryShare(ledgerRows, selectedRegion)
     : { shares: [], suppressed: [] };
@@ -122,18 +132,20 @@ export default async function DashboardPage({
   // 라벨과 계산이 같은 창 정의를 쓰도록 regionAnalysis가 한 곳에서 만든다 (6개월 미만이면 null)
   const shiftWindow = shiftWindowLabel(ledgerMonths);
   // 일·요일 축 (usage_daily — 피드백 ⑦). 관측 집계라 전망 문구·근사 배지 대상이 아니다 (설계 08-08)
-  const weekdayBars = selectedRegion ? regionWeekdayAverages(usageDaily, selectedRegion) : [];
-  const weekdayInsight = selectedRegion ? regionWeekdayInsight(usageDaily, selectedRegion) : null;
+  // usageDaily가 null(호출 실패)이면 계산 자체를 건너뛴다 — 빈 배열로 넘기면 "관측치 0건"처럼
+  // 보여 "불러오지 못함"과 "정말 0건"이 구분되지 않는다.
+  const weekdayBars = selectedRegion && usageDaily ? regionWeekdayAverages(usageDaily, selectedRegion) : [];
+  const weekdayInsight = selectedRegion && usageDaily ? regionWeekdayInsight(usageDaily, selectedRegion) : null;
   // 전 지역 기준선 — 지역 리듬이 "다르다"는 말은 비교 대상이 화면에 함께 있어야 성립한다
-  const overallWeekday = selectedRegion ? overallWeekdayInsight(usageDaily) : null;
-  const categoryWeekdays = selectedRegion ? regionCategoryWeekdays(usageDaily, selectedRegion) : [];
+  const overallWeekday = selectedRegion && usageDaily ? overallWeekdayInsight(usageDaily) : null;
+  const categoryWeekdays = selectedRegion && usageDaily ? regionCategoryWeekdays(usageDaily, selectedRegion) : [];
   // 요일 축은 산출물이 달라(usage_daily) 억제 여부를 따로 읽는다 — 두 파일이 어긋나도 화면은 각자 사실대로 말한다
   const hiddenWeekdayLabel = categoryWeekdays
     .filter((r) => r.suppressed)
     .map((r) => r.category)
     .join(" · ");
-  const dailySeries = selectedRegion ? regionDailySeries(usageDaily, selectedRegion) : [];
-  const dailyPeriod = usageDaily.period;
+  const dailySeries = selectedRegion && usageDaily ? regionDailySeries(usageDaily, selectedRegion) : [];
+  const dailyPeriod = usageDaily?.period ?? null;
 
   return (
     <AdminShell dashboard={d}>
@@ -218,7 +230,7 @@ export default async function DashboardPage({
           title="성과 리포트 · 정책 운영 KPI"
           desc="Action Card 상태값으로 계산한 지표다. 승인·상태 변경이 일어나면 즉시 바뀐다."
         >
-          {demo === "report" ? (
+          {demo === "report" && kpi ? (
             <MenuDemoGuide
               icon="report"
               title="성과 리포트 데모"
@@ -226,34 +238,39 @@ export default async function DashboardPage({
               steps={["채택률에서 승인 카드 비중을 확인합니다.", "실행 전환율에서 승인 후 추진 상태를 봅니다.", "균형지수로 승인 확충 카드의 지역 쏠림을 점검합니다."]}
             />
           ) : null}
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
-            <KpiCard
-              icon="check"
-              label="채택률"
-              value={ratioPct(kpi.adoption_rate)}
-              sub={`승인 ${kpi.counts.approved} / 결정 ${kpi.counts.decided}장`}
-            />
-            <KpiCard
-              icon="trend"
-              label="실행 전환율"
-              value={ratioPct(kpi.execution_rate)}
-              sub="승인 카드 중 추진중·완료 비중"
-            />
-            <KpiCard
-              icon="clock"
-              label="평균 의사결정 소요"
-              value={dash(kpi.avg_decision_hours)}
-              unit={kpi.avg_decision_hours === null ? undefined : "시간"}
-              sub="승인·반려·보류까지 걸린 시간의 평균"
-            />
-            <KpiCard
-              icon="scale"
-              label="지역 균형지수"
-              value={dash(kpi.regional_balance_index)}
-              unit={kpi.regional_balance_index === null ? undefined : "/ 100"}
-              sub={`승인 카드가 여러 지역에 고루 쌓일수록 상승 (현재 승인 ${kpi.counts.approved}건)`}
-            />
-          </div>
+          {kpi ? (
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
+              <KpiCard
+                icon="check"
+                label="채택률"
+                value={ratioPct(kpi.adoption_rate)}
+                sub={`승인 ${kpi.counts.approved} / 결정 ${kpi.counts.decided}장`}
+              />
+              <KpiCard
+                icon="trend"
+                label="실행 전환율"
+                value={ratioPct(kpi.execution_rate)}
+                sub="승인 카드 중 추진중·완료 비중"
+              />
+              <KpiCard
+                icon="clock"
+                label="평균 의사결정 소요"
+                value={dash(kpi.avg_decision_hours)}
+                unit={kpi.avg_decision_hours === null ? undefined : "시간"}
+                sub="승인·반려·보류까지 걸린 시간의 평균"
+              />
+              <KpiCard
+                icon="scale"
+                label="지역 균형지수"
+                value={dash(kpi.regional_balance_index)}
+                unit={kpi.regional_balance_index === null ? undefined : "/ 100"}
+                sub={`승인 카드가 여러 지역에 고루 쌓일수록 상승 (현재 승인 ${kpi.counts.approved}건)`}
+              />
+            </div>
+          ) : (
+            // 값을 0·"—"로 채우면 "채택률 0%"처럼 실제 성과로 오독된다 — 아예 못 불러왔다고 밝힌다
+            <FailedChart />
+          )}
         </Section>
 
         {/* ── 추이 ─────────────────────────────────────────────── */}
@@ -330,7 +347,9 @@ export default async function DashboardPage({
                 badge={hasHidden ? <PrivacyBadge note={privacy?.note} k={privacyK} /> : null}
                 desc="전 기간 누적 사용 건수를 표시 6분류로 집계했다."
               >
-                {regionDonut.shares.length ? (
+                {usageLedger === null ? (
+                  <FailedChart />
+                ) : regionDonut.shares.length ? (
                   <>
                     <CategoryDonut data={regionDonut.shares} height={240} />
                     {/* 억제 업종을 말없이 빼면 "그 업종 소비가 없다"로 읽힌다 — 뺀 사실과 이유를 밝힌다 */}
@@ -353,7 +372,9 @@ export default async function DashboardPage({
                 badge={hasHidden ? <PrivacyBadge note={privacy?.note} k={privacyK} /> : null}
                 desc="월별 하이원포인트 사용 건수 합계."
               >
-                {regionTrend.points.some((p) => p.value > 0) ? (
+                {usageLedger === null ? (
+                  <FailedChart />
+                ) : regionTrend.points.some((p) => p.value > 0) ? (
                   <>
                     <LineTrend data={regionTrend.points} unit="건" />
                     {hasHidden ? (
@@ -375,7 +396,9 @@ export default async function DashboardPage({
               badge={hasHidden ? <PrivacyBadge note={privacy?.note} k={privacyK} /> : null}
               desc={`누적 사용 건수 상위 업종을 원 업종 분류 그대로 보여준다.${shiftWindow ? ` 증감은 ${shiftWindow}한 값이다.` : ""}`}
             >
-              {regionShifts.length ? (
+              {usageLedger === null ? (
+                <FailedChart />
+              ) : regionShifts.length ? (
                 <>
                   <div className="u-scroll-x">
                     <table className="u-table min-w-[520px]">
@@ -446,9 +469,15 @@ export default async function DashboardPage({
               <Section
                 icon="calendar"
                 title={`${selectedRegion} 요일별 사용 패턴`}
-                desc={`요일별 하루 평균 사용 건수 — ${dailyPeriod.start.slice(0, 4)}년 ${dailyPeriod.days}일 일 단위 집계.`}
+                desc={
+                  dailyPeriod
+                    ? `요일별 하루 평균 사용 건수 — ${dailyPeriod.start.slice(0, 4)}년 ${dailyPeriod.days}일 일 단위 집계.`
+                    : "요일별 하루 평균 사용 건수."
+                }
               >
-                {weekdayBars.length ? (
+                {usageDaily === null ? (
+                  <FailedChart />
+                ) : weekdayBars.length ? (
                   <>
                     {weekdayInsight ? (
                       <p className="mb-2 rounded-lg bg-admin-primary-soft px-3 py-2 text-[13px] text-admin-text">
@@ -490,7 +519,9 @@ export default async function DashboardPage({
                 badge={hiddenWeekdayLabel ? <PrivacyBadge note={privacy?.note} k={privacyK} /> : null}
                 desc="표시 6분류별로 사용이 가장 몰리는 요일과 주중·주말 하루 평균을 비교한다."
               >
-                {categoryWeekdays.length ? (
+                {usageDaily === null ? (
+                  <FailedChart />
+                ) : categoryWeekdays.length ? (
                   <div className="u-scroll-x">
                     <table className="u-table min-w-[420px]">
                       <thead>
@@ -556,7 +587,9 @@ export default async function DashboardPage({
               title={`${selectedRegion} 일별 사용 추이`}
               desc="일별 사용 건수(옅은 선)와 7일 이동평균(진한 선) — 주말 파동과 계절 흐름이 함께 보인다."
             >
-              {dailySeries.length ? (
+              {usageDaily === null ? (
+                <FailedChart />
+              ) : dailySeries.length ? (
                 <>
                   <DailyTrend data={dailySeries} />
                   <p className="u-note mt-3 border-t border-admin-border pt-2.5">
@@ -579,7 +612,11 @@ export default async function DashboardPage({
             shares={d.region_share ?? []}
             monthlyByRegion={d.monthly_by_region ?? []}
             ranking={eupRanking}
-            selectedRegions={cand.selected_eups ?? []}
+            /* candidates 조회 실패를 "순위 없음"·"진단 대상 아님"으로 렌더하지 않게 한다 —
+               같은 화면 아래 "1단계 지역 진단" 섹션이 같은 데이터에 대해 실패를 밝히므로,
+               두 블록이 같은 사실을 다르게 말하면 안 된다 */
+            rankingUnavailable={cand === null}
+            selectedRegions={cand?.selected_eups ?? []}
             onlyRegion={selectedRegion}
           />
         </Section>
@@ -602,7 +639,9 @@ export default async function DashboardPage({
           title="1단계 지역 진단 — 읍·시 스코어"
           desc="소비저조도·소비증감을 0~1로 정규화해 합산한 값이다. AI 제안 대상 지역 선정의 정량 근거이며, 순위는 화면에서 감추지 않는다."
         >
-          {eupRanking.length ? (
+          {cand === null ? (
+            <FailedChart />
+          ) : eupRanking.length ? (
             <div className="u-scroll-x">
               <table className="u-table min-w-[460px]">
                 <thead>
@@ -664,7 +703,7 @@ export default async function DashboardPage({
           title="가맹점 관리 · 2단계 후보 스코어"
           desc="세 요인을 같은 가중치로 합산한다. 현재 데이터에서는 업종공백도·기존가맹포화도가 후보 간 동률인지 함께 확인한다."
         >
-          {demo === "merchant" ? (
+          {demo === "merchant" && cand ? (
             <MenuDemoGuide
               icon="store"
               title="가맹점 후보 관리 데모"
@@ -672,7 +711,9 @@ export default async function DashboardPage({
               steps={["종합 점수로 검토 순서를 잡습니다.", "업종공백도·동선근접도·기존가맹포화도를 비교합니다.", "후보를 선택해 확충 Action Card를 생성·결정합니다."]}
             />
           ) : null}
-          {(cand.candidates ?? []).length ? (
+          {cand === null ? (
+            <FailedChart />
+          ) : (cand.candidates ?? []).length ? (
               <>
                 <div className="u-scroll-x">
                   <table className="u-table min-w-[480px]">
@@ -743,7 +784,9 @@ export default async function DashboardPage({
             title="운영 2년 미만 사업자 비중"
             desc="국세청 사업자등록 데이터 기준 — 지역 상권의 배경 정보다. 4개 시군 편차가 0.5%p 수준이라 지역 간 비교나 순위 근거로는 쓰지 않는다."
           >
-            {risk.length ? (
+            {risk === null ? (
+              <FailedChart />
+            ) : risk.length ? (
               <>
                 <p className="break-keep text-[15px] leading-7 text-admin-text">
                   {risk.length}개 시군 모두{" "}
@@ -847,6 +890,20 @@ function EmptyChart() {
   return (
     <div className="flex h-[180px] items-center justify-center rounded-xl border border-dashed border-admin-border bg-admin-surface-sunken text-[13px] text-admin-text-muted">
       표시할 데이터가 없습니다
+    </div>
+  );
+}
+
+/**
+ * 보조 데이터 호출이 실패했을 때(null) 전용 — `EmptyChart`("표시할 데이터가 없습니다")와
+ * 문구·색을 다르게 한다. "데이터가 없다"와 "불러오지 못했다"는 다른 사실이라 값을 0·빈
+ * 배열로 조용히 치환해 같은 빈 상태로 보이면 안 된다(이 레포에서 이미 세 번 잡은 결함 패턴).
+ */
+function FailedChart() {
+  return (
+    <div className="flex h-[180px] flex-col items-center justify-center gap-1 rounded-xl border border-dashed border-state-warn-line bg-state-warn-bg px-4 text-center text-[13px] text-state-warn">
+      <span className="font-semibold">이 데이터를 불러오지 못했습니다</span>
+      <span className="text-xs text-state-warn/80">페이지의 다른 정보는 그대로 이용할 수 있습니다</span>
     </div>
   );
 }
