@@ -17,7 +17,7 @@ import { LineTrend } from "@/components/charts/LineTrend";
 import { ScaleCompare } from "@/components/charts/ScaleCompare";
 import { api } from "@/lib/api";
 import { REGIONS, REGION_TOOLTIP, STABILITY_NOTE } from "@/lib/constants";
-import { monthLabel, num, pct } from "@/lib/format";
+import { monthLabel, num, pctNum, pctUnit } from "@/lib/format";
 
 export const metadata: Metadata = { title: "전체 지역 현황 · 상생 나침반" };
 
@@ -169,7 +169,8 @@ export default async function DashboardPage({
               icon="trend"
               label="지역 전환율"
               badge={d.conversion.is_proxy ? <ProxyBadge note={d.conversion.proxy_note} /> : null}
-              value={pct(d.conversion.headline_rate)}
+              value={pctNum(d.conversion.headline_rate)}
+              unit={pctUnit(d.conversion.headline_rate)}
               delta={{
                 value: d.growth?.qoq_pp ?? null,
                 unit: "%p",

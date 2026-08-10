@@ -16,7 +16,7 @@ import { api } from "@/lib/api";
 import { eventLabel } from "@/lib/cardEvents";
 import { eligibilityStatus, workflowLabel } from "@/lib/cardWorkflow";
 import { REGIONS } from "@/lib/constants";
-import { dash, ratioPct } from "@/lib/format";
+import { dash, pctUnit, ratioNum } from "@/lib/format";
 import { ApiError } from "@/lib/errors";
 import {
   kstToday,
@@ -554,13 +554,15 @@ export default async function TrackingPage({
             <KpiCard
               icon="check"
               label="채택률"
-              value={ratioPct(kpi.adoption_rate)}
+              value={ratioNum(kpi.adoption_rate)}
+              unit={pctUnit(kpi.adoption_rate)}
               sub={`승인 ${kpi.counts.approved} / 결정 ${kpi.counts.decided}장`}
             />
             <KpiCard
               icon="trend"
               label="실행 전환율"
-              value={ratioPct(kpi.execution_rate)}
+              value={ratioNum(kpi.execution_rate)}
+              unit={pctUnit(kpi.execution_rate)}
               sub="승인 카드 중 추진중·완료 비중"
             />
             <KpiCard

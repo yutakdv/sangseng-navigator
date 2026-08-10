@@ -6,7 +6,7 @@ import { KpiCard } from "@/components/KpiCard";
 import { Section } from "@/components/Section";
 import { Sparkline } from "@/components/Sparkline";
 import { PROXY_NOTE } from "@/lib/constants";
-import { ratioPct } from "@/lib/format";
+import { pctNum, pctUnit, ratioNum } from "@/lib/format";
 import {
   PROGRESS_METRICS,
   PROXY_METRIC_KEY,
@@ -64,22 +64,21 @@ export function ProgressReportDashboard({
           unit="건"
           sub={`${periodLabel(report)} · 기록 카드 ${report.recorded_card_count}건 · 미기록 ${report.cards_without_records}건`}
         />
+        {/* KPI 타일의 `%`는 값이 아니라 `unit` 슬롯으로 넘긴다 — 값 문자열에 넣으면 32px로 커져
+            한 행 안에서 같은 퍼센트인데 크기가 달라 보인다 (pctNum/ratioNum/pctUnit 짝) */}
         <KpiCard
           accent
           icon="trend"
           label="평균 진행률"
-          value={
-            report.average_progress_pct.value === null
-              ? "—"
-              : report.average_progress_pct.value.toFixed(1)
-          }
-          unit={report.average_progress_pct.value === null ? undefined : "%"}
+          value={pctNum(report.average_progress_pct.value)}
+          unit={pctUnit(report.average_progress_pct.value)}
           sub={`기간 내 카드별 최신 진행률 · 표본 ${report.average_progress_pct.sample_size}건`}
         />
         <KpiCard
           icon="check"
           label="완료율"
-          value={ratioPct(report.completion.rate)}
+          value={ratioNum(report.completion.rate)}
+          unit={pctUnit(report.completion.rate)}
           sub={`기간 종료일까지 최신 기록 기준 · 완료 ${report.completion.completed_count} / 기록 카드 ${report.completion.sample_size}건`}
         />
         {/* 목표일(due_at)은 선택 입력이라 표본 0이 정상 상태다 — 값은 05 §8의 "분모 0 → null → —"
@@ -87,7 +86,8 @@ export function ProgressReportDashboard({
         <KpiCard
           icon="calendar"
           label="목표일 내 완료율"
-          value={ratioPct(report.on_time.rate)}
+          value={ratioNum(report.on_time.rate)}
+          unit={pctUnit(report.on_time.rate)}
           sub={
             report.on_time.sample_size === 0 ? (
               <>
