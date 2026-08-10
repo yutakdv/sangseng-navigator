@@ -30,6 +30,15 @@ test.describe("홈 sticky 겹침 회귀", () => {
     // sticky 재계산은 즉시 일어나지만, 레이아웃이 안정될 여유를 짧게 둔다
     await page.waitForTimeout(100);
 
+    // 스크롤이 실제로 일어났는지 먼저 확인한다 — 페이지가 아예 스크롤되지 않으면(콘텐츠가 짧거나
+    // body가 고정된 회귀) 아래 위치 단언이 "헤더가 위로 흘러갔다"를 잘못 증명하게 된다.
+    const scrolledY = await page.evaluate(() => window.scrollY);
+    expect(scrolledY, "페이지가 스크롤되지 않았습니다 — sticky 동작을 검증할 수 없습니다").toBeGreaterThan(0);
+    expect(
+      scrolledY,
+      `스크롤 양(${scrolledY}px)이 헤더 높이(${headerBefore!.height}px)에 못 미쳐 헤더가 화면 밖으로 나갈 수 없습니다`,
+    ).toBeGreaterThan(headerBefore!.height);
+
     const statusBarAfter = await statusBar.boundingBox();
     expect(statusBarAfter, "스크롤 후 StatusBar boundingBox를 가져오지 못했습니다").not.toBeNull();
     // sticky top-0 — 뷰포트 상단에 고정돼 있어야 한다
@@ -58,8 +67,20 @@ test.describe("홈 sticky 겹침 회귀", () => {
     const header = page.locator("header").filter({ has: page.getByRole("link", { name: "3분 체험" }) });
     await expect(header).toBeVisible();
 
+    const headerBefore = await header.boundingBox();
+    expect(headerBefore, "스크롤 전 헤더 boundingBox를 가져오지 못했습니다").not.toBeNull();
+
     await page.evaluate(() => window.scrollTo(0, 1500));
     await page.waitForTimeout(100);
+
+    // 스크롤이 실제로 일어나야 "고정돼 있다"가 의미를 가진다 — 스크롤이 0이면 아래 단언은
+    // 아무것도 증명하지 않는다(정지 화면의 헤더는 당연히 상단에 있다).
+    const scrolledY = await page.evaluate(() => window.scrollY);
+    expect(scrolledY, "/tracking 페이지가 스크롤되지 않았습니다 — sticky 동작을 검증할 수 없습니다").toBeGreaterThan(0);
+    expect(
+      scrolledY,
+      `/tracking 스크롤 양(${scrolledY}px)이 헤더 높이(${headerBefore!.height}px)보다 작아 고정 여부를 가릴 수 없습니다`,
+    ).toBeGreaterThan(headerBefore!.height);
 
     const headerAfter = await header.boundingBox();
     expect(headerAfter, "스크롤 후 헤더 boundingBox를 가져오지 못했습니다").not.toBeNull();
