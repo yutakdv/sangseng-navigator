@@ -51,7 +51,14 @@ Base URL: 로컬 `http://localhost:8000` / 배포 후 API Gateway URL. 경로 �
   ],
   "growth": {"mom_pct": -2.1, "qoq_pp": -0.4},
   "ranking_stability": null,
-  "ai_stability": null
+  "ai_stability": null,
+  "impact_meta": {
+    "basis": "count",
+    "annual_local_uses": 507628,
+    "annual_visitors": 2478656,
+    "per_pp_additional_uses": 24787,
+    "note": "지역 전환율(근사 지표) 1%p 개선 시 연간 지역 사용 건수 추가분 추정 = 연간 입장 연인원 × 1%. 건수 기준이며 금액 환산은 포함하지 않는다. 가정 기반 전망이며 실제와 다를 수 있음."
+  }
 }
 ```
 
@@ -82,6 +89,13 @@ Base URL: 로컬 `http://localhost:8000` / 배포 후 API Gateway URL. 경로 �
 - `ranking_stability`: P8 민감도 분석 `sensitivity.json`의 `top3_stable_ratio × 100`
   (정수, "추천 순위 안정도" 타일). AI 모델 품질 지표가 아니다. P8 실행 전에는 `null`.
   `ai_stability`는 이전 소비자 호환용 별칭이며 신규 화면은 사용하지 않는다
+- `impact_meta`: "지역 전환율 1%p 개선 = 연간 지역 사용 건수 몇 건 추가" 임팩트 헤드라인의
+  역추적 가능한 원천(`pipeline/p5_metrics.py`의 `build_impact_meta`, `conversion.monthly`의
+  겹치는 월 합산). **건수 기준 고정**(`basis: "count"`) — 강원랜드 공개 금액 기준 지역 사용 비율
+  (2024년 28.5%)과는 종류가 다른 별개 지표라 금액 환산을 포함하지 않는다(README·발표 전용).
+  화면에 노출하는 숫자는 `per_pp_additional_uses`(연간 입장 연인원 × 1%, 반올림) 하나뿐이며
+  `annual_local_uses`·`annual_visitors`는 근거 표기용이다. `note`는 고정 설명 문구로, 배지만으로는
+  막지 못하는 오인을 막기 위해 **그대로** 노출한다(요약·의역 금지).
 
 ### `GET /api/candidates`
 지도·카드 상세용 스코어링 결과 (`eup_scores.json` + `candidates.json` 병합).

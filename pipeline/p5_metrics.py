@@ -47,6 +47,21 @@ def quarter_rate(months, uses_by_month, visitors):
     return sum(uses_by_month[m] for m in months) / denominator * 100
 
 
+def build_impact_meta(monthly):
+    """지역 전환율 1%p 개선의 연간 효과(건수 기준). 화면 숫자는 전부 이 메타에서 역추적된다."""
+    annual_local = sum(m["local_uses"] for m in monthly)
+    annual_visitors = sum(m["visitors"] for m in monthly)
+    return {
+        "basis": "count",
+        "annual_local_uses": annual_local,
+        "annual_visitors": annual_visitors,
+        "per_pp_additional_uses": round(annual_visitors / 100),
+        "note": ("지역 전환율(근사 지표) 1%p 개선 시 연간 지역 사용 건수 추가분 추정 "
+                 "= 연간 입장 연인원 × 1%. 건수 기준이며 금액 환산은 포함하지 않는다. "
+                 "가정 기반 전망이며 실제와 다를 수 있음."),
+    }
+
+
 def main():
     src = PROCESSED_DIR / "usage_monthly.json"
     data = json.loads(src.read_text(encoding="utf-8"))
@@ -165,6 +180,7 @@ def main():
         "ranking_stability": ranking_stability,
         "ai_stability": ranking_stability,  # 이전 API 소비자 호환용 별칭
     }
+    out["impact_meta"] = build_impact_meta(conversion_monthly)
 
     path = PROCESSED_DIR / "dashboard.json"
     path.write_text(json.dumps(out, ensure_ascii=False, indent=2), encoding="utf-8")

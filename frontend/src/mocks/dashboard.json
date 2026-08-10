@@ -1,5 +1,5 @@
 {
-  "updated_at": "2026-08-08",
+  "updated_at": "2026-08-10",
   "period_note": "하이원포인트 사용현황 최신 제공분(2025-12) 기준",
   "conversion": {
     "headline_rate": 20.5,
@@ -366,5 +366,12 @@
     "qoq_pp": 1.1
   },
   "ranking_stability": 16,
-  "ai_stability": 16
+  "ai_stability": 16,
+  "impact_meta": {
+    "basis": "count",
+    "annual_local_uses": 507628,
+    "annual_visitors": 2478656,
+    "per_pp_additional_uses": 24787,
+    "note": "지역 전환율(근사 지표) 1%p 개선 시 연간 지역 사용 건수 추가분 추정 = 연간 입장 연인원 × 1%. 건수 기준이며 금액 환산은 포함하지 않는다. 가정 기반 전망이며 실제와 다를 수 있음."
+  }
 }
