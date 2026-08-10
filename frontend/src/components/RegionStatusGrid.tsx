@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { DeltaValue } from "@/components/DeltaValue";
 import { Icon } from "@/components/Icon";
 import { REGION_TOOLTIP, REGIONS } from "@/lib/constants";
@@ -21,6 +22,7 @@ export function RegionStatusGrid({
   selectedRegions = [],
   targetRegion = null,
   onlyRegion = null,
+  withDetailLink = false,
 }: {
   shares: RegionShare[];
   monthlyByRegion: MonthlyRegion[];
@@ -28,6 +30,8 @@ export function RegionStatusGrid({
   selectedRegions?: string[];
   targetRegion?: string | null;
   onlyRegion?: string | null;
+  /** 카드마다 지역 상세 존으로 가는 링크를 단다 — 이 그리드가 탐색 진입점을 겸할 때만 */
+  withDetailLink?: boolean;
 }) {
   const shareByRegion = new Map(shares.map((row) => [row.region, row]));
   const rankByRegion = new Map(ranking.map((row) => [row.eup, row]));
@@ -127,6 +131,16 @@ export function RegionStatusGrid({
                 <Icon name="info" size={12} className="mt-0.5" />
                 <span>{REGION_TOOLTIP[region as Region]}</span>
               </p>
+            ) : null}
+
+            {withDetailLink ? (
+              <Link
+                href={`/dashboard?region=${encodeURIComponent(region)}#region-detail`}
+                className="mt-3 inline-flex items-center gap-1 text-[11px] font-semibold text-admin-primary underline-offset-4 hover:underline"
+              >
+                이 지역 상세 분석
+                <Icon name="arrowRight" size={12} strokeWidth={2} />
+              </Link>
             ) : null}
           </article>
         );

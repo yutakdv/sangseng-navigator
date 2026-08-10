@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { AdminShell } from "@/components/AdminShell";
 import { Icon } from "@/components/Icon";
+import { KpiCard } from "@/components/KpiCard";
 import { PageHeader } from "@/components/PageHeader";
 import { PeriodFilter } from "@/components/PeriodFilter";
 import { ProgressRecordTimeline } from "@/components/ProgressRecordTimeline";
@@ -14,6 +15,7 @@ import { api } from "@/lib/api";
 import { eventLabel } from "@/lib/cardEvents";
 import { eligibilityStatus, workflowLabel } from "@/lib/cardWorkflow";
 import { REGIONS } from "@/lib/constants";
+import { dash, ratioPct } from "@/lib/format";
 import { ApiError } from "@/lib/errors";
 import {
   kstToday,
@@ -532,6 +534,46 @@ export default async function TrackingPage({
             </div>
           </details>
         ) : null}
+
+        {/* ── 정책 운영 KPI — 지역 소비 분석에서 옮겨 왔다(존 재편). 카드 상태값 기반의
+            운영 성과라 소비 데이터 진단 화면이 아니라 이 화면의 주제다.
+            경과 기록 기반의 위 리포트와 달리 **기간 필터와 무관한 현재 스냅샷**이므로,
+            기간 문맥이 닿지 않는 페이지 꼬리에 요약으로 둔다 ── */}
+        <Section
+          id="kpi"
+          icon="report"
+          title="정책 운영 KPI"
+          desc="Action Card 상태값으로 계산한 지표다. 위 기간 필터와 무관한 전 기간 현재 스냅샷이며, 승인·상태 변경이 일어나면 즉시 바뀐다."
+        >
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
+            <KpiCard
+              icon="check"
+              label="채택률"
+              value={ratioPct(kpi.adoption_rate)}
+              sub={`승인 ${kpi.counts.approved} / 결정 ${kpi.counts.decided}장`}
+            />
+            <KpiCard
+              icon="trend"
+              label="실행 전환율"
+              value={ratioPct(kpi.execution_rate)}
+              sub="승인 카드 중 추진중·완료 비중"
+            />
+            <KpiCard
+              icon="clock"
+              label="평균 의사결정 소요"
+              value={dash(kpi.avg_decision_hours)}
+              unit={kpi.avg_decision_hours === null ? undefined : "시간"}
+              sub="승인·반려·보류까지 걸린 시간의 평균"
+            />
+            <KpiCard
+              icon="scale"
+              label="지역 균형지수"
+              value={dash(kpi.regional_balance_index)}
+              unit={kpi.regional_balance_index === null ? undefined : "/ 100"}
+              sub={`승인 카드가 여러 지역에 고루 쌓일수록 상승 (현재 승인 ${kpi.counts.approved}건)`}
+            />
+          </div>
+        </Section>
 
         <p className="u-note">
           승인 대기 {kpi.counts.pending}건 · 반려 {kpi.counts.rejected}건 · 보류 {kpi.counts.held}

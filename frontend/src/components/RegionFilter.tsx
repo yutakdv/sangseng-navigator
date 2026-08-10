@@ -2,7 +2,11 @@ import Link from "next/link";
 import { Icon } from "@/components/Icon";
 import { REGIONS } from "@/lib/constants";
 
-/** 지역 소비 분석의 지역 고정 필터. 선택 상태는 URL에 남겨 새로고침·공유에도 유지된다. */
+/**
+ * 지역 소비 분석의 지역 고정 필터. 선택 상태는 URL에 남겨 새로고침·공유에도 유지된다.
+ * 링크에 `#region-detail` 해시를 붙인다 — 이 필터가 지배하는 영역은 지역 상세 존뿐이라,
+ * 선택 후 서버 렌더가 끝나면 그 존으로 돌아와야 "필터가 어디에 적용됐는지"가 화면으로 답해진다.
+ */
 export function RegionFilter({ selectedRegion }: { selectedRegion: string | null }) {
   return (
     <nav
@@ -14,7 +18,7 @@ export function RegionFilter({ selectedRegion }: { selectedRegion: string | null
         지역 보기
       </span>
       <Link
-        href="/dashboard"
+        href="/dashboard#region-detail"
         aria-current={selectedRegion === null ? "page" : undefined}
         className={`rounded-xl px-3 py-2 text-xs font-bold transition-colors ${
           selectedRegion === null
@@ -27,7 +31,7 @@ export function RegionFilter({ selectedRegion }: { selectedRegion: string | null
       {REGIONS.map((region) => (
         <Link
           key={region}
-          href={`/dashboard?region=${encodeURIComponent(region)}`}
+          href={`/dashboard?region=${encodeURIComponent(region)}#region-detail`}
           aria-current={selectedRegion === region ? "page" : undefined}
           className={`rounded-xl px-3 py-2 text-xs font-bold transition-colors ${
             selectedRegion === region
