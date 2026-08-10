@@ -1,5 +1,3 @@
-import { REGION_COLORS } from "@/lib/constants";
-
 /**
  * 지도 지역 정의 — geometry(mapData.ts)와 UI 메타를 분리해 관리한다.
  *
@@ -11,8 +9,10 @@ import { REGION_COLORS } from "@/lib/constants";
  *   영역도 도계읍 실제 경계로 그린다 — 시 전체를 칠하면 지도가 "삼척 시내도 대상"이라고
  *   말하는 셈이 된다. 시 전역 윤곽은 비대화형 배경(samcheok)으로만 깔아 맥락을 준다.
  *
- * 색은 REGION_COLORS(지역 고정 팔레트, 13 §5)를 그대로 쓴다 — 지도의 영월군 색과
- * 차트의 영월군 색이 같아야 화면 간 인지가 이어진다. 저채도 느낌은 fill-opacity로 낸다.
+ * 지역별 색을 두지 않는다 — 전 지역이 같은 라벤더 계열이고, 지역 구분은 흰 경계선과
+ * 라벨이 맡는다. 색은 상태(hover·선택)만 인코딩한다 (13 §4 "색은 신호일 때만").
+ * 처음에는 REGION_COLORS를 저투명도로 깔았지만, 알파 블렌딩이 색을 탁하게 만들고
+ * 6색이 라벤더 UI 위에서 시끄러워 걷어냈다.
  */
 export type MapRegion = {
   id: string;
@@ -22,7 +22,6 @@ export type MapRegion = {
   label: string;
   type: "county" | "town";
   parentId?: string;
-  color: string;
   /** 라벨 미세 조정(px) — centroid 기준 배치에서 이웃 라벨과 겹칠 때만 쓴다 */
   labelDx?: number;
   labelDy?: number;
@@ -30,16 +29,15 @@ export type MapRegion = {
 
 /** 렌더 순서 = 배열 순서 — 읍(town)이 군 위에 얹히도록 county 먼저 */
 export const MAP_REGIONS: MapRegion[] = [
-  { id: "yeongwol", name: "영월군", label: "영월군", type: "county", color: REGION_COLORS["영월군"] },
-  { id: "jeongseon", name: "정선군", label: "정선군", type: "county", color: REGION_COLORS["정선군"] },
-  { id: "taebaek", name: "태백시", label: "태백시", type: "county", color: REGION_COLORS["태백시"] },
+  { id: "yeongwol", name: "영월군", label: "영월군", type: "county" },
+  { id: "jeongseon", name: "정선군", label: "정선군", type: "county" },
+  { id: "taebaek", name: "태백시", label: "태백시", type: "county" },
   {
     id: "dogye",
     name: "삼척시",
     label: "삼척시(도계읍)",
     type: "town",
     parentId: "samcheok",
-    color: REGION_COLORS["삼척시"],
     labelDy: -4,
   },
   // 고한·사북은 정선군 위에 얹히는 별도 선택 영역 — 정선군 클릭은 두 읍을 제외한
@@ -50,7 +48,6 @@ export const MAP_REGIONS: MapRegion[] = [
     label: "고한읍",
     type: "town",
     parentId: "jeongseon",
-    color: REGION_COLORS["고한읍"],
     labelDx: 14,
     labelDy: 16,
   },
@@ -60,7 +57,6 @@ export const MAP_REGIONS: MapRegion[] = [
     label: "사북읍",
     type: "town",
     parentId: "jeongseon",
-    color: REGION_COLORS["사북읍"],
     labelDx: -12,
     labelDy: -8,
   },
