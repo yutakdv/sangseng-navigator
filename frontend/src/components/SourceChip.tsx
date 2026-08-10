@@ -1,4 +1,6 @@
+import { PrivacyBadge } from "@/components/Badge";
 import { Icon } from "@/components/Icon";
+import type { PrivacyMeta } from "@/types";
 
 /**
  * 데이터 출처 칩 — 화면 숫자가 어느 공공데이터에서 왔는지 드러낸다 (심사 "데이터활용성" 근거).
@@ -15,6 +17,7 @@ export function SourceChip({
   baseNote,
   approx,
   version,
+  privacy,
 }: {
   /** 칩에 보이는 짧은 문구. 예: "하이원포인트 사용현황 · 2025-12 외 2종" */
   label: string;
@@ -26,6 +29,11 @@ export function SourceChip({
   approx?: boolean;
   /** 데이터셋 버전 (manifest.json dataset_version) */
   version?: string;
+  /**
+   * 소표본 보호 고지 — 이 화면의 숫자가 억제·반올림을 거쳤다면 넘긴다. 출처를 밝히는 자리에서
+   * "어디까지 감췄는지"까지 함께 말해야 출처 표기가 완결된다. 구형 응답에는 없어 옵셔널이다.
+   */
+  privacy?: PrivacyMeta | null;
 }) {
   return (
     <span className="group relative inline-flex align-middle">
@@ -51,6 +59,17 @@ export function SourceChip({
         {approx ? <span className="mt-0.5 block text-admin-text-muted">근사 지표 포함</span> : null}
         {version ? (
           <span className="mt-0.5 block text-admin-text-muted">데이터 버전 {version}</span>
+        ) : null}
+        {privacy ? (
+          <span className="mt-1.5 block border-t border-admin-border pt-1.5">
+            <PrivacyBadge note={privacy.note} k={privacy.k} />
+            <span className="mt-1 block text-admin-text-muted">
+              가맹점 {privacy.k}곳 미만인 셀 {privacy.suppressed_cells.length}개(
+              {privacy.suppressed_cells.map((c) => `${c.eup} ${c.category}`).join(" · ")})는 건수를
+              비공개 처리했고, 영향받는 합계는 {privacy.aggregate_rounding.unit} 단위로 반올림해
+              발행합니다.
+            </span>
+          </span>
         ) : null}
       </span>
     </span>

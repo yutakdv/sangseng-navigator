@@ -160,6 +160,7 @@ export function DashboardOverview({
                   baseNote={dashboard.period_note}
                   approx
                   version={datasetVersion()}
+                  privacy={dashboard.privacy_meta}
                 />
               </p>
             ) : null}

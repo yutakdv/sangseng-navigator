@@ -58,12 +58,20 @@ export interface Dashboard {
     note: string;
   };
   /** 소표본 셀 비공개·집계 반올림 고지 (v4.1 Phase 4·5, C2 셀 탐색기가 소비). 옵셔널. */
-  privacy_meta?: {
-    k: number;
-    suppressed_cells: { eup: string; category: string }[];
-    aggregate_rounding: { unit: number };
-    note: string;
-  };
+  privacy_meta?: PrivacyMeta;
+}
+
+/**
+ * 소표본 보호 고지 — 파이프라인 P10이 dashboard.json·usage_monthly.json에 함께 싣는다.
+ * 가맹점 k곳 미만인 (지역×표시업종) 셀은 개별 사업자가 역산될 수 있어 건수를 비공개 처리하고,
+ * 영향받는 집계는 aggregate_rounding.unit 단위로 반올림해 발행한다.
+ * `note`는 요약·의역 없이 그대로 노출한다 (lib/constants.ts PRIVACY_NOTE가 같은 문구).
+ */
+export interface PrivacyMeta {
+  k: number;
+  suppressed_cells: { eup: string; category: string }[];
+  aggregate_rounding: { unit: number };
+  note: string;
 }
 
 /**
@@ -88,6 +96,8 @@ export interface UsageMonthly {
   region_note: string;
   usage: UsageMonthlyRow[];
   visitors_monthly: Record<string, number>;
+  /** 소표본 셀 비공개 고지 — 구형 산출물에는 없을 수 있어 옵셔널이다 */
+  privacy_meta?: PrivacyMeta;
 }
 
 /**

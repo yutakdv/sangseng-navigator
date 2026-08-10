@@ -353,6 +353,7 @@ export default async function CardDetailPage({
                 ]}
                 baseNote={dashboard.period_note}
                 version={datasetVersion()}
+                privacy={dashboard.privacy_meta}
               />
             </>
           }

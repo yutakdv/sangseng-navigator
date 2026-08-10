@@ -225,6 +225,7 @@ export default async function IncentivePage({
                     baseNote={dashboard.period_note}
                     approx
                     version={datasetVersion()}
+                    privacy={dashboard.privacy_meta}
                   />
                 </>
               }
