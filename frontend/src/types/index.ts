@@ -111,8 +111,16 @@ export interface UsageDaily {
   region_note: string;
   weekday_labels: string[];
   weekday_days: number[];
-  weekday_category: Record<string, Record<DisplayCategory, number[]>>;
+  /**
+   * 요일×표시업종 건수. **`null`은 소표본 억제 셀이다** — 0이 아니라 "비공개"다.
+   * 억제 지역의 공개 셀과 '전체'의 억제 업종은 차분 복원을 막으려 100 단위로 반올림해 발행된다
+   * (`privacy_meta` 참고). 지역 요일 합계는 이 값을 더하지 말고 `daily_total`에서 만든다.
+   */
+  weekday_category: Record<string, Record<DisplayCategory, number[] | null>>;
+  /** 지역 일별 총 건수 — 셀이 아니라 지역 총합이라 억제 영향이 없다(원값) */
   daily_total: Record<string, [string, number][]>;
+  /** 소표본 셀 비공개 고지 — 구형 산출물에는 없을 수 있어 옵셔널이다 */
+  privacy_meta?: PrivacyMeta;
 }
 
 /** 셀 부하 구간 — 상위/중간/하위는 공개 셀의 사분위(Q3·Q1) 경계다. suppressed는 값 자체가 없다 */

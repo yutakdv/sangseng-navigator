@@ -8,7 +8,7 @@ LLM 최종 실패 시 규칙 기반 fallback (07 B3 — 데모 루프가 LLM 장
 """
 import json
 import logging
-from datetime import datetime, timedelta
+from datetime import date, datetime, timedelta
 
 from app import dataload, db, llm, prompts
 from app.clock import KST
@@ -152,11 +152,37 @@ def _clean_external(text) -> str:
     return str(text).replace("<data>", "").replace("</data>", "")
 
 
+def eup_weekday_totals(daily: dict, eup: str, by_cat: dict) -> list[int]:
+    """읍 전 업종의 요일별 건수 — **지역 총합인 daily_total에서 만든다** (C4 후속).
+
+    소표본 억제(P10)로 `weekday_category`의 일부 셀이 None이라, 업종 셀을 더하면 읍 합계가
+    실제보다 낮아진다(실측 영월군: 화요일 3,484 → 2,880, -17%). `daily_total`은 셀이 아니라
+    지역 총합이라 억제 영향이 없으므로 그쪽을 1순위로 읽는다 — 시뮬레이션이 기준월 지역 분포를
+    `monthly_by_region`에서 읽는 것과 같은 판단이다. 일자 목록이 없으면 공개 셀 합으로 폴백한다.
+    """
+    rows = (daily.get("daily_total") or {}).get(eup) or []
+    totals = [0] * 7
+    if rows:
+        for item in rows:
+            if not isinstance(item, (list, tuple)) or len(item) != 2:
+                return [sum(c[i] for c in by_cat.values() if isinstance(c, list)) for i in range(7)]
+            day, value = item
+            try:
+                totals[date.fromisoformat(str(day)).weekday()] += int(value)
+            except (TypeError, ValueError):
+                return [sum(c[i] for c in by_cat.values() if isinstance(c, list)) for i in range(7)]
+        return totals
+    # 억제 셀은 None이라 len()이 터진다 — 리스트인 셀만 더한다
+    return [sum(c[i] for c in by_cat.values() if isinstance(c, list)) for i in range(7)]
+
+
 def _weekday_signal(target: dict) -> dict | None:
     """AI 입력 ⑧ — 타깃 (읍×표시업종) 요일 패턴 요약 (참고용, 05 §6·설계 2026-08-08).
 
     확충 후보는 공백 업종이라 타깃 자체 실적이 0인 경우가 기본이다(예: 영월군 숙박업) —
     그때는 읍 전 업종 패턴으로 폴백하고 그 사실을 집계_대상 라벨에 명시한다.
+    타깃이 **소표본 억제 셀**이면 같은 폴백을 타되 라벨을 달리한다 — "실적이 없다"와
+    "값을 감췄다"는 다른 사실이라, 감춘 것을 없는 것처럼 적으면 AI 입력이 거짓이 된다.
     usage_daily.json이 없으면 None — ⑦ risk_signal과 같은 실패 내성으로 생성을 막지 않는다.
     """
     try:
@@ -173,10 +199,19 @@ def _weekday_signal(target: dict) -> dict | None:
     eup_label = _clean_external(target["eup"])
     category_label = _clean_external(target["category"])
     scope = f"{eup_label} {category_label}"
+    suppressed = any(
+        c.get("eup") == target["eup"] and c.get("category") == target["category"]
+        for c in (daily.get("privacy_meta") or {}).get("suppressed_cells") or []
+    )
     if len(counts) != 7 or sum(counts) == 0:
-        counts = [sum(c[i] for c in by_cat.values() if len(c) == 7) for i in range(7)]
-        scope = (f"{eup_label} 전 업종 — 타깃 업종은 하이원포인트 사용 실적이 없어"
-                 " (공백 업종 = 확충 후보인 이유) 읍 전체 방문 리듬으로 대신함")
+        counts = eup_weekday_totals(daily, target["eup"], by_cat)
+        scope = (
+            f"{eup_label} 전 업종 — 타깃 업종은 가맹점이 적어 표본 보호로 건수를 비공개 처리했고"
+            " (사용 실적이 0이라는 뜻이 아님) 읍 전체 방문 리듬으로 대신함"
+            if suppressed
+            else f"{eup_label} 전 업종 — 타깃 업종은 하이원포인트 사용 실적이 없어"
+                 " (공백 업종 = 확충 후보인 이유) 읍 전체 방문 리듬으로 대신함"
+        )
         if sum(counts) == 0:
             return None
     avg = [round(c / d, 1) for c, d in zip(counts, days)]

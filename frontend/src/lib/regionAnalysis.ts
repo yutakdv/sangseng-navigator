@@ -230,17 +230,41 @@ export const isValidWeekday = (daily: UsageDaily): boolean =>
   daily.weekday_days.length === 7 &&
   daily.weekday_days.every((d) => d > 0);
 
+/** 요일 인덱스(0=월, pandas dayofweek 계약)를 UTC 산술로 — 2025-01-01(수)=2 */
+const weekdayIndexOf = (date: string): number =>
+  (Math.floor(Date.parse(`${date}T00:00:00Z`) / 86_400_000) + 3) % 7;
+
+/**
+ * 지역(또는 "전체")의 **요일별 총 건수**. 억제 셀이 있어도 낮아지지 않는 값이다.
+ *
+ * 업종 셀(`weekday_category`)을 더하면 소표본 억제로 비운 칸만큼 합계가 빈다
+ * (실측 영월군 화요일: 3,484 → 2,880, -17%). `daily_total`은 셀이 아니라 지역 총합이라
+ * 억제 영향이 없으므로 그쪽을 1순위로 읽는다 — 월별 추이가 dashboard의 monthly_by_region을
+ * 쓰는 것과 같은 판단이다. 일자 목록이 없는 산출물에서만 업종 셀 합으로 떨어진다.
+ */
+function weekdayTotals(daily: UsageDaily, scope: string): number[] | null {
+  const rows = daily.daily_total?.[scope];
+  if (rows?.length) {
+    const totals = [0, 0, 0, 0, 0, 0, 0];
+    for (const [date, value] of rows) totals[weekdayIndexOf(date)] += value;
+    return totals;
+  }
+  const byCat = daily.weekday_category?.[scope];
+  if (!byCat) return null;
+  // 억제 셀은 null이라 그대로 더하면 NaN이 된다 — 숫자만 더하고, 그래서 합계가 낮을 수 있다
+  return daily.weekday_labels.map((_, i) =>
+    CATEGORIES.reduce((sum, c) => sum + (byCat[c]?.[i] ?? 0), 0),
+  );
+}
+
 /** 선택 지역의 요일별 하루 평균 건수(전 업종 합) — 막대(BarRank) 입력 형식 */
 export function regionWeekdayAverages(
   daily: UsageDaily,
   region: Region,
 ): { label: string; value: number; note?: string }[] {
-  const byCat = daily.weekday_category[region];
-  if (!byCat || !isValidWeekday(daily)) return [];
-  const totals = daily.weekday_labels.map((_, i) =>
-    CATEGORIES.reduce((sum, c) => sum + (byCat[c]?.[i] ?? 0), 0),
-  );
-  if (totals.every((t) => t === 0)) return [];
+  if (!isValidWeekday(daily)) return [];
+  const totals = weekdayTotals(daily, region);
+  if (!totals || totals.every((t) => t === 0)) return [];
   const avgs = totals.map((t, i) => round1(t / daily.weekday_days[i]));
   const max = Math.max(...avgs);
   return daily.weekday_labels.map((label, i) => ({
@@ -266,11 +290,8 @@ export interface WeekdayInsight {
 /** 요일 패턴 인사이트 한 줄 — "토요일 하루 평균 N건, 주중 대비 +M%" 문장의 재료 */
 export function regionWeekdayInsight(daily: UsageDaily, region: Region): WeekdayInsight | null {
   const bars = regionWeekdayAverages(daily, region);
-  if (!bars.length) return null;
-  const byCat = daily.weekday_category[region];
-  const totals = daily.weekday_labels.map((_, i) =>
-    CATEGORIES.reduce((sum, c) => sum + (byCat[c]?.[i] ?? 0), 0),
-  );
+  const totals = weekdayTotals(daily, region);
+  if (!bars.length || !totals) return null;
   const sum = (xs: number[]) => xs.reduce((a, b) => a + b, 0);
   const weekdayAvg = sum(totals.slice(0, 5)) / sum(daily.weekday_days.slice(0, 5));
   const weekendAvg = sum(totals.slice(5)) / sum(daily.weekday_days.slice(5));
@@ -289,15 +310,12 @@ export function regionWeekdayInsight(daily: UsageDaily, region: Region): Weekday
  *
  * 지역별 리듬이 다르다는 주장은 기준이 함께 보일 때만 성립한다. 이 값이 없으면 발표에서
  * "전체는 토요일이 가장 많은데"라고 말하는 근거가 화면 어디에도 없다(데모 대본 9단계).
- * 파이프라인이 `weekday_category`에 이미 '전체' 키를 만들어 두므로 추가 데이터가 필요 없다.
+ * 파이프라인이 '전체' 키를 미리 만들어 두므로 추가 데이터가 필요 없다.
  */
 export function overallWeekdayInsight(daily: UsageDaily): WeekdayInsight | null {
-  const byCat = daily.weekday_category?.["전체"];
-  if (!byCat || !isValidWeekday(daily)) return null;
-  const totals = daily.weekday_labels.map((_, i) =>
-    CATEGORIES.reduce((sum, c) => sum + (byCat[c]?.[i] ?? 0), 0),
-  );
-  if (totals.every((t) => t === 0)) return null;
+  if (!isValidWeekday(daily)) return null;
+  const totals = weekdayTotals(daily, "전체");
+  if (!totals || totals.every((t) => t === 0)) return null;
   const sum = (xs: number[]) => xs.reduce((a, b) => a + b, 0);
   const avgs = totals.map((t, i) => t / daily.weekday_days[i]);
   const maxIdx = avgs.indexOf(Math.max(...avgs));
@@ -318,20 +336,39 @@ export function overallWeekdayInsight(daily: UsageDaily): WeekdayInsight | null 
 
 export interface CategoryWeekdayRow {
   category: DisplayCategory;
-  maxLabel: string;
-  weekdayAvg: number;
-  weekendAvg: number;
+  /** 억제 업종이면 null — 화면은 월 원장 표와 같은 "표본 보호로 비공개"를 찍는다 */
+  maxLabel: string | null;
+  weekdayAvg: number | null;
+  weekendAvg: number | null;
   /** 주말 하루 평균의 주중 대비 증감률(%). 주중 실적 0이면 null */
   weekendVsWeekdayPct: number | null;
+  /** 이 지역에서 값이 비공개인 업종인지 */
+  suppressed: boolean;
 }
 
-/** 선택 지역의 표시 6분류별 요일 패턴 — 실적 있는 업종만, CATEGORIES 고정 순서(13 §5) */
+/**
+ * 선택 지역의 표시 6분류별 요일 패턴 — 실적 있는 업종과 **비공개 업종**, CATEGORIES 고정 순서(13 §5).
+ *
+ * 억제 셀(파이프라인 P10이 `null`로 비운 칸)은 행을 지우지 않는다. 지우면 월 원장 표가
+ * "표본 보호로 비공개"라고 적은 그 업종이 요일 표에서는 흔적 없이 사라져, 같은 화면이
+ * 같은 셀을 두 가지로 말하게 된다.
+ */
 export function regionCategoryWeekdays(daily: UsageDaily, region: Region): CategoryWeekdayRow[] {
   const byCat = daily.weekday_category[region];
   if (!byCat || !isValidWeekday(daily)) return [];
   const sum = (xs: number[]) => xs.reduce((a, b) => a + b, 0);
-  return CATEGORIES.flatMap((category) => {
+  return CATEGORIES.flatMap((category): CategoryWeekdayRow[] => {
     const counts = byCat[category];
+    if (counts === null) {
+      return [{
+        category,
+        maxLabel: null,
+        weekdayAvg: null,
+        weekendAvg: null,
+        weekendVsWeekdayPct: null,
+        suppressed: true,
+      }];
+    }
     if (!counts || counts.length !== 7 || sum(counts) === 0) return [];
     const avgs = counts.map((c, i) => c / daily.weekday_days[i]);
     const maxIdx = avgs.indexOf(Math.max(...avgs));
@@ -344,6 +381,7 @@ export function regionCategoryWeekdays(daily: UsageDaily, region: Region): Categ
       weekendAvg: round1(weekendAvg),
       weekendVsWeekdayPct:
         weekdayAvg > 0 ? round1(((weekendAvg - weekdayAvg) / weekdayAvg) * 100) : null,
+      suppressed: false,
     }];
   });
 }
@@ -371,8 +409,7 @@ export function regionDailySeries(daily: UsageDaily, region: Region): DailyTrend
     windowSum += value;
     if (i >= 7) windowSum -= rows[i - 7][1];
     const span = Math.min(i + 1, 7);
-    // 요일은 파이프라인 계약(0=월)과 같은 값을 UTC 산술로 얻는다 — 2025-01-01(수)=dayofweek 2
-    const dow = (Math.floor(Date.parse(`${date}T00:00:00Z`) / 86_400_000) + 3) % 7;
+    const dow = weekdayIndexOf(date);
     return {
       date,
       tooltipLabel: `${Number(date.slice(5, 7))}월 ${Number(date.slice(8, 10))}일 (${daily.weekday_labels[dow]})`,

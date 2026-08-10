@@ -127,6 +127,11 @@ export default async function DashboardPage({
   // 전 지역 기준선 — 지역 리듬이 "다르다"는 말은 비교 대상이 화면에 함께 있어야 성립한다
   const overallWeekday = selectedRegion ? overallWeekdayInsight(usageDaily) : null;
   const categoryWeekdays = selectedRegion ? regionCategoryWeekdays(usageDaily, selectedRegion) : [];
+  // 요일 축은 산출물이 달라(usage_daily) 억제 여부를 따로 읽는다 — 두 파일이 어긋나도 화면은 각자 사실대로 말한다
+  const hiddenWeekdayLabel = categoryWeekdays
+    .filter((r) => r.suppressed)
+    .map((r) => r.category)
+    .join(" · ");
   const dailySeries = selectedRegion ? regionDailySeries(usageDaily, selectedRegion) : [];
   const dailyPeriod = usageDaily.period;
 
@@ -466,6 +471,14 @@ export default async function DashboardPage({
                       </p>
                     ) : null}
                     <BarRank data={weekdayBars} unit="건" height={236} />
+                    {/* 옆 표의 공개 업종만 더하면 이 막대에 못 미친다 — 두 값이 어긋나 보이지 않게 밝힌다 */}
+                    {hiddenWeekdayLabel ? (
+                      <p className="u-note mt-3 border-t border-admin-border pt-2.5">
+                        이 막대는 지역 일별 집계에서 만든 지역 전체 합계라 비공개 업종
+                        ({hiddenWeekdayLabel})까지 포함합니다 — 오른쪽 업종별 표의 공개 업종을
+                        더한 값보다 큽니다.
+                      </p>
+                    ) : null}
                   </>
                 ) : (
                   <EmptyChart />
@@ -474,6 +487,7 @@ export default async function DashboardPage({
               <Section
                 icon="list"
                 title={`${selectedRegion} 업종별 요일 패턴`}
+                badge={hiddenWeekdayLabel ? <PrivacyBadge note={privacy?.note} k={privacyK} /> : null}
                 desc="표시 6분류별로 사용이 가장 몰리는 요일과 주중·주말 하루 평균을 비교한다."
               >
                 {categoryWeekdays.length ? (
@@ -489,31 +503,52 @@ export default async function DashboardPage({
                         </tr>
                       </thead>
                       <tbody>
-                        {categoryWeekdays.map((row) => (
-                          <tr key={row.category}>
-                            <td className="font-medium">{row.category}</td>
-                            <td className="text-right">{row.maxLabel}</td>
-                            <td className="text-right tabular-nums text-admin-text-muted">
-                              {num(row.weekdayAvg)}건
-                            </td>
-                            <td className="text-right tabular-nums text-admin-text-muted">
-                              {num(row.weekendAvg)}건
-                            </td>
-                            <td className="text-right font-semibold tabular-nums">
-                              {row.weekendVsWeekdayPct === null ? (
-                                <span className="font-normal text-admin-text-muted">비교 불가</span>
-                              ) : (
-                                signed(row.weekendVsWeekdayPct, "%", 1)
-                              )}
-                            </td>
-                          </tr>
-                        ))}
+                        {categoryWeekdays.map((row) =>
+                          // 문구는 위 상위 업종 표와 같은 것을 쓴다 — 같은 셀을 화면마다 달리 부르지 않는다
+                          row.suppressed ? (
+                            <tr key={row.category}>
+                              <td className="font-medium">{row.category}</td>
+                              <td
+                                colSpan={4}
+                                className="text-right text-admin-text-muted"
+                                title={privacy?.note ?? undefined}
+                              >
+                                표본 보호로 비공개
+                              </td>
+                            </tr>
+                          ) : (
+                            <tr key={row.category}>
+                              <td className="font-medium">{row.category}</td>
+                              <td className="text-right">{row.maxLabel}</td>
+                              <td className="text-right tabular-nums text-admin-text-muted">
+                                {num(row.weekdayAvg)}건
+                              </td>
+                              <td className="text-right tabular-nums text-admin-text-muted">
+                                {num(row.weekendAvg)}건
+                              </td>
+                              <td className="text-right font-semibold tabular-nums">
+                                {row.weekendVsWeekdayPct === null ? (
+                                  <span className="font-normal text-admin-text-muted">비교 불가</span>
+                                ) : (
+                                  signed(row.weekendVsWeekdayPct, "%", 1)
+                                )}
+                              </td>
+                            </tr>
+                          ),
+                        )}
                       </tbody>
                     </table>
                   </div>
                 ) : (
                   <EmptyChart />
                 )}
+                {hiddenWeekdayLabel ? (
+                  <p className="u-note mt-3 border-t border-admin-border pt-2.5">
+                    가맹점 {privacyK}곳 미만인 업종({hiddenWeekdayLabel})은 요일 축에서도 건수를
+                    비공개 처리했습니다. 공개 업종 값은 차분으로 되살아나지 않도록{" "}
+                    {privacy?.aggregate_rounding.unit ?? 100} 단위로 반올림해 발행합니다.
+                  </p>
+                ) : null}
               </Section>
             </div>
             <Section

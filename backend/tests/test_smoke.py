@@ -359,6 +359,9 @@ def test_generate_hands_target_weekday_pattern_to_the_llm(monkeypatch):
 
     시드 상태의 확정 타깃(영월군 숙박업)은 하이원 실적 0인 공백 업종이라 읍 전 업종
     패턴 폴백이 **기본 경로**다 — 폴백 사실이 집계_대상 라벨에 명시되는지까지 본다.
+
+    읍 전 업종 합계는 업종 셀이 아니라 `daily_total`(지역 총합)에서 나와야 한다 — 소표본
+    억제(P10)로 영월군 카페·편의점 셀이 None이라, 셀을 더하면 읍 합계가 17% 낮아진다.
     """
     captured = {}
 
@@ -374,8 +377,12 @@ def test_generate_hands_target_weekday_pattern_to_the_llm(monkeypatch):
     daily = dataload.load("usage_daily")
     by_cat = daily["weekday_category"]["영월군"]
     assert sum(by_cat["숙박업"]) == 0 and "전 업종" in signal["집계_대상"]   # 폴백 경로가 기본
+    assert by_cat["편의점"] is None                                      # 억제 셀이 실제로 비어 있다
+    totals = cardgen.eup_weekday_totals(daily, "영월군", by_cat)
+    open_cells = [sum(c[i] for c in by_cat.values() if isinstance(c, list)) for i in range(7)]
+    assert sum(totals) > sum(open_cells)                                 # 억제분이 빠지지 않았다
     expected = {
-        label: round(sum(c[i] for c in by_cat.values()) / daily["weekday_days"][i], 1)
+        label: round(totals[i] / daily["weekday_days"][i], 1)
         for i, label in enumerate(daily["weekday_labels"])
     }
     assert signal["요일별_하루평균_건수"] == expected                     # 입력에 없는 수치를 만들지 않는다
