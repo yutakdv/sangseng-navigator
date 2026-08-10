@@ -6,7 +6,8 @@ import { EmptyChart } from "@/components/EmptyChart";
 import { Icon } from "@/components/Icon";
 import { KpiCard } from "@/components/KpiCard";
 import { PageHeader } from "@/components/PageHeader";
-import { RegionStatusGrid } from "@/components/RegionStatusGrid";
+import { RegionalMapSection } from "@/components/RegionalMap/RegionalMapSection";
+import { buildRegionStatuses } from "@/components/RegionStatusCard";
 import { MenuDemoGuide } from "@/components/MenuDemoGuide";
 import { GroupHeading, Section } from "@/components/Section";
 import { DashboardTabs, NextViewLink, resolveView } from "@/components/DashboardTabs";
@@ -128,19 +129,21 @@ export default async function DashboardPage({
         <section aria-label="현황" className="flex flex-col gap-6">
           <GroupHeading note="원천 데이터에서 바로 계산한 값">현황</GroupHeading>
 
-          {/* 6개 지역 비교표가 첫 조망이다 — 여기서 이상한 지역을 발견하고 카드의 상세 링크로
-              지역 상세 분석 화면에 진입하는 것이 이 페이지의 기본 탐색 동선이다 */}
+          {/* 지도가 첫 조망이자 탐색 진입점이다 — 지역을 고르면 상태 카드가 열리고,
+              카드의 상세 링크로 지역 상세 분석 화면에 들어가는 것이 기본 동선이다.
+              수치 계산은 여기(서버)서 끝내고 평면 배열만 내려보낸다 */}
           <Section
             icon="map"
             title="지역별 현재 상태"
-            desc="6개 지역을 같은 기준으로 나란히 비교한다. 누적 사용 건수·전체 비중·최근 월 흐름·1단계 진단 순위를 함께 표시한다. 지역 한 곳의 업종 구성·시간 패턴은 카드의 상세 분석에서 본다."
+            desc="실제 행정구역 경계 지도에서 지역을 고르면 누적 사용 건수·전체 비중·최근 월 흐름·1단계 진단 순위가 열린다. 지역 한 곳의 업종 구성·시간 패턴은 카드의 상세 분석에서 본다."
           >
-            <RegionStatusGrid
-              shares={d.region_share ?? []}
-              monthlyByRegion={d.monthly_by_region ?? []}
-              ranking={eupRanking}
-              selectedRegions={cand.selected_eups ?? []}
-              withDetailLink
+            <RegionalMapSection
+              statuses={buildRegionStatuses({
+                shares: d.region_share ?? [],
+                monthlyByRegion: d.monthly_by_region ?? [],
+                ranking: eupRanking,
+                selectedRegions: cand.selected_eups ?? [],
+              })}
             />
           </Section>
 
