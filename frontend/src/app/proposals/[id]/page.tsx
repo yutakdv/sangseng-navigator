@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { AdminShell } from "@/components/AdminShell";
+import { DissentList, hasDissent } from "@/components/DissentList";
 import { Icon } from "@/components/Icon";
 import { Act, Panel } from "@/components/Panel";
 import { DecisionBar } from "@/components/proposals/DecisionBar";
@@ -52,6 +53,9 @@ export default async function ProposalDetailPage({ params }: { params: Promise<{
   if (!card) notFound();
 
   const evidence = composeEvidence(dashboard, candidates, card);
+  const showDissent = hasDissent(card);
+  // 반대 관점 막을 끼워 넣으면 뒤따르는 이력 막 번호가 밀린다 — 없는 카드에서는 그대로 03을 쓴다
+  const historyActNo = showDissent ? "04" : "03";
 
   return (
     <AdminShell dashboard={dashboard}>
@@ -82,8 +86,27 @@ export default async function ProposalDetailPage({ params }: { params: Promise<{
         {/* ── ② 근거 · ③ 전망 — 허브 02·03막의 이동 ── */}
         <EvidenceSections card={card} dashboard={dashboard} evidence={evidence} />
 
+        {/* ── 반대 관점 — 하단 고정 결정 바를 누르기 전 마지막 본문 막 (v4.1 C3 · 절대 규칙 4) ── */}
+        {showDissent ? (
+          <Act
+            no="03"
+            phase="반론"
+            question="이 제안이 틀릴 수 있는 이유는?"
+            title="반대 관점을 확인합니다"
+          >
+            <Panel
+              id="dissent"
+              icon="warn"
+              title="반대 관점"
+              desc="이 제안이 틀릴 수 있는 이유입니다 — 승인 전에 확인하세요."
+            >
+              <DissentList card={card} />
+            </Panel>
+          </Act>
+        ) : null}
+
         {/* ── ⑤ 변경 이력 ── */}
-        <Act no="03" phase="이력" question="이 카드에 무슨 일이 있었나" title="결정·상태 변경 기록" last>
+        <Act no={historyActNo} phase="이력" question="이 카드에 무슨 일이 있었나" title="결정·상태 변경 기록" last>
           <Panel
             icon="clock"
             title="변경 기록"

@@ -3,6 +3,7 @@ import Link from "next/link";
 import { AdminShell } from "@/components/AdminShell";
 import { AssumptionBadge, AssumptionNote, NarrativeSourceChip, ProxyBadge } from "@/components/Badge";
 import { CellExplorer } from "@/components/CellExplorer";
+import { DissentList, hasDissent } from "@/components/DissentList";
 import { Icon } from "@/components/Icon";
 import { PageHeader } from "@/components/PageHeader";
 import { PaybackCycle } from "@/components/PaybackCycle";
@@ -197,6 +198,18 @@ export default async function IncentivePage({
                 ) : null}
               </div>
             </article>
+
+            {/* ── 반대 관점 — 시나리오 비교 Section(승인 UI 포함) 바로 위 (v4.1 C3 · 절대 규칙 4) ── */}
+            {hasDissent(card) ? (
+              <Section
+                id="dissent"
+                icon="warn"
+                title="반대 관점"
+                desc="이 제안이 틀릴 수 있는 이유입니다 — 승인 전에 확인하세요."
+              >
+                <DissentList card={card} />
+              </Section>
+            ) : null}
 
             {/* ── 시나리오 비교 + 승인 ──────────────────────────── */}
             <Section

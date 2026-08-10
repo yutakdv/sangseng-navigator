@@ -6,6 +6,7 @@ import { AssumptionBadge, AssumptionNote, NarrativeSourceChip, ProxyBadge } from
 import { CandidateVerification } from "@/components/CandidateVerification";
 import { DecisionActions } from "@/components/DecisionActions";
 import { DeltaValue } from "@/components/DeltaValue";
+import { DissentList, hasDissent } from "@/components/DissentList";
 import { Icon } from "@/components/Icon";
 import { IncentiveDecision } from "@/components/IncentiveDecision";
 import { MapView } from "@/components/MapView";
@@ -632,6 +633,18 @@ export default async function CardDetailPage({
               <p className="u-note mt-3">{card.assumption_note}</p>
             ) : null}
             <AssumptionNote className="mt-1.5" />
+          </Section>
+        ) : null}
+
+        {/* ── 반대 관점 — 담당자 결정 Section 바로 위 (v4.1 C3 · 절대 규칙 4의 화면 증거) ── */}
+        {hasDissent(card) ? (
+          <Section
+            id="dissent"
+            icon="warn"
+            title="반대 관점"
+            desc="이 제안이 틀릴 수 있는 이유입니다 — 승인 전에 확인하세요."
+          >
+            <DissentList card={card} />
           </Section>
         ) : null}
 

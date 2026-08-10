@@ -145,7 +145,7 @@ export function GradeChip({ grade }: { grade: string }) {
 export function NarrativeSourceChip({ kind }: { kind: NarrativeSourceKind | null }) {
   if (!kind) return null;
   const { label, note } = NARRATIVE_SOURCE_TEXT[kind];
-  const byAi = kind === "ai" || kind === "ai_partial";
+  const byAi = kind === "ai" || kind === "ai_partial" || kind === "ai_unverified";
   const tone = byAi
     ? "bg-admin-primary-soft text-admin-primary ring-admin-primary-line"
     : "bg-admin-surface-sunken text-admin-text-muted ring-admin-border";
