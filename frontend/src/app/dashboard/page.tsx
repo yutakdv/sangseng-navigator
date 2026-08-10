@@ -135,6 +135,7 @@ export default async function DashboardPage({
           <Section
             icon="map"
             title="지역별 현재 상태"
+            wideDesc
             desc="실제 행정구역 경계 지도에서 지역을 고르면 누적 사용 건수·전체 비중·최근 월 흐름·1단계 진단 순위가 열린다. 지역 한 곳의 업종 구성·시간 패턴은 카드의 상세 분석에서 본다."
           >
             <RegionalMapSection

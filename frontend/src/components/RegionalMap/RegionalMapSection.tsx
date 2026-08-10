@@ -68,7 +68,7 @@ export function RegionalMapSection({ statuses }: { statuses: RegionStatus[] }) {
             }}
           />
         </div>
-        <p className="mt-2 flex items-center gap-1.5 px-1 text-[11px] text-admin-text-muted">
+        <p className="mt-6 flex items-center gap-1.5 px-1 text-[11px] text-admin-text-muted">
           <Icon name="info" size={12} />
           실제 행정구역 경계 기반 · 정선군은 고한읍·사북읍을 제외한 잔여 지역, 삼척시는
           도계읍(지역가맹 대상지역) 기준

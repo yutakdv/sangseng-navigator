@@ -13,6 +13,7 @@ export function Section({
   icon,
   badge,
   desc,
+  wideDesc = false,
   right,
   children,
   id,
@@ -21,6 +22,11 @@ export function Section({
   icon?: IconName;
   badge?: ReactNode;
   desc?: ReactNode;
+  /**
+   * 설명의 최대 폭 제한(max-w-3xl)을 푼다. 기본 제한은 긴 문단의 행길이를 읽기 좋게
+   * 묶는 장치인데, 한 문장이 제한 폭보다 조금 길어 공간이 남는데도 두 줄로 꺾일 때만 켠다.
+   */
+  wideDesc?: boolean;
   right?: ReactNode;
   children: ReactNode;
   id?: string;
@@ -40,7 +46,11 @@ export function Section({
               {badge}
             </div>
             {desc ? (
-              <p className="mt-1.5 max-w-3xl break-keep text-[13px] leading-[1.6] text-admin-text-muted">
+              <p
+                className={`mt-1.5 break-keep text-[13px] leading-[1.6] text-admin-text-muted ${
+                  wideDesc ? "" : "max-w-3xl"
+                }`}
+              >
                 {desc}
               </p>
             ) : null}
