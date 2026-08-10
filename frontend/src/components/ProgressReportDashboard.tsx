@@ -5,7 +5,6 @@ import { Icon } from "@/components/Icon";
 import { KpiCard } from "@/components/KpiCard";
 import { Section } from "@/components/Section";
 import { Sparkline } from "@/components/Sparkline";
-import { ProgressChip } from "@/components/StatusChip";
 import { PROXY_NOTE } from "@/lib/constants";
 import { ratioPct } from "@/lib/format";
 import {
@@ -206,38 +205,31 @@ export function ProgressReportDashboard({
           desc={`완료되지 않은 카드 중 ${report.stale.threshold_days}일 이상 새 기록이 없는 항목입니다.`}
         >
           {report.stale.items.length ? (
-            // 좌측 주의색 레일 + 큰 일수 — "며칠째 멈췄나"가 이 목록의 유일한 정렬 기준이라
-            // 그 숫자를 카드의 머리로 올린다. 예전에는 divide-y 목록의 오른쪽 끝에 떠 있어
-            // 카드 제목과 시선이 두 갈래로 갈렸다.
-            <ul className="flex flex-col gap-2">
+            /* 상자를 씌우지 않는다 — 항목마다 틴트 면 + 좌측 주의색 레일을 두르면 패널 안에
+               또 패널이 생겨(테두리 두 겹) 목록 몇 줄이 경고 더미처럼 보인다. 이 레포의
+               목록 문법대로 가는 실선으로만 나눈다(바로 아래 미기록 목록과 같은 모양).
+               상태는 이 줄의 주어가 아니라 부연이라 칩을 쓰지 않고 메타 줄의 글자로 내린다 —
+               칩의 점까지 붙으면 제목보다 배지가 먼저 읽힌다. */
+            <ul className="divide-y divide-admin-border border-y border-admin-border">
               {report.stale.items.map((item) => (
-                <li
-                  key={item.card_id}
-                  className="rounded-xl border border-admin-border border-l-[3px] border-l-state-warn bg-admin-surface-sunken px-3.5 py-3"
-                >
-                  <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
-                    <span className="text-[19px] font-bold leading-none tabular-nums text-state-warn">
-                      {item.days_since_update}일
-                    </span>
-                    <span className="text-[11px] font-semibold text-state-warn/80">미갱신</span>
-                    <span className="ml-auto">
-                      <ProgressChip progress={item.progress} />
-                    </span>
-                  </div>
-                  <p className="mt-2 break-keep text-[13px] font-semibold leading-5 text-admin-text">
+                <li key={item.card_id} className="flex flex-wrap items-baseline gap-x-3 gap-y-1 py-3">
+                  <p className="min-w-0 flex-1 basis-56 break-keep text-[13px] font-semibold leading-5 text-admin-text">
                     {item.title}
                   </p>
-                  <div className="mt-1.5 flex flex-wrap items-baseline gap-x-2 gap-y-1 text-[11px] text-admin-text-muted">
-                    <span className="tabular-nums">{item.card_id}</span>
-                    <span aria-hidden>·</span>
-                    <span>마지막 기록 {kstDateTime(item.last_recorded_at)}</span>
+                  {/* 며칠째 멈췄는지가 이 목록의 정렬 기준 — 수치는 오른쪽 열에 세로로 맞춰
+                      여러 줄일 때 눈이 한 열만 훑으면 되게 한다 */}
+                  <span className="shrink-0 text-[15px] font-bold tabular-nums text-state-warn">
+                    {item.days_since_update}일째
+                  </span>
+                  <p className="w-full text-[11px] leading-5 text-admin-text-muted">
+                    {item.progress} · {item.card_id} · 마지막 기록 {kstDateTime(item.last_recorded_at)}
                     <Link
                       href={`/tracking/new?card_id=${encodeURIComponent(item.card_id)}`}
-                      className="ml-auto shrink-0 font-semibold text-admin-primary underline-offset-4 hover:underline"
+                      className="float-right font-semibold text-admin-primary underline-offset-4 hover:underline"
                     >
                       경과 기록 →
                     </Link>
-                  </div>
+                  </p>
                 </li>
               ))}
             </ul>
