@@ -50,7 +50,9 @@ export const dynamic = "force-dynamic";
  * 서버에서 처리한다 (`lib/widgetList.ts`).
  */
 type Search = {
+  /** 선택된 지역들 — 쉼표로 잇는다 (`고한읍,사북읍`) */
   region?: string;
+  /** 선택된 업종들 — 쉼표로 잇는다 */
   category?: string;
   limit?: string;
   live?: string;
@@ -60,15 +62,35 @@ type Search = {
   sort?: string;
   /** "off"면 오늘의 추천 카드를 접어 둔다 (사용자가 닫은 상태) */
   today?: string;
+  /** 다시 그려질 때 열어 둘 선택 목록 ("region" | "category") — 다중 선택용 */
+  open?: string;
 };
 const DEFAULT_LIST_LIMIT = 12;
 const MAX_LIST_LIMIT = 120;
+
+/**
+ * 쿼리의 목록 값을 읽는다 — 계약에 없는 값은 버리고, 정본 순서(REGIONS·CATEGORIES)로 정렬한다.
+ * 전부 고른 상태는 "전체"와 같으므로 빈 목록으로 접는다 — 조회 조합 수도 줄고 URL도 짧아진다.
+ */
+const parseList = (raw: string | undefined, allowed: readonly string[]): string[] => {
+  if (!raw) return [];
+  const picked = new Set(raw.split(",").map((v) => v.trim()));
+  const valid = allowed.filter((a) => picked.has(a));
+  return valid.length === allowed.length ? [] : valid;
+};
+
+/** 항목 하나를 켜고 끈다 */
+const toggle = (list: string[], value: string, allowed: readonly string[]): string[] => {
+  const next = list.includes(value) ? list.filter((v) => v !== value) : [...list, value];
+  return allowed.filter((a) => next.includes(a));
+};
 
 const href = (next: Search, current: Search): string => {
   const merged = { ...current, ...next };
   const params = new URLSearchParams();
   if (merged.region) params.set("region", merged.region);
   if (merged.category) params.set("category", merged.category);
+  if (merged.open) params.set("open", merged.open);
   if (merged.limit) params.set("limit", merged.limit);
   if (merged.q) params.set("q", merged.q);
   // 기본 정렬은 URL에 남기지 않는다 — 공유된 주소가 짧고, 기본값이 바뀌어도 링크가 따라온다
@@ -85,8 +107,9 @@ export default async function WidgetPage({ searchParams }: { searchParams: Promi
   // Next 15+ 에서 params·searchParams 는 Promise 다 — await 없이 접근하면 런타임 에러
   const sp = await searchParams;
   // 계약에 없는 값이 쿼리로 들어오면 무시한다 (필터는 6지역·표시 6분류로 고정)
-  const region = REGIONS.includes(sp.region as never) ? sp.region : undefined;
-  const category = CATEGORIES.includes(sp.category as never) ? sp.category : undefined;
+  const regions = parseList(sp.region, REGIONS);
+  const categories = parseList(sp.category, CATEGORIES);
+  const openMenu = sp.open === "region" || sp.open === "category" ? sp.open : undefined;
   const requestedLimit = Number(sp.limit);
   const listLimit = Number.isFinite(requestedLimit)
     ? Math.max(DEFAULT_LIST_LIMIT, Math.min(MAX_LIST_LIMIT, Math.floor(requestedLimit)))
@@ -95,9 +118,13 @@ export default async function WidgetPage({ searchParams }: { searchParams: Promi
   const query = normalizeQuery(sp.q);
   const sort = sortKeyOf(sp.sort);
   const todayClosed = sp.today === "off";
+  // 링크가 물고 다닐 현재 상태. `open`은 일부러 넣지 않는다 — 선택 목록 안의 항목 링크만
+  // 그 값을 실어 열린 채로 돌아오고, 나머지 링크(칩·정렬·검색)는 목록을 닫은 채 이동해야 한다.
+  const regionParam = regions.join(",") || undefined;
+  const categoryParam = categories.join(",") || undefined;
   const current: Search = {
-    region,
-    category,
+    region: regionParam,
+    category: categoryParam,
     limit: sp.limit ? String(listLimit) : undefined,
     live,
     q: query,
@@ -105,8 +132,8 @@ export default async function WidgetPage({ searchParams }: { searchParams: Promi
     today: todayClosed ? "off" : undefined,
   };
   const filters: Search = {
-    region,
-    category,
+    region: regionParam,
+    category: categoryParam,
     live,
     q: query,
     sort,
@@ -121,10 +148,19 @@ export default async function WidgetPage({ searchParams }: { searchParams: Promi
    * **무엇을 담을지**를 정하고, 담긴 것을 어떤 순서로 볼지는 여기서 정한다.
    */
   const fetchLimit = MAX_LIST_LIMIT;
+  /**
+   * 다중 선택 조회 — `/api/widget/recommend`는 region·category를 **하나씩만** 받는다(05 §1).
+   * 그래서 고른 값들의 조합마다 한 번씩 부르고 합친다. 조합은 (지역 × 업종)이라 서로 겹치지
+   * 않으므로 total은 그냥 더하면 되고, 그래도 같은 가맹점이 두 번 오면 이름+주소로 거른다.
+   * 6지역·6업종을 다 고른 상태는 parseList가 "전체"로 접기 때문에 최대 조합은 5×5다.
+   */
+  const combos = (regions.length ? regions : [undefined]).flatMap((r) =>
+    (categories.length ? categories : [undefined]).map((c) => ({ r, c })),
+  );
 
-  const [{ recommendations, total }, dashboard, cand, incentiveRes, usageDaily, weather] =
+  const [widgetResults, dashboard, cand, incentiveRes, usageDaily, weather] =
     await Promise.all([
-      api.widget(region, category, fetchLimit),
+      Promise.all(combos.map(({ r, c }) => api.widget(r, c, fetchLimit))),
       // 푸터 "데이터 기준" 한 줄 전용 — 이 엔드포인트만 죽어도 방문객 위젯 전체가 에러 화면이
       // 되면 안 된다 (아래 candidates와 같은 방어 관용구).
       api.dashboard().catch(() => null),
@@ -137,8 +173,21 @@ export default async function WidgetPage({ searchParams }: { searchParams: Promi
       api.usageDaily(),
       // 기상청 실황은 있으면 좋은 곁들임이다 — 실패해도 요일 문구는 그대로 나와야 한다.
       // fetchNowcast는 던지지 않도록 구현했지만 위 candidates와 같은 방어 관용구를 맞춘다.
-      fetchNowcast(region as Region | undefined).catch(() => null),
+      // 날씨는 지역 하나일 때만 그 지역 격자로 본다 — 여러 곳을 고르면 거점 격자로 말한다
+      fetchNowcast(regions.length === 1 ? (regions[0] as Region) : undefined).catch(() => null),
     ]);
+
+  const seenMerchant = new Set<string>();
+  const recommendations: Recommendation[] = [];
+  for (const result of widgetResults) {
+    for (const rec of result.recommendations) {
+      const key = `${rec.name}|${rec.address}`;
+      if (seenMerchant.has(key)) continue;
+      seenMerchant.add(key);
+      recommendations.push(rec);
+    }
+  }
+  const total = widgetResults.reduce((sum, r) => sum + r.total, 0);
 
   // 칩의 숫자는 "그 칩을 눌렀을 때 볼 목록"의 크기 — 반대편 활성 필터를 반영해야 한다.
   // 1,679개 배열을 칩(14개)마다 재스캔하지 않도록 한 번 훑어 (지역|업종) 조합 카운트를 만든다.
@@ -151,9 +200,19 @@ export default async function WidgetPage({ searchParams }: { searchParams: Promi
   }
   const countMerchants = (r?: string, c?: string): number =>
     pairCount.get(`${r ?? ""}|${c ?? ""}`) ?? 0;
-  // candidates를 못 받았으면 countOf를 아예 내리지 않는다 — 칩이 전부 0으로 보이는 오표기 방지
-  const countOfRegion = merchants.length ? (v?: string) => countMerchants(v, category) : undefined;
-  const countOfCategory = merchants.length ? (v?: string) => countMerchants(region, v) : undefined;
+  /**
+   * 항목 옆 숫자 = "그 항목까지 켰을 때 걸리는 가맹점 수". 반대편 필터가 여러 개면 그 값들의
+   * 합이다(지역×업종 칸은 서로 겹치지 않는다). candidates를 못 받았으면 countOf를 아예
+   * 내리지 않는다 — 숫자가 전부 0으로 보이는 오표기 방지.
+   */
+  const sumOver = (values: string[], count: (v?: string) => number): number =>
+    values.length ? values.reduce((sum, v) => sum + count(v), 0) : count(undefined);
+  const countOfRegion = merchants.length
+    ? (v?: string) => sumOver(categories, (c) => countMerchants(v, c))
+    : undefined;
+  const countOfCategory = merchants.length
+    ? (v?: string) => sumOver(regions, (r) => countMerchants(r, v))
+    : undefined;
 
   /**
    * 페이백 배너 — 우선 추천 항목이 실어 온 값을 쓰고(서버 라벨이 정본), 필터 결과가 0건이라
@@ -171,19 +230,23 @@ export default async function WidgetPage({ searchParams }: { searchParams: Promi
       : null);
   /**
    * 오늘의 추천 — 요일 실측이 주근거, 날씨는 상황 설명이다(추천 업종을 바꾸지 않는다).
-   * 지역이 없으면 "전체" 축으로 말하고 날씨는 거점 격자를 쓴다.
-   * 48~49행의 `region`/`category`는 `CATEGORIES.includes(...)` 가드를 거쳐도 타입이
-   * `string | undefined`다(includes가 타입 서술어가 아님) — 그래서 캐스팅한다.
+   * 지역·업종을 여러 개 골랐으면 한 지역/한 업종의 사실로 말할 수 없으므로 "전체" 축으로 돌아간다
+   * (한 개만 고른 경우에만 그 축을 쓴다).
    */
-  const fact = weekdayFact(usageDaily, (region as Region) ?? "전체", kstWeekdayIndex(), {
+  const soleRegion = regions.length === 1 ? (regions[0] as Region) : undefined;
+  const soleCategory = categories.length === 1 ? (categories[0] as DisplayCategory) : undefined;
+  const fact = weekdayFact(usageDaily, soleRegion ?? "전체", kstWeekdayIndex(), {
     // 방문객이 업종을 이미 골랐으면 그 업종 사실만 말한다 — 다른 업종을 들이밀지 않는다
-    only: category as DisplayCategory | undefined,
+    only: soleCategory,
     // 지름길 칩이 빈 목록으로 이어지지 않게. candidates를 못 받았으면(merchants 0) 거르지 않는다
-    isAvailable: merchants.length ? (c) => countMerchants(region, c) > 0 : undefined,
+    isAvailable: merchants.length ? (c) => sumOver(regions, (r) => countMerchants(r, c)) > 0 : undefined,
   });
-  const todayCopy = fact ? todayPickCopy(fact, region ?? null, weather) : null;
-  // 업종이 이미 선택돼 있으면 칩이 현재 필터와 같아진다 — 그때는 칩을 내리지 않는다
-  const todayHref = fact && !category ? href({ category: fact.category }, filters) : null;
+  const todayCopy = fact ? todayPickCopy(fact, soleRegion ?? null, weather) : null;
+  // 그 업종이 이미 켜져 있으면 칩이 현재 필터와 같아진다 — 그때는 칩을 내리지 않는다
+  const todayHref =
+    fact && !categories.includes(fact.category)
+      ? href({ category: toggle(categories, fact.category, CATEGORIES).join(",") || undefined }, filters)
+      : null;
 
   /**
    * 화면에 실제로 뿌릴 목록 — 이름 검색 → 정렬 → 표시 개수만큼 자르기.
@@ -204,11 +267,20 @@ export default async function WidgetPage({ searchParams }: { searchParams: Promi
   const shown = [...fresh, ...others];
   const shownTotal = query ? matched.length : total;
 
-  /** 필터 요약 칩 — 누르면 그 조건만 빠진다 */
+  /** 필터 요약 칩 — 고른 값마다 하나씩, 누르면 그 값만 빠진다 */
   const summaryChips = [
-    region ? { label: region, removeHref: href({ region: undefined }, filters) } : null,
-    category ? { label: category, removeHref: href({ category: undefined }, filters) } : null,
-  ].filter((c): c is { label: string; removeHref: string } => c !== null);
+    ...regions.map((v) => ({
+      label: v,
+      removeHref: href({ region: toggle(regions, v, REGIONS).join(",") || undefined }, filters),
+    })),
+    ...categories.map((v) => ({
+      label: v,
+      removeHref: href(
+        { category: toggle(categories, v, CATEGORIES).join(",") || undefined },
+        filters,
+      ),
+    })),
+  ];
 
   return (
     <div className="min-h-screen bg-admin-bg py-0 sm:py-8">
@@ -269,8 +341,8 @@ export default async function WidgetPage({ searchParams }: { searchParams: Promi
               <WidgetSearch
                 q={query}
                 hidden={{
-                  region,
-                  category,
+                  region: regionParam,
+                  category: categoryParam,
                   live,
                   sort: sort === DEFAULT_SORT ? undefined : sort,
                   today: todayClosed ? "off" : undefined,
@@ -279,22 +351,40 @@ export default async function WidgetPage({ searchParams }: { searchParams: Promi
               />
             </div>
 
-            {/* 칩 14개를 늘어놓지 않고 눌러서 목록이 열리는 선택 필드로 준다 (WidgetControls 주석) */}
+            {/* 칩 14개를 늘어놓지 않고 눌러서 목록이 열리는 선택 필드로 준다 (WidgetControls 주석).
+                항목 링크에는 `open`을 실어, 여러 개를 고르는 동안 목록이 닫히지 않게 한다 */}
             <div className="mt-2.5 grid grid-cols-2 gap-2">
               <WidgetSelect
                 label="관심 지역"
                 options={REGIONS}
-                selected={region}
-                makeHref={(v) => href({ region: v }, filters)}
+                selected={regions}
+                makeHref={(v) =>
+                  href(
+                    { region: toggle(regions, v, REGIONS).join(",") || undefined, open: "region" },
+                    filters,
+                  )
+                }
+                clearHref={href({ region: undefined, open: "region" }, filters)}
                 titleOf={(v) => REGION_TOOLTIP[v as keyof typeof REGION_TOOLTIP]}
                 countOf={countOfRegion}
+                open={openMenu === "region"}
               />
               <WidgetSelect
                 label="업종"
                 options={CATEGORIES}
-                selected={category}
-                makeHref={(v) => href({ category: v }, filters)}
+                selected={categories}
+                makeHref={(v) =>
+                  href(
+                    {
+                      category: toggle(categories, v, CATEGORIES).join(",") || undefined,
+                      open: "category",
+                    },
+                    filters,
+                  )
+                }
+                clearHref={href({ category: undefined, open: "category" }, filters)}
                 countOf={countOfCategory}
+                open={openMenu === "category"}
               />
             </div>
             <WidgetFilterSummary
@@ -303,7 +393,8 @@ export default async function WidgetPage({ searchParams }: { searchParams: Promi
             />
           </div>
 
-          <KakaoMapView recommendations={shown} region={region} />
+          {/* 지도 제목 칩은 지역을 하나만 골랐을 때만 그 이름을 말한다 (여러 곳이면 거점 기준) */}
+          <KakaoMapView recommendations={shown} region={soleRegion} />
         </div>
 
         <div className="px-5 pb-5 sm:px-8 sm:pb-8">

@@ -72,26 +72,45 @@ export function WidgetSearch({
   );
 }
 
-/** 관심 지역·업종 선택 필드 — 누르면 목록이 열린다 */
+/**
+ * 관심 지역·업종 선택 필드 — 누르면 목록이 열리고, **여러 개를 고를 수 있다**.
+ *
+ * 항목을 누르면 그 값이 켜지거나 꺼진 URL로 이동한다(토글). 다중 선택인데 고를 때마다 목록이
+ * 닫히면 두 개째부터는 매번 다시 열어야 하므로, 항목 링크에 `open` 파라미터를 실어 다시 그려질 때
+ * 열린 채로 오게 한다 — 클라이언트 상태 없이 "열린 목록에서 계속 고르기"를 만든다.
+ */
 export function WidgetSelect({
   label,
   selected,
   options,
   makeHref,
+  clearHref,
   countOf,
   titleOf,
+  open = false,
 }: {
   label: string;
-  selected?: string;
+  /** 선택된 값들 (빈 배열 = 전체) */
+  selected: string[];
   options: readonly string[];
-  makeHref: (value?: string) => string;
-  /** 그 항목을 골랐을 때 보게 될 가맹점 수 — 반대편 활성 필터가 반영된 값이어야 한다 */
+  /** 그 값을 토글한 주소 */
+  makeHref: (value: string) => string;
+  /** "전체" — 이 필터를 통째로 비운 주소 */
+  clearHref: string;
+  /** 그 항목까지 켰을 때 걸리는 가맹점 수 — 반대편 활성 필터가 반영된 값이어야 한다 */
   countOf?: (value?: string) => number;
   titleOf?: (value: string) => string | undefined;
+  open?: boolean;
 }) {
-  const rows: (string | undefined)[] = [undefined, ...options];
+  const summaryText =
+    selected.length === 0
+      ? "전체"
+      : selected.length === 1
+        ? selected[0]
+        : `${selected[0]} 외 ${selected.length - 1}`;
+
   return (
-    <details name={MENU_GROUP} className="group relative">
+    <details name={MENU_GROUP} open={open} className="group relative">
       <summary
         className={`${SUMMARY} flex min-h-[52px] items-center gap-2 rounded-2xl bg-slate-100 px-3.5`}
       >
@@ -101,10 +120,10 @@ export function WidgetSelect({
           </span>
           <span
             className={`block truncate text-[14px] font-bold leading-5 ${
-              selected ? "text-visitor-primary" : "text-admin-text"
+              selected.length ? "text-visitor-primary" : "text-admin-text"
             }`}
           >
-            {selected ?? "전체"}
+            {summaryText}
           </span>
         </span>
         <Icon
@@ -114,15 +133,36 @@ export function WidgetSelect({
         />
       </summary>
       <div className={`${PANEL} inset-x-0`}>
-        <p className="px-4 pb-1 pt-3 text-[11px] font-semibold text-admin-text-muted">{label}</p>
+        <p className="px-4 pb-1 pt-3 text-[11px] font-semibold text-admin-text-muted">
+          {label} <span className="font-medium">· 여러 개 고를 수 있어요</span>
+        </p>
         <ul className="max-h-[292px] divide-y divide-slate-100 overflow-y-auto pb-1">
-          {rows.map((value) => {
-            const active = value === selected;
+          <li>
+            <Link
+              href={clearHref}
+              aria-current={selected.length === 0 ? "true" : undefined}
+              className={`${ROW} ${selected.length === 0 ? "font-bold text-visitor-primary" : "text-admin-text"}`}
+            >
+              {selected.length === 0 ? (
+                <Icon name="check" size={15} strokeWidth={2} />
+              ) : (
+                <span aria-hidden className="w-[15px]" />
+              )}
+              <span className="min-w-0 flex-1 truncate">전체</span>
+              {countOf ? (
+                <span className="text-[11px] font-semibold tabular-nums text-admin-text-muted">
+                  {countOf(undefined)}
+                </span>
+              ) : null}
+            </Link>
+          </li>
+          {options.map((value) => {
+            const active = selected.includes(value);
             return (
-              <li key={value ?? "전체"}>
+              <li key={value}>
                 <Link
                   href={makeHref(value)}
-                  title={value ? titleOf?.(value) : undefined}
+                  title={titleOf?.(value)}
                   aria-current={active ? "true" : undefined}
                   className={`${ROW} ${active ? "font-bold text-visitor-primary" : "text-admin-text"}`}
                 >
@@ -131,7 +171,7 @@ export function WidgetSelect({
                   ) : (
                     <span aria-hidden className="w-[15px]" />
                   )}
-                  <span className="min-w-0 flex-1 truncate">{value ?? "전체"}</span>
+                  <span className="min-w-0 flex-1 truncate">{value}</span>
                   {countOf ? (
                     <span className="text-[11px] font-semibold tabular-nums text-admin-text-muted">
                       {countOf(value)}
