@@ -31,6 +31,8 @@ export type KakaoMapInstance = {
   ) => void;
   /** LatLngBounds를 넘기면 그 영역에 맞춰 **부드럽게** 이동한다 (뷰 전환 버튼용) */
   panTo: (target: KakaoLatLng | KakaoBounds) => void;
+  /** 픽셀 단위로 밀어 준다. 말풍선이 지도 밖으로 잘리지 않게 자리를 만들 때 쓴다 */
+  panBy: (dx: number, dy: number) => void;
   setCenter: (position: KakaoLatLng) => void;
   setLevel: (level: number, options?: { animate?: boolean | { duration: number } }) => void;
   getLevel: () => number;
@@ -46,6 +48,14 @@ export type KakaoMarker = {
 export type KakaoInfoWindow = {
   open: (map: KakaoMapInstance, marker?: KakaoMarker) => void;
   close: () => void;
+};
+
+/**
+ * 말풍선을 우리가 직접 그릴 때 쓴다 — InfoWindow는 흰 프레임·꼬리·닫기 버튼이 SDK 것이라
+ * 화면 디자인(라운드·그림자·그린 배지)을 맞출 수 없다. 방문객 위젯 지도가 이걸 쓴다.
+ */
+export type KakaoCustomOverlay = {
+  setMap: (map: KakaoMapInstance | null) => void;
 };
 
 export type KakaoCircle = {
@@ -87,6 +97,16 @@ export type KakaoNamespace = {
       removable?: boolean;
       zIndex?: number;
     }) => KakaoInfoWindow;
+    CustomOverlay: new (options: {
+      position: KakaoLatLng;
+      content: HTMLElement;
+      /** 0=위쪽 끝, 1=아래쪽 끝이 position에 붙는다. 핀 위에 띄우려면 1 */
+      yAnchor?: number;
+      xAnchor?: number;
+      zIndex?: number;
+      /** 내부 링크·버튼이 눌리게 하려면 필요하다 (지도 드래그로 먹히지 않게) */
+      clickable?: boolean;
+    }) => KakaoCustomOverlay;
     Circle: new (options: {
       center: KakaoLatLng;
       /** 미터 단위 — MapLibre처럼 원을 다각형으로 근사할 필요가 없다 */

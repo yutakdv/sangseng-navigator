@@ -312,9 +312,6 @@ export function DashboardOverview({
                 leadId={heroId}
                 selectedId={selected?.id}
                 hrefFor={hrefFor}
-                /* 이 목록만 왼쪽 세로 강조 바를 끈다 — 연보라 배경과 우측 체크로 선택이 충분히 읽힌다.
-                   실행 관리·완료 목록은 기본값(바 있음)을 그대로 쓴다 */
-                accentBar={false}
                 badge={
                   qualityLabel ? (
                     <span className="rounded-full bg-state-warn-bg px-2.5 py-1 text-xs font-bold text-state-warn">

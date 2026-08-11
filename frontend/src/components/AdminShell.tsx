@@ -2,8 +2,8 @@ import type { ReactNode } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { Footer } from "@/components/Footer";
-import { Icon } from "@/components/Icon";
 import { SideNav } from "@/components/SideNav";
+import { TourLink } from "@/components/tour/TourLink";
 import { TourOverlay } from "@/components/tour/TourOverlay";
 import type { Dashboard } from "@/types";
 import { dataFreshness } from "@/lib/dataFreshness";
@@ -112,18 +112,3 @@ export function AdminShell({
   );
 }
 
-/**
- * 투어 재시작 진입점 — 사이드바 두 자리(모바일 상단 바·데스크톱 바닥)가 같은 버튼을 쓴다.
- * 버튼 스타일은 새로 만들지 않고 사이트 전역 primary 버튼 톤을 그대로 따른다.
- */
-function TourLink({ className = "" }: { className?: string }) {
-  return (
-    <Link
-      href="/?tour=1"
-      className={`inline-flex min-h-9 items-center gap-1.5 rounded-lg bg-admin-primary px-3 py-1.5 text-xs font-bold text-white transition-colors hover:bg-admin-primary-strong ${className}`}
-    >
-      <Icon name="sparkle" size={14} strokeWidth={2} />
-      3분 체험
-    </Link>
-  );
-}

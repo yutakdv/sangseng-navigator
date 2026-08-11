@@ -26,8 +26,13 @@ export default function NotFound() {
         </p>
 
         <ul className="mt-6 flex flex-col gap-2">
-          <NavItem href="/" title="Action Card 허브" desc="이번 분기 승인 대기 제안 목록 (첫 화면)" />
-          <NavItem href="/tracking" title="정책 카드 관리" desc="승인된 카드의 추진 상태 4단계" />
+          {/* 제목·설명은 사이드바의 현행 메뉴명과 맞춘다 — 여기만 옛 이름이면 같은 화면을 다른 기능으로 읽는다 */}
+          <NavItem href="/" title="정책 나침반" desc="결정 대기 제안과 오늘 할 일 (첫 화면)" />
+          <NavItem
+            href="/tracking"
+            title="추진 경과 리포트"
+            desc="승인된 카드의 추진 상태·진행률·실제 성과 기록"
+          />
           {/* 이 화면은 AdminShell 밖이라 헤더의 `근사 지표` 배지가 없다 — 배지 없이 "지역 전환율"이
               노출되지 않도록 설명을 다른 진단 지표로 적는다 (절대 규칙 2, 13 §9) */}
           <NavItem

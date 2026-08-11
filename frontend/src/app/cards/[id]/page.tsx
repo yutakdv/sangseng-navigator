@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { cache } from "react";
 import { notFound } from "next/navigation";
 import { AdminShell } from "@/components/AdminShell";
 import { AssumptionBadge, AssumptionNote, NarrativeSourceChip, ProxyBadge } from "@/components/Badge";
@@ -24,7 +25,7 @@ import { eventActorLabel, eventLabel } from "@/lib/cardEvents";
 import { cardNarrativeSource } from "@/lib/aiSource";
 import { ANCHOR, PRIMARY } from "@/lib/constants";
 import { ApiError } from "@/lib/errors";
-import type { Candidate, Card } from "@/types";
+import type { Candidate, Card, ProgressMetrics, ProgressRecord } from "@/types";
 
 export const dynamic = "force-dynamic";
 
@@ -34,8 +35,29 @@ export async function generateMetadata({
   params: Promise<{ id: string }>;
 }): Promise<Metadata> {
   const { id } = await params;
+  /**
+   * 없는 카드는 여기서 걸러야 **응답 코드까지** 404가 된다 — 본문에서 notFound()를 부르면
+   * loading.tsx가 이미 200으로 셸을 흘려보낸 뒤라 상태 코드를 바꿀 수 없고, 제목도
+   * "AC-999 제안 근거"로 남아 없는 카드가 있는 것처럼 읽힌다.
+   * BE 장애(404 외 오류)는 여기서 판단하지 않고 본문의 에러 경계로 넘긴다.
+   */
+  if (!(await getCard(id))) notFound();
   return { title: `${id} 제안 근거 · 상생 나침반` };
 }
+
+/**
+ * 카드 한 장 — generateMetadata와 본문이 같은 요청 안에서 한 번만 부르도록 캐시한다.
+ * 404는 "없는 카드"라 undefined로 접고, 그 밖의 오류는 본문 에러 경계로 던진다.
+ */
+const getCard = cache(async (id: string) =>
+  api
+    .card(id)
+    .then((r) => r.card)
+    .catch((error) => {
+      if (error instanceof ApiError && error.status === 404) return undefined;
+      throw error;
+    }),
+);
 
 /**
  * ② 카드 상세 (docs/plan/08 F4 · 03 문서 구조) — 데모 3·4·5단계.
@@ -61,14 +83,7 @@ export default async function CardDetailPage({
   const [dashboard, cand, card, progressResult] = await Promise.all([
     api.dashboard(),
     api.candidates(),
-    api
-      .card(id)
-      .then((r) => r.card)
-      // 실 API의 404는 장애가 아니라 "없는 카드"다 — 에러 화면 대신 Next의 not-found로 넘긴다
-      .catch((error) => {
-        if (error instanceof ApiError && error.status === 404) return undefined;
-        throw error;
-      }),
+    getCard(id),
     api.progressRecords(id).catch((error) => {
       if (error instanceof ApiError && error.status === 404) {
         return { records: [], next_cursor: null };
@@ -261,7 +276,7 @@ export default async function CardDetailPage({
                     editable={card.status === "approved"}
                   />
                 </div>
-                <OperationsSummary card={card} />
+                <OperationsSummary card={card} records={progressResult.records} />
               </>
             ) : null}
 
@@ -305,14 +320,19 @@ export default async function CardDetailPage({
             id="progress-history"
             icon="report"
             title={`추진 경과 기록 · ${progressResult.records.length}건`}
-            desc="상태 변경 근거, 장애 요인, 다음 행동과 실제 관측 성과를 최신 기록부터 보여 줍니다. 빠른 상태 변경은 메모 없음으로 구분합니다."
+            desc="상태 변경 근거, 장애 요인, 다음 행동과 담당자가 입력한 관측값을 최신 기록부터 보여 줍니다. 빠른 상태 변경은 메모 없음으로 구분합니다."
+            /* 기록이 0건이면 아래 타임라인의 빈 상태가 "첫 기록 입력"으로 같은 곳을 가리킨다 —
+               같은 화면에 같은 목적지 버튼을 둘 두면 어느 쪽이 정식 입구인지 흐려진다.
+               기록이 있을 때만 머리에 두고, 없을 때는 빈 상태 하나로 모은다 */
             right={
-              <Link
-                href={`/tracking/new?card_id=${encodeURIComponent(card.id)}`}
-                className="inline-flex min-h-9 items-center gap-1.5 rounded-xl bg-admin-primary px-3.5 py-2 text-xs font-bold text-white hover:bg-admin-primary-strong"
-              >
-                기록 입력 <Icon name="arrowRight" size={13} />
-              </Link>
+              progressResult.records.length ? (
+                <Link
+                  href={`/tracking/new?card_id=${encodeURIComponent(card.id)}`}
+                  className="inline-flex min-h-9 items-center gap-1.5 rounded-xl bg-admin-primary px-3.5 py-2 text-xs font-bold text-white hover:bg-admin-primary-strong"
+                >
+                  기록 입력 <Icon name="arrowRight" size={13} />
+                </Link>
+              ) : null
             }
           >
             <ProgressRecordTimeline
@@ -508,8 +528,12 @@ export default async function CardDetailPage({
                     <th scope="col" className="text-right">
                       기존가맹포화도
                     </th>
+                    {/* 한 줄로 두면 이 열만 폭을 밀어 표가 컨테이너를 넘긴다 — 괄호 안 정의를 아래 줄로 접는다 */}
                     <th scope="col" className="text-right">
-                      반경 500m 내 (동일 업종 가맹점 / 동일 업종 상가)
+                      반경 500m 내
+                      <span className="block text-[11px] font-normal text-admin-text-muted">
+                        (동일 업종 가맹점 / 동일 업종 상가)
+                      </span>
                     </th>
                     <th scope="col">거점에서의 거리</th>
                   </tr>
@@ -799,16 +823,43 @@ function ReviewStep({ href, step, label, note }: { href: string; step: string; l
   );
 }
 
-function OperationsSummary({ card }: { card: Card }) {
+const METRIC_SUMMARY_LABELS: [keyof ProgressMetrics, string, string][] = [
+  ["usage_count", "지역 사용 건수", "건"],
+  ["conversion_rate_pct", "지역 전환율", "%"],
+  ["active_merchant_count", "활성 가맹점", "곳"],
+  ["spend_krw", "지역 사용액", "원"],
+  ["concentration_index", "지역 소비 집중도", "점"],
+];
+
+function OperationsSummary({ card, records }: { card: Card; records: ProgressRecord[] }) {
   const operations = card.operations;
-  const fields = [
-    ["담당자", operations?.owner],
-    ["목표일", operations?.target_date],
-    ["예상 비용", operations?.expected_cost],
-    ["접촉 결과", operations?.contact_result],
-    ["부적격 사유", operations?.ineligible_reason],
-    ["완료 후 실제 성과", operations?.actual_outcome],
-  ] as const;
+  // 담당자·목표일·실측값의 단일 원천은 추진 기록이다 (Codex 리뷰 — 구형 operations와 이중 원천).
+  // operations 값이 있으면 계약 정본으로 우선하고, 비어 있으면 최신 기록에서 투영해
+  // "전부 미입력"인 죽은 블록이 되지 않게 한다. 투영 값은 출처 캡션으로 구분한다.
+  const latest = [...records].sort((a, b) => b.recorded_at.localeCompare(a.recorded_at));
+  const latestOwner = latest.find((r) => r.owner)?.owner ?? null;
+  const latestDue = latest.find((r) => r.due_at)?.due_at ?? null;
+  const latestMetrics = latest.find((r) =>
+    METRIC_SUMMARY_LABELS.some(([key]) => r.metrics?.[key] !== undefined && r.metrics?.[key] !== null),
+  )?.metrics;
+  const metricsSummary = latestMetrics
+    ? METRIC_SUMMARY_LABELS.filter(([key]) => latestMetrics[key] !== undefined && latestMetrics[key] !== null)
+        .map(([key, label, unit]) => `${label} ${Number(latestMetrics[key]).toLocaleString("ko-KR")}${unit}`)
+        .join(" · ")
+    : null;
+
+  const fields: [string, string | null | undefined, boolean][] = [
+    ["담당자", operations?.owner || latestOwner, !operations?.owner && !!latestOwner],
+    ["목표일", operations?.target_date || (latestDue ? latestDue.slice(0, 10) : null), !operations?.target_date && !!latestDue],
+    ["예상 비용", operations?.expected_cost, false],
+    ["접촉 결과", operations?.contact_result, false],
+    ["부적격 사유", operations?.ineligible_reason, false],
+    [
+      "완료 후 실제 성과",
+      operations?.actual_outcome || (card.progress === "완료" ? metricsSummary : null),
+      !operations?.actual_outcome && card.progress === "완료" && !!metricsSummary,
+    ],
+  ];
   return (
     <section aria-labelledby={`operations-${card.id}`} className="border-t border-admin-border pt-4">
       <div className="flex flex-wrap items-baseline justify-between gap-2">
@@ -816,7 +867,7 @@ function OperationsSummary({ card }: { card: Card }) {
         <span className="u-note">예상 효과와 실제 성과를 분리해 기록합니다.</span>
       </div>
       <dl className="mt-3 grid grid-cols-1 border-y border-admin-border sm:grid-cols-2 lg:grid-cols-3">
-        {fields.map(([label, value], index) => (
+        {fields.map(([label, value, projected], index) => (
           <div
             key={label}
             className={`min-w-0 py-3 sm:px-3 ${index === 0 ? "sm:pl-0" : ""} ${index % 3 !== 2 ? "lg:border-r lg:border-admin-border" : ""}`}
@@ -824,6 +875,7 @@ function OperationsSummary({ card }: { card: Card }) {
             <dt className="text-xs font-semibold text-admin-text-muted">{label}</dt>
             <dd className={`mt-1 break-keep text-[13px] ${value ? "font-medium text-admin-text" : "text-admin-text-muted"}`}>
               {value || "아직 입력되지 않음"}
+              {projected ? <span className="ml-1.5 text-[11px] font-normal text-admin-text-muted">최신 추진 기록 기준</span> : null}
             </dd>
           </div>
         ))}

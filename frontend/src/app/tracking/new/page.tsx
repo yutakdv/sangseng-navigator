@@ -50,7 +50,7 @@ export default async function NewProgressRecordPage({
           icon="workflow"
           eyebrow="운영 기록"
           title="추진 기록 입력"
-          lede="상태 변경의 근거와 다음 행동, 실제 관측 성과를 한 번에 남깁니다. 입력값은 카드 타임라인과 경과 리포트에 그대로 반영됩니다."
+          lede="상태 변경의 근거와 다음 행동, 담당자가 확인한 관측값을 한 번에 남깁니다. 입력값은 카드 타임라인과 경과 리포트에 그대로 반영되며, 관측값은 정책의 인과 효과가 아니라 기록입니다."
           actions={
             <Link
               href="/tracking"

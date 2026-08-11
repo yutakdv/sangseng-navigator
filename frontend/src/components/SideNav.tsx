@@ -32,6 +32,12 @@ type Item = {
    * 않는다: `demo` 값이 이미 대상 섹션과 1:1이라 쿼리만으로 충분하다.
    */
   match?: (pathname: string, search: URLSearchParams) => boolean;
+  /**
+   * 이 항목이 현재 화면일 때, 지금 URL의 이 쿼리들을 링크에 그대로 남긴다.
+   * 지역 상세처럼 "무엇을 보고 있는지"가 쿼리에 있는 화면에서, 같은 메뉴를 다시 눌렀을 때
+   * 보던 지역이 기본값으로 되돌아가지 않게 하기 위한 것이다.
+   */
+  keepQuery?: string[];
   /** 모바일 가로 스트립에서는 감춘다 — 좁은 화면에선 자리만 먹는 보조 진입점이다 */
   desktopOnly?: boolean;
   /** 이 화면 안에서만 쓰는 하위 작업. 연결선으로 부모와 묶어 그린다 */
@@ -104,6 +110,7 @@ const GROUPS: { title: string; items: Item[] }[] = [
             icon: "pin",
             href: "/dashboard/region",
             note: "지역별 업종 구성·시간 패턴",
+            keepQuery: ["region"],
             match: (p) => p === "/dashboard/region",
           },
           {
@@ -257,6 +264,26 @@ export function SideNav() {
  *
  * 모바일 가로 스트립에서는 `contents`로 상자를 지워 평평한 한 줄로 되돌린다.
  */
+/**
+ * 현재 화면인 항목의 링크에 "보고 있던 쿼리"를 남긴다 (Item.keepQuery).
+ *
+ * 지역 상세처럼 무엇을 보고 있는지가 쿼리에만 있는 화면에서, 같은 메뉴를 다시 누르면
+ * 쿼리가 떨어져 기본 지역으로 되돌아간다 — 사용자가 한 선택을 메뉴가 지우는 셈이다.
+ * 다른 화면에 있을 때는 남길 상태가 없으므로 기본 경로 그대로 둔다.
+ */
+function useKeptHref(item: Item): string {
+  const pathname = usePathname();
+  const search = useSearchParams();
+  if (!item.href || !item.keepQuery?.length || pathname !== item.href) return item.href ?? "";
+  const params = new URLSearchParams();
+  for (const key of item.keepQuery) {
+    const value = search.get(key);
+    if (value) params.set(key, value);
+  }
+  const query = params.toString();
+  return query ? `${item.href}?${query}` : item.href;
+}
+
 function NavBranch({ item, activeLabel }: { item: Item; activeLabel: string | null }) {
   const kids = item.children ?? [];
   const self = <NavItem item={item} active={item.label === activeLabel} />;
@@ -293,6 +320,7 @@ function NavItem({
   visitor?: boolean;
 }) {
   const hidden = item.desktopOnly ? "hidden lg:flex" : "";
+  const href = useKeptHref(item);
 
   if (!item.href) {
     return (
@@ -343,16 +371,16 @@ function NavItem({
   );
 
   // 링크는 표준 해시 URL을 유지하고, SideNav의 수화 후 스크롤 보정이 실제 대상까지 이동시킨다.
-  if (item.href.includes("#")) {
+  if (href.includes("#")) {
     return (
-      <a href={item.href} title={item.note} aria-current={active ? "page" : undefined} className={className}>
+      <a href={href} title={item.note} aria-current={active ? "page" : undefined} className={className}>
         {body}
       </a>
     );
   }
 
   return (
-    <Link href={item.href} title={item.note} aria-current={active ? "page" : undefined} className={className}>
+    <Link href={href} title={item.note} aria-current={active ? "page" : undefined} className={className}>
       {body}
     </Link>
   );

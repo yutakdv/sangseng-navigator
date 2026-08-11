@@ -14,12 +14,30 @@ import type { TodayPickCopy } from "@/lib/todayPick";
  *
  * 문구는 전부 서버에서 만들어 props로 받는다(lib/todayPick.ts) — 이 컴포넌트는 문장을 짓지 않는다.
  */
-export function TodayPick({ copy, chipHref }: { copy: TodayPickCopy; chipHref: string | null }) {
+export function TodayPick({
+  copy,
+  chipHref,
+  closeHref,
+}: {
+  copy: TodayPickCopy;
+  chipHref: string | null;
+  /** 닫기 — URL로 처리한다(`today=off`). 필터를 눌러 화면이 다시 그려져도 닫힌 상태가 유지되고,
+   *  클라이언트 상태를 들이지 않아 이 컴포넌트가 서버 컴포넌트로 남는다 */
+  closeHref: string;
+}) {
   return (
     <section
       aria-label="오늘의 추천"
-      className="mx-5 mt-5 rounded-2xl border border-slate-200/80 bg-white px-4 py-3.5 shadow-card sm:mx-8"
+      // 바깥 여백은 두지 않는다 — 놓이는 자리(지도와 목록 사이)의 컨테이너가 정한다
+      className="relative rounded-2xl border border-slate-200/80 bg-white px-4 py-3.5 shadow-card"
     >
+      <Link
+        href={closeHref}
+        aria-label="오늘의 추천 닫기"
+        className="absolute right-2 top-2 flex h-8 w-8 items-center justify-center rounded-full text-admin-text-muted transition-colors hover:bg-slate-100 hover:text-admin-text"
+      >
+        <Icon name="close" size={14} strokeWidth={2.2} />
+      </Link>
       <div className="flex items-start gap-3">
         <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-visitor-primary-soft text-visitor-primary">
           <Icon name="calendar" size={17} strokeWidth={2} />
@@ -28,8 +46,9 @@ export function TodayPick({ copy, chipHref }: { copy: TodayPickCopy; chipHref: s
           <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-visitor-primary">
             오늘의 추천
           </p>
-          {/* 390px 모바일에서 headline이 2줄로 접힌다 — 단어 중간에서 끊기지 않게 break-keep */}
-          <p className="mt-1 break-keep text-[15px] font-bold leading-6 text-admin-text">
+          {/* 390px 모바일에서 headline이 2줄로 접힌다 — 단어 중간에서 끊기지 않게 break-keep.
+              pr-7은 우상단 닫기 버튼 자리 */}
+          <p className="mt-1 break-keep pr-7 text-[15px] font-bold leading-6 text-admin-text">
             {copy.headline}
           </p>
           <p className="mt-1 break-keep text-xs leading-5 text-admin-text-muted">{copy.evidence}</p>
@@ -39,7 +58,9 @@ export function TodayPick({ copy, chipHref }: { copy: TodayPickCopy; chipHref: s
           {chipHref ? (
             <Link
               href={chipHref}
-              className="mt-2.5 inline-flex min-h-10 items-center gap-1.5 rounded-full bg-visitor-primary px-3.5 text-[13px] font-bold text-white shadow-[0_4px_12px_-4px_rgb(22_101_52_/_0.7)]"
+              /* 파스텔 — 이 칩은 목록으로 가는 지름길이지 화면의 주 버튼이 아니다.
+                 짙은 그린 알약을 쓰면 카드 안에서 가장 무거운 덩어리가 되어 헤드라인을 누른다 */
+              className="mt-2.5 inline-flex min-h-10 items-center gap-1.5 rounded-full bg-visitor-primary-soft-deep px-3.5 text-[13px] font-bold text-visitor-primary transition-colors hover:bg-[#b3dfc3]"
             >
               {copy.chipLabel}
               <Icon name="arrowRight" size={14} strokeWidth={2.2} />

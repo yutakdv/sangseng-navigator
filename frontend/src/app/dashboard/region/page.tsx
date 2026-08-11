@@ -3,6 +3,7 @@ import Link from "next/link";
 import { AdminShell } from "@/components/AdminShell";
 import { PrivacyBadge } from "@/components/Badge";
 import { DashboardToc } from "@/components/DashboardToc";
+import { DeltaValue } from "@/components/DeltaValue";
 import { EmptyChart, FailedChart } from "@/components/EmptyChart";
 import { Icon } from "@/components/Icon";
 import { PageHeader } from "@/components/PageHeader";
@@ -13,7 +14,7 @@ import { CategoryDonut } from "@/components/charts/CategoryDonut";
 import { DailyTrend } from "@/components/charts/DailyTrend";
 import { LineTrend } from "@/components/charts/LineTrend";
 import { api } from "@/lib/api";
-import { REGIONS } from "@/lib/constants";
+import { DEFAULT_REGION, REGIONS, regionLabel } from "@/lib/constants";
 import { num, ratioPct, signed } from "@/lib/format";
 import {
   regionCategoryShare,
@@ -59,9 +60,14 @@ export default async function RegionDetailPage({
   searchParams: Promise<{ region?: string }>;
 }) {
   const sp = await searchParams;
+  /**
+   * 지역을 안 고르고 들어와도 화면이 비어 있지 않게 기본 지역을 연다.
+   * 고한읍은 하이원리조트 거점이 있는 읍이라 "어디부터 볼지 모르겠다"의 기본값으로 적합하다.
+   * 계약에 없는 값이 쿼리로 들어와도 같은 기본값으로 되돌린다.
+   */
   const selectedRegion = REGIONS.includes(sp.region as (typeof REGIONS)[number])
     ? (sp.region as (typeof REGIONS)[number])
-    : null;
+    : DEFAULT_REGION;
 
   // 핵심 데이터는 d(진단 계약) 하나 — 실패하면 에러 경계가 정직하다. 원장·일별 집계는
   // 보조 데이터라 각자 실패해도 화면의 다른 축은 성립한다. null이면 아래에서 빈 배열
@@ -79,32 +85,32 @@ export default async function RegionDetailPage({
   // 파생값은 지역을 골랐을 때만 계산한다 (원장은 서버에서만 읽는다)
   const ledgerRows = usageLedger?.usage ?? [];
   const ledgerMonths = usageLedger?.months ?? [];
-  const regionDonut = selectedRegion
+  const regionDonut = ledgerRows.length
     ? regionCategoryShare(ledgerRows, selectedRegion)
     : { shares: [], suppressed: [] };
   // 지역 월 합계는 억제 영향이 없는 monthly_by_region을 1순위로 읽는다 — 원장 셀만 더하면
   // 비공개 셀만큼 비어 실제보다 낮게 그려진다 (regionMonthlyTrend 주석 참고)
-  const regionTrend = selectedRegion
+  const regionTrend = ledgerRows.length
     ? regionMonthlyTrend(ledgerRows, ledgerMonths, selectedRegion, d.monthly_by_region ?? [])
     : { points: [], basis: "ledger" as const };
-  const regionShifts = selectedRegion ? topCategoryShifts(ledgerRows, ledgerMonths, selectedRegion) : [];
+  const regionShifts = ledgerRows.length ? topCategoryShifts(ledgerRows, ledgerMonths, selectedRegion) : [];
   // 비공개 업종 목록 — 도넛·추이·상세 표 세 곳이 같은 문장을 쓰도록 여기서 한 번만 만든다
   const hiddenLabel = regionDonut.suppressed.join(" · ");
   const hasHidden = regionDonut.suppressed.length > 0;
   // 라벨과 계산이 같은 창 정의를 쓰도록 regionAnalysis가 한 곳에서 만든다 (6개월 미만이면 null)
   const shiftWindow = shiftWindowLabel(ledgerMonths);
   // 일·요일 축 (usage_daily — 피드백 ⑦). 관측 집계라 전망 문구·근사 배지 대상이 아니다 (설계 08-08)
-  const weekdayBars = selectedRegion && usageDaily ? regionWeekdayAverages(usageDaily, selectedRegion) : [];
-  const weekdayInsight = selectedRegion && usageDaily ? regionWeekdayInsight(usageDaily, selectedRegion) : null;
+  const weekdayBars = usageDaily ? regionWeekdayAverages(usageDaily, selectedRegion) : [];
+  const weekdayInsight = usageDaily ? regionWeekdayInsight(usageDaily, selectedRegion) : null;
   // 전 지역 기준선 — 지역 리듬이 "다르다"는 말은 비교 대상이 화면에 함께 있어야 성립한다
-  const overallWeekday = selectedRegion && usageDaily ? overallWeekdayInsight(usageDaily) : null;
-  const categoryWeekdays = selectedRegion && usageDaily ? regionCategoryWeekdays(usageDaily, selectedRegion) : [];
+  const overallWeekday = usageDaily ? overallWeekdayInsight(usageDaily) : null;
+  const categoryWeekdays = usageDaily ? regionCategoryWeekdays(usageDaily, selectedRegion) : [];
   // 요일 축은 산출물이 달라(usage_daily) 억제 여부를 따로 읽는다 — 두 파일이 어긋나도 화면은 각자 사실대로 말한다
   const hiddenWeekdayLabel = categoryWeekdays
     .filter((r) => r.suppressed)
     .map((r) => r.category)
     .join(" · ");
-  const dailySeries = selectedRegion && usageDaily ? regionDailySeries(usageDaily, selectedRegion) : [];
+  const dailySeries = usageDaily ? regionDailySeries(usageDaily, selectedRegion) : [];
   const dailyPeriod = usageDaily?.period ?? null;
 
   return (
@@ -122,11 +128,9 @@ export default async function RegionDetailPage({
         <PageHeader
           icon="pin"
           eyebrow="진단"
-          title={selectedRegion ? `${selectedRegion} 상세 분석` : "지역 상세 분석"}
+          title={`${regionLabel(selectedRegion)} 상세 분석`}
           lede={
-            selectedRegion
-              ? `${selectedRegion} 한 곳의 하이원포인트 소비를 업종 구성과 시간 패턴(월·요일·일) 두 축으로 본다. 이 화면의 모든 값은 ${selectedRegion} 기준이며, 6개 지역을 함께 비교하는 진단 지표·추이·제안 근거는 전체 지역 현황에 있다.`
-              : "지역 한 곳을 골라 그 지역의 업종 구성과 시간 패턴(월·요일·일)을 본다. 이 화면의 값은 항상 선택한 지역 한 곳 기준이며, 6개 지역을 함께 비교하는 값은 전체 지역 현황에 있다."
+            `${selectedRegion} 한 곳의 하이원포인트 소비를 업종 구성과 시간 패턴(월·요일·일) 두 축으로 본다. 이 화면의 모든 값은 ${selectedRegion} 기준이며, 6개 지역을 함께 비교하는 진단 지표·추이·제안 근거는 전체 지역 현황에 있다.`
           }
         >
           <p className="u-note mt-2 flex flex-wrap items-center gap-x-2">
@@ -139,9 +143,7 @@ export default async function RegionDetailPage({
           <RegionFilter selectedRegion={selectedRegion} />
         </section>
 
-        {selectedRegion ? (
-          <>
-            <DashboardToc items={TOC} />
+        <DashboardToc items={TOC} />
 
             {/* ══ 업종 구성 — 무엇을 사는가 ══ */}
             <section id="category-mix" aria-label="업종 구성" className="flex scroll-mt-32 flex-col gap-6">
@@ -223,8 +225,14 @@ export default async function RegionDetailPage({
                                     {s.changePct === null ? (
                                       <span className="font-normal text-admin-text-muted">비교 불가</span>
                                     ) : (
-                                      // 0자리 반올림이면 ±0.x%가 "▲0%"로 찍혀 화살표와 크기가 모순된다
-                                      signed(s.changePct, "%", 1)
+                                      // 0자리 반올림이면 ±0.x%가 "▲0%"로 찍혀 화살표와 크기가 모순돼 1자리로 둔다.
+                                      // 색·화살표 규칙은 대시보드 KPI와 같은 DeltaValue가 진다 (증가=적색·감소=청색)
+                                      <DeltaValue
+                                        value={s.changePct}
+                                        unit="%"
+                                        variant="text"
+                                        className="font-semibold"
+                                      />
                                     )}
                                   </td>
                                 </tr>
@@ -371,7 +379,12 @@ export default async function RegionDetailPage({
                                   {row.weekendVsWeekdayPct === null ? (
                                     <span className="font-normal text-admin-text-muted">비교 불가</span>
                                   ) : (
-                                    signed(row.weekendVsWeekdayPct, "%", 1)
+                                    <DeltaValue
+                                      value={row.weekendVsWeekdayPct}
+                                      unit="%"
+                                      variant="text"
+                                      className="font-semibold"
+                                    />
                                   )}
                                 </td>
                               </tr>
@@ -412,29 +425,6 @@ export default async function RegionDetailPage({
                 )}
               </Section>
             </section>
-          </>
-        ) : (
-          /* 지역 없이 이 URL로 바로 들어온 경우 — 빈 화면 대신 무엇을 고르면 무엇이 열리는지 말한다 */
-          <div className="rounded-2xl border border-dashed border-admin-border bg-admin-surface px-4 py-10 text-center shadow-card">
-            <span className="mx-auto flex h-11 w-11 items-center justify-center rounded-full bg-lavender-100 text-lavender-700">
-              <Icon name="pin" size={20} />
-            </span>
-            <p className="mt-3 text-[15px] font-semibold text-admin-text">
-              아직 선택한 지역이 없습니다
-            </p>
-            <p className="mx-auto mt-1.5 max-w-xl break-keep text-[13px] leading-6 text-admin-text-muted">
-              위 필터에서 지역을 고르면 그 지역의 업종 구성·상위 업종·월별 추이·요일과 일별 패턴이
-              열립니다. 어느 지역부터 볼지 모르겠다면{" "}
-              <Link
-                href="/dashboard"
-                className="font-semibold text-admin-primary underline-offset-4 hover:underline"
-              >
-                전체 지역 현황
-              </Link>
-              에서 6개 지역을 나란히 비교해 보십시오. (예: 진단 1위 영월군)
-            </p>
-          </div>
-        )}
       </div>
     </AdminShell>
   );

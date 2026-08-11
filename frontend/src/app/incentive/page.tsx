@@ -285,6 +285,14 @@ export default async function IncentivePage({
               title="예상 효과"
               badge={
                 <>
+                  {/* 이 문장은 서버 저장 AI 해설이라 위 시나리오 라디오 선택에 반응하지 않는다 —
+                      선택 반영 수치는 시나리오 표 아래에서 보여주고, 여기는 출처를 명시한다 */}
+                  <span
+                    title="담당자가 고른 페이백률과 무관한 AI의 고정 해설입니다. 선택한 시나리오의 수치는 위 비교 표에서 확인하세요."
+                    className="rounded-md bg-admin-surface-sunken px-2 py-0.5 text-[11px] font-semibold text-admin-text-muted"
+                  >
+                    AI 해설 · 선택과 무관한 고정 문구
+                  </span>
                   <AssumptionBadge />
                   {proxyBadge}
                 </>
