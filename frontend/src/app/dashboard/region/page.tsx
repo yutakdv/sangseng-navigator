@@ -3,6 +3,7 @@ import Link from "next/link";
 import { AdminShell } from "@/components/AdminShell";
 import { PrivacyBadge } from "@/components/Badge";
 import { DashboardToc } from "@/components/DashboardToc";
+import { DeltaValue } from "@/components/DeltaValue";
 import { EmptyChart, FailedChart } from "@/components/EmptyChart";
 import { Icon } from "@/components/Icon";
 import { PageHeader } from "@/components/PageHeader";
@@ -13,7 +14,7 @@ import { CategoryDonut } from "@/components/charts/CategoryDonut";
 import { DailyTrend } from "@/components/charts/DailyTrend";
 import { LineTrend } from "@/components/charts/LineTrend";
 import { api } from "@/lib/api";
-import { REGIONS } from "@/lib/constants";
+import { REGIONS, regionLabel } from "@/lib/constants";
 import { num, ratioPct, signed } from "@/lib/format";
 import {
   regionCategoryShare,
@@ -122,7 +123,7 @@ export default async function RegionDetailPage({
         <PageHeader
           icon="pin"
           eyebrow="진단"
-          title={selectedRegion ? `${selectedRegion} 상세 분석` : "지역 상세 분석"}
+          title={selectedRegion ? `${regionLabel(selectedRegion)} 상세 분석` : "지역 상세 분석"}
           lede={
             selectedRegion
               ? `${selectedRegion} 한 곳의 하이원포인트 소비를 업종 구성과 시간 패턴(월·요일·일) 두 축으로 본다. 이 화면의 모든 값은 ${selectedRegion} 기준이며, 6개 지역을 함께 비교하는 진단 지표·추이·제안 근거는 전체 지역 현황에 있다.`
@@ -223,8 +224,14 @@ export default async function RegionDetailPage({
                                     {s.changePct === null ? (
                                       <span className="font-normal text-admin-text-muted">비교 불가</span>
                                     ) : (
-                                      // 0자리 반올림이면 ±0.x%가 "▲0%"로 찍혀 화살표와 크기가 모순된다
-                                      signed(s.changePct, "%", 1)
+                                      // 0자리 반올림이면 ±0.x%가 "▲0%"로 찍혀 화살표와 크기가 모순돼 1자리로 둔다.
+                                      // 색·화살표 규칙은 대시보드 KPI와 같은 DeltaValue가 진다 (증가=적색·감소=청색)
+                                      <DeltaValue
+                                        value={s.changePct}
+                                        unit="%"
+                                        variant="text"
+                                        className="font-semibold"
+                                      />
                                     )}
                                   </td>
                                 </tr>
@@ -371,7 +378,12 @@ export default async function RegionDetailPage({
                                   {row.weekendVsWeekdayPct === null ? (
                                     <span className="font-normal text-admin-text-muted">비교 불가</span>
                                   ) : (
-                                    signed(row.weekendVsWeekdayPct, "%", 1)
+                                    <DeltaValue
+                                      value={row.weekendVsWeekdayPct}
+                                      unit="%"
+                                      variant="text"
+                                      className="font-semibold"
+                                    />
                                   )}
                                 </td>
                               </tr>

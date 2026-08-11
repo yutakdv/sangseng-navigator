@@ -34,6 +34,15 @@ export function ExecutionStatus({
   className?: string;
 }) {
   const count = (p: CardProgress) => approved.filter((card) => normalizedProgress(card) === p).length;
+  /**
+   * 균형지수는 승인된 **확충** 카드의 6지역 분포만 본다 (backend/app/routes/kpi.py) —
+   * "승인 카드"로만 적으면 인센티브까지 포함된 표본으로 읽힌다. 소표본에서는 한 장만 들어와도
+   * 0점이 되므로 3건 미만은 참고값으로 못박는다.
+   */
+  const balanceBase = approved.filter((card) => card.type === "EXPANSION").length;
+  const balanceNote =
+    `확충 승인 ${balanceBase}건의 6개 지역 분포 기준 · 인센티브 제외` +
+    (balanceBase < 3 ? " · 표본 3건 미만 참고값" : "");
   const total = approved.length;
   const quality = kpi ? sampleQuality(kpi.counts.decided) : null;
   const sampleNote = quality === "demo" ? "예시 데이터" : quality === "limited" ? "표본 부족" : null;
@@ -126,8 +135,7 @@ export function ExecutionStatus({
               label="지역 균형지수"
               value={dash(kpi.regional_balance_index)}
               unit={kpi.regional_balance_index === null ? undefined : "/ 100"}
-              /* regional_balance_index도 승인 EXPANSION 카드의 6지역 분포만 본다 (routes/kpi.py) */
-              note="승인 카드가 여러 지역에 고루 쌓일수록 상승"
+              note={balanceNote}
             />
           </dl>
         ) : (

@@ -94,6 +94,13 @@ export default async function DashboardPage({
     };
   });
   const totalUses = (d.region_share ?? []).reduce((a, b) => a + b.count, 0);
+  /**
+   * 지역축 합계와 업종축 합계는 소표본 보호 반올림을 각각 적용해 나온 값이라 몇 건 어긋난다.
+   * 두 숫자가 같은 화면(현황 KPI ↔ 추이·분포 도넛)에 나오므로, 차이가 있으면 왜인지 밝힌다 —
+   * 설명 없는 불일치는 심사에서 데이터 오류로 읽힌다.
+   */
+  const categoryTotal = (d.category_share ?? []).reduce((a, b) => a + b.count, 0);
+  const axisGap = Math.abs(totalUses - categoryTotal);
   const eupRanking = cand?.eup_ranking ?? [];
   // candidates 호출 자체가 실패했는지 — ranking이 비어 있는 이유가 "없다"가 아니라
   // "못 불러왔다"일 때 빈 값을 사실처럼 그리지 않기 위한 플래그 (지도 카드·제안 근거 뷰 공용)
@@ -265,7 +272,11 @@ export default async function DashboardPage({
             <Section
               icon="scatter"
               title="업종별 사용 비중"
-              desc="표시 6분류 기준. 범례에 비중을 함께 표기한다."
+              desc={
+                axisGap
+                  ? `표시 6분류 기준. 범례에 비중을 함께 표기한다. 업종축 합계 ${num(categoryTotal)}건은 지역축 합계 ${num(totalUses)}건과 ${num(axisGap)}건 다르다 — 소표본 보호 반올림을 축마다 따로 적용한 결과이며 원본 건수가 다른 것이 아니다.`
+                  : "표시 6분류 기준. 범례에 비중을 함께 표기한다."
+              }
             >
               {(d.category_share ?? []).length ? (
                 <CategoryDonut data={d.category_share} height={240} />

@@ -118,6 +118,7 @@ export default async function TrackingPage({
 
   // 최근에 승인한 카드가 맨 위 — 허브에서 막 승인하고 넘어온 카드를 바로 조작할 수 있게 한다.
   // 타임스탬프는 전부 KST 오프셋(+09:00)이라 문자열 비교로 시간순이 나온다 (05 §8).
+  const expansionApproved = cards.filter((card) => card.type === "EXPANSION").length;
   const rows = [...cards].sort((a, b) =>
     (b.decided_at ?? b.created_at).localeCompare(a.decided_at ?? a.created_at),
   );
@@ -565,7 +566,10 @@ export default async function TrackingPage({
               label="지역 균형지수"
               value={dash(kpi.regional_balance_index)}
               unit={kpi.regional_balance_index === null ? undefined : "/ 100"}
-              sub={`승인 카드가 여러 지역에 고루 쌓일수록 상승 (현재 승인 ${kpi.counts.approved}건)`}
+              /* 분모는 승인 카드 전체가 아니라 승인된 **확충** 카드다 (routes/kpi.py) */
+              sub={`확충 승인 ${expansionApproved}건의 6개 지역 분포 기준 · 인센티브 제외${
+                expansionApproved < 3 ? " · 표본 3건 미만 참고값" : ""
+              }`}
             />
           </div>
           )}

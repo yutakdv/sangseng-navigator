@@ -97,3 +97,11 @@ export const VISITOR_SOURCE_NOTE =
 export const REGION_TOOLTIP: Partial<Record<Region, string>> = {
   삼척시: "삼척시 도계읍 (하이원포인트 지역가맹 대상지역)",
 };
+
+/**
+ * 지역 선택 접점에서 쓰는 표시명 — 데이터의 `삼척시`는 실제로 **도계읍**만 가리킨다.
+ * 이름만 "삼척시"로 두면 시 전역 수치로 읽히므로 고르는 자리에서는 범위를 함께 적는다.
+ * 좁은 칩(방문객 위젯)·차트 축처럼 폭이 빠듯한 곳은 REGION_TOOLTIP(툴팁)이 대신한다.
+ */
+export const regionLabel = (region: string): string =>
+  region === "삼척시" ? "삼척시(도계읍)" : region;
