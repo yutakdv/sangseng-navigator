@@ -34,8 +34,14 @@ export function CategoryShareBars({
         {rows.map((r, i) => {
           const isTarget = r.category === targetCategory;
           return (
-            <li key={r.category} className="flex items-center gap-3">
-              <span className="flex w-[92px] shrink-0 items-center gap-2">
+            // 그리드 3열 — 배지가 막대·숫자 사이에 끼면 배지 행만 막대가 사라지고 숫자 열이
+            // 밀린다. 배지를 이름 셀에 넣고 열 폭을 행마다 고정해 정렬이 어긋날 수 없게 한다.
+            // 이름 열 126px = 색점+업종명(3자)+배지가 잘리지 않는 최소 폭 (업종 6분류는 전부 2~3자)
+            <li
+              key={r.category}
+              className="grid grid-cols-[126px_minmax(1.5rem,1fr)_116px] items-center gap-3"
+            >
+              <span className="flex min-w-0 items-center gap-2">
                 <span
                   aria-hidden
                   className="h-2.5 w-2.5 shrink-0 rounded-[3px]"
@@ -48,9 +54,15 @@ export function CategoryShareBars({
                 >
                   {r.category}
                 </span>
+                {/* 색만으로 제안 업종을 전달하지 않는다 (13 §4) */}
+                {isTarget ? (
+                  <span className="shrink-0 whitespace-nowrap rounded-full bg-admin-primary px-2 py-0.5 text-[10px] font-bold text-white">
+                    제안 업종
+                  </span>
+                ) : null}
               </span>
 
-              <span className="h-3 min-w-0 flex-1 overflow-hidden rounded-full bg-admin-surface-sunken">
+              <span className="h-3 min-w-0 overflow-hidden rounded-full bg-admin-surface-sunken">
                 <span
                   style={{
                     width: `${Math.max(2, (r.share / max) * 100)}%`,
@@ -61,14 +73,7 @@ export function CategoryShareBars({
                 />
               </span>
 
-              {/* 색만으로 제안 업종을 전달하지 않는다 (13 §4) */}
-              {isTarget ? (
-                <span className="shrink-0 whitespace-nowrap rounded-full bg-admin-primary px-2 py-0.5 text-[10px] font-bold text-white">
-                  제안 업종
-                </span>
-              ) : null}
-
-              <span className="w-[104px] shrink-0 whitespace-nowrap text-right text-[13px] font-bold tabular-nums text-admin-text">
+              <span className="whitespace-nowrap text-right text-[13px] font-bold tabular-nums text-admin-text">
                 {Math.round(r.share * 100)}%
                 <span className="ml-1.5 text-[11px] font-medium text-admin-text-muted">
                   {num(r.count)}건
