@@ -13,6 +13,7 @@ const RATES: PaybackRate[] = [3, 5, 7];
  * 하단 고정 결정 바 — 상세 페이지(/proposals/[id])의 존재 이유 (08 F3 · 절대 규칙 4).
  *
  * 스크롤 위치와 무관하게 승인·반려·보류가 항상 보인다. AI 제안은 이 바를 거쳐야만 확정된다.
+ * 결정은 되돌릴 수 없으므로 1차 클릭은 바 안의 확인 단계로만 전환하고, "확정"을 눌러야 실행된다.
  * 색은 상태색을 쓴다: 승인=그린 · 반려=레드 · 보류=앰버 (라벤더는 브랜드·강조 전용이라 금지).
  *
  * 변경은 서버 액션(decideAction)으로만 하고, 성공 시 액션의 revalidate가 페이지를 다시
@@ -34,6 +35,8 @@ export function DecisionBar({
   const [rate, setRate] = useState<PaybackRate | null>(initialRate);
   const [pending, startTransition] = useTransition();
   const [busy, setBusy] = useState<CardStatus | null>(null);
+  /** 1차 클릭으로 고른 결정 — 확정 전 확인 단계. 결정은 되돌릴 수 없어서 원클릭 확정을 막는다 */
+  const [confirming, setConfirming] = useState<CardStatus | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const decided = status !== "pending";
@@ -41,8 +44,14 @@ export function DecisionBar({
   const rateMissing = requireRate && !rate;
   const working = pending || busy !== null;
 
+  const ask = (decision: CardStatus) => {
+    setError(null);
+    setConfirming(decision);
+  };
+
   const run = (decision: CardStatus) => {
     setError(null);
+    setConfirming(null);
     setBusy(decision);
     startTransition(() => {
       decideAction(cardId, decision, rate ?? undefined)
@@ -53,6 +62,17 @@ export function DecisionBar({
         .finally(() => setBusy(null));
     });
   };
+
+  const decisionLabel = (d: CardStatus) =>
+    d === "approved" ? decisionPrimaryLabel(cardType) : d === "rejected" ? "반려" : "보류";
+
+  /** 확정 버튼도 1차 버튼과 같은 상태색을 쓴다 — 라벤더는 브랜드·강조 전용(13 §6) */
+  const confirmStyle = (d: CardStatus) =>
+    d === "approved"
+      ? "bg-state-good text-white hover:bg-[#166534]"
+      : d === "rejected"
+        ? "border border-state-danger-line bg-admin-surface text-state-danger hover:bg-state-danger-bg"
+        : "border border-state-warn-line bg-admin-surface text-state-warn hover:bg-state-warn-bg";
 
   const buttonBase =
     "min-h-11 rounded-lg px-4 py-2 text-sm font-bold transition-colors disabled:cursor-not-allowed disabled:opacity-45";
@@ -65,6 +85,9 @@ export function DecisionBar({
       <div
         role="group"
         aria-label="담당자 결정"
+        onKeyDown={(e) => {
+          if (e.key === "Escape" && confirming) setConfirming(null);
+        }}
         className="mx-auto flex max-w-5xl flex-wrap items-center gap-x-4 gap-y-2 px-4 py-3 sm:px-6"
       >
         <div className="flex min-w-0 flex-wrap items-center gap-x-2.5 gap-y-1">
@@ -75,7 +98,7 @@ export function DecisionBar({
           </span>
         </div>
 
-        {requireRate && !decided ? (
+        {requireRate && !decided && !confirming ? (
           <div className="flex items-center gap-1.5" role="radiogroup" aria-label="페이백률 선택">
             <span className="text-xs font-semibold text-admin-text-muted">페이백률</span>
             {RATES.map((r) => (
@@ -97,35 +120,71 @@ export function DecisionBar({
           </div>
         ) : null}
 
-        <div className="ml-auto flex flex-wrap items-center gap-2">
-          <button
-            type="button"
-            onClick={() => run("approved")}
-            disabled={decided || isDemoReadOnly || working || rateMissing}
-            aria-busy={busy === "approved"}
-            className={`${buttonBase} bg-state-good text-white hover:bg-[#166534]`}
+        {confirming ? (
+          <div
+            role="alertdialog"
+            aria-label="결정 확인"
+            className="ml-auto flex flex-wrap items-center justify-end gap-x-3 gap-y-2"
           >
-            {busy === "approved" ? "처리 중…" : decisionPrimaryLabel(cardType)}
-          </button>
-          <button
-            type="button"
-            onClick={() => run("rejected")}
-            disabled={decided || isDemoReadOnly || working}
-            aria-busy={busy === "rejected"}
-            className={`${buttonBase} border border-state-danger-line bg-admin-surface text-state-danger hover:bg-state-danger-bg`}
-          >
-            {busy === "rejected" ? "처리 중…" : "반려"}
-          </button>
-          <button
-            type="button"
-            onClick={() => run("held")}
-            disabled={decided || isDemoReadOnly || working}
-            aria-busy={busy === "held"}
-            className={`${buttonBase} border border-state-warn-line bg-admin-surface text-state-warn hover:bg-state-warn-bg`}
-          >
-            {busy === "held" ? "처리 중…" : "보류"}
-          </button>
-        </div>
+            <p className="break-keep text-sm leading-6 text-admin-text">
+              <b>{decisionLabel(confirming)}</b> — {cardId}
+              {requireRate && confirming === "approved" && rate ? (
+                <>
+                  {" "}
+                  · 확정 페이백률 <b className="tabular-nums">{rate}%</b>
+                </>
+              ) : null}
+              <span className="text-admin-text-muted"> · 확정 후 되돌릴 수 없습니다</span>
+            </p>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                autoFocus
+                onClick={() => run(confirming)}
+                className={`${buttonBase} ${confirmStyle(confirming)}`}
+              >
+                {decisionLabel(confirming)} 확정
+              </button>
+              <button
+                type="button"
+                onClick={() => setConfirming(null)}
+                className={`${buttonBase} border border-admin-border bg-admin-surface text-admin-text hover:bg-admin-surface-sunken`}
+              >
+                돌아가기
+              </button>
+            </div>
+          </div>
+        ) : (
+          <div className="ml-auto flex flex-wrap items-center gap-2">
+            <button
+              type="button"
+              onClick={() => ask("approved")}
+              disabled={decided || isDemoReadOnly || working || rateMissing}
+              aria-busy={busy === "approved"}
+              className={`${buttonBase} bg-state-good text-white hover:bg-[#166534]`}
+            >
+              {busy === "approved" ? "처리 중…" : decisionPrimaryLabel(cardType)}
+            </button>
+            <button
+              type="button"
+              onClick={() => ask("rejected")}
+              disabled={decided || isDemoReadOnly || working}
+              aria-busy={busy === "rejected"}
+              className={`${buttonBase} border border-state-danger-line bg-admin-surface text-state-danger hover:bg-state-danger-bg`}
+            >
+              {busy === "rejected" ? "처리 중…" : "반려"}
+            </button>
+            <button
+              type="button"
+              onClick={() => ask("held")}
+              disabled={decided || isDemoReadOnly || working}
+              aria-busy={busy === "held"}
+              className={`${buttonBase} border border-state-warn-line bg-admin-surface text-state-warn hover:bg-state-warn-bg`}
+            >
+              {busy === "held" ? "처리 중…" : "보류"}
+            </button>
+          </div>
+        )}
 
         {rateMissing && !decided ? (
           <p className="w-full text-xs leading-5 text-admin-text-muted">

@@ -10,6 +10,7 @@ import type { CardStatus, CardType, PaybackRate } from "@/types";
  * 승인/반려/보류 버튼 묶음 (docs/plan/08 F3·F6).
  *
  * AI 출력은 제안일 뿐이고, 이 버튼을 거쳐야 카드가 확정된다 (절대 규칙 4).
+ * 결정은 되돌릴 수 없으므로 1차 클릭은 확인 단계로만 전환하고, "확정"을 눌러야 실행된다.
  * 변경은 서버 액션(`app/actions.ts`)으로만 한다 — `lib/api.ts`는 mock JSON을 정적 import 해서
  * 클라이언트에서 부를 수 없기 때문이다. 성공하면 액션의 revalidate가 화면을 갱신하므로
  * 여기서 카드 상태를 따로 들고 있지 않는다.
@@ -51,6 +52,8 @@ export function DecisionActions({
 }) {
   const [pending, startTransition] = useTransition();
   const [busy, setBusy] = useState<CardStatus | null>(null);
+  /** 1차 클릭으로 고른 결정 — 확정 전 확인 단계. 결정은 되돌릴 수 없어서 원클릭 확정을 막는다 */
+  const [confirming, setConfirming] = useState<CardStatus | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const rateMissing = requireRate && !selectedRate;
@@ -58,8 +61,12 @@ export function DecisionActions({
   const readOnly = isDemoReadOnly;
   const hintId = `decision-hint-${cardId}`;
 
+  const decisionLabel = (d: CardStatus) =>
+    d === "approved" ? decisionPrimaryLabel(requireRate ? "INCENTIVE" : cardType) : d === "rejected" ? "반려" : "보류";
+
   const run = (decision: CardStatus) => {
     setError(null);
+    setConfirming(null);
     setBusy(decision);
     // React 18의 startTransition은 async 스코프를 기다리지 않는다 — "처리 중" 표시는 busy로 따로
     // 잡고, 트랜지션은 액션이 revalidate한 화면을 논블로킹으로 커밋하는 용도로만 쓴다.
@@ -75,26 +82,68 @@ export function DecisionActions({
   };
 
   return (
-    <div aria-label="카드 결정" role="group">
-      <div className="flex flex-wrap gap-2">
-        {DECISIONS.map((d) => {
-          const blocked = disabled || readOnly || working || (d.value === "approved" && rateMissing);
-          const label = d.value === "approved" ? decisionPrimaryLabel(requireRate ? "INCENTIVE" : cardType) : d.label;
-          return (
+    <div
+      aria-label="카드 결정"
+      role="group"
+      onKeyDown={(e) => {
+        if (e.key === "Escape" && confirming) setConfirming(null);
+      }}
+    >
+      {confirming ? (
+        <div role="alertdialog" aria-label="결정 확인" className="flex flex-wrap items-center gap-x-3 gap-y-2">
+          <p className="break-keep text-sm leading-6 text-admin-text">
+            <b>{decisionLabel(confirming)}</b> — {cardId}
+            {requireRate && confirming === "approved" && selectedRate ? (
+              <>
+                {" "}
+                · 확정 페이백률 <b className="tabular-nums">{selectedRate}%</b>
+              </>
+            ) : null}
+            <span className="text-admin-text-muted"> · 확정 후 되돌릴 수 없습니다</span>
+          </p>
+          <div className="flex items-center gap-2">
             <button
-              key={d.value}
               type="button"
-              onClick={() => run(d.value)}
-              disabled={blocked}
-              aria-busy={busy === d.value}
-              aria-describedby={d.value === "approved" && rateMissing ? hintId : undefined}
-              className={`min-h-10 rounded-lg px-4 py-2 text-sm font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${d.tone}`}
+              autoFocus
+              onClick={() => run(confirming)}
+              className={`min-h-10 rounded-lg px-4 py-2 text-sm font-semibold transition-colors ${
+                DECISIONS.find((d) => d.value === confirming)?.tone ?? ""
+              }`}
             >
-              {busy === d.value ? "처리 중…" : label}
+              {decisionLabel(confirming)} 확정
             </button>
-          );
-        })}
-      </div>
+            <button
+              type="button"
+              onClick={() => setConfirming(null)}
+              className="min-h-10 rounded-lg border border-admin-border bg-admin-surface px-4 py-2 text-sm font-semibold text-admin-text transition-colors hover:bg-admin-surface-sunken"
+            >
+              돌아가기
+            </button>
+          </div>
+        </div>
+      ) : (
+        <div className="flex flex-wrap gap-2">
+          {DECISIONS.map((d) => {
+            const blocked = disabled || readOnly || working || (d.value === "approved" && rateMissing);
+            return (
+              <button
+                key={d.value}
+                type="button"
+                onClick={() => {
+                  setError(null);
+                  setConfirming(d.value);
+                }}
+                disabled={blocked}
+                aria-busy={busy === d.value}
+                aria-describedby={d.value === "approved" && rateMissing ? hintId : undefined}
+                className={`min-h-10 rounded-lg px-4 py-2 text-sm font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${d.tone}`}
+              >
+                {busy === d.value ? "처리 중…" : decisionLabel(d.value)}
+              </button>
+            );
+          })}
+        </div>
+      )}
 
       {rateMissing ? (
         <p id={hintId} className="u-note mt-2">
