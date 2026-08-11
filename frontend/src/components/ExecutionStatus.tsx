@@ -1,9 +1,14 @@
 import Link from "next/link";
 import { Icon, type IconName } from "@/components/Icon";
-import { ProgressChip } from "@/components/StatusChip";
-import { normalizedProgress, sampleQuality } from "@/lib/cardWorkflow";
+import { StageTrack } from "@/components/StageTrack";
+import {
+  EXPANSION_PROGRESS,
+  INCENTIVE_PROGRESS,
+  normalizedProgress,
+  sampleQuality,
+} from "@/lib/cardWorkflow";
 import { dash, pctUnit, ratioNum } from "@/lib/format";
-import type { Card, CardProgress, Kpi } from "@/types";
+import type { Card, CardProgress, CardType, Kpi } from "@/types";
 
 /**
  * 실행 현황 + 정책 성과 (docs/plan/13 §3 — 목업 image-1의 "정책 성과 요약").
@@ -14,13 +19,18 @@ import type { Card, CardProgress, Kpi } from "@/types";
  * 계산되는 **실행 전환율**을 넣는다 — 전부 Action Card 상태에서 나오는 값이라 승인·상태 변경이
  * 일어나면 즉시 바뀐다 (05 §3).
  */
-const STAGES: CardProgress[] = [
-  "후보 접촉·검토 시작",
-  "적격성 확인",
-  "가맹 심사",
-  "추진중",
-  "보류",
-  "완료",
+/**
+ * 유형별 단계는 정본 배열에서 파생한다 — 여기서 손으로 다시 적으면 하나 빠졌을 때
+ * 그 상태의 카드가 어느 칸에도 안 잡혀 헤더 건수와 트랙 합계가 조용히 어긋난다.
+ * 보류는 흐름의 중간이 아니라 이탈이라 자리만 맨 뒤로 옮긴다 (트랙이 흐름 밖으로 떼어 그린다).
+ */
+const orderedStages = (stages: CardProgress[]): CardProgress[] => [
+  ...stages.filter((stage) => stage !== "보류"),
+  ...stages.filter((stage) => stage === "보류"),
+];
+const LAYERS: { type: CardType; title: string; stages: CardProgress[] }[] = [
+  { type: "EXPANSION", title: "가맹점 확충", stages: orderedStages(EXPANSION_PROGRESS) },
+  { type: "INCENTIVE", title: "페이백 인센티브", stages: orderedStages(INCENTIVE_PROGRESS) },
 ];
 
 export function ExecutionStatus({
@@ -33,7 +43,9 @@ export function ExecutionStatus({
   kpi: Kpi | null;
   className?: string;
 }) {
-  const count = (p: CardProgress) => approved.filter((card) => normalizedProgress(card) === p).length;
+  const count = (type: CardType, stage: CardProgress) =>
+    approved.filter((card) => card.type === type && normalizedProgress(card) === stage).length;
+  const layerTotal = (type: CardType) => approved.filter((card) => card.type === type).length;
   /**
    * 균형지수는 승인된 **확충** 카드의 6지역 분포만 본다 (backend/app/routes/kpi.py) —
    * "승인 카드"로만 적으면 인센티브까지 포함된 표본으로 읽힌다. 소표본에서는 한 장만 들어와도
@@ -72,34 +84,29 @@ export function ExecutionStatus({
             검토를 시작한 카드가 아직 없습니다. 후보 접촉·검토를 시작하면 단계가 쌓입니다.
           </p>
         ) : (
-          <>
-            <div
-              aria-hidden
-              className="flex h-2.5 gap-1 overflow-hidden rounded-full bg-admin-surface-sunken"
-            >
-              {STAGES.map((s, i) => {
-                const n = count(s);
-                if (!n) return null;
-                return (
-                  <span
-                    key={s}
-                    style={{ width: `${(n / total) * 100}%`, animationDelay: `${160 + i * 90}ms` }}
-                    className={`origin-left animate-grow rounded-full ${STAGE_BAR[s]}`}
-                  />
-                );
-              })}
-            </div>
-            <ul className="mt-3 flex flex-wrap gap-x-4 gap-y-2">
-              {STAGES.map((s) => (
-                <li key={s} className="flex items-center gap-1.5">
-                  <ProgressChip progress={s} />
-                  <span className="text-[13px] font-bold tabular-nums text-admin-text">
-                    {count(s)}
-                  </span>
-                </li>
-              ))}
-            </ul>
-          </>
+          /* 추진 경과 리포트와 같은 트랙으로 그린다 — 같은 단계 데이터를 두 화면이 다른 그림으로
+             그리면 담당자가 다른 지표로 읽는다. 다만 이쪽 모집단은 "승인 카드의 현재 상태"라
+             리포트(기간 내 경과 기록)와 다르므로 meta에 무엇을 센 값인지 적는다 */
+          <div className="flex flex-col gap-2">
+            {LAYERS.filter((layer) => layerTotal(layer.type) > 0).map((layer) => (
+              <StageTrack
+                key={layer.type}
+                title={layer.title}
+                stages={layer.stages}
+                counts={Object.fromEntries(layer.stages.map((stage) => [stage, count(layer.type, stage)]))}
+                compact
+                meta={
+                  <>
+                    승인 카드{" "}
+                    <span className="font-semibold tabular-nums text-admin-text">
+                      {layerTotal(layer.type)}
+                    </span>
+                    장의 현재 상태
+                  </>
+                }
+              />
+            ))}
+          </div>
         )}
 
         {/* ── 성과 지표 ────────────────────────────────────────── */}
@@ -157,16 +164,6 @@ export function ExecutionStatus({
     </section>
   );
 }
-
-const STAGE_BAR: Record<CardProgress, string> = {
-  검토중: "bg-state-notice",
-  "후보 접촉·검토 시작": "bg-admin-primary/55",
-  "적격성 확인": "bg-admin-primary/70",
-  "가맹 심사": "bg-admin-primary/85",
-  추진중: "bg-admin-primary",
-  보류: "bg-state-warn",
-  완료: "bg-state-good",
-};
 
 function Stat({
   icon,
