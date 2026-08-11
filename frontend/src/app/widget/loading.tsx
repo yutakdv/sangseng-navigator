@@ -5,28 +5,19 @@
  * (`/tracking` → `/widget`)에서 그린 테마 위젯 직전에 인디고 화면이 한 번 번쩍인다.
  * 역할 구분(담당자=인디고, 방문객=그린)은 13 §4에서 불변 원칙이므로 로딩 중에도 유지한다.
  */
-import Image from "next/image";
 
 const BAR = "animate-pulse rounded-md bg-black/[0.06]";
 
 export default function WidgetLoading() {
   return (
-    <div className="min-h-screen bg-slate-100 py-0 sm:py-10" role="status" aria-live="polite">
+    <div className="min-h-screen bg-admin-bg py-0 sm:py-10" role="status" aria-live="polite">
       <span className="sr-only">추천 가맹점을 불러오는 중입니다</span>
 
       <div className="mx-auto w-full max-w-[390px] bg-visitor-bg shadow-card-hover sm:rounded-[28px] sm:ring-1 sm:ring-black/5">
-        {/* 헤더는 실제 화면과 같은 파스텔 로고 바 한 줄이다 — 로고는 정적이라 로딩 중에도 그대로
-            보여 줄 수 있고, 뜰 때 첫 화면이 밀리지 않는다 */}
-        <header className="flex items-center bg-visitor-primary-soft-deep px-5 py-3.5 sm:rounded-t-[28px]">
-          <Image
-            src="/brand/sangseng-navigator-lockup-green.png"
-            alt="상생 나침반"
-            width={144}
-            height={28}
-            priority
-            className="h-[22px] w-auto"
-          />
-        </header>
+        {/* 실제 화면과 같이 로고 바 없이 시작한다 — 우측 상단 담당자 화면 링크 자리만 비워 둔다 */}
+        <div className="flex justify-end px-5 pt-4">
+          <div className={`${BAR} h-3 w-20`} />
+        </div>
 
         <div className="px-5 py-5">
           {/* 검색 한 칸 + 선택 필드 두 칸 — 실제 컨트롤과 같은 높이(52px)로 잡아 뜰 때 밀리지 않게 */}

@@ -1,5 +1,4 @@
 import type { Metadata } from "next";
-import Image from "next/image";
 import Link from "next/link";
 import { PaybackBadge } from "@/components/Badge";
 import { CategoryIcon } from "@/components/CategoryIcon";
@@ -212,38 +211,23 @@ export default async function WidgetPage({ searchParams }: { searchParams: Promi
   ].filter((c): c is { label: string; removeHref: string } => c !== null);
 
   return (
-    <div className="min-h-screen bg-slate-100 py-0 sm:py-8">
+    <div className="min-h-screen bg-admin-bg py-0 sm:py-8">
       {/* 모바일에서는 한 열, 넓은 화면에서는 레퍼런스(image-2)처럼 필터와 지도를 나란히 둔다. */}
       <div className="mx-auto w-full max-w-[1180px] overflow-hidden bg-visitor-bg shadow-card-hover sm:rounded-[28px] sm:ring-1 sm:ring-black/5">
         {/**
-         * 헤더는 로고 한 줄이다. 안내 문구는 히어로 아래 한 문단으로 합쳤다 — 짙은 그린 밴드에
-         * 같은 말을 얹으면 화면 첫 인상이 무거워지고 문장도 두 군데로 갈라진다.
-         *
-         * 로고는 방문객 화면 전용 자산(`-green`)을 쓴다. 원본 락업의 포인트 색이 인디고라
-         * 그린 테마 위에서 혼자 다른 계열로 튄다 — 심볼과 "나" 자만 visitor-primary로 옮기고
-         * 검정 워드마크는 그대로 둔 파일이다. 담당자 화면은 원본을 계속 쓴다.
+         * 로고 바를 두지 않는다 — 방문객은 브랜드를 확인하러 오는 게 아니라 쓸 곳을 찾으러 온다.
+         * 다만 두 얼굴(담당자↔방문객)을 잇는 고리가 최하단에만 있으면 모바일 심사에서 폐루프
+         * 서사를 놓치므로(검토 §3-2), 색 면 없이 링크 한 줄만 남긴다.
          */}
-        <header className="flex items-center justify-between gap-3 bg-visitor-primary-soft-deep px-5 py-3.5 sm:rounded-t-[28px] sm:px-8">
-          <Image
-            src="/brand/sangseng-navigator-lockup-green.png"
-            alt="상생 나침반"
-            width={144}
-            height={28}
-            priority
-            className="h-[22px] w-auto"
-          />
-          <span className="flex items-center gap-2">
-            {live ? <WidgetLiveRefresh /> : null}
-            {/* 두 얼굴(담당자↔방문객) 연결 고리가 최하단에만 있으면 모바일 심사에서 폐루프
-                서사를 놓친다 (검토 §3-2) — 하단 줄은 유지하고 헤더에도 짧게 건다 */}
-            <Link
-              href="/"
-              className="text-[11px] font-semibold text-visitor-primary underline underline-offset-2"
-            >
-              담당자 화면 →
-            </Link>
-          </span>
-        </header>
+        <div className="flex items-center justify-end gap-2 px-5 pt-4 sm:px-8">
+          {live ? <WidgetLiveRefresh /> : null}
+          <Link
+            href="/"
+            className="text-[11px] font-semibold text-admin-text-muted underline underline-offset-2 transition-colors hover:text-visitor-primary"
+          >
+            담당자 화면 →
+          </Link>
+        </div>
 
         {/* 시행 중인 페이백은 전 항목 공통 — 목록을 스크롤하기 전에 상단에서 먼저 알린다 (카드 배지는 유지) */}
         {payback ? (
