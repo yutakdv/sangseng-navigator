@@ -2,10 +2,17 @@
 
 import { useState, useTransition } from "react";
 import { decideAction } from "@/app/actions";
+import {
+  DecisionReasonPanel,
+  emptyDecisionReason,
+  toDecisionFields,
+  type DecisionReason,
+} from "@/components/DecisionReasonPanel";
 import { StatusChip } from "@/components/StatusChip";
-import { decisionPrimaryLabel } from "@/lib/cardWorkflow";
+import { decisionPrimaryLabel, decisionReasonRequired } from "@/lib/cardWorkflow";
+import { operator } from "@/lib/operator";
 import { isDemoReadOnly } from "@/lib/runtime";
-import type { CardStatus, CardType, PaybackRate } from "@/types";
+import type { Card, CardStatus, CardType, PaybackRate } from "@/types";
 
 const RATES: PaybackRate[] = [3, 5, 7];
 
@@ -18,40 +25,77 @@ const RATES: PaybackRate[] = [3, 5, 7];
  * 변경은 서버 액션(decideAction)으로만 하고, 성공 시 액션의 revalidate가 페이지를 다시
  * 그리므로 여기서 카드 상태를 따로 들고 있지 않는다. INCENTIVE 승인은 페이백률 선택이
  * 필수라(05 §2) 바 안에 3·5·7% 선택 칩을 함께 둔다.
+ *
+ * **사유 칸은 접어 둔다.** 반려·보류(또는 신뢰도 `하` 카드의 승인)를 누른 뒤에만 펼쳐지고,
+ * 확정·취소로 다시 접힌다 — 늘 펼쳐 두면 고정 바가 높아져 본문과 가이드 투어 카드를 덮는다.
  */
 export function DecisionBar({
   cardId,
   cardType,
   status,
   initialRate,
+  confidence = "중",
+  version,
 }: {
   cardId: string;
   cardType: CardType;
   status: CardStatus;
   /** 이미 확정된 페이백률(승인 후) 또는 null */
   initialRate: PaybackRate | null;
+  /** 신뢰도 `하` 카드의 승인에는 확인 근거가 필수다 (05 §2) */
+  confidence?: Card["confidence"];
+  /** 낙관적 잠금 — 화면이 읽은 카드의 version */
+  version?: number;
 }) {
   const [rate, setRate] = useState<PaybackRate | null>(initialRate);
   const [pending, startTransition] = useTransition();
   const [busy, setBusy] = useState<CardStatus | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [armed, setArmed] = useState<CardStatus | null>(null);
+  const [draft, setDraft] = useState<DecisionReason>(emptyDecisionReason);
 
   const decided = status !== "pending";
   const requireRate = cardType === "INCENTIVE";
   const rateMissing = requireRate && !rate;
   const working = pending || busy !== null;
+  const armedRequiresReason = armed !== null && decisionReasonRequired(armed, confidence);
+  const reasonMissing = armedRequiresReason && !draft.reason.trim();
 
-  const run = (decision: CardStatus) => {
+  const submit = (decision: CardStatus) => {
     setError(null);
     setBusy(decision);
+    const fields = toDecisionFields(draft, decision);
     startTransition(() => {
-      decideAction(cardId, decision, rate ?? undefined)
+      decideAction(cardId, {
+        decision,
+        rate: rate ?? undefined,
+        reason: fields.reason,
+        version,
+        cooldownDays: fields.cooldownDays,
+        recheckCondition: fields.recheckCondition,
+      })
         .then((res) => {
-          if (!res.ok) setError(res.detail);
+          if (!res.ok) {
+            setError(res.detail);
+            return;
+          }
+          setArmed(null);
+          setDraft(emptyDecisionReason());
         })
         .catch(() => setError("요청을 처리하지 못했습니다. 잠시 후 다시 시도해 주세요."))
         .finally(() => setBusy(null));
     });
+  };
+
+  const press = (decision: CardStatus) => {
+    setError(null);
+    if (!decisionReasonRequired(decision, confidence)) {
+      setArmed(null);
+      submit(decision);
+      return;
+    }
+    // 같은 버튼을 다시 누르면 접는다 — 고정 바에서 잘못 편 칸을 닫을 길이 있어야 한다
+    setArmed((current) => (current === decision ? null : decision));
   };
 
   const buttonBase =
@@ -100,32 +144,84 @@ export function DecisionBar({
         <div className="ml-auto flex flex-wrap items-center gap-2">
           <button
             type="button"
-            onClick={() => run("approved")}
+            onClick={() => press("approved")}
             disabled={decided || isDemoReadOnly || working || rateMissing}
             aria-busy={busy === "approved"}
+            aria-expanded={armed === "approved" || undefined}
             className={`${buttonBase} bg-state-good text-white hover:bg-[#166534]`}
           >
             {busy === "approved" ? "처리 중…" : decisionPrimaryLabel(cardType)}
           </button>
           <button
             type="button"
-            onClick={() => run("rejected")}
+            onClick={() => press("rejected")}
             disabled={decided || isDemoReadOnly || working}
             aria-busy={busy === "rejected"}
+            aria-expanded={armed === "rejected" || undefined}
             className={`${buttonBase} border border-state-danger-line bg-admin-surface text-state-danger hover:bg-state-danger-bg`}
           >
             {busy === "rejected" ? "처리 중…" : "반려"}
           </button>
           <button
             type="button"
-            onClick={() => run("held")}
+            onClick={() => press("held")}
             disabled={decided || isDemoReadOnly || working}
             aria-busy={busy === "held"}
+            aria-expanded={armed === "held" || undefined}
             className={`${buttonBase} border border-state-warn-line bg-admin-surface text-state-warn hover:bg-state-warn-bg`}
           >
             {busy === "held" ? "처리 중…" : "보류"}
           </button>
         </div>
+
+        {armed && !decided ? (
+          <div className="w-full">
+            <DecisionReasonPanel
+              idPrefix={`decision-bar-${cardId}`}
+              decision={armed}
+              required={armedRequiresReason}
+              value={draft}
+              onChange={setDraft}
+              disabled={working}
+              compact
+            />
+            <div className="mt-2.5 flex flex-wrap items-center gap-2">
+              <button
+                type="button"
+                onClick={() => submit(armed)}
+                disabled={working || reasonMissing}
+                aria-busy={busy === armed}
+                className={`${buttonBase} bg-admin-primary text-white hover:bg-admin-primary-strong`}
+              >
+                {busy === armed
+                  ? "처리 중…"
+                  : armed === "rejected"
+                    ? "반려 확정"
+                    : armed === "held"
+                      ? "보류 확정"
+                      : "승인 확정"}
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setArmed(null);
+                  setError(null);
+                }}
+                disabled={working}
+                className="min-h-11 rounded-lg px-3 py-2 text-sm font-semibold text-admin-text-muted transition-colors hover:bg-admin-surface-sunken disabled:cursor-not-allowed disabled:opacity-45"
+              >
+                취소
+              </button>
+              <span className="text-xs leading-5 text-admin-text-muted">
+                {reasonMissing
+                  ? armed === "approved"
+                    ? "신뢰도가 낮은 카드라 확인 근거를 적어야 승인할 수 있습니다."
+                    : "사유를 적어야 확정할 수 있습니다."
+                  : `${operator.name} 이름으로 기록됩니다 · 계정 체계 도입 전이라 신원은 검증되지 않습니다.`}
+              </span>
+            </div>
+          </div>
+        ) : null}
 
         {rateMissing && !decided ? (
           <p className="w-full text-xs leading-5 text-admin-text-muted">

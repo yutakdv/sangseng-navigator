@@ -1,7 +1,10 @@
 """P3: 하이원포인트 가맹점 상세정보 수집 + 지오코딩 + category·eup 부여 → data/processed/merchants.json.
 
 산출물은 T5(P6 2단계 포화도·공백도), B1(candidates 병합), B6(위젯 추천)이 소비한다.
-스키마는 05 문서 §1 `merchants` 배열: {"name","category","eup","address","lat","lng"}.
+스키마는 05 문서 §1 `merchants` 배열: {"merchant_id","name","category","eup","address","lat","lng"}.
+`merchant_id` 는 원응답의 `FRCS_REG_NO`(가맹점 등록번호)를 **문자열로** 담은 안정 식별자다.
+카드에 저장되어 위젯 배지 매칭에 쓰이므로(집합 매칭 대신 ID 매칭), DynamoDB·JSON 왕복에서
+int/str 이 흔들리지 않도록 표기를 문자열 하나로 고정한다. verify() 가 결측·중복을 막는다.
 
 --- 가맹점 API 명세 (포털 웹 다운으로 승인 페이지 대신 실호출 검증, 2026-08-03) -----------
 GET https://apis.data.go.kr/B552525/pbdata/getStoreInfo
@@ -363,6 +366,24 @@ def verify(merchants: list[dict], failed: list[dict], methods: dict[str, int]) -
     print("   표시 분류 분포: " + " / ".join(f"{c} {cats.get(c, 0):,}" for c in DISPLAY_CATEGORIES))
     print("   분류 방법: " + " / ".join(f"{k} {v:,}건" for k, v in methods.items()))
 
+    # ⑤ merchant_id 는 카드에 저장되어 위젯 배지 매칭의 조인 키가 된다 — 결측·중복이면 매칭이 깨진다.
+    missing = [m["name"] for m in merchants if not m.get("merchant_id")]
+    if missing:
+        raise SystemExit(f"P3 실패: merchant_id 결측 {len(missing)}건 — 원응답 FRCS_REG_NO 확인 "
+                         f"(예: {missing[:3]})")
+    seen: dict[str, str] = {}
+    dups: list[str] = []
+    for m in merchants:
+        mid = m["merchant_id"]
+        if mid in seen:
+            dups.append(f"{mid}: {seen[mid]} ↔ {m['name']}")
+        else:
+            seen[mid] = m["name"]
+    if dups:
+        raise SystemExit(f"P3 실패: merchant_id 중복 {len(dups)}건 — 식별자로 쓸 수 없다 "
+                         f"(예: {dups[:3]})")
+    print(f"⑤ merchant_id: 결측 0건 / 중복 0건 — 유일 식별자 {len(seen):,}개 (FRCS_REG_NO, 문자열)")
+
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="P3 가맹점 수집·지오코딩 (06 문서 P3)")
@@ -384,6 +405,7 @@ def main() -> None:
     eup_etc: list[str] = []
 
     for i, row in enumerate(rows, 1):
+        merchant_id = str(row.get("FRCS_REG_NO") or "").strip()   # 원응답은 int — 표기는 문자열로 고정
         name = (row.get("FRCS_NM") or "").strip()
         address = " ".join((row.get("FRCS_ADDR") or "").split())  # trailing space·중복 공백 정리
         if not name or not address:
@@ -399,8 +421,8 @@ def main() -> None:
         if coord is None:
             failed.append({"name": name, "address": address, "eup": eup, "reason": "지오코딩 실패"})
             continue
-        merchants.append({"name": name, "category": category, "eup": eup, "address": address,
-                          "lat": coord[0], "lng": coord[1]})
+        merchants.append({"merchant_id": merchant_id, "name": name, "category": category,
+                          "eup": eup, "address": address, "lat": coord[0], "lng": coord[1]})
         if i % 200 == 0:
             print(f"  진행 {i:,}/{len(rows):,} — 성공 {len(merchants):,} / 실패 {len(failed)} "
                   f"(캐시 적중 {stats['cached']:,})")

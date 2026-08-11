@@ -9,12 +9,16 @@ import { Icon } from "@/components/Icon";
 import { WorkflowChip } from "@/components/StatusChip";
 import { PROXY_NOTE } from "@/lib/constants";
 import { normalizedProgress, progressOptions } from "@/lib/cardWorkflow";
+import { josa } from "@/lib/korean";
+import { measurementOf, metricUnit } from "@/lib/progressMetrics";
 import { isDemoReadOnly } from "@/lib/runtime";
 import type {
   Card,
   CardProgress,
+  CompletionEvidence,
+  ProgressMeasurementInput,
   ProgressMetricKey,
-  ProgressMetrics,
+  ProgressMetricsInput,
   ProgressRecordInput,
 } from "@/types";
 
@@ -75,19 +79,36 @@ const METRIC_FIELDS: {
   },
 ];
 
-const EMPTY_METRICS: Record<ProgressMetricKey, string> = {
-  usage_count: "",
-  conversion_rate_pct: "",
-  active_merchant_count: "",
-  spend_krw: "",
-  concentration_index: "",
+/**
+ * 관측값 한 칸의 입력 상태 — 값과 함께 **무엇을 언제 어디서 쟀는지**를 받는다.
+ *
+ * 값만 받던 시절에는 기간·출처 없는 숫자가 리포트 수치로 올라가, 나중에 무엇을 잰 값인지
+ * 되짚을 수 없고 서로 다른 범위의 값이 한 리포트에서 비교되는 사고도 막지 못했다.
+ * 서버가 네 필드를 전부 요구하며 누락은 422다. **단위는 받지 않는다** — 서버가 채운다.
+ */
+type MetricDraft = { value: string; from: string; to: string; source: string; scope: string };
+
+const EMPTY_METRIC: MetricDraft = { value: "", from: "", to: "", source: "", scope: "" };
+
+const EMPTY_METRICS: Record<ProgressMetricKey, MetricDraft> = {
+  usage_count: { ...EMPTY_METRIC },
+  conversion_rate_pct: { ...EMPTY_METRIC },
+  active_merchant_count: { ...EMPTY_METRIC },
+  spend_krw: { ...EMPTY_METRIC },
+  concentration_index: { ...EMPTY_METRIC },
 };
+
+const INTEGER_METRICS: ProgressMetricKey[] = ["usage_count", "active_merchant_count", "spend_krw"];
 
 const cardProgress = (card: Card): CardProgress =>
   normalizedProgress(card) ?? (card.type === "EXPANSION" ? "후보 접촉·검토 시작" : "검토중");
 
 const targetText = (card: Card): string =>
   card.target ? `${card.target.eup} · ${card.target.category}` : "전 지역 공통";
+
+/** 측정 범위 칸의 예시 — 카드 타깃을 그대로 제안해 "무엇을 잰 값인가"를 처음부터 좁혀 준다 */
+const scopePlaceholder = (card?: Card): string =>
+  card?.target ? `예: ${card.target.eup} ${card.target.category} 가맹점 전체` : "예: 6개 지역 전체";
 
 const idempotencyKey = (): string => {
   if (typeof crypto !== "undefined" && "randomUUID" in crypto) return crypto.randomUUID();
@@ -109,6 +130,9 @@ const toKstLocal = (iso?: string | null): string | undefined => {
 
 const optionalNumber = (value: string): number | undefined =>
   value.trim() === "" ? undefined : Number(value);
+
+/** `YYYY-MM-DDTHH:mm` → `YYYY-MM-DD`. 측정 종료일이 기록 시각보다 미래인지 보는 데 쓴다 */
+const datePart = (localDateTime: string): string => localDateTime.slice(0, 10);
 
 export function ProgressRecordForm({
   cards,
@@ -136,7 +160,14 @@ export function ProgressRecordForm({
   const [owner, setOwner] = useState("");
   const [dueAt, setDueAt] = useState("");
   const [source, setSource] = useState("");
-  const [metrics, setMetrics] = useState<Record<ProgressMetricKey, string>>(EMPTY_METRICS);
+  const [metrics, setMetrics] = useState<Record<ProgressMetricKey, MetricDraft>>(EMPTY_METRICS);
+  /** 완료 증빙 — `완료` 기록에만 쓰이고 타입별로 요구가 다르다 (05 §2) */
+  const [merchantRegistrationId, setMerchantRegistrationId] = useState("");
+  const [evidenceDocument, setEvidenceDocument] = useState("");
+  const [appliedFrom, setAppliedFrom] = useState("");
+  const [appliedTo, setAppliedTo] = useState("");
+  const [evidenceOwner, setEvidenceOwner] = useState("");
+  const [budgetCapConfirmed, setBudgetCapConfirmed] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   /** 직전 저장 성공의 요약 — 어떤 관측 지표가 이 기록으로 갱신됐는지 즉시 보여준다 */
@@ -152,6 +183,17 @@ export function ProgressRecordForm({
   const options = useMemo(
     () => (selectedCard ? progressOptions(selectedCard) : []),
     [selectedCard],
+  );
+  // 같은 이유가 여러 단계에 붙는 경우가 많아 문장 단위로 접어 보여 준다 (ProgressSelect와 같은 관용구)
+  const blockedProgressReasons = useMemo(
+    () => [
+      ...new Set(
+        options
+          .filter((option) => !option.allowed && option.reason)
+          .map((option) => option.reason as string),
+      ),
+    ],
+    [options],
   );
   const earliestRecordedAt = selectedCard
     ? toKstLocal(selectedCard.last_progress_record_at) ?? toKstLocal(selectedCard.created_at)
@@ -178,8 +220,8 @@ export function ProgressRecordForm({
     retryRef.current = null;
   };
 
-  const updateMetric = (key: ProgressMetricKey, value: string) => {
-    setMetrics((current) => ({ ...current, [key]: value }));
+  const updateMetric = (key: ProgressMetricKey, patch: Partial<MetricDraft>) => {
+    setMetrics((current) => ({ ...current, [key]: { ...current[key], ...patch } }));
     retryRef.current = null;
   };
 
@@ -213,29 +255,84 @@ export function ProgressRecordForm({
       return;
     }
 
-    const metricValues: ProgressMetrics = {
-      usage_count: optionalNumber(metrics.usage_count),
-      conversion_rate_pct: optionalNumber(metrics.conversion_rate_pct),
-      active_merchant_count: optionalNumber(metrics.active_merchant_count),
-      spend_krw: optionalNumber(metrics.spend_krw),
-      concentration_index: optionalNumber(metrics.concentration_index),
-    };
+    // 값을 적은 지표만 보낸다. 값이 있으면 측정 기간·출처·범위가 **전부 필수**다 —
+    // 서버가 422로 막지만, 무엇이 빠졌는지는 여기서 먼저 짚어 줘야 다시 적으러 갈 수 있다.
+    const measurements: Partial<Record<ProgressMetricKey, ProgressMeasurementInput>> = {};
+    const recordedDate = datePart(recordedAt);
     for (const field of METRIC_FIELDS) {
-      const value = metricValues[field.key];
-      if (value === undefined || value === null) continue;
+      const draft = metrics[field.key];
+      const value = optionalNumber(draft.value);
+      if (value === undefined) continue;
       if (!Number.isFinite(value) || value < 0 || (field.max !== undefined && value > field.max)) {
-        setError(`${field.label} 값을 ${field.max ? `0~${field.max}` : "0 이상"}으로 입력해 주세요.`);
+        const range = field.max ? `0~${field.max}` : "0 이상";
+        setError(`${field.label} 값을 ${josa(range, "으로/로")} 입력해 주세요.`);
         return;
       }
-      if (["usage_count", "active_merchant_count", "spend_krw"].includes(field.key) && !Number.isInteger(value)) {
-        setError(`${field.label}은 정수로 입력해 주세요.`);
+      if (INTEGER_METRICS.includes(field.key) && !Number.isInteger(value)) {
+        setError(`${josa(field.label, "은/는")} 정수로 입력해 주세요.`);
         return;
+      }
+      const scope = draft.scope.trim();
+      const metricSource = draft.source.trim();
+      if (!draft.from || !draft.to || !metricSource || !scope) {
+        setError(`${field.label}의 측정 기간·출처·범위를 모두 입력해 주세요.`);
+        return;
+      }
+      if (draft.from > draft.to) {
+        setError(`${field.label}의 측정 시작일은 종료일보다 늦을 수 없습니다.`);
+        return;
+      }
+      if (draft.to > recordedDate) {
+        setError(`${field.label}의 측정 종료일은 기록 시각보다 미래일 수 없습니다.`);
+        return;
+      }
+      measurements[field.key] = {
+        value,
+        measured_from: draft.from,
+        measured_to: draft.to,
+        source: metricSource,
+        scope,
+      };
+    }
+    const cleanMetrics = measurements as ProgressMetricsInput;
+
+    // 완료는 위젯 확충 배지·실행 전환율에 직결되므로 근거 없이 만들어져서는 안 된다 (05 §2)
+    let completionEvidence: CompletionEvidence | undefined;
+    if (progress === "완료") {
+      if (selectedCard.type === "EXPANSION") {
+        const registration = merchantRegistrationId.trim();
+        const document = evidenceDocument.trim();
+        if (!registration && !document) {
+          setError("확충 완료에는 가맹 등록 ID 또는 증빙 문서가 필요합니다.");
+          return;
+        }
+        completionEvidence = {
+          ...(registration ? { merchant_registration_id: registration } : {}),
+          ...(document ? { document } : {}),
+        };
+      } else {
+        const owner = evidenceOwner.trim();
+        if (!appliedFrom || !appliedTo || !owner) {
+          setError("인센티브 완료에는 적용 기간과 책임자가 필요합니다.");
+          return;
+        }
+        if (appliedFrom > appliedTo) {
+          setError("적용 시작일은 종료일보다 늦을 수 없습니다.");
+          return;
+        }
+        if (!budgetCapConfirmed) {
+          setError("예산 한도 확인 없이는 완료로 넘어갈 수 없습니다.");
+          return;
+        }
+        completionEvidence = {
+          applied_from: appliedFrom,
+          applied_to: appliedTo,
+          owner,
+          budget_cap_confirmed: true,
+        };
       }
     }
 
-    const cleanMetrics = Object.fromEntries(
-      Object.entries(metricValues).filter(([, value]) => value !== undefined),
-    ) as ProgressMetrics;
     const baseInput: Omit<ProgressRecordInput, "idempotency_key"> = {
       progress,
       recorded_at: recordedIso,
@@ -247,6 +344,7 @@ export function ProgressRecordForm({
       ...(dueAt ? { due_at: dueAt } : {}),
       ...(source.trim() ? { source: source.trim() } : {}),
       ...(Object.keys(cleanMetrics).length ? { metrics: cleanMetrics } : {}),
+      ...(completionEvidence ? { completion_evidence: completionEvidence } : {}),
     };
     const signature = JSON.stringify({ cardId: selectedCard.id, ...baseInput });
     if (retryRef.current?.signature !== signature) {
@@ -273,21 +371,32 @@ export function ProgressRecordForm({
           const saved = result.data.record;
           setSavedSummary({
             cardId: selectedCard.id,
-            metrics: METRIC_FIELDS.filter(
-              (field) => saved.metrics?.[field.key] !== undefined && saved.metrics?.[field.key] !== null,
-            ).map((field) => ({
-              label: field.label,
-              text: `${Number(saved.metrics[field.key]).toLocaleString("ko-KR", {
-                minimumFractionDigits: field.digits,
-                maximumFractionDigits: field.digits,
-              })}${field.unit}`,
-            })),
+            metrics: METRIC_FIELDS.flatMap((field) => {
+              const observed = measurementOf(saved.metrics, field.key);
+              if (!observed) return [];
+              return [
+                {
+                  label: field.label,
+                  // 단위는 서버가 지표 정의에서 채운 값을 그대로 쓴다 (화면 표는 폴백일 뿐)
+                  text: `${observed.value.toLocaleString("ko-KR", {
+                    minimumFractionDigits: field.digits,
+                    maximumFractionDigits: field.digits,
+                  })}${metricUnit(field.key, observed)}${
+                    observed.measured_from && observed.measured_to
+                      ? ` · ${observed.measured_from}~${observed.measured_to}`
+                      : ""
+                  }`,
+                },
+              ];
+            }),
           });
           setNote("");
           setBlocker("");
           setNextAction("");
           setSource("");
           setMetrics(EMPTY_METRICS);
+          setMerchantRegistrationId("");
+          setEvidenceDocument("");
           retryRef.current = null;
           router.refresh();
         })
@@ -338,12 +447,30 @@ export function ProgressRecordForm({
               className={FIELD}
               required
             >
+              {/* 고를 수 있는 단계의 정본은 서버다 — 화면은 순서만 입히고 판정하지 않는다 */}
               {options.map((option) => (
-                <option key={option.value} value={option.value} disabled={option.disabled}>
-                  {option.value}{option.disabled ? " · 적격성 확인 필요" : ""}
+                <option
+                  key={option.value}
+                  value={option.value}
+                  disabled={!option.allowed && option.value !== progress}
+                >
+                  {option.value}
+                  {!option.allowed && option.value !== progress ? " · 선택 불가" : ""}
                 </option>
               ))}
             </select>
+            {blockedProgressReasons.length ? (
+              <span className="mt-1.5 flex flex-col gap-0.5">
+                {blockedProgressReasons.map((reason) => (
+                  <span
+                    key={reason}
+                    className="block text-[11px] font-normal leading-4 text-admin-text-muted"
+                  >
+                    {reason}
+                  </span>
+                ))}
+              </span>
+            ) : null}
           </label>
         </div>
 
@@ -516,39 +643,229 @@ export function ProgressRecordForm({
           </span>
         </div>
 
-        <div className="mt-5 grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
-          {METRIC_FIELDS.map((field) => (
-            <label key={field.key} className="text-[13px] font-semibold text-admin-text">
-              {field.label}
-              {/* 절대 규칙 2 — 지역 전환율이 보이는 모든 화면에 근사 지표 배지 병기 */}
-              {field.key === "conversion_rate_pct" ? (
-                <span className="ml-1.5 inline-flex align-middle">
-                  <ProxyBadge note={PROXY_NOTE} />
-                </span>
-              ) : null}
-              <span className="relative mt-1.5 block">
-                <input
-                  type="number"
-                  min={0}
-                  max={field.max}
-                  step={field.step}
-                  value={metrics[field.key]}
-                  onChange={(event) => updateMetric(field.key, event.target.value)}
-                  disabled={working || isDemoReadOnly}
-                  placeholder="미입력"
-                  className={`${FIELD} mt-0 pr-10`}
-                />
-                <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-[11px] text-admin-text-muted">
-                  {field.unit}
-                </span>
-              </span>
-              <span className="mt-1.5 block text-[11px] font-normal leading-4 text-admin-text-muted">
-                {field.hint}
-              </span>
-            </label>
-          ))}
+        {/* 값을 적은 지표에만 측정 기간·출처·범위 칸이 열린다 — 다섯 지표에 네 칸씩 늘 펼쳐 두면
+            실제로는 한둘만 적는 폼이 스무 칸짜리 벽이 된다. 값이 없으면 서버도 요구하지 않는다 */}
+        <div className="mt-5 grid gap-3 xl:grid-cols-2">
+          {METRIC_FIELDS.map((field) => {
+            const draft = metrics[field.key];
+            const active = draft.value.trim() !== "";
+            return (
+              <div key={field.key} className="rounded-xl bg-admin-surface-sunken p-3.5">
+                <label className="block text-[13px] font-semibold text-admin-text">
+                  {field.label}
+                  {/* 절대 규칙 2 — 지역 전환율이 보이는 모든 화면에 근사 지표 배지 병기 */}
+                  {field.key === "conversion_rate_pct" ? (
+                    <span className="ml-1.5 inline-flex align-middle">
+                      <ProxyBadge note={PROXY_NOTE} />
+                    </span>
+                  ) : null}
+                  <span className="relative mt-1.5 block">
+                    <input
+                      type="number"
+                      min={0}
+                      max={field.max}
+                      step={field.step}
+                      value={draft.value}
+                      onChange={(event) => updateMetric(field.key, { value: event.target.value })}
+                      disabled={working || isDemoReadOnly}
+                      placeholder="미입력"
+                      className={`${FIELD} mt-0 pr-10`}
+                    />
+                    <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-[11px] text-admin-text-muted">
+                      {field.unit}
+                    </span>
+                  </span>
+                  <span className="mt-1.5 block text-[11px] font-normal leading-4 text-admin-text-muted">
+                    {field.hint}
+                  </span>
+                </label>
+
+                {active ? (
+                  <div className="mt-3 grid gap-3 sm:grid-cols-2">
+                    <label className="text-[12px] font-semibold text-admin-text">
+                      측정 시작일 <span className="text-state-warn">필수</span>
+                      <input
+                        type="date"
+                        value={draft.from}
+                        max={draft.to || datePart(recordedAt)}
+                        onChange={(event) => updateMetric(field.key, { from: event.target.value })}
+                        disabled={working || isDemoReadOnly}
+                        className={FIELD}
+                        required
+                      />
+                    </label>
+                    <label className="text-[12px] font-semibold text-admin-text">
+                      측정 종료일 <span className="text-state-warn">필수</span>
+                      <input
+                        type="date"
+                        value={draft.to}
+                        min={draft.from || undefined}
+                        max={datePart(recordedAt)}
+                        onChange={(event) => updateMetric(field.key, { to: event.target.value })}
+                        disabled={working || isDemoReadOnly}
+                        className={FIELD}
+                        required
+                      />
+                    </label>
+                    <label className="text-[12px] font-semibold text-admin-text">
+                      관측 출처 <span className="text-state-warn">필수</span>
+                      <input
+                        value={draft.source}
+                        onChange={(event) => updateMetric(field.key, { source: event.target.value })}
+                        disabled={working || isDemoReadOnly}
+                        maxLength={200}
+                        placeholder="예: 하이원포인트 운영 DB 월 마감"
+                        className={FIELD}
+                        required
+                      />
+                    </label>
+                    <label className="text-[12px] font-semibold text-admin-text">
+                      측정 범위 <span className="text-state-warn">필수</span>
+                      <input
+                        value={draft.scope}
+                        onChange={(event) => updateMetric(field.key, { scope: event.target.value })}
+                        disabled={working || isDemoReadOnly}
+                        maxLength={200}
+                        placeholder={scopePlaceholder(selectedCard)}
+                        className={FIELD}
+                        required
+                      />
+                    </label>
+                    <p className="text-[11px] leading-4 text-admin-text-muted sm:col-span-2">
+                      기간·출처·범위 없는 숫자는 나중에 무엇을 잰 값인지 되짚을 수 없고, 범위가 다른
+                      값이 한 리포트에서 나란히 비교되는 것도 막지 못합니다. 단위는 서버가 지표
+                      정의에서 채웁니다.
+                    </p>
+                  </div>
+                ) : null}
+              </div>
+            );
+          })}
         </div>
       </section>
+
+      {/* 완료 증빙 — `완료` 기록에만 나타난다. 완료는 방문객 위젯 배지·실행 전환율에 직결되므로
+          근거 없이 만들어져서는 안 되고, 빠른 상태 변경으로는 아예 완료를 만들 수 없다 (05 §2·§8) */}
+      {progress === "완료" && selectedCard ? (
+        <section className="rounded-panel bg-admin-surface p-4 shadow-card sm:p-5">
+          <div className="flex items-start gap-3">
+            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-state-good-bg text-state-good">
+              <Icon name="check" size={17} />
+            </span>
+            <div>
+              <h2 className="u-h2">완료 증빙</h2>
+              <p className="mt-1 break-keep text-[13px] leading-5 text-admin-text-muted">
+                {selectedCard.type === "EXPANSION"
+                  ? "가맹 등록 ID 또는 증빙 문서 중 최소 하나가 필요합니다. 등록 ID를 적으면 그 가맹점에 방문객 위젯의 확충 업종 배지가 붙고, 문서만 적으면 카드는 완료되지만 위젯 반영은 대기로 남습니다."
+                  : "적용 기간·책임자·예산 한도 확인이 모두 필요합니다. 예산 한도를 확인하지 않으면 완료로 넘어갈 수 없습니다."}
+              </p>
+            </div>
+          </div>
+
+          {selectedCard.type === "EXPANSION" ? (
+            <div className="mt-5 grid gap-4 md:grid-cols-2">
+              <label className="text-[13px] font-semibold text-admin-text">
+                가맹 등록 ID
+                <input
+                  value={merchantRegistrationId}
+                  onChange={(event) => {
+                    setMerchantRegistrationId(event.target.value);
+                    retryRef.current = null;
+                  }}
+                  disabled={working || isDemoReadOnly}
+                  maxLength={64}
+                  placeholder="하이원포인트 가맹점 등록번호"
+                  className={FIELD}
+                />
+                <span className="mt-1 block text-[11px] font-normal leading-4 text-admin-text-muted">
+                  이 값이 있어야 방문객 위젯이 어느 가맹점을 확충 결과로 표시할지 알 수 있습니다.
+                </span>
+              </label>
+              <label className="text-[13px] font-semibold text-admin-text">
+                증빙 문서
+                <input
+                  value={evidenceDocument}
+                  onChange={(event) => {
+                    setEvidenceDocument(event.target.value);
+                    retryRef.current = null;
+                  }}
+                  disabled={working || isDemoReadOnly}
+                  maxLength={500}
+                  placeholder="예: 가맹 계약서 사본 2026-08-11"
+                  className={FIELD}
+                />
+              </label>
+            </div>
+          ) : (
+            <div className="mt-5 grid gap-4 md:grid-cols-2">
+              <label className="text-[13px] font-semibold text-admin-text">
+                적용 시작일 <span className="text-state-warn">필수</span>
+                <input
+                  type="date"
+                  value={appliedFrom}
+                  max={appliedTo || undefined}
+                  onChange={(event) => {
+                    setAppliedFrom(event.target.value);
+                    retryRef.current = null;
+                  }}
+                  disabled={working || isDemoReadOnly}
+                  className={FIELD}
+                  required
+                />
+              </label>
+              <label className="text-[13px] font-semibold text-admin-text">
+                적용 종료일 <span className="text-state-warn">필수</span>
+                <input
+                  type="date"
+                  value={appliedTo}
+                  min={appliedFrom || undefined}
+                  onChange={(event) => {
+                    setAppliedTo(event.target.value);
+                    retryRef.current = null;
+                  }}
+                  disabled={working || isDemoReadOnly}
+                  className={FIELD}
+                  required
+                />
+              </label>
+              <label className="text-[13px] font-semibold text-admin-text">
+                책임자 <span className="text-state-warn">필수</span>
+                <input
+                  value={evidenceOwner}
+                  onChange={(event) => {
+                    setEvidenceOwner(event.target.value);
+                    retryRef.current = null;
+                  }}
+                  disabled={working || isDemoReadOnly}
+                  maxLength={100}
+                  placeholder="예: 지역상생팀 김지수"
+                  className={FIELD}
+                  required
+                />
+              </label>
+              <label className="flex items-start gap-2.5 rounded-xl bg-admin-surface-sunken p-3.5 text-[13px] font-semibold text-admin-text">
+                <input
+                  type="checkbox"
+                  checked={budgetCapConfirmed}
+                  onChange={(event) => {
+                    setBudgetCapConfirmed(event.target.checked);
+                    retryRef.current = null;
+                  }}
+                  disabled={working || isDemoReadOnly}
+                  className="mt-0.5 h-4 w-4 shrink-0 accent-admin-primary"
+                />
+                <span className="min-w-0">
+                  예산 한도 확인
+                  <span className="ml-1 text-state-warn">필수</span>
+                  <span className="mt-0.5 block break-keep text-[11px] font-normal leading-4 text-admin-text-muted">
+                    재원 부담이 예산 부서와 확인된 한도 안에 있음을 확인했습니다.
+                  </span>
+                </span>
+              </label>
+            </div>
+          )}
+        </section>
+      ) : null}
 
       {isDemoReadOnly ? (
         <p className="rounded-xl bg-state-notice-bg px-4 py-3 text-[13px] leading-5 text-state-notice">

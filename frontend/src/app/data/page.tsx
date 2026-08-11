@@ -10,6 +10,7 @@ import { PageHeader } from "@/components/PageHeader";
 import { GroupHeading, Section } from "@/components/Section";
 import { api, manifest } from "@/lib/api";
 import { ASSUMPTION_NOTE, PROXY_NOTE, STABILITY_NOTE } from "@/lib/constants";
+import { canonicalTotalUses, signedCount } from "@/lib/dashboardView";
 import { num } from "@/lib/format";
 
 export const metadata: Metadata = { title: "데이터 활용 정보 · 상생 나침반" };
@@ -190,6 +191,21 @@ export default async function DataPage({
                   표기하며, 영향받는 지역의 합계는 {privacy.aggregate_rounding.unit} 단위로 반올림해
                   발행합니다. 비율·순위·스코어는 반올림 전 원값으로 계산합니다.
                 </p>
+                {/* 총계는 반올림을 타지 않는 정본 하나만 쓴다 — 그래서 공개 배열을 더한 값과
+                    어긋나고, 배열마다 어긋나는 폭도 다르다. 그 차이를 수치로 밝힌다 */}
+                {privacy.privacy_rounding_adjustment ? (
+                  <p className="u-note mt-2">
+                    화면의 총 사용 건수는 반올림을 거치지 않은 정본{" "}
+                    <b className="font-semibold tabular-nums text-admin-text">
+                      {num(canonicalTotalUses(d))}건
+                    </b>
+                    입니다. 공개된 지역별 건수를 더하면{" "}
+                    {signedCount(privacy.privacy_rounding_adjustment.region_share)}건, 업종별 건수를
+                    더하면 {signedCount(privacy.privacy_rounding_adjustment.category_share)}건만큼
+                    이 값과 어긋납니다 — 반올림 때문이며 지역·업종 각각의 값은 여전히 반올림된
+                    공개값입니다.
+                  </p>
+                ) : null}
                 <h3 className="u-h3 mt-4">
                   비공개 셀 {privacy.suppressed_cells.length}개
                 </h3>

@@ -142,7 +142,8 @@ test.describe("5단계 반전 장면 — 투어 중에도 조작이 통과한다
     await expect(slider).toBeVisible();
     // 딥링크(?preset=flip)는 반전 **직전** 상태로 들어온다 — 아직은 수요 측 처방이어야 한다
     await expect(slider).toHaveValue("0.25");
-    await expect(flipCard).toContainText("수요 측 우선");
+    // 판정 칩은 "이 가정에서는 …"으로 조건을 앞세운다(확정형 금지) — 방향만 바뀌고 어형은 같다
+    await expect(flipCard).toContainText("이 가정에서는 수요 측 우선");
 
     // 실제 포인터 클릭이다. 오버레이가 클릭을 삼키면 Playwright의 hit-target 검사가 여기서
     // "intercepts pointer events"로 실패한다 — C1 회귀를 잡는 핵심 지점이다.
@@ -151,14 +152,16 @@ test.describe("5단계 반전 장면 — 투어 중에도 조작이 통과한다
     expect(beta, `슬라이더 조작이 화면에 닿지 않았습니다(값이 ${beta}에 머무름)`).toBeGreaterThanOrEqual(0.3);
 
     // 그리고 실제로 처방이 뒤집혀야 한다 — 조작만 되고 판정이 그대로면 시연 가치가 없다
-    await expect(flipCard).toContainText("공급 측 우선 — 가맹점 확충");
+    await expect(flipCard).toContainText("이 가정에서는 공급 측 우선 — 가맹점 확충");
     await expect(flipCard).toContainText("가맹점 확충이 먼저입니다");
+    // 반전이 이 가정 하나에 걸려 있다는 사실을 강건성 줄이 함께 말해야 한다(점추정 단정 금지)
+    await expect(flipCard).toContainText("이상에서만 공급 측으로 바뀝니다");
 
     // 투어는 계속 5단계로 살아 있어야 한다(조작이 투어를 끊지 않는다)
     await expect(dialog).toContainText("5 / 6");
 
     // 반전 판정이 투어 안내 카드에 가려지면 "뒤집혔다"를 볼 수 없다 — 좌표로 확인한다
-    const verdict = flipCard.getByText("공급 측 우선 — 가맹점 확충");
+    const verdict = flipCard.getByText("이 가정에서는 공급 측 우선 — 가맹점 확충");
     await expect(verdict).toBeInViewport();
     const verdictBox = await verdict.boundingBox();
     const cardBox = await tourCard(page).boundingBox();

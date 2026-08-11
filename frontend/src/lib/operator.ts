@@ -12,6 +12,15 @@ const DEMO_NAME = "홍길동";
 const DEMO_TEAM = "지역상생팀";
 /** 이름을 어디서도 얻지 못했을 때 쓰는 역할 이름 */
 const FALLBACK_NAME = "담당자";
+/**
+ * 결정 감사 기록에 남는 담당자 식별자의 기본값.
+ *
+ * 이름과 달리 표시용이 아니라 **기록의 키**라, 이름을 바꿔도 같은 사람의 결정이 갈라지지 않도록
+ * 따로 둔다. 계정 체계가 없어 이 값은 화면이 보내는 **자기신고 값**이며, 서버가
+ * `verified: false`·공유 토큰 인증과 함께 저장해 검증되지 않았음을 명시한다 —
+ * 그러니 FE가 이 값을 검증된 신원처럼 다루지 않는다.
+ */
+const DEMO_ID = "operator.demo";
 
 const clean = (value: string | undefined): string => (value ?? "").trim();
 
@@ -19,6 +28,8 @@ const clean = (value: string | undefined): string => (value ?? "").trim();
 const resolvedName = clean(process.env.NEXT_PUBLIC_OPERATOR_NAME) || clean(DEMO_NAME);
 
 export const operator = {
+  /** 결정 요청의 actor_id — 비어 있으면 서버가 422를 내므로 기본값을 반드시 남긴다 */
+  id: clean(process.env.NEXT_PUBLIC_OPERATOR_ID) || DEMO_ID,
   name: resolvedName || FALLBACK_NAME,
   team: clean(process.env.NEXT_PUBLIC_OPERATOR_TEAM) || clean(DEMO_TEAM),
 };

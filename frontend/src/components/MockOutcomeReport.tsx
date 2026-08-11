@@ -1,4 +1,5 @@
 import { Icon, type IconName } from "@/components/Icon";
+import { canonicalTotalUses } from "@/lib/dashboardView";
 import { num } from "@/lib/format";
 import type { Card, Dashboard } from "@/types";
 
@@ -19,7 +20,9 @@ type Metric = {
  */
 export function MockOutcomeReport({ card, dashboard }: { card: Card; dashboard: Dashboard }) {
   const seed = [...card.id].reduce((sum, char) => sum + char.charCodeAt(0), 0) % 5;
-  const totalUses = dashboard.region_share.reduce((sum, row) => sum + row.count, 0);
+  // 전체 총계는 반올림 전 정본을 쓴다. 지역 하나의 값은 여전히 반올림된 공개값이며,
+  // 그 차이는 화면의 소표본 보호 고지가 설명한다 (05 §1 canonical_total).
+  const totalUses = canonicalTotalUses(dashboard);
   const regionUses = card.target
     ? dashboard.region_share.find((row) => row.region === card.target?.eup)?.count ?? totalUses
     : totalUses;

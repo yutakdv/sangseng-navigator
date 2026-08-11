@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { AssumptionBadge, AssumptionNote, EstimateBadge, ProxyBadge } from "@/components/Badge";
 import { Icon } from "@/components/Icon";
 import { SourceChip } from "@/components/SourceChip";
+import { josa } from "@/lib/korean";
 import type { CellLoad, CellLoadCell } from "@/types";
 
 /**
@@ -47,20 +48,56 @@ const DAMPING = 0.5;
 const RATES = [3, 5, 7] as const;
 const TIER_LABEL: Record<string, string> = { high: "상위", mid: "중간", low: "하위" };
 
+/**
+ * 민감도 슬라이더가 실제로 갈 수 있는 값들 — 강건성 문장이 훑는 구간이다.
+ *
+ * 프리셋 세 점만 훑으면 화면이 거짓말을 할 수 있다: 페이백 7%에서는 0.25에서 이미 공급 측인데
+ * 프리셋 기준으로는 "0.30 이상에서만"이 되어, 칩 판정과 강건성 문장이 어긋난다. 슬라이더와
+ * 같은 눈금을 쓰면 담당자가 손으로 확인할 수 있는 범위와 문장이 정확히 일치한다.
+ */
+const BETA_MIN = 0.1;
+const BETA_MAX = 0.6;
+const BETA_STEP = 0.05;
+const BETA_STEPS = Array.from(
+  { length: Math.round((BETA_MAX - BETA_MIN) / BETA_STEP) + 1 },
+  // 0.1 + n×0.05는 부동소수로 0.30000000000000004가 된다 — 슬라이더 onChange와 같은 방식으로 맞춘다
+  (_, i) => Math.round((BETA_MIN + i * BETA_STEP) * 100) / 100,
+);
+const BETA_SPAN = `${BETA_MIN.toFixed(2)}부터 ${BETA_MAX.toFixed(2)}까지`;
+
 const keyOf = (c: { eup: string; category: string }): string => `${c.eup}·${c.category}`;
+
+/**
+ * 한 가정 조합(민감도 β · 페이백률)에서의 전망·격차·처방 판정.
+ *
+ * 부하 상위 셀은 페이백을 올려도 개선폭이 절반만 실현된다고 본다(가정). `fullPp`는 같은 조건에서
+ * 감쇠가 없는 셀이 얻는 몫으로, 격차를 보여 줘야 감쇠의 의미가 읽힌다.
+ *
+ * 판정은 **화면에 찍히는 반올림값**으로 한다 — 이유는 감사 가능성 하나다. 담당자가 처방 카드의
+ * 세 칸(비포화 셀 전망 − 이 셀 전망 = 격차)을 손으로 빼면 판정 근거가 그대로 재현된다.
+ * 정확도 문제는 아니다: 요율 3·5·7% × 민감도 0.10~0.60 전 구간에서 원값 판정과 반올림값 판정이
+ * 갈리는 지점은 없다.
+ *
+ * 현재 조건과 프리셋 훑기(강건성 표시)가 같은 함수를 쓴다 — 두 곳이 갈라지면 화면이 "지금 판정"과
+ * "가정을 바꿨을 때의 판정"을 서로 다른 규칙으로 말하게 된다.
+ */
+function outcomeAt(
+  tier: string,
+  rate: number,
+  beta: number,
+): { deltaPp: number; fullPp: number; gapPp: number; flipped: boolean } {
+  const damped = tier === "high" ? beta * DAMPING : beta;
+  const deltaPp = +(rate * damped).toFixed(2);
+  const fullPp = +(rate * beta).toFixed(2);
+  const gapPp = +(fullPp - deltaPp).toFixed(2);
+  return { deltaPp, fullPp, gapPp, flipped: tier === "high" && gapPp >= FLIP_GAP_PP };
+}
 
 /** 천 단위 구분 — 서버·브라우저 결과가 항상 같도록 로캘 API를 쓰지 않는다(하이드레이션 불일치 방지) */
 const num = (v: number): string => String(Math.round(v)).replace(/\B(?=(\d{3})+(?!\d))/g, ",");
 
 /** 부하 지수·기준선은 소수 1자리 고정 — 34.0이 "34"로 찍히면 같은 지표가 자리마다 달라 보인다 */
 const one = (v: number): string => v.toFixed(1);
-
-/** 받침 여부로 은/는을 고른다 — "카페은"처럼 읽히면 화면 신뢰가 깎인다 */
-const topic = (word: string): string => {
-  const code = word.charCodeAt(word.length - 1);
-  const hasFinal = code >= 0xac00 && code <= 0xd7a3 && (code - 0xac00) % 28 !== 0;
-  return `${word}${hasFinal ? "은" : "는"}`;
-};
 
 const chip =
   "min-h-9 rounded-lg px-3 py-1.5 text-sm font-bold tabular-nums transition-colors duration-200";
@@ -125,17 +162,21 @@ export function CellExplorer({
     );
   }
 
-  // 부하 상위 셀은 페이백을 올려도 개선폭이 절반만 실현된다고 본다(가정)
-  const damped = cell.tier === "high" ? beta * DAMPING : beta;
-  const deltaPp = +(rate * damped).toFixed(2);
-  /** 같은 조건에서 감쇠가 없는 셀이 얻는 몫 — 격차를 보여 줘야 감쇠의 의미가 읽힌다 */
-  const fullPp = +(rate * beta).toFixed(2);
-  const gapPp = +(fullPp - deltaPp).toFixed(2);
-  // 판정은 **화면에 찍히는 반올림값**으로 한다 — 이유는 감사 가능성 하나다. 담당자가 처방 카드의
-  // 세 칸(비포화 셀 전망 − 이 셀 전망 = 격차)을 손으로 빼면 판정 근거가 그대로 재현된다.
-  // 정확도 문제는 아니다: 요율 3·5·7% × 민감도 0.10~0.60 전 구간에서 원값 판정과 반올림값 판정이
-  // 갈리는 지점은 없다.
-  const flipped = cell.tier === "high" && gapPp >= FLIP_GAP_PP;
+  const { deltaPp, fullPp, gapPp, flipped } = outcomeAt(cell.tier, rate, beta);
+
+  /**
+   * 가정을 바꿨을 때의 판정 — 지금 고른 β 하나로 결론이 정해진 것처럼 보이지 않게 한다.
+   * `sweep`은 이름 붙은 프리셋 3종을 나란히 보여 주고, `flipFrom`은 슬라이더 눈금 전체를 훑어
+   * 처음 공급 측이 되는 가정을 찾는다. 격차는 β에 비례해 커지므로 반전 지점은 항상 하나다.
+   */
+  const sweep = BETA_PRESETS.map((p) => ({ ...p, ...outcomeAt(cell.tier, rate, p.value) }));
+  const flipFrom = BETA_STEPS.find((b) => outcomeAt(cell.tier, rate, b).flipped);
+  const robustness =
+    flipFrom === undefined
+      ? `이 셀은 페이백 ${rate}% 기준으로 민감도 가정 ${BETA_SPAN} 전 구간에서 수요 측입니다 — 가정을 어디에 놓아도 처방 방향이 바뀌지 않습니다.`
+      : flipFrom === BETA_STEPS[0]
+        ? `이 셀은 페이백 ${rate}% 기준으로 민감도 가정 ${BETA_SPAN} 전 구간에서 공급 측입니다 — 가정을 어디에 놓아도 처방 방향이 바뀌지 않습니다.`
+        : `이 셀은 페이백 ${rate}% 기준으로 민감도 가정 ${flipFrom.toFixed(2)} 이상에서만 공급 측으로 바뀝니다 — 지금 판정은 가정을 어디에 놓느냐에 달려 있습니다.`;
 
   const rank = open.indexOf(cell) + 1;
   const position =
@@ -144,7 +185,7 @@ export function CellExplorer({
       : cell.tier === "low"
         ? `하위 구간 기준선 ${one(data.thresholds.low)}보다 낮은 값`
         : `중간 구간(하위 기준 ${one(data.thresholds.low)} ~ 상위 기준 ${one(data.thresholds.high)})`;
-  const fact = `${cell.eup} ${topic(cell.category)} 가맹점 ${cell.merchants}곳이 월 평균 ${num(cell.monthly_uses_avg)}건을 처리합니다 — 가맹점당 ${one(cell.load_index)}건으로 값이 공개된 ${open.length}개 셀 중 ${rank}위, ${position}입니다.`;
+  const fact = `${cell.eup} ${josa(cell.category, "은/는")} 가맹점 ${cell.merchants}곳이 월 평균 ${num(cell.monthly_uses_avg)}건을 처리합니다 — 가맹점당 ${one(cell.load_index)}건으로 값이 공개된 ${open.length}개 셀 중 ${rank}위, ${position}입니다.`;
 
   return (
     <div ref={root} className="flex flex-col gap-4">
@@ -193,9 +234,9 @@ export function CellExplorer({
         <input
           id="cell-explorer-beta"
           type="range"
-          min={0.1}
-          max={0.6}
-          step={0.05}
+          min={BETA_MIN}
+          max={BETA_MAX}
+          step={BETA_STEP}
           value={beta}
           // 슬라이더가 0.1 + n×0.05를 부동소수로 만들면 0.30000000000000004 같은 값이 나온다 —
           // 반전 임계(0.30) 비교와 화면 표기가 어긋나지 않도록 소수 둘째 자리로 맞춘다
@@ -252,13 +293,15 @@ export function CellExplorer({
         }`}
       >
         <div className="flex flex-wrap items-center gap-2">
+          {/* 확정형으로 읽히지 않도록 판정 앞에 조건을 붙인다 — 이 결과는 위에서 고른 가정에서만
+              성립한다(실측 탄력성이 아니다). 프리셋 전 구간 판정은 아래 강건성 줄이 따로 말한다 */}
           <span
-            className={`inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1 text-[13px] font-bold text-white transition-colors duration-200 ${
+            className={`inline-flex items-center gap-1.5 break-keep rounded-lg px-2.5 py-1 text-[13px] font-bold text-white transition-colors duration-200 ${
               flipped ? "bg-state-warn" : "bg-admin-primary"
             }`}
           >
-            <Icon name={flipped ? "store" : "gift"} size={14} strokeWidth={2} />
-            {flipped ? "공급 측 우선 — 가맹점 확충" : "수요 측 우선 — 페이백·노출"}
+            <Icon name={flipped ? "store" : "gift"} size={14} strokeWidth={2} className="shrink-0" />
+            {flipped ? "이 가정에서는 공급 측 우선 — 가맹점 확충" : "이 가정에서는 수요 측 우선 — 페이백·노출"}
           </span>
           <AssumptionBadge />
           <EstimateBadge note={data.method_note} />
@@ -267,8 +310,8 @@ export function CellExplorer({
 
         <p className="u-body mt-3 font-semibold">
           {flipped
-            ? "이 지역은 가맹점당 이용 부하가 이미 상위권이라 페이백 증액 효과가 제한적입니다 — 가맹점 확충이 먼저입니다."
-            : "이 지역은 가맹점이 더 받을 여력이 남아 있어, 페이백 증액분이 그대로 전달될 여지가 큽니다."}
+            ? "선택한 가정에서는 이 지역의 가맹점당 이용 부하가 이미 상위권이라 페이백 증액 효과가 제한적으로 나옵니다 — 이 조건에서는 가맹점 확충이 먼저입니다."
+            : "선택한 가정에서는 이 지역의 가맹점이 더 받을 여력이 남아 있어, 페이백 증액분이 그대로 전달될 여지가 큽니다."}
         </p>
         <p className="u-body mt-2 text-admin-text-soft">{fact}</p>
 
@@ -311,6 +354,37 @@ export function CellExplorer({
             편이 근거가 섭니다.
           </p>
         ) : null}
+
+        {/* 민감도 범위 ─ 지금 고른 β 하나가 아니라 프리셋 전 구간에서 판정이 어떻게 되는지.
+            점추정 하나로 결론이 정해진 것처럼 보이면 설정값이 실측처럼 읽힌다 */}
+        <div className="mt-3 rounded-lg bg-admin-surface p-3">
+          <p className="u-note">
+            민감도 가정을 바꾸면 — 페이백 {rate}% 고정, 프리셋 {sweep.length}종
+          </p>
+          <ul className="mt-2 flex flex-wrap gap-1.5">
+            {sweep.map((s) => (
+              <li
+                key={s.key}
+                className={`break-keep rounded-lg px-2.5 py-1 text-[13px] font-bold tabular-nums ${
+                  s.flipped
+                    ? "bg-state-warn-bg text-state-warn"
+                    : "bg-admin-primary-soft text-admin-primary"
+                }`}
+              >
+                {s.label} {s.value.toFixed(2)} · {s.flipped ? "공급 측" : "수요 측"}
+                <span className="font-medium">
+                  {" "}
+                  (
+                  {cell.tier === "high"
+                    ? `격차 ${s.gapPp.toFixed(2)}%p`
+                    : `전망 +${s.deltaPp.toFixed(2)}%p`}
+                  {s.value === beta ? " · 지금" : ""})
+                </span>
+              </li>
+            ))}
+          </ul>
+          <p className="u-note mt-2">{robustness}</p>
+        </div>
 
         <AssumptionNote className="mt-3" />
       </div>

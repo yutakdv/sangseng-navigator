@@ -1,5 +1,5 @@
 import { EXPANSION_PROGRESS, INCENTIVE_PROGRESS, normalizedProgress } from "@/lib/cardWorkflow";
-import { PROGRESS_METRICS } from "@/lib/progressMetrics";
+import { PROGRESS_METRICS, measurementOf } from "@/lib/progressMetrics";
 import type { Card, CardProgress, CardType, ProgressMetricKey, ProgressRecord } from "@/types";
 
 /**
@@ -355,15 +355,16 @@ export function metricSeries(
   for (const meta of PROGRESS_METRICS) {
     const cards: MetricCardSeries[] = [];
     for (const entry of withinByCard) {
-      const observed = entry.records.filter((record) => {
-        const value = record.metrics?.[meta.key];
-        return value !== undefined && value !== null;
-      });
+      // 관측값은 값·기간·출처·범위를 지닌 객체다 — 추세는 그중 value만 잇는다
+      // (개정 이전 기록의 스칼라도 measurementOf가 함께 받는다)
+      const observed = entry.records.filter((record) => measurementOf(record.metrics, meta.key));
       if (observed.length < 2) continue;
       cards.push({
         cardId: entry.card.id,
         title: entry.card.title,
-        values: observed.map((record) => record.metrics[meta.key] as number),
+        values: observed.map(
+          (record) => measurementOf(record.metrics, meta.key)?.value as number,
+        ),
         firstAt: observed[0].recorded_at,
         lastAt: observed[observed.length - 1].recorded_at,
       });

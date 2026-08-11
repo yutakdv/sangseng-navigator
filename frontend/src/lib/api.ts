@@ -19,9 +19,9 @@ import type {
   CardStatus,
   CardType,
   Dashboard,
+  DecisionRequest,
   EligibilityCheck,
   Kpi,
-  PaybackRate,
   CreateProgressRecordResponse,
   ProgressRecordInput,
   ProgressRecordsResponse,
@@ -198,12 +198,16 @@ export const api = {
     return { card: data.card, created: status === 201 };
   },
 
-  /** INCENTIVE를 approved 할 때는 selectedRate(3|5|7) 필수 (05 §2·§8) */
-  decide: (id: string, decision: CardStatus, selectedRate?: PaybackRate): Promise<{ card: Card }> =>
-    post(`/api/cards/${id}/decision`, {
-      decision,
-      ...(selectedRate ? { selected_rate: selectedRate } : {}),
-    }),
+  /**
+   * 담당자 결정 — 요청 조립은 이 한 곳에서만 한다.
+   *
+   * 조건부 필수가 셋이다(05 §2·§8): INCENTIVE 승인의 `selected_rate`, 반려·보류의 `reason`,
+   * 그리고 신뢰도 `하` 카드 승인의 `reason`(확인 근거). 셋 다 누락은 422다.
+   * `version`은 낙관적 잠금이라 불일치면 409, `actor_id`는 자기신고 값이라 서버가
+   * 검증되지 않았음을 함께 저장한다.
+   */
+  decide: (id: string, body: DecisionRequest): Promise<{ card: Card }> =>
+    post(`/api/cards/${id}/decision`, body),
 
   progress: (id: string, progress: CardProgress): Promise<{ card: Card }> =>
     post(`/api/cards/${id}/progress`, { progress }),

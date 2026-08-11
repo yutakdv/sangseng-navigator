@@ -25,6 +25,17 @@ def _elapsed_hours(card: dict) -> float | None:
         return None
 
 
+def _balance_sample(approved: list) -> int:
+    """지역 균형지수를 만든 표본 수 — 집계 6지역 안에 target.eup이 있는 승인 EXPANSION 카드 수.
+
+    `counts.approved`는 INCENTIVE를 포함해 다른 숫자라 표본으로 쓸 수 없다. 지수만 크게 띄우고
+    그것이 카드 몇 장에서 나온 값인지 감추지 않기 위해 응답에 함께 싣는다 (05 문서 §3).
+    """
+    return sum(1 for card in approved
+               if card.get("type") == "EXPANSION"
+               and (card.get("target") or {}).get("eup") in simulate.REGIONS)
+
+
 def _balance_index(approved: list) -> int | None:
     """지역 균형지수 = 100 − 집중도(승인 EXPANSION 카드의 6지역 분포) (05 문서 §3).
 
@@ -65,6 +76,8 @@ def get_kpi():
         "avg_decision_hours": round(sum(hours) / len(hours), 1) if hours else None,
         "avg_approval_hours": round(sum(hours) / len(hours), 1) if hours else None,
         "regional_balance_index": _balance_index(approved),
+        # counts 안이 아니라 최상위 — counts는 카드 상태별 건수만 담는 자리다 (05 문서 §3)
+        "balance_sample_count": _balance_sample(approved),
         "counts": {
             "total": len(cards),
             "pending": len(by_status["pending"]),

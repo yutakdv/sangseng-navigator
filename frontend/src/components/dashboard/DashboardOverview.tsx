@@ -10,6 +10,7 @@ import { ProposalSummary } from "@/components/proposals/ProposalSummary";
 import { SourceChip } from "@/components/SourceChip";
 import { datasetVersion } from "@/lib/api";
 import { isExecutionStage, isStartStage, sampleQuality } from "@/lib/cardWorkflow";
+import { canonicalTotalUses } from "@/lib/dashboardView";
 import { dataFreshness } from "@/lib/dataFreshness";
 import { operatorGreeting } from "@/lib/operator";
 import type { Card, CardType, Dashboard, EupScore, Kpi } from "@/types";
@@ -74,7 +75,8 @@ export function DashboardOverview({
   /** 3층(결정 이력·실행 현황) — sticky 상태 바의 부모 박스를 페이지 전체로 넓히기 위해 여기서 받는다 */
   children?: React.ReactNode;
 }) {
-  const totalUses = (dashboard.region_share ?? []).reduce((sum, row) => sum + row.count, 0);
+  // 총계는 반올림 전 정본 하나만 쓴다 — 공개 배열을 더하면 배열마다 다른 총계가 나온다
+  const totalUses = canonicalTotalUses(dashboard);
   const freshness = dataFreshness(dashboard.period_note);
   // kpi가 null(호출 실패)이면 표본 품질을 판단할 근거가 없다 — "운영 표본"으로 기본값을 주면
   // 실제로는 확인하지 못한 품질을 확인한 것처럼 말하게 되므로 배지 자체를 숨긴다.
