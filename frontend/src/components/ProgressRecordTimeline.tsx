@@ -146,7 +146,7 @@ export function ProgressRecordTimeline({
               {observed.length ? (
                 <div className="mt-3 border-t border-admin-border pt-3">
                   <div className="flex flex-wrap items-center gap-1.5">
-                    <p className="text-[11px] font-bold text-admin-text-muted">실제 관측 성과</p>
+                    <p className="text-[11px] font-bold text-admin-text-muted">담당자 입력 관측값</p>
                     {/* 절대 규칙 2 — 이 블록에 지역 전환율이 보이면 근사 지표 배지를 반드시 병기한다 */}
                     {observed.some(({ meta, measurement }) => metricIsProxy(meta.key, measurement)) ? (
                       <ProxyBadge note={PROXY_NOTE} />

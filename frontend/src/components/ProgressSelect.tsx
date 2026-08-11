@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useId, useState, useTransition } from "react";
+import { useId, useState, useSyncExternalStore, useTransition } from "react";
 import { progressAction } from "@/app/actions";
 import { needsRecordForm, normalizedProgress, progressOptions } from "@/lib/cardWorkflow";
 import { isDemoReadOnly } from "@/lib/runtime";
@@ -21,6 +21,21 @@ import type { Card, CardProgress } from "@/types";
  * 성공하면 액션의 revalidate가 페이지를 다시 그린다(칩·KPI·완료 안내가 함께 갱신).
  * 그동안 셀렉트가 옛 값으로 남지 않도록 고른 값을 낙관적으로 표시하고, 실패하면 서버 값으로 되돌린다.
  */
+/** sessionStorage는 구독할 이벤트가 없다 — 스냅숏만 읽는 useSyncExternalStore용 무동작 구독 */
+const subscribeNoop = () => () => {};
+
+/** 방금(8초 내) 저장한 기록의 시각 라벨 — 지났거나 없으면 null. 외부 저장소 읽기라 스냅숏 함수에 둔다 */
+function readFreshSavedLabel(key: string): string | null {
+  try {
+    const raw = sessionStorage.getItem(key);
+    if (!raw) return null;
+    const { label, at } = JSON.parse(raw) as { label: string; at: number };
+    return Date.now() - at < 8_000 ? label : null;
+  } catch {
+    return null;
+  }
+}
+
 export function ProgressSelect({
   card,
   disabled = false,
@@ -42,7 +57,20 @@ export function ProgressSelect({
   const [recordHint, setRecordHint] = useState<string | null>(null);
   /** 완료 전환 성공 직후 — 위젯 반영을 확인하러 가는 동선을 그 자리에서 보여준다 */
   const [justCompleted, setJustCompleted] = useState(false);
+  /** 저장 성공 시각 — "변경 중…"이 사라진 뒤에도 저장됐다는 사실이 화면에 남게 한다 */
+  const [savedAtState, setSavedAt] = useState<string | null>(null);
   const id = useId();
+
+  // 상태 변경 성공 시 revalidate로 카드가 목록에서 재정렬되면 이 컴포넌트가 리마운트되어
+  // state가 사라진다 — 방금 저장한 기록을 sessionStorage로 이어받아 칩을 유지한다.
+  // useSyncExternalStore라 서버 스냅숏은 null(SSR에 칩 없음)이고 하이드레이션과 어긋나지 않는다.
+  const savedKey = `progress-saved-${cardId}`;
+  const restoredLabel = useSyncExternalStore(
+    subscribeNoop,
+    () => readFreshSavedLabel(savedKey),
+    () => null,
+  );
+  const savedAt = savedAtState ?? restoredLabel;
 
   // 서버 값이 바뀐 순간에만 로컬 선택값을 맞춘다 — effect 없이 렌더 중 조정하는 React 표준 패턴이라
   // revalidate 직후 한 번의 렌더로 끝나고, 낙관적 표시 중에는 개입하지 않는다(prop이 아직 옛 값이므로).
@@ -67,6 +95,7 @@ export function ProgressSelect({
     setError(null);
     setRecordHint(null);
     setJustCompleted(false);
+    setSavedAt(null);
     const option = options.find((o) => o.value === next);
     // 완료처럼 증빙이 필요한 단계는 빠른 상태 변경으로 만들 수 없다(보내면 422) —
     // 요청을 보내지 않고 서버가 준 안내와 함께 추진 기록 폼으로 유도한다 (05 §2·§8).
@@ -86,6 +115,14 @@ export function ProgressSelect({
             setValue(server);
             setError(res.detail);
             return;
+          }
+          const now = new Date();
+          const label = now.toLocaleTimeString("ko-KR", { hour: "2-digit", minute: "2-digit" });
+          setSavedAt(label);
+          try {
+            sessionStorage.setItem(savedKey, JSON.stringify({ label, at: now.getTime() }));
+          } catch {
+            /* storage 불가 환경은 현재 마운트의 state로만 표시된다 */
           }
           if (next === "완료") setJustCompleted(true);
         })
@@ -151,6 +188,12 @@ export function ProgressSelect({
       {isDemoReadOnly ? <p className="u-note mt-1.5">공개 데모 읽기 전용</p> : null}
 
       {working ? <p className="u-note mt-1.5">변경 중…</p> : null}
+
+      {savedAt && !working && !justCompleted && !error ? (
+        <p className="mt-1.5 rounded-lg bg-state-good-bg px-2 py-1.5 text-xs leading-5 text-state-good">
+          저장됨 · {savedAt}
+        </p>
+      ) : null}
 
       {/* 반영 "확정"을 단정하지 않는다 — 배지는 완료가 아니라 가맹 등록 ID 확인 이후에 붙는다.
           정확한 반영 여부는 같은 행의 DoneNote가 카드의 확인된 가맹점 ID를 보고 말해 준다. */}

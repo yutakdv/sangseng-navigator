@@ -277,7 +277,8 @@ export default async function WidgetPage({ searchParams }: { searchParams: Promi
   ];
 
   return (
-    <div className="min-h-screen bg-admin-bg py-0 sm:py-8">
+    // 방문객 화면은 AdminShell 밖이라 랜드마크가 없다 — 본문을 main으로 감싼다 (13 §4 접근성)
+    <main className="min-h-screen bg-admin-bg py-0 sm:py-8">
       {/* 모바일에서는 한 열, 넓은 화면에서는 레퍼런스(image-2)처럼 필터와 지도를 나란히 둔다. */}
       <div className="mx-auto w-full max-w-[1180px] overflow-hidden bg-visitor-bg shadow-card-hover sm:rounded-[28px] sm:ring-1 sm:ring-black/5">
         {/**
@@ -461,16 +462,22 @@ export default async function WidgetPage({ searchParams }: { searchParams: Promi
             </div>
           ) : (
             <>
-              {/* 확충 완료 매칭 항목은 이미 정렬 최상단이다 — 섹션으로 갈라 "무엇이 새로 생겼는지"가 먼저 읽히게 한다 */}
+              {/* 확충 완료 매칭 항목은 이미 정렬 최상단이다 — 섹션으로 갈라 먼저 읽히게 한다.
+                  배지는 업종 단위 사실이라 개별 가맹점에 붙이면 신규 개점으로 오독된다.
+                  캠페인 배너 한 장으로만 말하고 카드에는 표식을 두지 않는다. */}
               {fresh.length ? (
-                <section aria-label="이번 분기 새로 확충된 업종" className="mt-4">
-                  <h3 className="flex items-center gap-1.5 text-[14px] font-bold text-state-good">
-                    <Icon name="sparkle" size={15} strokeWidth={2} />
-                    이번 분기 새로 확충된 업종
-                  </h3>
-                  <p className="mt-0.5 text-xs leading-5 text-admin-text-muted">
-                    지역상생팀이 이번 분기에 확충을 완료한 업종과 연결된 가맹점이에요.
-                  </p>
+                <section aria-label="이번 분기 확충 완료 업종" className="mt-4">
+                  <div className="rounded-2xl bg-state-good-bg px-4 py-3">
+                    <h3 className="flex items-center gap-1.5 text-[14px] font-bold text-state-good">
+                      <Icon name="sparkle" size={15} strokeWidth={2} />
+                      이번 분기 확충 완료:{" "}
+                      {[...new Set(fresh.map((r) => r.category))].join(" · ")} 업종
+                    </h3>
+                    <p className="mt-0.5 break-keep text-xs leading-5 text-admin-text-muted">
+                      지역상생팀이 이 업종의 가맹점 확충을 완료했어요. 아래 목록은 신규 개점이
+                      아니라 해당 업종에서 지금 하이원포인트를 쓸 수 있는 가맹점이에요.
+                    </p>
+                  </div>
                   <ul className="mt-3 grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
                     {fresh.map((r) => (
                       <MerchantCard key={`${r.name}-${r.address}`} r={r} pop={Boolean(live)} />
@@ -496,6 +503,7 @@ export default async function WidgetPage({ searchParams }: { searchParams: Promi
               </p>
               <Link
                 href={href({ limit: String(Math.min(MAX_LIST_LIMIT, listLimit + DEFAULT_LIST_LIMIT)) }, current)}
+                scroll={false}
                 className="inline-flex min-h-10 items-center rounded-xl bg-visitor-primary px-3.5 text-[13px] font-bold text-white shadow-[0_6px_16px_-8px_rgb(22_101_52_/_0.75)]"
               >
                 가맹점 더 보기
@@ -504,6 +512,7 @@ export default async function WidgetPage({ searchParams }: { searchParams: Promi
           ) : shown.length > DEFAULT_LIST_LIMIT ? (
             <Link
               href={href({}, filters)}
+              scroll={false}
               className="mt-5 inline-flex min-h-10 items-center rounded-xl bg-slate-100 px-3.5 text-[13px] font-bold text-admin-text-muted"
             >
               목록 접기
@@ -524,7 +533,8 @@ export default async function WidgetPage({ searchParams }: { searchParams: Promi
                 순서는 이름·업종 중에서 직접 고르시게 했어요.
               </li>
               <li>
-                <b>이번 분기 확충 업종</b> 배지는 지역상생팀이 확충을 완료한 업종과 연결된 가맹점이에요.
+                <b>이번 분기 확충 완료</b> 섹션은 지역상생팀이 확충을 완료한 <b>업종</b>의
+                가맹점이에요 — 개별 가맹점이 새로 생겼다는 뜻은 아니에요.
               </li>
               <li>
                 페이백 배지는 담당자가 승인·적용한 <b>지역 결제 리워드</b>가 있을 때만 보여요. 이미
@@ -558,7 +568,7 @@ export default async function WidgetPage({ searchParams }: { searchParams: Promi
       </p>
       {/* /widget은 AdminShell을 쓰지 않으므로(방문객 화면) 여기서 직접 마운트한다 */}
       <TourOverlay />
-    </div>
+    </main>
   );
 }
 

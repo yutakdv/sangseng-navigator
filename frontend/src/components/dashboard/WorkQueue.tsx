@@ -34,7 +34,6 @@ export function WorkQueue({
   leadId,
   selectedId,
   hrefFor,
-  accentBar = true,
   empty,
 }: {
   /** 상태 요약 띠가 스크롤로 찾아오는 앵커 */
@@ -50,8 +49,6 @@ export function WorkQueue({
   selectedId?: string;
   /** 선택 시 갈아 끼울 쿼리를 만드는 함수 (서버에서 문자열로 계산) */
   hrefFor: (cardId: string) => string;
-  /** 선택 줄 왼쪽의 세로 강조 바. 끄면 배경 틴트 + 우측 체크만으로 선택을 알린다 */
-  accentBar?: boolean;
   /** 빈 상태는 안내가 아니라 다음 행동으로의 입구여야 한다 */
   empty: { title: string; body: ReactNode };
 }) {
@@ -64,7 +61,6 @@ export function WorkQueue({
               <SelectRow
                 href={hrefFor(card.id)}
                 selected={card.id === selectedId}
-                accentBar={accentBar}
                 label={`${card.id} ${card.target ? `${card.target.eup} ${card.target.category}` : "전 지역 공통"}`}
               >
                 <QueueRowBody card={card} lead={card.id === leadId} selected={card.id === selectedId} />

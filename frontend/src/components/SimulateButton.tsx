@@ -18,6 +18,13 @@ import type { Simulation } from "@/types";
  * 함께 붙어야 하기 때문이다 (절대 규칙 3). 상태를 바꾸지 않는 호출이라 revalidate도 없다.
  * EXPANSION 전용이며, INCENTIVE 카드에서는 호출부가 버튼 자체를 렌더하지 않는다 (05 §8: 400).
  */
+/** 관측 분위수 범위 — 반올림 후 양끝이 같으면 "20~20건" 대신 단일값으로 축약한다 */
+function formatCountRange(lo: number, hi: number): string {
+  const [a, b] = [Math.round(lo), Math.round(hi)];
+  if (a === b) return a.toLocaleString("ko-KR");
+  return `${a.toLocaleString("ko-KR")}~${b.toLocaleString("ko-KR")}`;
+}
+
 export function SimulateButton({ cardId }: { cardId: string }) {
   const [pending, startTransition] = useTransition();
   const [busy, setBusy] = useState(false);
@@ -95,7 +102,8 @@ export function SimulateButton({ cardId }: { cardId: string }) {
                 <DeltaValue
                   value={result.delta_pp}
                   direction="down"
-                  unit="%p"
+                  /* 집중도는 0~100 지수라 %p가 아니라 "점"이 맞다 — 42.4/100 → 42.3/100은 0.1점 감소 */
+                  unit="점"
                   variant="text"
                   className="font-bold"
                 />
@@ -106,7 +114,10 @@ export function SimulateButton({ cardId }: { cardId: string }) {
               label="예상 월 사용건수"
               value={
                 result.expected_monthly_range?.length
-                  ? `${Math.round(result.expected_monthly_range[0]).toLocaleString("ko-KR")}~${Math.round(result.expected_monthly_range[result.expected_monthly_range.length - 1]).toLocaleString("ko-KR")}`
+                  ? formatCountRange(
+                      result.expected_monthly_range[0],
+                      result.expected_monthly_range[result.expected_monthly_range.length - 1],
+                    )
                   : Math.round(result.expected_monthly_count).toLocaleString("ko-KR")
               }
               unit="건"

@@ -633,9 +633,12 @@ export function ProgressRecordForm({
       <section className="rounded-panel bg-admin-surface p-4 shadow-card sm:p-5">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
-            <h2 className="u-h2">실제 관측 성과</h2>
+            {/* "실제 성과"라고 부르면 이 정책이 만든 효과로 읽힌다 — 담당자가 적어 넣은 관측값일
+                뿐이고 인과는 이 화면이 판정하지 않는다 (대조군 없음) */}
+            <h2 className="u-h2">담당자 입력 관측값</h2>
             <p className="mt-1 text-[13px] leading-5 text-admin-text-muted">
               선택 입력입니다. 같은 카드에 같은 계산 기준으로 두 번 이상 입력된 지표만 기초값 대비 변화로 리포트합니다.
+              같은 기간의 다른 요인과 분리하지 않으므로 <b className="font-semibold">정책의 인과 효과가 아닙니다</b>.
             </p>
           </div>
           <span className="rounded-full bg-state-notice-bg px-2.5 py-1 text-[11px] font-semibold text-state-notice">
@@ -883,7 +886,7 @@ export function ProgressRecordForm({
           {savedSummary?.metrics.length ? (
             <>
               <p className="mt-2.5 text-[11px] font-bold text-state-good">
-                이 기록으로 갱신된 실제 관측 성과
+                이 기록으로 갱신된 관측값
               </p>
               <ul className="mt-1.5 flex flex-wrap gap-1.5">
                 {savedSummary.metrics.map((metric) => (
@@ -919,9 +922,24 @@ export function ProgressRecordForm({
       ) : null}
 
       <div className="sticky bottom-3 z-10 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-admin-border bg-admin-surface/95 p-3 shadow-lift backdrop-blur sm:px-4">
-        <p className="text-xs leading-5 text-admin-text-muted">
-          저장하면 카드 상태와 경과 리포트가 함께 갱신됩니다.
-        </p>
+        {/* 저장 버튼이 있는 이 바가 유일하게 항상 시야에 있다 — 결과 피드백도 여기서 바로 보여준다.
+            상세(갱신된 지표·링크)는 위의 success 블록이 계속 담당한다 */}
+        {success ? (
+          <p role="status" className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs font-semibold leading-5 text-state-good">
+            <span>{success}</span>
+            <Link href="/tracking" className="text-admin-primary underline-offset-4 hover:underline">
+              경과 리포트 보기
+            </Link>
+          </p>
+        ) : error ? (
+          <p className="text-xs font-semibold leading-5 text-state-warn">
+            저장하지 못했습니다 — {error}
+          </p>
+        ) : (
+          <p className="text-xs leading-5 text-admin-text-muted">
+            저장하면 카드 상태와 경과 리포트가 함께 갱신됩니다.
+          </p>
+        )}
         <button
           type="submit"
           disabled={working || isDemoReadOnly || !selectedCard}

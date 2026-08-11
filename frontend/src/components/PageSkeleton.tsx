@@ -23,9 +23,12 @@ export function PageSkeleton({ variant = "page" }: { variant?: "hub" | "page" })
 
       {/* 사이드바 — 실제 폭(lg:w-[228px])과 같게 두어 본문 시작점이 움직이지 않게 한다 */}
       <aside className="border-b border-admin-border bg-admin-sidebar-surface lg:min-h-screen lg:w-[228px] lg:shrink-0 lg:border-b-0 lg:border-r-[0.5px]">
-        {/* 로고는 자리표시가 아니라 실제 이미지를 쓴다 — 스켈레톤→실화면 전환에서 브랜드가 깜빡이지 않는다 */}
+        {/* 로고는 자리표시가 아니라 실제 이미지를 쓴다 — 스켈레톤→실화면 전환에서 브랜드가 깜빡이지 않는다.
+            priority는 쓰지 않는다: 이 스켈레톤은 하위 라우트에도 상속돼서, 로고를 쓰지 않는 방문객
+            위젯까지 이 이미지를 preload 하고 "preload 했는데 안 썼다" 경고를 남긴다. 실제 화면의
+            로고(AdminShell)는 priority를 그대로 유지한다 */}
         <div className="hidden px-5 pb-2 pt-6 lg:block">
-          <Image src="/brand/sangseng-navigator-lockup.png" alt="" width={180} height={35} priority />
+          <Image src="/brand/sangseng-navigator-lockup.png" alt="" width={180} height={35} />
           <span className="mt-2 block text-xs leading-4 text-admin-text-soft">
             강원랜드 지역상생 의사결정 지원
           </span>

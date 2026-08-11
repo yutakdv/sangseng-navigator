@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useEffect, useRef, useState, useTransition } from "react";
 import { decideAction } from "@/app/actions";
 import {
   DecisionReasonPanel,
@@ -27,8 +27,10 @@ const RATES: PaybackRate[] = [3, 5, 7];
  * 그리므로 여기서 카드 상태를 따로 들고 있지 않는다. INCENTIVE 승인은 페이백률 선택이
  * 필수라(05 §2) 바 안에 3·5·7% 선택 칩을 함께 둔다.
  *
- * 입력 패널은 접어 둔다. 반려·보류는 사유를, 승인은 안전 검토 확인(저신뢰면 확인 근거도)을
- * 받은 뒤 확정한다 — 늘 펼쳐 두면 고정 바가 높아져 본문과 가이드 투어 카드를 덮는다.
+ * **결정은 되돌릴 수 없으므로 원클릭으로 확정하지 않는다** — 어떤 결정이든 1차 클릭은
+ * 입력 패널(확인 단계)을 펼칠 뿐이고, "확정"을 눌러야 실행된다. 반려·보류는 사유를,
+ * 승인은 안전 검토 확인(저신뢰면 확인 근거도)을 받은 뒤 확정한다. 늘 펼쳐 두면 고정 바가
+ * 높아져 본문과 가이드 투어 카드를 덮으므로 확정·취소·Esc로 다시 접힌다.
  */
 export function DecisionBar({
   cardId,
@@ -64,6 +66,26 @@ export function DecisionBar({
   const reasonMissing = armedRequiresReason && !draft.reason.trim();
   const reviewMissing = armed === "approved" && !safetyReviewed;
 
+  // fixed 바가 문서 맨 끝(레이아웃 footer)을 영구히 가리지 않도록, 떠 있는 동안 body에
+  // 자기 높이만큼 하단 패딩을 준다. 페이지의 pb-32는 본문만 보호하고 footer는 layout에
+  // 있어 여기서만 해결할 수 있다. 높이는 상태 문구·사유 칸·뷰포트 폭에 따라 변하므로
+  // ResizeObserver로 실측한다.
+  const barRef = useRef<HTMLDivElement | null>(null);
+  useEffect(() => {
+    const el = barRef.current;
+    if (!el) return;
+    const apply = () => {
+      document.body.style.paddingBottom = `${el.offsetHeight}px`;
+    };
+    apply();
+    const ro = new ResizeObserver(apply);
+    ro.observe(el);
+    return () => {
+      ro.disconnect();
+      document.body.style.paddingBottom = "";
+    };
+  }, []);
+
   const submit = (decision: CardStatus) => {
     setError(null);
     setBusy(decision);
@@ -94,18 +116,10 @@ export function DecisionBar({
 
   const press = (decision: CardStatus) => {
     setError(null);
-    // 승인은 신뢰도와 무관하게 안전 검토 확인을 받아 서버 감사 기록에 남긴다.
-    if (decision === "approved") {
-      setSafetyReviewed(false);
-      setArmed((current) => (current === decision ? null : decision));
-      return;
-    }
-    if (!decisionReasonRequired(decision, confidence)) {
-      setArmed(null);
-      submit(decision);
-      return;
-    }
-    // 같은 버튼을 다시 누르면 접는다 — 고정 바에서 잘못 편 칸을 닫을 길이 있어야 한다
+    // 어떤 결정이든 바로 확정하지 않는다 — 결정은 불가역이라 확인 단계를 거친다 (P0 검수).
+    // 승인은 펼칠 때마다 안전 검토 확인을 새로 받는다(서버 감사 기록과 짝).
+    // 같은 버튼을 다시 누르면 접는다: 고정 바에서 잘못 편 칸을 닫을 길이 있어야 한다.
+    if (decision === "approved") setSafetyReviewed(false);
     setArmed((current) => (current === decision ? null : decision));
   };
 
@@ -114,12 +128,19 @@ export function DecisionBar({
 
   return (
     <div
+      ref={barRef}
       data-tour="decision"
       className="fixed inset-x-0 bottom-0 z-40 border-t border-admin-border bg-admin-surface shadow-header lg:left-[272px]"
     >
       <div
         role="group"
         aria-label="담당자 결정"
+        onKeyDown={(e) => {
+          if (e.key === "Escape" && armed) {
+            setArmed(null);
+            setError(null);
+          }
+        }}
         className="mx-auto flex max-w-5xl flex-wrap items-center gap-x-4 gap-y-2 px-4 py-3 sm:px-6"
       >
         <div className="flex min-w-0 flex-wrap items-center gap-x-2.5 gap-y-1">
@@ -195,6 +216,24 @@ export function DecisionBar({
 
         {armed && !decided ? (
           <div className="w-full">
+            {/* 확정 직전 요약 — 무엇을 확정하는지, 인센티브라면 어떤 요율이 고정되는지 먼저 말한다 */}
+            <p className="mb-2 break-keep text-sm leading-6 text-admin-text">
+              <b>
+                {armed === "approved"
+                  ? decisionPrimaryLabel(cardType)
+                  : armed === "rejected"
+                    ? "반려"
+                    : "보류"}
+              </b>{" "}
+              — {cardId}
+              {requireRate && armed === "approved" && rate ? (
+                <>
+                  {" "}
+                  · 확정 페이백률 <b className="tabular-nums">{rate}%</b>
+                </>
+              ) : null}
+              <span className="text-admin-text-muted"> · 확정 후 되돌릴 수 없습니다</span>
+            </p>
             {armed !== "approved" || armedRequiresReason ? (
               <DecisionReasonPanel
                 idPrefix={`decision-bar-${cardId}`}

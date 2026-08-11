@@ -22,8 +22,10 @@ import type { Card, CardStatus, CardType, PaybackRate } from "@/types";
  * 클라이언트에서 부를 수 없기 때문이다. 성공하면 액션의 revalidate가 화면을 갱신하므로
  * 여기서 카드 상태를 따로 들고 있지 않는다.
  *
- * 결정은 2단계다. 반려·보류는 사유를, 승인은 안전 검토 확인(저신뢰면 확인 근거도)을 받은 뒤
- * 확정한다. 서버도 같은 조건을 검사해 UI를 우회한 승인 요청을 422로 거부한다.
+ * **결정은 되돌릴 수 없으므로 원클릭으로 확정하지 않는다** — 어떤 결정이든 1차 클릭은
+ * 입력 패널(확인 단계)을 펼치고, "확정"을 한 번 더 받아야 나간다. 반려·보류는 사유를,
+ * 승인은 안전 검토 확인(저신뢰면 확인 근거도)을 받은 뒤 확정한다. 서버도 같은 조건을
+ * 검사해 UI를 우회한 요청을 422로 거부한다.
  */
 const DECISIONS: { value: CardStatus; label: string; tone: string }[] = [
   {
@@ -69,7 +71,7 @@ export function DecisionActions({
   const [pending, startTransition] = useTransition();
   const [busy, setBusy] = useState<CardStatus | null>(null);
   const [error, setError] = useState<string | null>(null);
-  /** 사유를 받는 중인 결정 — null이면 사유 칸이 접혀 있다 */
+  /** 사유·확인을 받는 중인 결정 — null이면 사유 칸이 접혀 있다 */
   const [armed, setArmed] = useState<CardStatus | null>(null);
   const [draft, setDraft] = useState<DecisionReason>(emptyDecisionReason);
   const [safetyReviewed, setSafetyReviewed] = useState(false);
@@ -81,6 +83,13 @@ export function DecisionActions({
   const armedRequiresReason = armed !== null && decisionReasonRequired(armed, confidence);
   const reasonMissing = armedRequiresReason && !draft.reason.trim();
   const reviewMissing = armed === "approved" && !safetyReviewed;
+
+  const decisionLabel = (d: CardStatus) =>
+    d === "approved"
+      ? decisionPrimaryLabel(requireRate ? "INCENTIVE" : cardType)
+      : d === "rejected"
+        ? "반려"
+        : "보류";
 
   const submit = (decision: CardStatus) => {
     setError(null);
@@ -115,29 +124,27 @@ export function DecisionActions({
 
   const press = (decision: CardStatus) => {
     setError(null);
-    if (decision === "approved") {
-      setSafetyReviewed(false);
-      setArmed((current) => (current === decision ? null : decision));
-      return;
-    }
-    // 승인 외 결정은 기존 사유 규칙을 따른다.
-    if (!decisionReasonRequired(decision, confidence)) {
-      setArmed(null);
-      submit(decision);
-      return;
-    }
-    setArmed(decision);
+    // 어떤 결정이든 바로 확정하지 않는다 — 결정은 불가역이라 확인 단계를 거친다 (P0 검수).
+    // 승인은 펼칠 때마다 안전 검토 확인을 새로 받는다(서버 감사 기록과 짝).
+    // 같은 버튼을 다시 누르면 접는다.
+    if (decision === "approved") setSafetyReviewed(false);
+    setArmed((current) => (current === decision ? null : decision));
   };
 
   return (
-    <div aria-label="카드 결정" role="group">
+    <div
+      aria-label="카드 결정"
+      role="group"
+      onKeyDown={(e) => {
+        if (e.key === "Escape" && armed) {
+          setArmed(null);
+          setError(null);
+        }
+      }}
+    >
       <div className="flex flex-wrap gap-2">
         {DECISIONS.map((d) => {
           const blocked = disabled || readOnly || working || (d.value === "approved" && rateMissing);
-          const label =
-            d.value === "approved"
-              ? decisionPrimaryLabel(requireRate ? "INCENTIVE" : cardType)
-              : d.label;
           return (
             <button
               key={d.value}
@@ -149,7 +156,7 @@ export function DecisionActions({
               aria-describedby={d.value === "approved" && rateMissing ? hintId : undefined}
               className={`min-h-10 rounded-lg px-4 py-2 text-sm font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${d.tone}`}
             >
-              {busy === d.value ? "처리 중…" : label}
+              {busy === d.value ? "처리 중…" : decisionLabel(d.value)}
             </button>
           );
         })}
@@ -157,6 +164,17 @@ export function DecisionActions({
 
       {armed ? (
         <div className="mt-3">
+          {/* 확정 직전 요약 — 무엇을 확정하는지, 인센티브라면 어떤 요율이 고정되는지 먼저 말한다 */}
+          <p className="mb-2 break-keep text-sm leading-6 text-admin-text">
+            <b>{decisionLabel(armed)}</b> — {cardId}
+            {requireRate && armed === "approved" && selectedRate ? (
+              <>
+                {" "}
+                · 확정 페이백률 <b className="tabular-nums">{selectedRate}%</b>
+              </>
+            ) : null}
+            <span className="text-admin-text-muted"> · 확정 후 되돌릴 수 없습니다</span>
+          </p>
           {armed !== "approved" || armedRequiresReason ? (
             <DecisionReasonPanel
               idPrefix={`decision-${cardId}`}

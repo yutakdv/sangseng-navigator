@@ -21,7 +21,6 @@ export function SelectRow({
   href,
   selected,
   label,
-  accentBar = true,
   children,
 }: {
   /** 서버가 만든 `?type=…&selected=…` 쿼리 문자열 */
@@ -29,11 +28,6 @@ export function SelectRow({
   selected: boolean;
   /** 스크린리더용 — 무엇을 미리보는 버튼인지 */
   label: string;
-  /**
-   * 선택 줄 왼쪽의 세로 강조 바. 배경 틴트와 우측 체크만으로 선택이 충분히 읽히는 목록에서는
-   * 끈다 (결정 대기 목록). 색만으로 상태를 전달하지 않는다는 원칙은 체크 아이콘이 계속 진다.
-   */
-  accentBar?: boolean;
   children: React.ReactNode;
 }) {
   const router = useRouter();
@@ -48,7 +42,8 @@ export function SelectRow({
       onClick={() => startTransition(() => router.replace(href, { scroll: false }))}
       className={`group flex w-full items-start gap-3 px-5 py-3.5 text-left transition-colors ${
         selected
-          ? `bg-lavender-100 ${accentBar ? "shadow-[inset_3px_0_0_0_theme(colors.admin.primary)]" : ""}`
+          ? // 면(라벤더 배경) + 우측 체크로 선택을 알린다 — 면 위에 세로선을 겹치지 않는다 (13 §6-1)
+            "bg-lavender-100"
           : "hover:bg-lavender-50"
       } ${pending ? "opacity-70" : ""}`}
     >

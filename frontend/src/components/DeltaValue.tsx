@@ -83,5 +83,8 @@ function formatValue(values: number[], unit: string, digits: number): string {
   if (values.length === 1) return `${Math.abs(values[0]).toFixed(digits)}${unit}`;
 
   const endpoints = [Math.abs(values[0]), Math.abs(values[values.length - 1])].sort((a, b) => a - b);
-  return `${endpoints[0].toFixed(digits)}~${endpoints[1].toFixed(digits)}${unit}`;
+  const [lo, hi] = [endpoints[0].toFixed(digits), endpoints[1].toFixed(digits)];
+  // 반올림 후 양끝이 같으면 "0.1~0.1" 같은 무의미한 범위 대신 단일값으로 축약한다
+  if (lo === hi) return `${lo}${unit}`;
+  return `${lo}~${hi}${unit}`;
 }

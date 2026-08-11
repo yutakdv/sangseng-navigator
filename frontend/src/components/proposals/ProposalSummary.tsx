@@ -140,10 +140,18 @@ function ExpansionFacts({
           대시보드(app/dashboard/page.tsx)와 같은 문구를 수치가 나오는 자리와 1:1로 붙인다.
           안정도가 없으면(P8 미실행) MiniFact가 "산출 전"을 찍으므로 각주도 그리지 않는다 */}
       {stability !== null && stability !== undefined ? (
-        <p className="u-note mt-2 flex items-start gap-1.5">
-          <Icon name="info" size={13} strokeWidth={2} className="mt-[3px]" />
-          <span>{STABILITY_NOTE}</span>
-        </p>
+        // 첫 화면에서 3~4줄을 차지하던 산출 방법 설명은 접는다 — 숫자 옆에 항상 붙어야 하는 것은
+        // "무엇을 센 비율인가" 한 줄이고, 조합 수·유지율 같은 산식은 펼쳐 볼 사람만 보면 된다.
+        // (오독 방지 문구 자체는 여전히 이 자리에 있고 없어지지 않는다)
+        <details className="mt-2">
+          <summary className="u-disclosure text-[12px]">
+            상위 3개 후보 순위가 가중치를 바꿔도 유지된 비율 — 산출 방법 보기
+          </summary>
+          <p className="u-note mt-2 flex items-start gap-1.5">
+            <Icon name="info" size={13} strokeWidth={2} className="mt-[3px]" />
+            <span>{STABILITY_NOTE}</span>
+          </p>
+        </details>
       ) : null}
 
       {/* 원 정량 순위 병기 — 조정 여부와 무관하게 항상 노출 (절대 규칙 5) */}

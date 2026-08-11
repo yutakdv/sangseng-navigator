@@ -172,16 +172,17 @@
     @apply border-b-0;
   }
   /** 강조 행 (제안 대상·담당자 확정) — 색만으로 의미를 전달하지 않으므로 텍스트 표기와 함께 쓴다 */
+  /* 면(연보라 배경)이 곧 경계다 — 왼쪽 굵은 세로선을 겹치지 않는다 (13 §6-1) */
   .u-table tbody tr[data-highlight="true"] td {
     @apply bg-admin-primary-soft;
   }
-  .u-table tbody tr[data-highlight="true"] td:first-child {
-    box-shadow: inset 3px 0 0 0 theme("colors.admin.primary");
-  }
 
   /** 가로 스크롤이 필요한 표·그림 래퍼 (13 §8 — 본문은 밀리지 않고 자기 컨테이너 안에서만 스크롤) */
+  /* `relative`가 필요하다 — 안쪽의 position:absolute 요소(예: sr-only 라벨)는 이 상자가
+     위치 기준이 아니면 바깥의 relative 조상에 걸려 **클리핑을 벗어난다**. 그러면 표는
+     자기 안에서만 스크롤되는데 화면 전체에 가로 스크롤이 생긴다 */
   .u-scroll-x {
-    @apply -mx-1 overflow-x-auto px-1 pb-1;
+    @apply relative -mx-1 overflow-x-auto px-1 pb-1;
   }
 
   /* ── 접기/펴기 ─────────────────────────────────────────────────────────

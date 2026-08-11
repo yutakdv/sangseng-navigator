@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { cache } from "react";
 import { notFound } from "next/navigation";
 import { AdminShell } from "@/components/AdminShell";
 import { DissentList, hasDissent } from "@/components/DissentList";
@@ -22,8 +23,26 @@ export async function generateMetadata({
   params: Promise<{ id: string }>;
 }): Promise<Metadata> {
   const { id } = await params;
+  /**
+   * 없는 카드는 여기서 걸러야 **응답 코드까지** 404가 된다 — 본문에서 notFound()를 부르면
+   * loading.tsx가 이미 200으로 셸을 흘려보낸 뒤라 상태 코드를 바꿀 수 없고, 제목도
+   * "AC-999 제안 검토"로 남아 없는 카드가 있는 것처럼 읽힌다.
+   * BE 장애(404 외 오류)는 여기서 판단하지 않고 본문의 에러 경계로 넘긴다.
+   */
+  if (!(await getCard(id))) notFound();
   return { title: `${id} 제안 검토 · 상생 나침반` };
 }
+
+/** 카드 한 장 — generateMetadata와 본문이 같은 요청 안에서 한 번만 부르도록 캐시한다 */
+const getCard = cache(async (id: string) =>
+  api
+    .card(id)
+    .then((r) => r.card)
+    .catch((error) => {
+      if (error instanceof ApiError && error.status === 404) return undefined;
+      throw error;
+    }),
+);
 
 /**
  * 제안 상세 — GitHub PR 패턴의 "상세" 쪽 (허브 카드는 미리보기, 여기가 전문이다).
@@ -41,14 +60,7 @@ export default async function ProposalDetailPage({ params }: { params: Promise<{
   const [dashboard, candidates, card] = await Promise.all([
     api.dashboard(),
     api.candidates(),
-    api
-      .card(id)
-      .then((r) => r.card)
-      // 실 API의 404는 장애가 아니라 "없는 카드"다 — 에러 화면 대신 not-found로 넘긴다
-      .catch((error) => {
-        if (error instanceof ApiError && error.status === 404) return undefined;
-        throw error;
-      }),
+    getCard(id),
   ]);
 
   if (!card) notFound();
@@ -77,8 +89,10 @@ export default async function ProposalDetailPage({ params }: { params: Promise<{
             ranking={evidence.ranking}
             dashboard={dashboard}
             leadBadge={
+              /* 결정 후에는 "승인 전 검토 대상"이 옆의 상태 칩과 모순된다 — 결정 종류(승인·반려·보류)는
+                 상태 칩이 말하므로 여기는 AI 제안 출처만 중립적으로 남긴다 */
               <span className="rounded-md bg-admin-primary px-2.5 py-1 text-xs font-bold text-white">
-                AI 제안 · 승인 전 검토 대상
+                {card.status === "pending" ? "AI 제안 · 승인 전 검토 대상" : "AI 제안 · 담당자 결정 완료"}
               </span>
             }
           />

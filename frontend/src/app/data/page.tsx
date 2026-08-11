@@ -352,7 +352,7 @@ export default async function DataPage({
           <Section
             icon="map"
             title="지도 · 외부 서비스"
-            desc="담당자 화면(카드 상세 500m 반경)과 방문객 위젯 모두 Kakao 지도를 쓴다."
+            desc="담당자 화면(카드 상세 500m 반경)과 방문객 위젯 모두 Kakao 지도를 쓴다. 지도 밖에서 쓰는 외부 서비스도 함께 밝힌다."
           >
             <dl className="flex flex-col gap-3">
               <div className="rounded-xl border border-admin-border p-3.5">
@@ -360,6 +360,18 @@ export default async function DataPage({
                   담당자 화면 지도 · 방문객 위젯 지도
                 </dt>
                 <dd className="u-note mt-1">© Kakao Maps (Kakao Maps JavaScript SDK)</dd>
+              </div>
+              <div className="rounded-xl border border-admin-border p-3.5">
+                <dt className="text-[13px] font-bold text-admin-text">
+                  도로 거리·소요시간 (거점 → 후보)
+                </dt>
+                <dd className="u-note mt-1">
+                  OSRM 공개 라우팅 API (router.project-osrm.org) — 공공데이터가 아닌 외부 보조
+                  서비스다. 파이프라인 스코어링 단계에서만 호출하고 응답은{" "}
+                  <code className="font-mono">data/raw/api_cache/road_routes.json</code>에 캐시해
+                  화면에서는 그 값을 그대로 읽는다. 카드 상세의 도로 거리·분은 여기서 온 추정치이며
+                  비포장·임도 구간이 섞일 수 있다.
+                </dd>
               </div>
               <div className="rounded-xl border border-admin-border p-3.5">
                 <dt className="text-[13px] font-bold text-admin-text">지오코딩 (주소 → 좌표)</dt>

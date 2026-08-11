@@ -53,6 +53,10 @@ export function PolicyOutcomeGuide({ card, headlineRate }: { card: Card; headlin
   const isIncentive = card.type === "INCENTIVE";
   const scenarios = card.scenarios ?? [];
   const selectedRate = card.selected_rate ?? null;
+  // 반려·보류된 카드는 실행·반영으로 이어지지 않는다 — 가정형 흐름(02·03)을 그대로 두면
+  // 01의 "반려됨"과 모순되므로 뒷 단계를 닫힌 상태로 바꾼다
+  const halted = card.status === "rejected" || card.status === "held";
+  const haltedLabel = card.status === "rejected" ? "반려" : "보류";
 
   return (
     <div className="mt-4 grid grid-cols-1 gap-3 xl:grid-cols-2" aria-label="정책 영향 안내">
@@ -63,9 +67,21 @@ export function PolicyOutcomeGuide({ card, headlineRate }: { card: Card; headlin
           </span>
           <div>
             <h4 className="text-[13px] font-bold text-admin-text">
-              {isIncentive ? "정책안을 승인하면" : "후보 검토를 시작하면"}
+              {halted
+                ? "정책안 결정 결과"
+                : card.status === "approved"
+                  ? isIncentive
+                    ? "정책안이 승인되어"
+                    : "후보 검토가 시작되어"
+                  : isIncentive
+                    ? "정책안을 승인하면"
+                    : "후보 검토를 시작하면"}
             </h4>
-            <p className="text-[11px] text-admin-text-muted">AI 제안이 담당자 결정과 실행 기록으로 이어집니다.</p>
+            <p className="text-[11px] text-admin-text-muted">
+              {halted
+                ? `${haltedLabel}로 결정되어 실행·반영 단계로 이어지지 않습니다.`
+                : "AI 제안이 담당자 결정과 실행 기록으로 이어집니다."}
+            </p>
           </div>
         </div>
 
@@ -74,27 +90,41 @@ export function PolicyOutcomeGuide({ card, headlineRate }: { card: Card; headlin
             <p className="text-[10px] font-bold uppercase tracking-[0.12em] text-admin-primary">01 · 결정</p>
             <p className="mt-1.5 text-[12px] font-semibold text-admin-text">{statusLabel[card.status]}</p>
             <p className="mt-1 text-[11px] leading-4 text-admin-text-muted">
-              {isIncentive
-                ? selectedRate
-                  ? `${selectedRate}% 페이백률이 고정됩니다.`
-                  : "3·5·7% 중 하나를 고른 뒤 승인합니다."
-                : "후보 접촉·검토 업무 항목이 시작되며 가맹은 확정되지 않습니다."}
+              {halted
+                ? "재검토가 필요하면 새 제안을 생성합니다."
+                : isIncentive
+                  ? selectedRate
+                    ? `${selectedRate}% 페이백률이 고정됩니다.`
+                    : "3·5·7% 중 하나를 고른 뒤 승인합니다."
+                  : "후보 접촉·검토 업무 항목이 시작되며 가맹은 확정되지 않습니다."}
             </p>
           </li>
-          <li className="rounded-card bg-admin-surface p-3">
-            <p className="text-[10px] font-bold uppercase tracking-[0.12em] text-admin-primary">02 · 실행</p>
-            <p className="mt-1.5 text-[12px] font-semibold text-admin-text">정책 트래킹으로 이동</p>
+          <li className={`rounded-card bg-admin-surface p-3 ${halted ? "opacity-55" : ""}`}>
+            <p className={`text-[10px] font-bold uppercase tracking-[0.12em] ${halted ? "text-admin-text-muted" : "text-admin-primary"}`}>
+              02 · 실행
+            </p>
+            <p className="mt-1.5 text-[12px] font-semibold text-admin-text">
+              {halted ? `${haltedLabel}로 종료 — 진행하지 않습니다` : "정책 트래킹으로 이동"}
+            </p>
             <p className="mt-1 text-[11px] leading-4 text-admin-text-muted">
-              {isIncentive
-                ? "승인된 정책안만 검토중·추진중·보류·완료를 기록합니다."
-                : "필수 적격성 5항목 확인 후 가맹 심사·추진·완료를 기록합니다."}
+              {halted
+                ? "승인된 카드만 정책 트래킹에서 추진 상태를 기록합니다."
+                : isIncentive
+                  ? "승인된 정책안만 검토중·추진중·보류·완료를 기록합니다."
+                  : "필수 적격성 5항목 확인 후 가맹 심사·추진·완료를 기록합니다."}
             </p>
           </li>
-          <li className="rounded-card bg-admin-surface p-3">
-            <p className="text-[10px] font-bold uppercase tracking-[0.12em] text-admin-primary">03 · 반영</p>
-            <p className="mt-1.5 text-[12px] font-semibold text-admin-text">완료 후 방문객 위젯 반영</p>
+          <li className={`rounded-card bg-admin-surface p-3 ${halted ? "opacity-55" : ""}`}>
+            <p className={`text-[10px] font-bold uppercase tracking-[0.12em] ${halted ? "text-admin-text-muted" : "text-admin-primary"}`}>
+              03 · 반영
+            </p>
+            <p className="mt-1.5 text-[12px] font-semibold text-admin-text">
+              {halted ? "방문객 위젯에 반영되지 않습니다" : "완료 후 방문객 위젯 반영"}
+            </p>
             <p className="mt-1 text-[11px] leading-4 text-admin-text-muted">
-              완료된 확충·인센티브 카드가 추천 가맹점과 페이백 배지에 연결됩니다.
+              {halted
+                ? "완료까지 도달한 카드만 추천 가맹점·페이백 배지에 연결됩니다."
+                : "완료된 확충·인센티브 카드가 추천 가맹점과 페이백 배지에 연결됩니다."}
             </p>
           </li>
         </ol>
