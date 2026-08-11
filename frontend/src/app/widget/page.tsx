@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { NewBadge, PaybackBadge } from "@/components/Badge";
+import { PaybackBadge } from "@/components/Badge";
 import { CategoryIcon } from "@/components/CategoryIcon";
 import { Icon } from "@/components/Icon";
 import { KakaoMapView } from "@/components/KakaoMapView";
@@ -244,16 +244,22 @@ export default async function WidgetPage({ searchParams }: { searchParams: Promi
             </div>
           ) : (
             <>
-              {/* 확충 완료 매칭 항목은 이미 정렬 최상단이다 — 섹션으로 갈라 "무엇이 새로 생겼는지"가 먼저 읽히게 한다 */}
+              {/* 확충 완료 매칭 항목은 이미 정렬 최상단이다 — 섹션으로 갈라 먼저 읽히게 한다.
+                  배지는 업종 단위 사실이라 개별 가맹점에 붙이면 신규 개점으로 오독된다.
+                  캠페인 배너 한 장으로만 말하고 카드에는 표식을 두지 않는다. */}
               {fresh.length ? (
-                <section aria-label="이번 분기 새로 확충된 업종" className="mt-4">
-                  <h3 className="flex items-center gap-1.5 text-[14px] font-bold text-state-good">
-                    <Icon name="sparkle" size={15} strokeWidth={2} />
-                    이번 분기 새로 확충된 업종
-                  </h3>
-                  <p className="mt-0.5 text-xs leading-5 text-admin-text-muted">
-                    지역상생팀이 이번 분기에 확충을 완료한 업종과 연결된 가맹점이에요.
-                  </p>
+                <section aria-label="이번 분기 확충 완료 업종" className="mt-4">
+                  <div className="rounded-2xl bg-state-good-bg px-4 py-3">
+                    <h3 className="flex items-center gap-1.5 text-[14px] font-bold text-state-good">
+                      <Icon name="sparkle" size={15} strokeWidth={2} />
+                      이번 분기 확충 완료:{" "}
+                      {[...new Set(fresh.map((r) => r.category))].join(" · ")} 업종
+                    </h3>
+                    <p className="mt-0.5 break-keep text-xs leading-5 text-admin-text-muted">
+                      지역상생팀이 이 업종의 가맹점 확충을 완료했어요. 아래 목록은 신규 개점이
+                      아니라 해당 업종에서 지금 하이원포인트를 쓸 수 있는 가맹점이에요.
+                    </p>
+                  </div>
                   <ul className="mt-3 grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
                     {fresh.map((r) => (
                       <MerchantCard key={`${r.name}-${r.address}`} r={r} pop={Boolean(live)} />
@@ -305,7 +311,8 @@ export default async function WidgetPage({ searchParams }: { searchParams: Promi
                 합니다. 산악 지형에서는 실제 이동시간과 다를 수 있어요.
               </li>
               <li>
-                <b>이번 분기 확충 업종</b> 배지는 지역상생팀이 확충을 완료한 업종과 연결된 가맹점이에요.
+                <b>이번 분기 확충 완료</b> 섹션은 지역상생팀이 확충을 완료한 <b>업종</b>의
+                가맹점이에요 — 개별 가맹점이 새로 생겼다는 뜻은 아니에요.
               </li>
               <li>
                 페이백 배지는 담당자가 승인·적용한 <b>지역 결제 리워드</b>가 있을 때만 보여요. 이미
@@ -403,7 +410,7 @@ function MerchantCard({ r, pop = false }: { r: Recommendation; pop?: boolean }) 
             <span className="min-w-0 truncate text-[15px] font-bold text-admin-text">
               {r.name}
             </span>
-            {r.badge ? <NewBadge label={r.badge} pop={pop} /> : null}
+            {/* r.badge는 업종 단위 매칭이라 카드에 붙이지 않는다 — 섹션 배너가 대신 말한다 */}
           </div>
           <p className="mt-0.5 text-xs font-medium text-admin-text-muted">
             {r.category}
