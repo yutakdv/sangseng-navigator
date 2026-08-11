@@ -9,7 +9,7 @@
 하이원포인트 소비 쏠림 진단 → 2단계 스코어링 → AI 제안·반대 관점 → **담당자 승인** → 추진 트래킹 → **확충 완료** → 방문객 위젯 반영
 
 [![Live Demo](https://img.shields.io/badge/Live%20Demo-Vercel-8B7BF0?style=for-the-badge&logo=vercel&logoColor=white)](https://sangseng-navigator.vercel.app)
-[![Demo Video](https://img.shields.io/badge/Demo%20Video-1%3A30-1E1840?style=for-the-badge&logo=youtube&logoColor=white)](#demo)
+[![Demo Video](https://img.shields.io/badge/Actual%20Demo-60s-1E1840?style=for-the-badge&logo=github&logoColor=white)](#demo)
 [![Open Data](https://img.shields.io/badge/Open%20Data-6%20datasets-2E2560?style=for-the-badge)](#-활용-데이터)
 [![Stack](https://img.shields.io/badge/Next.js%2016%20%C2%B7%20FastAPI%20%C2%B7%20AWS-443597?style=for-the-badge)](#-기술-스택)
 [![License: MIT](https://img.shields.io/badge/License-MIT-33266B?style=for-the-badge)](LICENSE)
@@ -24,49 +24,29 @@
 
 <a id="demo"></a>
 
-## 🎬 데모 영상 · 1분 30초
+## 🎬 60초 실제 동작 영상
 
 <div align="center">
 
-<!--
-  ┌── 영상 넣는 자리 · 아래 A / B / C 중 하나만 남기고 나머지는 지운다 ─────────────────────
-  │
-  │ A. README에서 바로 재생 (가장 권장 — 심사위원이 클릭 없이 본다)
-  │    GitHub 이슈 작성창(New issue)에 mp4 파일을 끌어다 놓으면 업로드되면서
-  │    https://github.com/user-attachments/assets/xxxxxxxx 주소가 만들어진다.
-  │    이슈를 등록할 필요는 없다 — 주소만 복사하고 창을 닫으면 된다.
-  │    그 주소를 아래 <a>…</a> 블록 대신 "한 줄로만" 붙여 넣으면 플레이어가 뜬다.
-  │
-  │ B. YouTube 링크 썸네일 (지금 설정된 방식)
-  │    아래 <a href="..."> 의 주소를 유튜브 주소로 바꾼다.
-  │    커버 이미지는 그대로 둬도 되고, 실제 영상 한 장면(1280×720 PNG)으로 바꾸려면
-  │    docs/images/demo-cover.png 로 저장한 뒤 아래 <img src>도 같이 바꾼다.
-  │
-  │ C. 레포에 직접 커밋 (파일 100MB 미만일 때만)
-  │    docs/media/demo.mp4 로 커밋한 뒤, 아래 <video> 주석을 해제하고 <a> 블록을 지운다.
-  └──────────────────────────────────────────────────────────────────────────────
--->
-
-<a href="https://youtu.be/VIDEO_ID">
-  <img src="docs/images/demo-cover.svg" width="780" alt="상생 나침반 데모 영상 — 1분 30초">
+<a href="https://github.com/yutakdv/sangseng-navigator/raw/main/docs/media/sangseng-navigator-60s-demo.mp4">
+  <img src="docs/media/sangseng-navigator-60s-demo-thumbnail.jpg" width="780" alt="상생 나침반 60초 실제 동작 영상 — 담당자 승인에서 방문객 추천까지">
 </a>
 
-<!-- C안:
-<video src="https://github.com/yutakdv/sangseng-navigator/raw/main/docs/media/demo.mp4" controls width="780"></video>
--->
+**[▶ 60초 MP4 바로 재생](https://github.com/yutakdv/sangseng-navigator/raw/main/docs/media/sangseng-navigator-60s-demo.mp4)**
 
 </div>
 
-**팀 V.I.B.E가 만든 90초 소개 영상.** 문제 정의부터 실제 화면 동작까지 한 번에 보여 줍니다.
+전체 페이지를 축소하지 않고 핵심 영역만 크게 잡았습니다. 클릭 지점과 상태 변화를 따라가면 담당자의 결정이 어떤 검증을 거쳐 방문객 추천에 닿는지 이해할 수 있습니다.
 
 | 장면 | 영상에서 보게 되는 것 |
 |---|---|
-| ① **문제** | 하이원포인트 소비가 리조트 인근 두 읍에 쏠려 있고, 그 다음 행동은 문서와 담당자 경험에 흩어져 있다 |
-| ② **진단** | 지역 소비 집중도·업종별 소비 분산도·지역 전환율(근사 지표)을 한 화면에서 확인 |
-| ③ **제안과 반대 관점** | 서버가 대상을 확정하고 AI가 근거를 설명 — 그리고 **AI가 자기 제안을 반박**하는 3항 |
-| ④ **담당자 승인** | 데이터 보호 범위·서버 검증 근거·AI 비교·반대 관점을 확인해야만 승인되는 Action Card |
-| ⑤ **반전 장면** | 페이백 민감도를 올렸는데 처방이 **수요 측 → 공급 측으로 뒤집히는** 10초 |
-| ⑥ **방문객 반영** | 승인 후 적격성·가맹 심사를 거쳐 **완료된 확충 업종**이 방문객 추천에 나타난다 |
+| ① **실시간 제안 생성** | 빈 의사결정 큐에서 `실시간 확충 제안 생성`을 눌러 영월군 음식점 Action Card를 실제 생성 |
+| ② **근거·반대 관점** | 생성 카드의 `근거·전망 검토하기`로 진입해 원 정량 순위·예상 효과와 이 제안이 틀릴 수 있는 이유를 함께 확인 |
+| ③ **안전 승인** | `후보 접촉·검토 시작` → 결정 안전 검토 체크 → 담당자 `승인 확정` |
+| ④ **적격성·추진 완료** | 5개 적격성 항목을 검증하고 `적격성 확인 → 가맹 심사 → 추진중`을 거쳐 완료 메모·가맹 등록 ID·증빙을 저장 |
+| ⑤ **방문객 반영** | 추진 리포트 100% → `방문객 위젯에서 확인` → 가나닭집에 `이번 분기 확충 업종` 배지가 붙는 폐루프 |
+
+60초 영상은 이 한 줄의 폐루프를 끊김 없이 증명하는 데 집중합니다. 수요 측 해법인 **페이백 3·5·7% 비교**는 기능에서 빠진 것이 아니라, [3분 심사 경로](#-3분-심사-경로)의 인센티브 화면과 아래 주요 기능·사업 확장성에서 별도로 확인할 수 있습니다.
 
 ---
 
