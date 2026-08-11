@@ -24,7 +24,7 @@ import { eventLabel } from "@/lib/cardEvents";
 import { NARRATIVE_SOURCE_TEXT, cardNarrativeSource } from "@/lib/aiSource";
 import { ANCHOR, PRIMARY } from "@/lib/constants";
 import { ApiError } from "@/lib/errors";
-import type { Candidate, Card } from "@/types";
+import type { Candidate, Card, ProgressMetrics, ProgressRecord } from "@/types";
 
 export const dynamic = "force-dynamic";
 
@@ -247,7 +247,7 @@ export default async function CardDetailPage({
                     editable={card.status === "approved"}
                   />
                 </div>
-                <OperationsSummary card={card} />
+                <OperationsSummary card={card} records={progressResult.records} />
               </>
             ) : null}
 
@@ -752,16 +752,43 @@ function ReviewStep({ href, step, label, note }: { href: string; step: string; l
   );
 }
 
-function OperationsSummary({ card }: { card: Card }) {
+const METRIC_SUMMARY_LABELS: [keyof ProgressMetrics, string, string][] = [
+  ["usage_count", "지역 사용 건수", "건"],
+  ["conversion_rate_pct", "지역 전환율", "%"],
+  ["active_merchant_count", "활성 가맹점", "곳"],
+  ["spend_krw", "지역 사용액", "원"],
+  ["concentration_index", "지역 소비 집중도", "점"],
+];
+
+function OperationsSummary({ card, records }: { card: Card; records: ProgressRecord[] }) {
   const operations = card.operations;
-  const fields = [
-    ["담당자", operations?.owner],
-    ["목표일", operations?.target_date],
-    ["예상 비용", operations?.expected_cost],
-    ["접촉 결과", operations?.contact_result],
-    ["부적격 사유", operations?.ineligible_reason],
-    ["완료 후 실제 성과", operations?.actual_outcome],
-  ] as const;
+  // 담당자·목표일·실측값의 단일 원천은 추진 기록이다 (Codex 리뷰 — 구형 operations와 이중 원천).
+  // operations 값이 있으면 계약 정본으로 우선하고, 비어 있으면 최신 기록에서 투영해
+  // "전부 미입력"인 죽은 블록이 되지 않게 한다. 투영 값은 출처 캡션으로 구분한다.
+  const latest = [...records].sort((a, b) => b.recorded_at.localeCompare(a.recorded_at));
+  const latestOwner = latest.find((r) => r.owner)?.owner ?? null;
+  const latestDue = latest.find((r) => r.due_at)?.due_at ?? null;
+  const latestMetrics = latest.find((r) =>
+    METRIC_SUMMARY_LABELS.some(([key]) => r.metrics?.[key] !== undefined && r.metrics?.[key] !== null),
+  )?.metrics;
+  const metricsSummary = latestMetrics
+    ? METRIC_SUMMARY_LABELS.filter(([key]) => latestMetrics[key] !== undefined && latestMetrics[key] !== null)
+        .map(([key, label, unit]) => `${label} ${Number(latestMetrics[key]).toLocaleString("ko-KR")}${unit}`)
+        .join(" · ")
+    : null;
+
+  const fields: [string, string | null | undefined, boolean][] = [
+    ["담당자", operations?.owner || latestOwner, !operations?.owner && !!latestOwner],
+    ["목표일", operations?.target_date || (latestDue ? latestDue.slice(0, 10) : null), !operations?.target_date && !!latestDue],
+    ["예상 비용", operations?.expected_cost, false],
+    ["접촉 결과", operations?.contact_result, false],
+    ["부적격 사유", operations?.ineligible_reason, false],
+    [
+      "완료 후 실제 성과",
+      operations?.actual_outcome || (card.progress === "완료" ? metricsSummary : null),
+      !operations?.actual_outcome && card.progress === "완료" && !!metricsSummary,
+    ],
+  ];
   return (
     <section aria-labelledby={`operations-${card.id}`} className="border-t border-admin-border pt-4">
       <div className="flex flex-wrap items-baseline justify-between gap-2">
@@ -769,7 +796,7 @@ function OperationsSummary({ card }: { card: Card }) {
         <span className="u-note">예상 효과와 실제 성과를 분리해 기록합니다.</span>
       </div>
       <dl className="mt-3 grid grid-cols-1 border-y border-admin-border sm:grid-cols-2 lg:grid-cols-3">
-        {fields.map(([label, value], index) => (
+        {fields.map(([label, value, projected], index) => (
           <div
             key={label}
             className={`min-w-0 py-3 sm:px-3 ${index === 0 ? "sm:pl-0" : ""} ${index % 3 !== 2 ? "lg:border-r lg:border-admin-border" : ""}`}
@@ -777,6 +804,7 @@ function OperationsSummary({ card }: { card: Card }) {
             <dt className="text-xs font-semibold text-admin-text-muted">{label}</dt>
             <dd className={`mt-1 break-keep text-[13px] ${value ? "font-medium text-admin-text" : "text-admin-text-muted"}`}>
               {value || "아직 입력되지 않음"}
+              {projected ? <span className="ml-1.5 text-[11px] font-normal text-admin-text-muted">최신 추진 기록 기준</span> : null}
             </dd>
           </div>
         ))}
