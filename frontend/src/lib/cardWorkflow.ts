@@ -1,6 +1,7 @@
 import type {
   Card,
   CardProgress,
+  CardType,
   CandidateVerification,
   EligibilityCheck,
   EligibilityCheckStatus,
@@ -26,6 +27,42 @@ export const EXPANSION_PROGRESS: CardProgress[] = [
 export const INCENTIVE_PROGRESS: CardProgress[] = ["검토중", "추진중", "보류", "완료"];
 
 const VERIFIED_REQUIRED = new Set<CardProgress>(["적격성 확인", "가맹 심사", "추진중", "완료"]);
+
+/**
+ * 서버 `workflow.can_set_progress`의 FE 미러 — 지금 상태에서 저장이 통과할 상태만 돌려준다.
+ *
+ * 서버 규칙(backend/app/services/workflow.py): ① 동일 상태 재기록 허용 ② 순방향 한 단계만
+ * ③ 시작 후에는 언제든 보류 가능 ④ 보류 해제는 직전 단계로만 ⑤ 완료는 되돌리기 불가
+ * ⑥ EXPANSION은 적격성 5항목 충족 전에 적격성 확인 이후 단계 잠금.
+ * 여기 결과는 셀렉트 옵션을 미리 닫는 편의 장치일 뿐, 최종 방어선은 서버 409다 —
+ * 두 구현이 어긋나면 기존 인라인 에러로 떨어지므로 오동작이 아니라 문구로 읽힌다.
+ */
+export function allowedProgress(opts: {
+  cardType: CardType;
+  /** 정규화된 현재 상태 (EXPANSION의 검토중은 후보 접촉·검토 시작으로 읽는다) */
+  current: CardProgress | null;
+  /** 보류 진입 직전 상태 — card.progress_before_hold */
+  beforeHold: CardProgress | null;
+  verified: boolean;
+}): Set<CardProgress> {
+  const list = opts.cardType === "EXPANSION" ? EXPANSION_PROGRESS : INCENTIVE_PROGRESS;
+  const flow = list.filter((s) => s !== "보류");
+  const ok = new Set<CardProgress>();
+  const cur = opts.current;
+  if (cur) ok.add(cur);
+  if (cur === "완료") return ok;
+  if (cur === "보류") {
+    if (opts.beforeHold) ok.add(opts.beforeHold);
+  } else {
+    const next = cur ? flow[flow.indexOf(cur) + 1] : flow[0];
+    if (next) ok.add(next);
+    if (cur) ok.add("보류");
+  }
+  if (opts.cardType === "EXPANSION" && !opts.verified) {
+    for (const s of VERIFIED_REQUIRED) ok.delete(s);
+  }
+  return ok;
+}
 
 export function normalizeEligibility(
   verification?: CandidateVerification,

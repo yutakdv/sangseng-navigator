@@ -343,6 +343,7 @@ export default async function TrackingPage({
                           cardType={card.type}
                           progress={card.progress}
                           verificationStatus={card.candidate_verification?.status}
+                          progressBeforeHold={card.progress_before_hold ?? null}
                         />
                       </div>
                     </div>
