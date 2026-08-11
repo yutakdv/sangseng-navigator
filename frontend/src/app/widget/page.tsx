@@ -477,8 +477,9 @@ export default async function WidgetPage({ searchParams }: { searchParams: Promi
 /**
  * 추천 가맹점 카드 한 장 — 확충 섹션과 전체 목록이 같은 마크업을 쓴다. pop은 라이브 미리보기 전용.
  *
- * 구조는 위에서 아래로 **누구인가(아이콘·이름·업종) → 무엇인가(한 줄 설명·주소) → 무엇을 할 수
- * 있나(배지·길찾기)** 세 켜다. 정보를 한 덩어리로 쌓아 두면 열두 장이 같은 회색 블록으로 보인다.
+ * 첫 줄이 **누구인가(아이콘·이름·업종)와 할 일(길찾기)**을 함께 말하고, 그 아래가 **무엇인가
+ * (한 줄 설명·주소·혜택)**다. 정보를 한 덩어리로 쌓아 두면 열두 장이 같은 회색 블록으로 보인다.
+ * 길찾기를 아래 구분선 칸에 따로 두었더니 칸은 늘 비어 있고 버튼은 작아, 이름 옆으로 올렸다.
  *
  * - 흰 패널 위 흰 카드에 테두리를 두르는 대신 `visitor-surface-sunken`으로 가라앉힌다
  *   (13 §6-1 규칙 2 — 면이 같으면 선이 아니라 면을 옮긴다). 호버는 흰색으로 띄우지 않고 한 단
@@ -490,7 +491,7 @@ export default async function WidgetPage({ searchParams }: { searchParams: Promi
  */
 function MerchantCard({ r, pop = false }: { r: Recommendation; pop?: boolean }) {
   return (
-    <li className="flex h-full flex-col rounded-2xl bg-visitor-surface-sunken p-4 transition-colors hover:bg-visitor-surface-hover">
+    <li className="rounded-2xl bg-visitor-surface-sunken p-4 transition-colors hover:bg-visitor-surface-hover">
       <div className="flex items-start gap-3">
         <span className="relative shrink-0">
           <CategoryIcon category={r.category} />
@@ -511,33 +512,34 @@ function MerchantCard({ r, pop = false }: { r: Recommendation; pop?: boolean }) 
             {r.category}
           </span>
         </span>
-      </div>
-
-      <p className="mt-3 break-keep text-[13px] leading-6 text-admin-text-soft">{r.blurb}</p>
-      <p className="mb-3.5 mt-1.5 flex items-start gap-1.5 break-keep text-[11px] leading-[18px] text-admin-text-muted">
-        <Icon name="pin" size={12} className="mt-[3px]" />
-        {r.address}
-      </p>
-
-      {/* mt-auto — 한 줄에 놓인 카드들의 액션 줄이 같은 높이에서 만나게 한다 */}
-      <div className="mt-auto flex items-center justify-between gap-2 border-t border-black/[0.06] pt-3">
-        {/* 확충 배지는 카드에 달지 않는다 — 이 카드들은 "이번 분기 새로 확충된 업종" 섹션
-            안에서만 나오므로 제목이 이미 말하고 있고, 카드에는 아이콘 타일의 반짝임 표식이 있다.
-            페이백은 카드마다 있을 수도 없을 수도 있어 여기서 말해야 한다 */}
-        <span className="flex min-w-0 flex-wrap gap-1">
-          {r.payback ? <PaybackBadge label={`${r.payback.rate}% 페이백`} pop={pop} /> : null}
-        </span>
+        {/* 길찾기는 이 카드에서 유일한 행동이라 이름 옆(우측 상단)에 상시 버튼으로 둔다.
+            가라앉은 카드 면 위의 흰 알약이라 테두리 없이도 버튼으로 읽힌다 (13 §6-1) */}
         <a
           href={r.directions_url}
           target="_blank"
           rel="noreferrer"
           aria-label={`${r.name} 카카오맵에서 길찾기`}
-          className="inline-flex min-h-9 shrink-0 items-center gap-1 rounded-xl px-2.5 text-[12px] font-bold text-visitor-primary transition-colors hover:bg-visitor-primary-soft"
+          className="inline-flex min-h-8 shrink-0 items-center gap-1 rounded-full bg-white px-3 text-[12px] font-bold text-visitor-primary shadow-[0_1px_2px_rgb(15_23_42_/_0.08)] transition-colors hover:bg-visitor-primary hover:text-white"
         >
           길찾기
           <Icon name="arrowUpRight" size={13} strokeWidth={2.2} />
         </a>
       </div>
+
+      <p className="mt-3 break-keep text-[13px] leading-6 text-admin-text-soft">{r.blurb}</p>
+      <p className="mt-1.5 flex items-start gap-1.5 break-keep text-[11px] leading-[18px] text-admin-text-muted">
+        <Icon name="pin" size={12} className="mt-[3px]" />
+        {r.address}
+      </p>
+
+      {/* 확충 배지는 카드에 달지 않는다 — 이 카드들은 "이번 분기 새로 확충된 업종" 섹션 안에서만
+          나오므로 제목이 이미 말하고 있고, 카드에는 아이콘 타일의 반짝임 표식이 있다.
+          페이백은 카드마다 있을 수도 없을 수도 있어 있을 때만 한 줄 더 쓴다 */}
+      {r.payback ? (
+        <p className="mt-2.5">
+          <PaybackBadge label={`${r.payback.rate}% 페이백`} pop={pop} />
+        </p>
+      ) : null}
     </li>
   );
 }
