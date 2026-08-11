@@ -20,8 +20,8 @@ import { SourceChip } from "@/components/SourceChip";
 import { WorkflowChip } from "@/components/StatusChip";
 import { BarRank } from "@/components/charts/BarRank";
 import { api, datasetVersion } from "@/lib/api";
-import { eventLabel } from "@/lib/cardEvents";
-import { NARRATIVE_SOURCE_TEXT, cardNarrativeSource } from "@/lib/aiSource";
+import { eventActorLabel, eventLabel } from "@/lib/cardEvents";
+import { cardNarrativeSource } from "@/lib/aiSource";
 import { ANCHOR, PRIMARY } from "@/lib/constants";
 import { ApiError } from "@/lib/errors";
 import type { Candidate, Card } from "@/types";
@@ -94,9 +94,9 @@ export default async function CardDetailPage({
   const isExpansion = card.type === "EXPANSION";
 
   // 이 카드의 설명 문구가 AI 응답인지 서버 규칙인지 (05 §2) — 화면 문장이 데이터와 다른 말을
-  // 하지 않게 하는 장치라, 배지·검증 배너·근거 Section 설명 세 곳이 이 값 하나를 공유한다
+  // 하지 않게 하는 장치라, 머리말 칩과 근거 Section 칩이 이 값 하나를 공유한다. 검증 배너는
+  // "무엇이 재검증됐는가"만 말하고 문구 출처는 칩에 맡긴다(두 자리가 다른 강도로 말하지 않게)
   const narrativeSource = cardNarrativeSource(card);
-  const narrativeNote = narrativeSource ? NARRATIVE_SOURCE_TEXT[narrativeSource].note : "";
 
   /**
    * `근사 지표` 배지 — "지역 전환율"이 보이는 **모든 위치**에 붙인다 (절대 규칙 2, 13 §9).
@@ -186,6 +186,17 @@ export default async function CardDetailPage({
                   {target ? `${target.eup} · ${target.category}` : "전 지역 공통"}
                 </b>
               </span>
+              {/* 확인된 가맹점 등록번호 — 방문객 위젯의 확충 배지가 붙는 유일한 근거다.
+                  확인 전 비어 있는 것이 정상이라, 없을 때는 그 사실을 그대로 적는다 (05 §2·§4) */}
+              {target ? (
+                <span className="flex items-center gap-1.5">
+                  <Icon name="store" size={14} />
+                  가맹 등록{" "}
+                  <b className="font-semibold text-admin-text">
+                    {target.verified_merchant_id ?? "확인 전"}
+                  </b>
+                </span>
+              ) : null}
               <span className="flex items-center gap-1.5">
                 <Icon name="shield" size={14} />
                 신뢰도 <b className="font-semibold text-admin-text">{card.confidence}</b>
@@ -211,15 +222,18 @@ export default async function CardDetailPage({
             {/* 정량 순위 병기 — 조정 여부와 무관하게 항상 노출 (절대 규칙 5) */}
             {showRank ? <RankTrace card={card} size="md" /> : null}
 
-            {/* 재검증 배너 — 무엇을 서버가 다시 만들었는지만 말한다. "누가 설명을 썼는가"는
-                같은 줄의 출처 칩이 지므로 여기서 AI의 역할을 단정하지 않는다 (05 §2).
+            {/* 재검증 배너 — 무엇을 서버가 다시 만들었는지와 **무엇이 그 범위 밖인지**를 함께
+                말한다. 검증 범위를 적지 않으면 같은 화면의 출처 칩("AI 서술 · 수치·순위 서버
+                검증")보다 배너가 세게 말해, 서술 문장까지 검증된 것처럼 읽힌다 (05 §2).
+                "누가 설명을 썼는가"는 같은 줄의 출처 칩이 지므로 여기서 단정하지 않는다.
                 INCENTIVE(status=partial)는 수치만 서버 고정이라 검증됨 톤을 쓰지 않는다 */}
             {card.ai.grounding?.status === "verified" ? (
               <p className="flex items-start gap-2 rounded-xl bg-state-good-bg px-3.5 py-3 text-xs leading-5 text-state-good">
                 <Icon name="check" size={14} strokeWidth={2} className="mt-0.5 shrink-0" />
                 <span>
                   서버가 정량 규칙으로 고른 대상과 화면의 후보명·Score·순위·추진 상태·도로 시간을
-                  정본 데이터로 다시 검증했습니다. {narrativeNote}
+                  정본 데이터로 다시 검증했습니다. 리스크·유의사항 서술 문장은 이 검증 범위 밖이며,
+                  문구의 출처는 제목 위 칩에 적었습니다.
                 </span>
               </p>
             ) : card.ai.grounding?.status === "partial" ? (
@@ -277,12 +291,7 @@ export default async function CardDetailPage({
                     </div>
                   </div>
                   <div className="w-full rounded-xl bg-admin-surface p-3 sm:w-60">
-                    <ProgressSelect
-                      cardId={card.id}
-                      cardType={card.type}
-                      progress={card.progress}
-                      verificationStatus={card.candidate_verification?.status}
-                    />
+                    <ProgressSelect card={card} />
                   </div>
                 </div>
               </section>
@@ -668,9 +677,19 @@ export default async function CardDetailPage({
               {/* INCENTIVE 승인은 페이백률이 필수라(05 §2) 이 화면에도 요율 칩을 함께 둔다 —
                   칩이 없던 동안 selectedRate가 영원히 null이라 승인 버튼이 눌리지 않았다 */}
               {card.type === "INCENTIVE" ? (
-                <IncentiveDecision cardId={card.id} initialRate={card.selected_rate ?? null} />
+                <IncentiveDecision
+                  cardId={card.id}
+                  initialRate={card.selected_rate ?? null}
+                  confidence={card.confidence}
+                  version={card.version}
+                />
               ) : (
-                <DecisionActions cardId={card.id} cardType={card.type} />
+                <DecisionActions
+                  cardId={card.id}
+                  cardType={card.type}
+                  confidence={card.confidence}
+                  version={card.version}
+                />
               )}
               {card.type === "INCENTIVE" ? (
                 <p className="u-note mt-2">
@@ -702,18 +721,47 @@ export default async function CardDetailPage({
             ))}
           </div>
           {card.events?.length ? (
-            <ol className="mt-4 flex flex-col gap-2 border-l-2 border-admin-border pl-4">
-              {card.events.map((e, i) => (
-                <li key={i} className="relative flex flex-wrap items-baseline gap-x-2.5 text-[13px]">
-                  <span
-                    aria-hidden
-                    className="absolute -left-[21px] top-1.5 h-2 w-2 rounded-full bg-admin-primary-line ring-2 ring-admin-surface"
-                  />
-                  <span className="tabular-nums text-admin-text-muted">{timeText(e.at)}</span>
-                  <span className="font-medium text-admin-text">{eventLabel(e.action)}</span>
-                </li>
-              ))}
+            <ol className="mt-4 flex flex-col gap-2.5 border-l-2 border-admin-border pl-4">
+              {card.events.map((e, i) => {
+                const actor = eventActorLabel(e, card.decision);
+                return (
+                  <li key={i} className="relative text-[13px]">
+                    <span
+                      aria-hidden
+                      className="absolute -left-[21px] top-1.5 h-2 w-2 rounded-full bg-admin-primary-line ring-2 ring-admin-surface"
+                    />
+                    <span className="flex flex-wrap items-baseline gap-x-2.5">
+                      <span className="tabular-nums text-admin-text-muted">{timeText(e.at)}</span>
+                      <span className="font-medium text-admin-text">{eventLabel(e)}</span>
+                      {/* 누가 결정했는지와 신원 검증 여부를 감추지 않는다 (05 §2 decision) */}
+                      {actor ? <span className="text-admin-text-muted">{actor}</span> : null}
+                    </span>
+                    {e.reason ? (
+                      <span className="mt-0.5 block break-keep text-xs leading-5 text-admin-text-soft">
+                        사유 {e.reason}
+                      </span>
+                    ) : null}
+                  </li>
+                );
+              })}
             </ol>
+          ) : null}
+
+          {/* 재제안 차단 창 — 반려·보류한 대상을 언제까지 다시 제안하지 않는지, 무엇이 바뀌면
+              다시 볼지. 이 기록이 없으면 담당자의 반려 판단이 시스템에 남지 않는다 (05 §8) */}
+          {card.reproposal_block ? (
+            <div className="mt-4 rounded-xl bg-state-notice-bg px-3.5 py-3">
+              <p className="text-[13px] font-bold text-state-notice">
+                재제안 보류 {card.reproposal_block.cooldown_days}일
+              </p>
+              <p className="mt-1 break-keep text-[13px] leading-6 text-admin-text">
+                {timeText(card.reproposal_block.until)}까지 같은 대상은 새 카드로 다시 제안되지
+                않습니다.
+                {card.reproposal_block.recheck_condition
+                  ? ` 재검토 조건: ${card.reproposal_block.recheck_condition}`
+                  : ""}
+              </p>
+            </div>
           ) : null}
         </Section>
       </div>

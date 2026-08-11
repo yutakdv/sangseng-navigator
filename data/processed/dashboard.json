@@ -389,6 +389,12 @@
     "aggregate_rounding": {
       "unit": 100
     },
-    "note": "가맹점 5곳 미만 셀의 건수는 비공개. 합계는 100 단위 반올림으로 차분 복원 정밀도를 낮춤(완전 차단은 아님). 비율·순위·스코어는 반올림 전 원값으로 계산됨."
+    "note": "가맹점 5곳 미만 셀의 건수는 비공개. 합계는 100 단위 반올림으로 차분 복원 정밀도를 낮춤(완전 차단은 아님). 비율·순위·스코어는 반올림 전 원값으로 계산됨.",
+    "canonical_total": 507628,
+    "privacy_rounding_adjustment": {
+      "region_share": 25,
+      "category_share": -42,
+      "monthly_by_region": 25
+    }
   }
 }

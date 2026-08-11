@@ -17,6 +17,7 @@ import { LineTrend } from "@/components/charts/LineTrend";
 import { ScaleCompare } from "@/components/charts/ScaleCompare";
 import { api } from "@/lib/api";
 import { REGIONS, REGION_TOOLTIP, STABILITY_NOTE } from "@/lib/constants";
+import { canonicalTotalUses } from "@/lib/dashboardView";
 import { monthLabel, num, pctNum, pctUnit } from "@/lib/format";
 
 export const metadata: Metadata = { title: "전체 지역 현황 · 상생 나침반" };
@@ -93,7 +94,8 @@ export default async function DashboardPage({
       note: row ? `${Math.round(row.share * 100)}%` : "0%",
     };
   });
-  const totalUses = (d.region_share ?? []).reduce((a, b) => a + b.count, 0);
+  // 지역 배열의 count 합이 아니라 반올림 전 정본을 쓴다 — 배열 합은 실측으로 +25 어긋난다
+  const totalUses = canonicalTotalUses(d);
   const eupRanking = cand?.eup_ranking ?? [];
   // candidates 호출 자체가 실패했는지 — ranking이 비어 있는 이유가 "없다"가 아니라
   // "못 불러왔다"일 때 빈 값을 사실처럼 그리지 않기 위한 플래그 (지도 카드·제안 근거 뷰 공용)

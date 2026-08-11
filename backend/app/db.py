@@ -105,38 +105,69 @@ def decide_card(
     *,
     initial_progress: str | None,
     selected_rate: int | None = None,
+    decision_record: dict | None = None,
+    reproposal_block: dict | None = None,
+    expected_version: int | None = None,
+    now: str | None = None,
 ) -> dict:
-    """pending 카드의 결정을 조건부·원자적으로 기록하고 이벤트를 append한다."""
-    now = now_iso()
+    """pending 카드의 결정을 조건부·원자적으로 기록하고 이벤트를 append한다.
+
+    이벤트에 결정자·사유·경로를 함께 싣는다 — 시각과 동작만 남기면 "누가 왜"가 기록에서
+    사라져 감사가 성립하지 않는다 (05 문서 §7).
+    `expected_version`을 주면 낙관적 잠금 조건을 함께 건다. 화면이 카드를 읽은 뒤 다른 요청이
+    먼저 바꿨으면 조건이 깨져 `ConcurrentUpdate`가 된다(라우트가 409로 변환).
+    """
+    now = now or now_iso()
     names = {
         "#status": "status",
         "#progress": "progress",
         "#events": "events",
         "#version": "version",
+        "#decision": "decision",        # 예약어 회피는 일괄 적용 — 어느 것이 예약어인지 외우지 않는다
+        "#block": "reproposal_block",
     }
+    event = {"at": now, "action": decision}
+    if decision_record:
+        event["actor_id"] = decision_record.get("actor_id")
+        event["source"] = decision_record.get("source")
+        if decision_record.get("reason"):
+            event["reason"] = decision_record["reason"]
     values = {
         ":pending": "pending",
         ":decision": decision,
         ":decided_at": now,
         ":progress": initial_progress if decision == "approved" else None,
         ":empty": [],
-        ":event": [{"at": now, "action": decision}],
+        ":event": [event],
         ":one": 1,
+        ":decision_record": decision_record,
+        ":block": reproposal_block,
     }
     sets = [
         "#status = :decision",
         "decided_at = :decided_at",
         "#progress = :progress",
         "#events = list_append(if_not_exists(#events, :empty), :event)",
+        "#decision = :decision_record",
+        "#block = :block",
     ]
     if selected_rate is not None:
         sets.append("selected_rate = :selected_rate")
         values[":selected_rate"] = selected_rate
+    condition = "#status = :pending"
+    if expected_version is not None:
+        # version 속성이 없는 구형 카드는 0으로 읽히므로 두 경우를 모두 통과시킨다 —
+        # 그러지 않으면 시드·배포 이전 카드에 낙관적 잠금을 쓸 수 없다.
+        if expected_version == 0:
+            condition += " AND (attribute_not_exists(#version) OR #version = :expected_version)"
+        else:
+            condition += " AND #version = :expected_version"
+        values[":expected_version"] = expected_version
     try:
         result = _table.update_item(
             Key={"id": cid},
             UpdateExpression=f"SET {', '.join(sets)} ADD #version :one",
-            ConditionExpression="#status = :pending",
+            ConditionExpression=condition,
             ExpressionAttributeNames=names,
             ExpressionAttributeValues=_to_ddb(values),
             ReturnValues="ALL_NEW",

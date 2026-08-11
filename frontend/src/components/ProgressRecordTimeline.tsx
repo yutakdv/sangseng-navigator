@@ -4,7 +4,13 @@ import { DeltaValue } from "@/components/DeltaValue";
 import { Icon } from "@/components/Icon";
 import { ProgressChip } from "@/components/StatusChip";
 import { PROXY_NOTE } from "@/lib/constants";
-import { PROGRESS_METRICS, PROXY_METRIC_KEY, formatMetric } from "@/lib/progressMetrics";
+import {
+  PROGRESS_METRICS,
+  formatMetric,
+  measurementOf,
+  metricIsProxy,
+  metricUnit,
+} from "@/lib/progressMetrics";
 import type { ProgressMetricKey, ProgressRecord } from "@/types";
 
 export function ProgressRecordTimeline({
@@ -47,15 +53,20 @@ export function ProgressRecordTimeline({
   for (let i = records.length - 1; i >= 0; i--) {
     previousMetrics.set(records[i].record_id, { ...lastSeen });
     for (const { key } of PROGRESS_METRICS) {
-      const value = records[i].metrics?.[key];
-      if (value !== undefined && value !== null) lastSeen[key] = value;
+      const observed = measurementOf(records[i].metrics, key);
+      if (observed) lastSeen[key] = observed.value;
     }
   }
 
   return (
     <ol className="relative flex flex-col gap-4 before:absolute before:bottom-5 before:left-[11px] before:top-5 before:w-px before:bg-admin-border sm:before:left-[15px]">
       {records.map((record) => {
-        const observed = PROGRESS_METRICS.filter(({ key }) => record.metrics?.[key] !== undefined && record.metrics?.[key] !== null);
+        // 관측값은 이제 값 하나가 아니라 측정 기간·출처·범위를 함께 지닌 객체다 —
+        // 그 메타가 있어야 나중에 무엇을 잰 값인지 되짚을 수 있어 화면에도 함께 남긴다.
+        const observed = PROGRESS_METRICS.flatMap((meta) => {
+          const measurement = measurementOf(record.metrics, meta.key);
+          return measurement ? [{ meta, measurement }] : [];
+        });
         const quick = record.source === "quick_status" || record.source === "빠른 상태 변경";
         return (
           <li key={record.record_id} className="relative pl-8 sm:pl-10">
@@ -137,20 +148,21 @@ export function ProgressRecordTimeline({
                   <div className="flex flex-wrap items-center gap-1.5">
                     <p className="text-[11px] font-bold text-admin-text-muted">실제 관측 성과</p>
                     {/* 절대 규칙 2 — 이 블록에 지역 전환율이 보이면 근사 지표 배지를 반드시 병기한다 */}
-                    {observed.some((metric) => metric.key === PROXY_METRIC_KEY) ? (
+                    {observed.some(({ meta, measurement }) => metricIsProxy(meta.key, measurement)) ? (
                       <ProxyBadge note={PROXY_NOTE} />
                     ) : null}
                   </div>
-                  <dl className="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-5">
-                    {observed.map((metric) => {
-                      const value = record.metrics[metric.key] as number;
-                      const prev = previousMetrics.get(record.record_id)?.[metric.key];
+                  <dl className="mt-2 grid grid-cols-1 gap-2 sm:grid-cols-2 xl:grid-cols-3">
+                    {observed.map(({ meta, measurement }) => {
+                      const prev = previousMetrics.get(record.record_id)?.[meta.key];
                       return (
-                        <div key={metric.key} className="rounded-lg bg-admin-surface-sunken px-2.5 py-2">
+                        <div key={meta.key} className="rounded-lg bg-admin-surface-sunken px-2.5 py-2">
                           {/* 좁은 셀이라 shortLabel — 리포트 타일의 긴 라벨과 같은 지표다 */}
-                          <dt className="text-[10px] leading-4 text-admin-text-muted">{metric.shortLabel}</dt>
+                          <dt className="text-[10px] leading-4 text-admin-text-muted">{meta.shortLabel}</dt>
                           <dd className="mt-0.5 text-xs font-bold tabular-nums text-admin-text">
-                            {formatMetric(value, metric.digits)}{metric.unit}
+                            {/* 단위는 서버가 지표 정의에서 채운 값을 우선한다 */}
+                            {formatMetric(measurement.value, meta.digits)}
+                            {metricUnit(meta.key, measurement)}
                           </dd>
                           <dd className="mt-1 text-[10px] leading-4">
                             {prev === undefined ? (
@@ -158,25 +170,40 @@ export function ProgressRecordTimeline({
                               <span className="text-admin-text-muted">
                                 {hasMore ? "표시 범위 첫 값" : "첫 관측"}
                               </span>
-                            ) : value === prev ? (
+                            ) : measurement.value === prev ? (
                               <span className="text-admin-text-muted">직전과 동일</span>
                             ) : (
                               <DeltaValue
-                                value={value - prev}
-                                unit={metric.deltaUnit}
-                                digits={metric.digits}
+                                value={measurement.value - prev}
+                                unit={meta.deltaUnit}
+                                digits={meta.digits}
                                 variant="text"
                                 className="text-[10px] font-semibold"
                                 note="직전 대비"
                               />
                             )}
                           </dd>
+                          {/* 기간·출처·범위가 없으면 무엇을 잰 값인지 되짚을 수 없다 — 값과 함께
+                              남긴다. 개정 이전 기록에는 이 메타가 없으므로 그때는 줄 자체를 그리지
+                              않는다(빈 값을 있는 것처럼 보여 주지 않는다) */}
+                          {measurement.measured_from && measurement.measured_to ? (
+                            <dd className="mt-1.5 flex flex-col gap-0.5 text-[10px] leading-4 text-admin-text-muted">
+                              <span className="tabular-nums">
+                                {measurement.measured_from} ~ {measurement.measured_to}
+                              </span>
+                              {measurement.scope || measurement.source ? (
+                                <span className="break-keep">
+                                  {[measurement.scope, measurement.source].filter(Boolean).join(" · ")}
+                                </span>
+                              ) : null}
+                            </dd>
+                          ) : null}
                         </div>
                       );
                     })}
                   </dl>
                   {/* 방향색은 값의 증감만 뜻한다 — 집중도는 의미가 반대라 문장으로 못 박는다 */}
-                  {observed.some((metric) => metric.key === "concentration_index") ? (
+                  {observed.some(({ meta }) => meta.key === "concentration_index") ? (
                     <p className="mt-2 text-[10px] leading-4 text-admin-text-muted">
                       지역 소비 집중도는 값이 낮아질수록(▼) 분산이 개선된 것입니다.
                     </p>

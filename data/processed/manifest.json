@@ -1,7 +1,7 @@
 {
-  "dataset_version": "2025-12.fdcbd442",
+  "dataset_version": "2025-12.62e0a4c7",
   "base_month": "2025-12",
-  "generated_at": "2026-08-10T16:45:12+00:00",
+  "generated_at": "2026-08-11T02:50:58+00:00",
   "files": {
     "candidates.json": {
       "sha256": "fe4179a7319f5db959aaaa7945e0e42f8baab15beb6cbe2adea145d06b03b23e",
@@ -12,16 +12,16 @@
       "bytes": 7160
     },
     "dashboard.json": {
-      "sha256": "f42fe830e33560d6107bea110cd16e569125b4bed5b5d7c90ef9d82717779af5",
-      "bytes": 8052
+      "sha256": "c388976919e06efeb513b929577efe7cb392f9327ff8d063b4eefbf0785ba86b",
+      "bytes": 8212
     },
     "eup_scores.json": {
       "sha256": "3039a01cda143e9a5c2abc7dcffb62f78c653d2adaf51f14e1afccb90c418848",
       "bytes": 1053
     },
     "merchants.json": {
-      "sha256": "931db80a9dddfa2a67c7386af8ff591809add2d05095b2f8697f2546bacb6d90",
-      "bytes": 330920
+      "sha256": "718ea902e05aa3f07cab3e32bff31a5223fb30601ae4a4cdb65148067e2cb444",
+      "bytes": 372743
     },
     "risk_signal.json": {
       "sha256": "0167757cef99c3b344ca65191ce5ea278ec25688d21d57dd3bb60fe351213e5b",

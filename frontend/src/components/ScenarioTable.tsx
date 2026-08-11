@@ -6,7 +6,7 @@ import { AssumptionNote } from "@/components/Badge";
 import { DeltaValue } from "@/components/DeltaValue";
 import { DecisionActions } from "@/components/DecisionActions";
 import { PaybackImpactPanel, scenarioHi } from "@/components/PaybackImpactPanel";
-import type { CardStatus, PaybackRate, Scenario } from "@/types";
+import type { Card, CardStatus, PaybackRate, Scenario } from "@/types";
 
 /**
  * 페이백률 3/5/7% 시나리오 비교 표 (docs/plan/08 F6 · 05 §2 · 13 §2-13).
@@ -35,10 +35,16 @@ export function ScenarioTable({
   avgVisitors = null,
   visitorsBasis = "",
   proxyNote,
+  confidence,
+  version,
 }: {
   cardId: string;
   scenarios: Scenario[];
   status: CardStatus;
+  /** 신뢰도 `하` 카드 승인의 확인 근거 게이트 — DecisionActions로 그대로 내려간다 (05 §2) */
+  confidence?: Card["confidence"];
+  /** 낙관적 잠금 version — 이 화면에서도 동시 변경을 서버가 잡을 수 있게 함께 보낸다 */
+  version?: number;
   /** 승인 시 담당자가 고른 확정 페이백률 — pending·반려·보류에서는 null (05 §2) */
   selectedRate?: PaybackRate | null;
   /** 카드가 실어 보낸 가정 문구 — 있으면 요약 없이 그대로 노출한다 */
@@ -158,7 +164,13 @@ export function ScenarioTable({
               AI는 세 시나리오의 효과·재원 트레이드오프를 비교해 제시할 뿐입니다. 확정 페이백률은
               담당자가 이 표에서 고른 값만 저장됩니다 — 의사결정 근거 제공이 AI의 역할입니다.
             </p>
-            <DecisionActions cardId={cardId} requireRate selectedRate={choice} />
+            <DecisionActions
+              cardId={cardId}
+              requireRate
+              selectedRate={choice}
+              confidence={confidence}
+              version={version}
+            />
           </>
         ) : selectedRate ? (
           <div>

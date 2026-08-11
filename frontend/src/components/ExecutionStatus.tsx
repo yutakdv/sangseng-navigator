@@ -37,6 +37,14 @@ export function ExecutionStatus({
   const total = approved.length;
   const quality = kpi ? sampleQuality(kpi.counts.decided) : null;
   const sampleNote = quality === "demo" ? "예시 데이터" : quality === "limited" ? "표본 부족" : null;
+  /**
+   * 지역 균형지수는 표본이 다르다 — 집계 6지역 안에 타깃이 있는 승인 확충 카드만 센다.
+   * 결정 총계로 품질을 판정하면 인센티브까지 포함한 수로 "운영 표본"이라 말하게 된다 (05 §3).
+   */
+  const balanceSample = kpi?.balance_sample_count ?? 0;
+  const balanceQuality = kpi ? sampleQuality(balanceSample) : null;
+  const balanceNote =
+    balanceQuality === "demo" ? "예시 데이터" : balanceQuality === "limited" ? "표본 부족" : null;
 
   return (
     <section
@@ -126,8 +134,8 @@ export function ExecutionStatus({
               label="지역 균형지수"
               value={dash(kpi.regional_balance_index)}
               unit={kpi.regional_balance_index === null ? undefined : "/ 100"}
-              /* regional_balance_index도 승인 EXPANSION 카드의 6지역 분포만 본다 (routes/kpi.py) */
-              note="승인 카드가 여러 지역에 고루 쌓일수록 상승"
+              /* 지수만 크게 띄우고 그것이 카드 몇 장에서 나온 값인지 감추지 않는다 (05 §3) */
+              note={`승인 확충 카드 ${balanceSample}건의 지역 분포${balanceNote ? ` · ${balanceNote}` : ""}`}
             />
           </dl>
         ) : (
