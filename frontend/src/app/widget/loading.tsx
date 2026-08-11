@@ -17,9 +17,9 @@ export default function WidgetLoading() {
       <div className="mx-auto w-full max-w-[390px] bg-visitor-bg shadow-card-hover sm:rounded-[28px] sm:ring-1 sm:ring-black/5">
         {/* 헤더는 실제 화면과 같은 파스텔 로고 바 한 줄이다 — 로고는 정적이라 로딩 중에도 그대로
             보여 줄 수 있고, 뜰 때 첫 화면이 밀리지 않는다 */}
-        <header className="flex items-center bg-visitor-primary-soft px-5 py-3.5 sm:rounded-t-[28px]">
+        <header className="flex items-center bg-visitor-primary-soft-deep px-5 py-3.5 sm:rounded-t-[28px]">
           <Image
-            src="/brand/sangseng-navigator-lockup.png"
+            src="/brand/sangseng-navigator-lockup-green.png"
             alt="상생 나침반"
             width={144}
             height={28}

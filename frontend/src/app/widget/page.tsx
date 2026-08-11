@@ -218,11 +218,14 @@ export default async function WidgetPage({ searchParams }: { searchParams: Promi
         {/**
          * 헤더는 로고 한 줄이다. 안내 문구는 히어로 아래 한 문단으로 합쳤다 — 짙은 그린 밴드에
          * 같은 말을 얹으면 화면 첫 인상이 무거워지고 문장도 두 군데로 갈라진다.
-         * 면이 파스텔 그린이라 로고를 흰색으로 뒤집지 않고 원래 색 그대로 쓴다.
+         *
+         * 로고는 방문객 화면 전용 자산(`-green`)을 쓴다. 원본 락업의 포인트 색이 인디고라
+         * 그린 테마 위에서 혼자 다른 계열로 튄다 — 심볼과 "나" 자만 visitor-primary로 옮기고
+         * 검정 워드마크는 그대로 둔 파일이다. 담당자 화면은 원본을 계속 쓴다.
          */}
-        <header className="flex items-center justify-between gap-3 bg-visitor-primary-soft px-5 py-3.5 sm:rounded-t-[28px] sm:px-8">
+        <header className="flex items-center justify-between gap-3 bg-visitor-primary-soft-deep px-5 py-3.5 sm:rounded-t-[28px] sm:px-8">
           <Image
-            src="/brand/sangseng-navigator-lockup.png"
+            src="/brand/sangseng-navigator-lockup-green.png"
             alt="상생 나침반"
             width={144}
             height={28}
@@ -283,8 +286,8 @@ export default async function WidgetPage({ searchParams }: { searchParams: Promi
             {/* 헤더 밴드에 있던 안내를 여기로 합쳤다 — 무엇인가 → 어떻게 쓰는가가 한 문단에서
                 이어지고, 화면 맨 위는 브랜드만 남는다 */}
             <p className="mt-3 max-w-md break-keep text-[14px] leading-7 text-slate-600">
-              하이원포인트를 쓸 수 있는 지역 가맹점을 로그인 없이 찾아드려요. 가게 이름으로 찾거나
-              관심 지역·업종으로 좁혀 보고, 목록 순서도 이름·업종으로 바꿔 볼 수 있어요.
+              로그인 없이 하이원포인트 사용처를 간편하게 찾아보세요. 하이원리조트 주변의 다양한
+              맛집과 즐길거리에서 여행의 특별함을 더해보세요!
             </p>
             {/* 검색은 필터보다 위에 온다 — 갈 곳을 이미 아는 사람은 지역·업종을 거치지 않는다.
                 limit은 넘기지 않는다: 새 검색은 첫 페이지부터 보는 게 맞다 */}

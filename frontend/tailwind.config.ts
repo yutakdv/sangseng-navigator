@@ -54,6 +54,11 @@ const config: Config = {
         visitor: {
           primary: "#166534",
           "primary-soft": "#dcfce7",
+          /**
+           * `primary-soft`보다 한 단 짙은 파스텔 — 로고 바처럼 **면 자체가 블록이 되는** 자리에
+           * 쓴다. #dcfce7은 배지·배너 배경이라 넓게 깔면 흰 패널과 거의 붙어 보인다.
+           */
+          "primary-soft-deep": "#c6e9d3",
           accent: "#15803d",
           bg: "#ffffff",
           /**
