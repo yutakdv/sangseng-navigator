@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { cache } from "react";
 import { notFound } from "next/navigation";
 import { AdminShell } from "@/components/AdminShell";
 import { AssumptionBadge, AssumptionNote, NarrativeSourceChip, ProxyBadge } from "@/components/Badge";
@@ -34,8 +35,29 @@ export async function generateMetadata({
   params: Promise<{ id: string }>;
 }): Promise<Metadata> {
   const { id } = await params;
+  /**
+   * 없는 카드는 여기서 걸러야 **응답 코드까지** 404가 된다 — 본문에서 notFound()를 부르면
+   * loading.tsx가 이미 200으로 셸을 흘려보낸 뒤라 상태 코드를 바꿀 수 없고, 제목도
+   * "AC-999 제안 근거"로 남아 없는 카드가 있는 것처럼 읽힌다.
+   * BE 장애(404 외 오류)는 여기서 판단하지 않고 본문의 에러 경계로 넘긴다.
+   */
+  if (!(await getCard(id))) notFound();
   return { title: `${id} 제안 근거 · 상생 나침반` };
 }
+
+/**
+ * 카드 한 장 — generateMetadata와 본문이 같은 요청 안에서 한 번만 부르도록 캐시한다.
+ * 404는 "없는 카드"라 undefined로 접고, 그 밖의 오류는 본문 에러 경계로 던진다.
+ */
+const getCard = cache(async (id: string) =>
+  api
+    .card(id)
+    .then((r) => r.card)
+    .catch((error) => {
+      if (error instanceof ApiError && error.status === 404) return undefined;
+      throw error;
+    }),
+);
 
 /**
  * ② 카드 상세 (docs/plan/08 F4 · 03 문서 구조) — 데모 3·4·5단계.
@@ -61,14 +83,7 @@ export default async function CardDetailPage({
   const [dashboard, cand, card, progressResult] = await Promise.all([
     api.dashboard(),
     api.candidates(),
-    api
-      .card(id)
-      .then((r) => r.card)
-      // 실 API의 404는 장애가 아니라 "없는 카드"다 — 에러 화면 대신 Next의 not-found로 넘긴다
-      .catch((error) => {
-        if (error instanceof ApiError && error.status === 404) return undefined;
-        throw error;
-      }),
+    getCard(id),
     api.progressRecords(id).catch((error) => {
       if (error instanceof ApiError && error.status === 404) {
         return { records: [], next_cursor: null };
@@ -298,13 +313,18 @@ export default async function CardDetailPage({
             icon="report"
             title={`추진 경과 기록 · ${progressResult.records.length}건`}
             desc="상태 변경 근거, 장애 요인, 다음 행동과 실제 관측 성과를 최신 기록부터 보여 줍니다. 빠른 상태 변경은 메모 없음으로 구분합니다."
+            /* 기록이 0건이면 아래 타임라인의 빈 상태가 "첫 기록 입력"으로 같은 곳을 가리킨다 —
+               같은 화면에 같은 목적지 버튼을 둘 두면 어느 쪽이 정식 입구인지 흐려진다.
+               기록이 있을 때만 머리에 두고, 없을 때는 빈 상태 하나로 모은다 */
             right={
-              <Link
-                href={`/tracking/new?card_id=${encodeURIComponent(card.id)}`}
-                className="inline-flex min-h-9 items-center gap-1.5 rounded-xl bg-admin-primary px-3.5 py-2 text-xs font-bold text-white hover:bg-admin-primary-strong"
-              >
-                기록 입력 <Icon name="arrowRight" size={13} />
-              </Link>
+              progressResult.records.length ? (
+                <Link
+                  href={`/tracking/new?card_id=${encodeURIComponent(card.id)}`}
+                  className="inline-flex min-h-9 items-center gap-1.5 rounded-xl bg-admin-primary px-3.5 py-2 text-xs font-bold text-white hover:bg-admin-primary-strong"
+                >
+                  기록 입력 <Icon name="arrowRight" size={13} />
+                </Link>
+              ) : null
             }
           >
             <ProgressRecordTimeline
