@@ -9,18 +9,19 @@ import type { Recommendation } from "@/types";
  * 화면 기능을 붙이는 쪽을 택한 것이고, 그 대가로 검색·정렬의 사정거리가 받아온 목록(최대
  * MAX_LIST_LIMIT)까지로 제한된다 — 그 이상이 필요해지면 BE에 파라미터를 추가해야 한다.
  */
-export type SortKey = "dist" | "name" | "category";
+export type SortKey = "name" | "category";
 
 export const SORT_OPTIONS: { key: SortKey; label: string }[] = [
-  // 첫 항목이 기본값 — 서버가 주는 순서 그대로다
-  { key: "dist", label: "거점 직선거리순" },
+  // 첫 항목이 기본값이다
   { key: "name", label: "가나다순" },
   { key: "category", label: "업종순" },
 ];
 
-/** 쿼리로 들어온 값이 계약에 없으면 기본 정렬로 되돌린다 */
+/** 기본 정렬 — URL에 sort가 없거나 계약에 없는 값이 오면 이걸로 본다 */
+export const DEFAULT_SORT: SortKey = SORT_OPTIONS[0].key;
+
 export const sortKeyOf = (raw?: string): SortKey =>
-  SORT_OPTIONS.some((o) => o.key === raw) ? (raw as SortKey) : "dist";
+  SORT_OPTIONS.some((o) => o.key === raw) ? (raw as SortKey) : DEFAULT_SORT;
 
 export const sortLabelOf = (key: SortKey): string =>
   SORT_OPTIONS.find((o) => o.key === key)?.label ?? SORT_OPTIONS[0].label;
@@ -56,9 +57,6 @@ export function particle(word: string, withJong: string, withoutJong: string): s
 const CATEGORY_ORDER = new Map<string, number>(CATEGORIES.map((c, i) => [c as string, i]));
 
 export function sortRecommendations(list: Recommendation[], key: SortKey): Recommendation[] {
-  // 거리 정렬은 서버 응답 순서가 곧 정답이다 — `Recommendation`에 distance 필드가 없어
-  // FE가 다시 계산할 수도 없고, 할 필요도 없다 (backend/app/routes/widget.py의 haversine 정렬)
-  if (key === "dist") return list;
   const byName = (a: Recommendation, b: Recommendation) => a.name.localeCompare(b.name, "ko");
   if (key === "name") return [...list].sort(byName);
   return [...list].sort((a, b) => {
@@ -68,13 +66,13 @@ export function sortRecommendations(list: Recommendation[], key: SortKey): Recom
 }
 
 /**
- * 목록 아래 한 줄 설명.
+ * 목록 아래 한 줄 설명 — 지금 무슨 순서로 보고 있는지만 말한다.
  *
- * 기본 정렬에서는 서버가 준 `policy_note`가 정본이다. 사용자가 정렬을 바꾸면 그 문구
- * ("… 거점 직선거리 기준")가 화면 순서와 어긋나므로 현재 정렬을 말하는 문장으로 바꾼다.
+ * 서버가 주는 `policy_note`("완료된 확충 업종 우선 · 그 외 거점 직선거리 기준")는 쓰지 않는다.
+ * 그건 **어느 가맹점을 골라 담았는지**에 대한 설명인데, 화면의 나열 순서는 사용자가 고른
+ * 정렬이라 그대로 붙이면 순서와 문구가 어긋난다. 선정 기준은 "이 서비스는요" 블록에서 말한다.
  */
-export function listNote(key: SortKey, policyNote: string, hasFresh: boolean): string {
-  if (key === "dist") return policyNote;
+export function listNote(key: SortKey, hasFresh: boolean): string {
   const freshClause = hasFresh ? " · 완료된 확충 업종은 위에 따로 모아 보여드려요" : "";
   return key === "name"
     ? `가맹점 이름 가나다순${freshClause}`

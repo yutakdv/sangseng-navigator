@@ -19,6 +19,7 @@ import { CATEGORIES, REGIONS, REGION_TOOLTIP, VISITOR_SOURCE_NOTE } from "@/lib/
 import { kstWeekdayIndex, todayPickCopy, weekdayFact } from "@/lib/todayPick";
 import { fetchNowcast } from "@/lib/weather";
 import {
+  DEFAULT_SORT,
   filterByName,
   listNote,
   normalizeQuery,
@@ -70,7 +71,7 @@ const href = (next: Search, current: Search): string => {
   if (merged.limit) params.set("limit", merged.limit);
   if (merged.q) params.set("q", merged.q);
   // 기본 정렬은 URL에 남기지 않는다 — 공유된 주소가 짧고, 기본값이 바뀌어도 링크가 따라온다
-  if (merged.sort && merged.sort !== "dist") params.set("sort", merged.sort);
+  if (merged.sort && merged.sort !== DEFAULT_SORT) params.set("sort", merged.sort);
   // 라이브 미리보기(데모)는 필터를 눌러도 꺼지지 않아야 한다
   if (merged.live) params.set("live", merged.live);
   const qs = params.toString();
@@ -100,13 +101,16 @@ export default async function WidgetPage({ searchParams }: { searchParams: Promi
   };
   const filters: Search = { region, category, live, q: query, sort };
   /**
-   * 검색·비기본 정렬은 목록 전체를 손에 들고 있어야 맞는 결과가 나온다 — 12곳만 받아 놓고
-   * 이름으로 걸러 내면 "87곳 중에 없다"가 아니라 "앞 12곳 안에 없다"를 보여 주게 된다.
-   * 그래서 그때만 상한까지 받아 온다 (05 §1에 검색·정렬 파라미터가 없어서 FE에서 처리한다).
+   * 목록은 항상 상한까지 받아 온다.
+   *
+   * 05 §1에 검색·정렬 파라미터가 없어 둘 다 FE에서 처리하는데, 12곳만 받아 놓고 이름으로
+   * 걸러 내면 "87곳 중에 없다"가 아니라 "앞 12곳 안에 없다"를 보여 주게 되고, 이름·업종
+   * 정렬도 앞 12곳 안에서만 도는 반쪽 정렬이 된다. 서버가 담아 주는 순서(거점 직선거리)가
+   * **무엇을 담을지**를 정하고, 담긴 것을 어떤 순서로 볼지는 여기서 정한다.
    */
-  const fetchLimit = query || sort !== "dist" ? MAX_LIST_LIMIT : listLimit;
+  const fetchLimit = MAX_LIST_LIMIT;
 
-  const [{ recommendations, policy_note, total }, dashboard, cand, incentiveRes, usageDaily, weather] =
+  const [{ recommendations, total }, dashboard, cand, incentiveRes, usageDaily, weather] =
     await Promise.all([
       api.widget(region, category, fetchLimit),
       // 푸터 "데이터 기준" 한 줄 전용 — 이 엔드포인트만 죽어도 방문객 위젯 전체가 에러 화면이
@@ -176,10 +180,17 @@ export default async function WidgetPage({ searchParams }: { searchParams: Promi
    * 맞는 수를 세는 게 맞다(받아 온 fetchLimit 범위 안에서 센다 — 그 밖은 애초에 없다).
    */
   const matched = query ? filterByName(recommendations, query) : recommendations;
-  const shown = sortRecommendations(matched, sort).slice(0, listLimit);
+  const sorted = sortRecommendations(matched, sort);
+  /**
+   * 자르기 **전에** 확충 섹션을 먼저 갈라 낸다 — 이름·업종 정렬을 목록 전체에 적용하면 확충
+   * 가맹점이 표시 개수 밖으로 밀려 "이번 분기에 무엇이 새로 생겼는지"가 첫 화면에서 사라진다.
+   * 서버가 확충 업종을 우선해 담아 주는 뜻(05 §1 policy_note)을 화면에서도 지키고, 정렬은
+   * 각 묶음 안에서만 돌게 한다.
+   */
+  const fresh = sorted.filter((r) => r.badge).slice(0, listLimit);
+  const others = sorted.filter((r) => !r.badge).slice(0, Math.max(0, listLimit - fresh.length));
+  const shown = [...fresh, ...others];
   const shownTotal = query ? matched.length : total;
-  const fresh = shown.filter((r) => r.badge);
-  const others = shown.filter((r) => !r.badge);
 
   /** 필터 요약 칩 — 누르면 그 조건만 빠진다 */
   const summaryChips = [
@@ -256,15 +267,15 @@ export default async function WidgetPage({ searchParams }: { searchParams: Promi
               가치로 이어지다
             </p>
             <p className="mt-3 max-w-md break-keep text-[14px] leading-7 text-slate-600">
-              관심 지역과 업종을 선택하면 하이원리조트 거점에서 이동을 시작하기 좋은 순서로
-              하이원포인트 가맹점을 보여드려요.
+              관심 지역과 업종을 선택하면 하이원포인트를 쓸 수 있는 가맹점을 모아 보여드려요.
+              목록 순서는 이름·업종으로 바꿔 볼 수 있어요.
             </p>
             {/* 검색은 필터보다 위에 온다 — 갈 곳을 이미 아는 사람은 지역·업종을 거치지 않는다.
                 limit은 넘기지 않는다: 새 검색은 첫 페이지부터 보는 게 맞다 */}
             <div className="mt-6">
               <WidgetSearch
                 q={query}
-                hidden={{ region, category, live, sort: sort === "dist" ? undefined : sort }}
+                hidden={{ region, category, live, sort: sort === DEFAULT_SORT ? undefined : sort }}
                 clearHref={href({ q: undefined }, filters)}
               />
             </div>
@@ -312,15 +323,12 @@ export default async function WidgetPage({ searchParams }: { searchParams: Promi
             </div>
             <WidgetSort selected={sort} makeHref={(key: SortKey) => href({ sort: key }, current)} />
           </div>
-          {/* 추천 순서는 거점 직선거리 오름차순이지만 "가까운 순"으로 라벨링하지 않는다 —
-              직선거리가 산악 지형에서 실제 접근성과 역전되기 때문 (05 §1·§4).
-              기본 정렬에서는 policy_note를 그대로 노출하고, 사용자가 정렬을 바꾸면 그 문구가
-              화면 순서와 어긋나므로 listNote가 현재 정렬을 말하는 문장으로 바꾼다. */}
+          {/* 나열 순서는 사용자가 고른 정렬이 정본이라 그것만 말한다. 서버의 policy_note는
+              "무엇을 담았는지"에 대한 설명이라 여기 붙이면 순서와 어긋난다 — 선정 기준은
+              아래 "이 서비스는요" 블록에서 밝힌다 (거리를 "가까운 순"이라 단정하지 않는 것도
+              그 자리에서 지킨다 · 05 §1·§4). */}
           <p className="mt-1.5 break-keep text-xs leading-5 text-admin-text-muted">
-            {listNote(sort, policy_note, fresh.length > 0)}
-            {sort === "dist" ? (
-              <span className="block">산길에서는 실제 이동시간과 다를 수 있어요.</span>
-            ) : null}
+            {listNote(sort, fresh.length > 0)}
           </p>
 
           {shown.length === 0 ? (
@@ -405,8 +413,9 @@ export default async function WidgetPage({ searchParams }: { searchParams: Promi
                 하이원포인트로 결제할 수 있는 <b>지역 가맹점</b>을 지역·업종으로 찾아볼 수 있어요.
               </li>
               <li>
-                위치 권한을 사용하지 않으며, 추천 순서는 <b>하이원리조트 거점 직선거리</b>를 기준으로
-                합니다. 산악 지형에서는 실제 이동시간과 다를 수 있어요.
+                위치 권한을 사용하지 않아요. 목록에 담는 가맹점은 <b>하이원리조트 거점 직선거리</b>를
+                기준으로 골라요 — 산악 지형에서는 실제 이동시간과 다를 수 있어서, 화면에 나열하는
+                순서는 이름·업종 중에서 직접 고르시게 했어요.
               </li>
               <li>
                 <b>이번 분기 확충 업종</b> 배지는 지역상생팀이 확충을 완료한 업종과 연결된 가맹점이에요.
