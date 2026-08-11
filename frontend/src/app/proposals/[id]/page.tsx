@@ -76,8 +76,10 @@ export default async function ProposalDetailPage({ params }: { params: Promise<{
             ranking={evidence.ranking}
             dashboard={dashboard}
             leadBadge={
+              /* 결정 후에는 "승인 전 검토 대상"이 옆의 상태 칩과 모순된다 — 결정 종류(승인·반려·보류)는
+                 상태 칩이 말하므로 여기는 AI 제안 출처만 중립적으로 남긴다 */
               <span className="rounded-md bg-admin-primary px-2.5 py-1 text-xs font-bold text-white">
-                AI 제안 · 승인 전 검토 대상
+                {card.status === "pending" ? "AI 제안 · 승인 전 검토 대상" : "AI 제안 · 담당자 결정 완료"}
               </span>
             }
           />
