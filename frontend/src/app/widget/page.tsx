@@ -284,6 +284,7 @@ export default async function WidgetPage({ searchParams }: { searchParams: Promi
               </p>
               <Link
                 href={href({ limit: String(Math.min(MAX_LIST_LIMIT, listLimit + DEFAULT_LIST_LIMIT)) }, current)}
+                scroll={false}
                 className="inline-flex min-h-10 items-center rounded-xl bg-visitor-primary px-3.5 text-[13px] font-bold text-white shadow-[0_6px_16px_-8px_rgb(22_101_52_/_0.75)]"
               >
                 가맹점 더 보기
@@ -292,6 +293,7 @@ export default async function WidgetPage({ searchParams }: { searchParams: Promi
           ) : recommendations.length > DEFAULT_LIST_LIMIT ? (
             <Link
               href={href({}, filters)}
+              scroll={false}
               className="mt-5 inline-flex min-h-10 items-center rounded-xl bg-slate-100 px-3.5 text-[13px] font-bold text-admin-text-muted ring-1 ring-inset ring-slate-200"
             >
               목록 접기
