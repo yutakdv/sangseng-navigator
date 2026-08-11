@@ -16,7 +16,7 @@
 
 ## Global Constraints (모든 태스크 공통 — docs/plan/README 제약에 추가)
 
-- **개발 중 AWS 배포 금지** — 테스트는 전부 Docker/로컬. `sam deploy`는 T17에서만
+- **개발 중 AWS 배포 금지** — 테스트는 전부 Docker/로컬. `./infra/scripts/deploy.sh` 는 T17에서만
 - **Claude 저자 표기 금지** — 커밋 트레일러·PR 푸터에 Co-Authored-By/Generated 문구 넣지 않음 (CLAUDE.md)
 - 브랜치 규칙: 태스크(또는 인접 태스크 묶음)마다 `feat/<이름>-<주제>` → PR → 스모크 확인 후 셀프 머지 가능 (03 §협업)
 - 파이프라인 실행은 항상 `.venv`(Python 3.12): `source .venv/bin/activate` 후 `cd pipeline`
@@ -28,7 +28,7 @@
 | 완료 | 내용 |
 |---|---|
 | Phase 0 | CSV 3종 `data/raw/` 커밋, COLMAP 실측 확정, OpenAI 키 검증, Kakao 키+카카오맵 활성화 검증(사북읍 주소 → 37.2267/128.8164), GitHub 초기 커밋·push |
-| Phase 1 | backend 골격(`/api/health` 스모크 통과), infra SAM 템플릿(`sam validate`·`build` 통과), pipeline 골격 |
+| Phase 1 | backend 골격(`/api/health` 스모크 통과), infra CloudFormation 2스택(`validate-template` 통과), pipeline 골격 |
 | Phase 2 일부 | **P1**(usage_monthly.json — 12개월×18업종 507,628건, 정선군=잔여지역 판정) · **P7**(risk_signal.json — 4개 시군구 14.6~15.1%) — 멀티에이전트 독립 재계산 검증 통과 |
 | 보류 | AWS 배포(IAM 권한 — T17 Step 1에서 해소), Vercel 연결(frontend 생성 후 — T15/T17) |
 
@@ -170,7 +170,7 @@ services:
       AWS_DEFAULT_REGION: ap-northeast-2
     volumes:
       - ./backend/app:/app/app                    # 코드 핫리로드
-      - ./data/processed:/app/app/data:ro         # Lambda 번들과 동일 경로에 정적 JSON
+      - ./data/processed:/app/app/data:ro         # ECS 이미지와 동일 경로(/app/app/data)
     depends_on: [dynamodb]
     command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
 ```
@@ -295,23 +295,28 @@ _table = boto3.resource("dynamodb", **_kw).Table(os.environ.get("CARDS_TABLE") o
 
 - [ ] **Step 1 (전날까지, 유탁 수동):** AWS 콘솔(관리자 권한)에서 IAM → 사용자 `Yutak_trading` →
       [권한 추가] → **`AdministratorAccess` 정책 한시 부착** (04 §5 후주 — 개인 계정·캠프 기간 한정).
-      인라인 정책 나열 방식은 SAM 배포 필수 권한(iam:CreateRole·PassRole, lambda:*, s3:*, logs:*)
-      누락 리스크로 폐기 (15 §3-2). **캠프 종료 후 콘솔에서 정책 분리(회수) 필수.**
+      배포 전용 IAM 사용자 `sangseng-deployer`(PowerUserAccess + `role/sangseng-*` 생성 인라인 정책)와
+      로컬 프로필 `sangseng` 을 쓴다. **IAM 자원 생성(OIDC 공급자·배포 역할)은 이 사용자로 안 되므로
+      관리자 프로필로 `bootstrap-github-oidc.sh` 를 1회 실행한다.**
 
-- [ ] Step 2: `.env`에 배포 파라미터 2종을 넣고 `cd infra && ./deploy-backend.sh` → Outputs의
-      `ApiUrl`·`CardsTable` 기록
-      - `ALLOWED_ORIGINS=https://<project>.vercel.app,http://localhost:3100` — 앱 CORS 허용 도메인.
-        Vercel 도메인은 F1 머지 직후 첫 Deploy에서 이미 확정돼 있다(T15). 비우면 `*` 유지 (09 §5)
-      - `RESERVED_CONCURRENCY` — 생략하면 template Default **5**가 적용된다(무인증 공개 URL의
-        LLM 호출 남용 상한, 09 §5.5). 동시성 한도 부족으로 배포가 실패하면 `-1`로 재시도
-- [ ] Step 3: `.env`의 `CARDS_TABLE=`에 Outputs 값 → **실 DDB로** `python backend/seed_demo.py --reset`
+- [ ] Step 2: `.env` 에 `DEMO_READ_ONLY`·`MUTATION_API_TOKEN`·`OPENAI_API_KEY` 를 채우고
+      `./infra/scripts/deploy.sh` → 출력된 `ApiUrl` 기록 (첫 배포 20~30분, 09 §1)
+      - `ALLOWED_ORIGINS=https://<project>.vercel.app` — 앱 CORS 허용 도메인. 배포 기본값은 빈 목록이라
+        미설정이 전체 허용으로 새지 않는다. 도메인 확정 후 채우고 재배포한다 (09 §5)
+      - LLM 남용 상한은 API Gateway 스테이지 스로틀링(rate 10 / burst 20)이 담당한다 (09 §8)
+- [ ] Step 3: 테이블 이름은 `sangseng-cards`·`sangseng-progress-records` 로 고정돼 있다 →
+      **실 DDB로** 시드: `cd backend && CARDS_TABLE=sangseng-cards PROGRESS_RECORDS_TABLE=sangseng-progress-records
+      AWS_PROFILE=sangseng AWS_DEFAULT_REGION=ap-northeast-2 python seed_demo.py --reset`
       (DYNAMO_ENDPOINT 미설정 = 실 AWS)
-- [ ] Step 4: `curl $ApiUrl/api/health` → `{"ok":true,"data_loaded":true,"datasets":{...}}` —
-      `datasets` 5종이 전부 `true`인지까지 확인(번들 복사 누락 조기 발견, 05 §5) + dashboard·cards 스모크
-- [ ] Step 5: Vercel — 프로젝트 [Settings] > [Environment Variables]에 `NEXT_PUBLIC_API_BASE=$ApiUrl` (Production+Preview) → **Production 재배포** → 배포 URL 기록 (04 §6; Import·첫 Deploy는 F1 머지 직후 완료됨 — 15 §7)
+- [ ] Step 4: `smoke-test.sh` 가 자동 검증한다 — `/api/health` datasets 전부 `true`,
+      `/api/health/ready` 200, Authorization 왕복(무토큰 401 / 유토큰 200), DynamoDB Gateway Endpoint 경로
+- [ ] Step 5: Vercel — [Settings] > [Environment Variables]에 `NEXT_PUBLIC_API_BASE=$ApiUrl`(끝 슬래시 없이)·
+      `API_MUTATION_TOKEN`·`NEXT_PUBLIC_DEMO_READ_ONLY`·`DATA_GO_KR_API_KEY`·`NEXT_PUBLIC_KAKAO_MAP_KEY`
+      를 Production+Preview 양쪽에 등록 → **Redeploy** → 배포 URL 기록 (09 §2).
+      `x-vercel-id` 둘째 칸이 `icn1` 인지 확인한다
 - [ ] Step 6: 배포 URL에서 11 §1 리허설 ×10 (Safari·휴대폰 실기기 포함), 09 §5 CORS 검증
-      (`AllowedOrigins` 파라미터 하나가 게이트웨이·앱 두 층을 함께 좁힌다 — API Gateway가 Lambda의
-      CORS 헤더를 덮으므로 게이트웨이 값이 실제 효력이다. `get-api`로 실값 확인)·§5.5 워밍 룰(선택)
+      (CORS 정본은 앱의 `ALLOWED_ORIGINS` 다 — API Gateway 에는 CORS 설정을 두지 않는다.
+      모든 호출이 Vercel 서버에서 오는 서버-대-서버라 브라우저 프리플라이트가 없다)
 - [ ] Step 6-1: 실 DDB에서 INCENTIVE 카드 승인 왕복 1회 후 `scenarios[].delta_pp`가 `[1.0, 2.0]`
       float로 남는지 확인 (DynamoDB Local에서만 검증된 동작 — `backend/app/db.py` `_clean` 주석)
 - **Gate:** 01 성공 기준 전항 + 12 §6 체크리스트 전항
@@ -320,7 +325,7 @@ _table = boto3.resource("dynamodb", **_kw).Table(os.environ.get("CARDS_TABLE") o
 
 - [ ] 12 §4 절차로 Public 전환(시크릿 스캔 → 개인정보 파일 확인 → 전환) → §3 문안으로 제출 양식 기재
 - [ ] 대표 스크린샷(허브 1920×1080) 캡처·제출, `git tag submission-final`, main 동결
-- [ ] 심사 기간: 12 §5 운영 모드 (시드 리셋·Billing 알림·`sam delete` 금지)
+- [ ] 심사 기간: 12 §5 운영 모드 (시드 리셋·Billing 알림·`ON_DEMAND_BASE_COUNT=1`·`teardown.sh` 금지)
 
 ---
 

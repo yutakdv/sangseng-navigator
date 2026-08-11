@@ -1,15 +1,14 @@
 # 07. 백엔드 + AI 태스크 (유탁 · Phase 3~5)
 
-> FastAPI 하나로 로컬(uvicorn)과 Lambda(Mangum)를 겸한다. 응답 형태와 엣지 케이스 규칙은
-> 05 문서(특히 §8)가 정본. LLM 분기는 `llm.py` 한 곳, 프롬프트는 `prompts.py` 한 곳(부록 A 원문).
+> FastAPI 를 로컬·컨테이너 양쪽에서 uvicorn 으로 **동일하게** 실행한다. 응답 형태와 엣지 케이스
+> 규칙은 05 문서(특히 §8)가 정본. LLM 호출은 `llm.py` 한 곳, 프롬프트는 `prompts.py` 한 곳(부록 A 원문).
 >
-> **의존성 원칙:** `backend/requirements.txt`는 `fastapi, mangum, boto3, python-dotenv,
-> openai, anthropic`만. **pandas·numpy 금지** — 백엔드는 JSON을 읽고 사칙연산만 하면 되고,
-> 무거운 패키지는 Lambda 번들 크기·콜드스타트를 악화시킨다 (계산은 파이프라인 소관).
-> `uvicorn`·`pytest`·`httpx2`는 **`requirements-dev.txt`** 쪽이다 — Lambda는 Mangum 핸들러라
-> uvicorn이 필요 없다. 그래서 로컬에서 `uvicorn app.main:app`이나 `pytest`를 돌리려면
-> `.venv/bin/pip install -r backend/requirements-dev.txt`를 **한 번은 해야 한다**
-> (Docker는 Dockerfile이 uvicorn을 따로 설치하므로 무관).
+> **의존성 원칙:** `backend/requirements.txt`는 `fastapi, uvicorn[standard], boto3,
+> python-dotenv, openai`만. **pandas·numpy 금지** — 백엔드는 JSON을 읽고 사칙연산만 하면 되고,
+> 무거운 패키지는 이미지 크기·빌드 시간을 악화시킨다 (계산은 파이프라인 소관).
+> `pytest`·`httpx`는 **`requirements-dev.txt`** 쪽이다 — 런타임 이미지를 테스트 도구로 오염시키지 않는다.
+> 로컬에서 `pytest`를 돌리려면 `.venv/bin/pip install -r backend/requirements-dev.txt` 를
+> **한 번은 해야 한다**.
 
 ## Task B1: FastAPI 스캐폴딩 + 정적 데이터 서빙
 
@@ -28,17 +27,16 @@ if not os.environ.get("AWS_LAMBDA_FUNCTION_NAME"):      # 로컬에서만 .env �
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
-from mangum import Mangum
 
 from app.routes import cards, dashboard, kpi, widget
 
-# 배포 URL 확정 후 09 문서 §5에서 좁힌다 — 코드 수정 없이 SAM 파라미터(환경변수)만 바꾸면 되게
+# 배포 URL 확정 후 09 문서 §5에서 좁힌다 — 코드 수정 없이 CloudFormation 파라미터(환경변수)만 바꾸면 되게
 # 쉼표 구분 목록으로 받는다. 미설정·빈 값이면 지금까지와 같은 전체 허용("*").
 ALLOWED_ORIGINS = [o.strip() for o in os.environ.get("ALLOWED_ORIGINS", "*").split(",") if o.strip()] or ["*"]
 
-# 로깅: Lambda·로컬 양쪽에서 app 로거(LLM 실패 경고 등)가 보이도록 최소 설정만 한다.
+# 로깅: 컨테이너 stdout 을 awslogs 드라이버가 CloudWatch 로 보낸다. 로컬에서도 같은 로거가 보인다.
 LOG_LEVEL = os.environ.get("LOG_LEVEL", "INFO")
-if not logging.getLogger().handlers:    # uvicorn·Lambda가 이미 붙인 핸들러는 덮지 않는다
+if not logging.getLogger().handlers:    # uvicorn 이 이미 붙인 핸들러는 덮지 않는다
     logging.basicConfig(level=LOG_LEVEL)
 logging.getLogger("app").setLevel(LOG_LEVEL)
 
@@ -71,8 +69,6 @@ def health():
             "data_loaded": all(datasets[n] for n in REQUIRED_DATASETS),
             "datasets": datasets}
 
-
-handler = Mangum(app)   # Lambda 진입점
 ```
 
 ```python
@@ -81,13 +77,14 @@ import functools
 import json
 from pathlib import Path
 
-# processed 를 먼저 본다 — app/data 는 deploy-backend.sh 가 만든 번들 사본이라 로컬에 옛 산출이
-# 남아 있으면 최신 data/processed 를 가린다. 배포 환경에는 레포 루트가 없어 첫 경로가 빗나가고
-# 번들 경로로 정상 폴백한다(Lambda·Docker 모두 첫 경로가 존재하지 않는 절대경로로 풀린다).
+# processed 를 먼저 본다 — app/data 는 build-and-push.sh 가 만든 이미지 사본이라 로컬에 옛 산출이
+# 남아 있으면 최신 data/processed 를 가린다. 컨테이너에는 레포 루트가 없어 첫 경로가 빗나가고
+# 이미지 경로로 정상 폴백한다(첫 경로가 존재하지 않는 절대경로 /data/processed 로 풀린다).
+# ⚠ 그래서 이미지·태스크 정의에 /data 디렉터리나 볼륨을 만들면 안 된다 — 이미지에 구운 사본을 가린다.
 # Docker 는 data/processed 를 app/data 에 마운트하므로 어느 쪽을 읽든 내용이 같다.
 CANDIDATE_DIRS = [
     Path(__file__).parents[2] / "data" / "processed",    # 로컬 개발 — 파이프라인 최신 산출
-    Path(__file__).parent / "data",                      # Lambda 번들 / Docker 마운트 지점
+    Path(__file__).parent / "data",                      # 컨테이너 이미지 / Docker 마운트 지점
 ]
 
 
@@ -106,11 +103,11 @@ def load(name: str) -> dict | list:      # candidates·merchants·risk_signal �
 - `load()` 반환 타입 `dict` → **`dict | list`**: `candidates`·`merchants`·`risk_signal`은 최상위가 배열이다
 - `loaded_ok()` **삭제** — `health`가 산출물 5종을 개별 확인하게 되면서 유일한 호출부가 사라졌다
 - `health`가 산출물 5종을 개별 보고(`datasets`)하고 `data_loaded`는 **필수 4종 AND** (05 §5)
-- CORS `allow_origins`를 **`ALLOWED_ORIGINS` 환경변수**로 받음 — 배포 후 코드 수정 없이 SAM 파라미터만
+- CORS `allow_origins`를 **`ALLOWED_ORIGINS` 환경변수**로 받음 — 배포 후 코드 수정 없이 CFN 파라미터만
   바꿔 좁히기 위함 (09 §5)
 - **GZip 미들웨어 추가**(`minimum_size=1000`) — `/api/candidates` 285KB → 44KB(실측).
   CORS가 바깥이어야 에러 응답에도 CORS 헤더가 붙으므로 GZip을 먼저 add한다
-- `logging` 최소 설정 — Lambda(CloudWatch)뿐 아니라 로컬/Docker에서도 `app` 로거(LLM 실패 경고)가 보이게
+- `logging` 최소 설정 — 컨테이너(awslogs→CloudWatch)뿐 아니라 로컬/Docker에서도 `app` 로거가 보이게
 
 - [ ] `GET /api/dashboard` → `load("dashboard")` 그대로 반환
 - [ ] `GET /api/candidates` → `eup_scores` + `candidates` + `merchants` 병합 반환 (05 §1)
@@ -251,15 +248,16 @@ provider 분기는 이 파일 안에만 존재. 두 provider 모두 **JSON 스�
 import os, json, re, time, logging
 
 log = logging.getLogger(__name__)
-# Lambda 런타임이 root 로거에 INFO 핸들러를 붙이므로 아래 log.info는 CloudWatch에 그대로 남는다.
+# 컨테이너 stdout 이 awslogs 로 흘러가므로 아래 log.info 는 CloudWatch 에 그대로 남는다.
 # 발표 Q&A("AI 응답 몇 초 걸리나") 근거 + 심사 기간 중 API 키 만료·rate limit을 로그로 감지하기 위함.
 
 RETRY_BACKOFF_SECONDS = 0.5
-# 재시도 사이 고정 대기. 최악 지연 = cardgen timeout 12s × 2회 + backoff 0.5s = 24.5s < Lambda 30s
+# 재시도 사이 고정 대기. 최악 지연 = cardgen timeout 12s × 2회 + backoff 0.5s = 24.5s
+# < API Gateway HTTP API 통합 타임아웃 30s(증액 불가)
 # (09 문서 Timeout: 30, cardgen.LLM_TIMEOUT=12). 마지막 시도 뒤에는 대기하지 않는다.
 # ⚠ 이 예산은 SDK 내부 재시도가 꺼져 있어야 성립한다 — 두 SDK 모두 기본 max_retries=2로
 # 타임아웃·429·5xx를 자체 재시도해, 막지 않으면 앱 시도 1회가 timeout×3(≈37.5s)까지 늘어나
-# 폴백 도달 전에 Lambda가 죽는다. 그래서 아래 클라이언트 생성에 max_retries=0을 명시한다.
+# 폴백 도달 전에 게이트웨이가 504로 끊는다. 그래서 아래 클라이언트 생성에 max_retries=0을 명시한다.
 
 # 인증 실패 응답에는 SDK가 부분 마스킹한 키가 그대로 들어 있다
 # (예: "Incorrect API key provided: sk-proj-****ABCD"). 로그·트레이스백에 남기지 않는다.
@@ -281,58 +279,33 @@ def generate_json(system: str, user: str, schema: dict, schema_name: str = "resu
     쓰지 않고 결정론 문구만 반환하므로(routes/widget.py `_fallback_blurb`) 여기 해당하지 않는다.
     지연 상한이 더 중요한 호출부가 생기면 attempts=1 로 재시도를 끄고 fallback 으로 넘긴다.
     """
-    provider = os.environ.get("LLM_PROVIDER", "openai")
-    if provider not in {"openai", "anthropic"}:
-        # 오타를 OpenAI로 조용히 처리하면 배포 환경에서 의도하지 않은 provider·키를 사용한다.
-        # 호출부는 LLMError를 받아 규칙 기반 fallback으로 전환하므로 사용자 흐름은 끊기지 않는다.
-        raise LLMError(f"Unsupported LLM_PROVIDER: {provider}")
-    model = (os.environ.get("ANTHROPIC_MODEL", "claude-sonnet-5") if provider == "anthropic"
-             else os.environ.get("OPENAI_MODEL", "gpt-4o-mini"))
+    model = os.environ.get("OPENAI_MODEL", "gpt-4o-mini")
     attempts = max(1, attempts)     # 0 이하면 아래 raise last_exc 가 None을 raise 하므로 최소 1회는 돈다
     last_exc: Exception | None = None
     started = time.perf_counter()   # 소요시간은 호출 전체(재시도·backoff 포함) 기준
     for attempt in range(1, attempts + 1):
         try:
-            if provider == "anthropic":
-                import anthropic
-                client = anthropic.Anthropic(max_retries=0)   # 재시도는 이 함수의 attempts가 전담 (위 예산 주석)
-                # timeout 미지정(None)이면 SDK 기본 타임아웃을 그대로 쓴다 — 명시적으로 None을
-                # 넘기면 SDK가 "타임아웃 없음(무한 대기)"으로 해석한다.
-                extra = {"timeout": timeout} if timeout is not None else {}
-                resp = client.messages.create(
-                    model=model,
-                    max_tokens=4096,
-                    system=system,
-                    messages=[{"role": "user", "content": user}],
-                    thinking={"type": "disabled"},  # sonnet-5는 기본 adaptive thinking — 짧은 JSON 생성엔 지연만 늘어 끔 (Lambda 30s 내 응답 보장)
-                    output_config={"format": {"type": "json_schema", "schema": schema}},
-                    **extra,
-                )
-                text = next(b.text for b in resp.content if b.type == "text")
-                out = json.loads(text)
-            else:
-                # 기본: openai
-                from openai import OpenAI
-                client = OpenAI(max_retries=0)   # 재시도는 이 함수의 attempts가 전담 (위 예산 주석)
-                if timeout is not None:     # with_options(timeout=None)은 "무한 대기"가 된다
-                    client = client.with_options(timeout=timeout)
-                resp = client.chat.completions.create(
-                    model=model,
-                    messages=[{"role": "system", "content": system}, {"role": "user", "content": user}],
-                    response_format={"type": "json_schema",
-                                     "json_schema": {"name": schema_name, "schema": schema, "strict": True}},
-                )
-                out = json.loads(resp.choices[0].message.content)
-            log.info("llm ok provider=%s model=%s schema=%s attempt=%d/%d elapsed=%.2fs",
-                     provider, model, schema_name, attempt, attempts, time.perf_counter() - started)
+            from openai import OpenAI
+            client = OpenAI(max_retries=0)   # 재시도는 이 함수의 attempts가 전담 (위 예산 주석)
+            if timeout is not None:     # with_options(timeout=None)은 "무한 대기"가 된다
+                client = client.with_options(timeout=timeout)
+            resp = client.chat.completions.create(
+                model=model,
+                messages=[{"role": "system", "content": system}, {"role": "user", "content": user}],
+                response_format={"type": "json_schema",
+                                 "json_schema": {"name": schema_name, "schema": schema, "strict": True}},
+            )
+            out = json.loads(resp.choices[0].message.content)
+            log.info("llm ok model=%s schema=%s attempt=%d/%d elapsed=%.2fs",
+                     model, schema_name, attempt, attempts, time.perf_counter() - started)
             return out
         except Exception as exc:
             last_exc = exc
             if attempt < attempts:
                 time.sleep(RETRY_BACKOFF_SECONDS)
     cause = redact(f"{type(last_exc).__name__}: {last_exc}")
-    log.info("llm fail provider=%s model=%s schema=%s attempts=%d elapsed=%.2fs error=%s",
-             provider, model, schema_name, attempts, time.perf_counter() - started, cause)
+    log.info("llm fail model=%s schema=%s attempts=%d elapsed=%.2fs error=%s",
+             model, schema_name, attempts, time.perf_counter() - started, cause)
     raise LLMError(cause) from None     # 원인 체인을 끊어 마스킹 안 된 SDK 메시지가 새지 않게
 ```
 
@@ -340,13 +313,13 @@ def generate_json(system: str, user: str, schema: dict, schema_name: str = "resu
 - **재시도가 `attempts` 인자로 명시**(기본 2 = 최초+1회). 현재 호출부는 전부 기본값 —
   위젯 blurb는 2026-08-08 확정으로 LLM을 아예 쓰지 않는다 (05 §4 결정론 문구)
 - **`RETRY_BACKOFF_SECONDS = 0.5` backoff 추가** — 즉시 재시도는 rate limit을 그대로 다시 맞는다.
-  최악 지연이 Lambda Timeout 30s 안에 들어오는 계산을 상수 옆에 병기
-- **SDK 내부 재시도 차단(`max_retries=0`, 2026-08-09 감사 반영)** — 두 SDK 모두 기본 max_retries=2로
+  최악 지연이 API Gateway 통합 타임아웃 30s(증액 불가) 안에 들어오는 계산을 상수 옆에 병기
+- **SDK 내부 재시도 차단(`max_retries=0`, 2026-08-09 감사 반영)** — openai SDK 는 기본 max_retries=2로
   타임아웃·429·5xx를 자체 재시도해, 막지 않으면 위 예산 계산이 깨진다(앱 시도 1회 = timeout×3).
   재시도는 이 함수의 `attempts` 루프가 전담한다 (`tests/test_algorithms.py`가 회귀 방지)
-- **`LLM_PROVIDER` 오타는 즉시 `LLMError`** — 조용히 openai로 폴백하면 배포 환경에서 의도하지 않은
-  provider·키를 쓴다. 호출부의 규칙 기반 fallback이 이어받아 사용자 흐름은 끊기지 않는다
-- **호출 1건당 로그 1줄**(성공·실패 모두, provider·model·schema·소요시간) — 심사 기간에 키 만료·
+- **provider 는 OpenAI 단일이다** (2026-08-11). 초기에는 `LLM_PROVIDER` 로 Anthropic 과 택일했으나
+  실제로 쓰지 않아 환경변수째 제거했다 — 값이 하나뿐인 스위치는 설정 표면만 늘린다
+- **호출 1건당 로그 1줄**(성공·실패 모두, model·schema·소요시간) — 심사 기간에 키 만료·
   쿼터 초과를 알아챌 유일한 흔적이자 발표 Q&A("AI 응답 몇 초") 근거
 - **`timeout` 인자**: 호출부별 상한(cardgen 12초 / simulate 8초 / 위젯 5초). `None`이면 SDK 기본값을
   유지한다 — 두 SDK 모두 명시적 `None`을 "무한 대기"로 해석하므로 분기해서 넘긴다
@@ -456,7 +429,7 @@ CARD_AI_SCHEMA = {
 - [ ] **정렬 근거 2단계**(05 §4): ① `신규` 배지 먼저 ② 그다음 거점(`ANCHOR`) 직선거리 오름차순.
       좌표 없는 가맹점은 맨 뒤. **거리 값은 응답에도 blurb 프롬프트에도 싣지 않는다** —
       05 §1 캐비엇("거점에서 가장 가깝다고 단정하지 않는다")을 지키려고 정렬 근거로만 쓴다.
-      `ANCHOR` 좌표는 `pipeline/common.py`의 복제본이다(Lambda 번들에 pipeline 모듈이 없어 import 불가 —
+      `ANCHOR` 좌표는 `pipeline/common.py`의 복제본이다(컨테이너 이미지에 pipeline 모듈이 없어 import 불가 —
       `services/simulate.py`의 `REGIONS`·`HIGHONE_TO_DISPLAY`와 같은 이유·같은 취급)
 - [ ] blurb 생성 payload의 `작성 지침`에 "상호명에서 취급 품목·맛을 유추하지 말 것"을 넣는다 —
       A-4 프롬프트 원문은 그대로 두고(발표 공개용), 실호출에서 나온 메뉴 유추 문구를 여기서 막는다

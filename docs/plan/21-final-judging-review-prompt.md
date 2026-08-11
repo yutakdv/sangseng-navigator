@@ -109,17 +109,17 @@
 위에 배치**한다.
 
 1. **배포 URL이 존재하는가.** README:8이 플레이스홀더다. 심사가 배포 URL 접속으로 이뤄지는 이상,
-   이것이 없으면 총점은 0에 수렴한다. Vercel(FE)·SAM(BE) 배포가 실제로 돌았는지, `.env`와
-   `infra/deploy-backend.sh`의 가드 조건이 만족되는지 확인하라.
+   이것이 없으면 총점은 0에 수렴한다. Vercel(FE)·ECS(BE) 배포가 실제로 돌았는지, `.env`와
+   `infra/scripts/preflight.sh` 의 가드 조건이 만족되는지 확인하라.
 2. **배포 환경의 쓰기 동작이 열려 있는가.** 감사 H1의 핵심이다. `DEMO_READ_ONLY`와
-   `MUTATION_API_TOKEN`이 Lambda와 Vercel 양쪽에 **같은 값으로** 들어가야 한다. 코드 수정은 끝났지만
+   `MUTATION_API_TOKEN`이 SSM 과 Vercel 양쪽에 **같은 값으로** 들어가야 한다. 코드 수정은 끝났지만
    **Vercel 대시보드 환경변수 등록은 사람이 하는 수동 작업**이라 아직 안 됐을 수 있다.
    안 되어 있으면 심사위원이 승인 버튼을 눌렀을 때 실패한다 = 완성도 항목 직격.
 3. **시드 상태가 데모 서사대로인가.** 공개 URL이라 심사위원이 승인·반려를 눌러 상태를 오염시킬 수 있다.
    `backend/seed_demo.py --reset` 운영 계획(카드 5장: AC-001~004, INC-001)이 실제로 준비돼 있는지,
    심사 기간 중 리셋 수단이 있는지 확인하라.
 
-추가로 확인: 시크릿 창 접속, 모바일 렌더, Vercel Password Protection OFF, Lambda 콜드스타트 체감,
+추가로 확인: 시크릿 창 접속, 모바일 렌더, Vercel Password Protection OFF, 첫 응답 지연 체감,
 README의 배포 URL·스크린샷·현재형 문구, 제출 양식 문안(§3).
 
 ### 단계 B — 무안내 자립성 워크스루 (이 검토의 심장)

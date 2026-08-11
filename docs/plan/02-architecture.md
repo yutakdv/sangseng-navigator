@@ -13,39 +13,43 @@ Kakao 지오코딩 API ──────────┘      │  집계·스�
 [런타임]                            ▼
 사용자 ─▶ Vercel (Next.js, xxx.vercel.app)
    │                                │ fetch (NEXT_PUBLIC_API_BASE)
-   └────────────────────────────────▶ API Gateway(HTTP API) ─▶ Lambda(FastAPI+Mangum)
-                          [AWS ap-northeast-2]                   │        │
-                                                        DynamoDB(cards)  LLM API
-                                                                          (OpenAI/Claude)
+   └───────────▶ API Gateway(HTTP API) ─VPC Link─▶ 내부 ALB ─▶ ECS Fargate(FastAPI+uvicorn)
+                          [AWS ap-northeast-2]                        │        │
+                                                             DynamoDB(cards)  OpenAI API
 ```
 
 ## 핵심 설계 결정과 이유
 
 | 결정 | 이유 |
 |---|---|
-| **파이프라인은 배치, 결과는 정적 JSON 커밋** | 공공데이터는 연간/저빈도 갱신이라 런타임 조회가 불필요. Lambda가 API 키 없이 파일만 읽으면 되고, FE mock도 같은 파일에서 나와 계약 불일치가 없다. 심사 때 "데이터 어디서 났나" 질문에 레포로 답변 가능 |
-| **BE = Lambda + HTTP API** | 유휴 비용 0원. 데모 트래픽(수백 req)이면 프리티어로 $0. EC2/App Runner는 유휴 과금 발생 |
+| **파이프라인은 배치, 결과는 정적 JSON 커밋** | 공공데이터는 연간/저빈도 갱신이라 런타임 조회가 불필요. 서버가 API 키 없이 파일만 읽으면 되고, 산출물이 컨테이너 이미지에 그대로 실려 재현 가능하다. 심사 때 "데이터 어디서 났나" 질문에 레포로 답변 가능 |
+| **BE = ECS Fargate + 내부 ALB + HTTP API(VPC Link)** | **배포 중 무중단**이 목적. 롤링 배포 + 대상그룹 드레이닝으로 진행 중 요청이 끊기지 않고, 상시 가동이라 콜드스타트가 없다. 대가는 ALB·Fargate 고정비(월 $30 수준, 09 §3) |
 | **상태 저장 = DynamoDB 온디맨드 1테이블** | Action Card 승인/상태/타임스탬프만 저장(수십 건). 온디맨드라 유휴 $0, 프리티어 25GB. RDS는 과잉 |
 | **FE = Vercel (Hobby 무료)** | git push 자동 배포 + PR별 Preview URL(2인 협업에 유용), Next.js 네이티브 지원이라 정적 export 제약(동적 라우트 등) 없음, https·CDN 기본 제공. AWS 쪽엔 순수 API 비용만 남는다 |
 | **지도 = Kakao Maps JS 단일** | 카드 상세·방문객 위젯 모두 보유한 Kakao Maps JS 키를 쓰고(국내 지물 표기가 500m 축척에서 위치를 읽히게 한다), 키·도메인 문제에는 화면별 fallback을 둔다. MapLibre 구현은 원복용으로 보존 |
 | **개발 중엔 DynamoDB Local(Docker), AWS 배포는 개발 완료 후 최종 1회** | (2026-08-03 변경) 개발 기간 AWS 의존 제거 — IAM 권한 이슈·비용·네트워크와 무관하게 로컬 완결 테스트. `docker compose up`으로 BE+DynamoDB Local 기동, `db.py`가 `DYNAMO_ENDPOINT` env로 분기 (14 문서 T7). 배포는 전체 개발 완료 후 09 문서 절차로 1회 |
-| **LLM 어댑터 (openai↔anthropic 전환)** | 기획서에는 openAI API, MVP안에는 Claude로 명시가 갈림. `LLM_PROVIDER` env로 양쪽 지원해 발표 자료와 코드의 불일치 리스크 제거. 기본값 openai(`gpt-4o-mini`) — 제출된 기획서와 일치 + 비용 최소 |
-| **IaC = AWS SAM** | 유탁이 AWS SAA/DVA 보유. 템플릿 1장으로 Lambda+API+DDB 재현 가능, 캠프에서 재배포 1분 |
+| **LLM = OpenAI 단일 (`gpt-4o-mini`)** | 제출된 기획서와 일치 + 비용 최소. 초기에는 `LLM_PROVIDER` 로 Anthropic 도 택일할 수 있게 뒀으나 실제로 쓰지 않아 제거했다 — 값이 하나뿐인 스위치는 설정 표면만 늘린다 |
+| **IaC = 순수 CloudFormation 2스택** | 수명이 다른 계층을 분리한다(`sangseng-foundation` = VPC·ECR·DynamoDB·IAM / `sangseng-service` = ALB·ECS·API GW). 코드만 바뀌면 service 만 갱신해 5분에 끝나고, 신규 툴체인이 0이다 |
 
 ## 비용 (월 기준, 데모+테스트 트래픽 — 상세는 09 문서 §3)
 
+계정이 조직 소속이라 상시 무료 티어를 조직 전체가 공유한다 — **프리티어를 가정하지 않는다.**
+
 | 항목 | 과금 기준 | 예상 |
 |---|---|---|
-| Lambda | 상시 프리티어 월 100만 req + 40만 GB-s | **$0** |
-| API Gateway (HTTP API) | 약 $1.2/100만 req(서울) · 12개월 프리티어 100만 | **$0** (프리티어 후에도 월 3만 req ≈ $0.04) |
-| DynamoDB (온디맨드) | 쓰기 ~$1.6/100만, 읽기 ~$0.3/100만(서울) · 25GB 상시 무료 | **$0** (수천 req·KB 단위) |
-| CloudWatch Logs · 데이터 전송 | 5GB / 100GB 상시 무료 | **$0** |
-| **AWS 합계 (LLM 제외)** | | **사실상 $0, 최악 가정 < $1/월** |
+| 내부 ALB 고정비 | $0.0225 / ALB-시간 | **$16.43** |
+| Fargate ARM Spot ×2 (0.25 vCPU / 0.5 GB) | $0.011175 / vCPU-시간, $0.001227 / GB-시간 | **$4.98** |
+| 퍼블릭 IPv4 ×2 | $0.005 / IP-시간 | **$7.30** |
+| ALB LCU · CloudWatch Logs(7일) · ECR · API GW · DynamoDB | 데모 트래픽 기준 | ~$1.6 |
+| VPC Link · DynamoDB Gateway Endpoint · SSM 표준 | 무과금 | **$0** |
+| **AWS 합계 (LLM 제외)** | | **≈ $30 / 월, 상한 $42(온디맨드 기준)** |
 | Vercel | Hobby 무료 (대역폭 100GB/월) | **$0** |
-| LLM (참고) | gpt-4o-mini $0.15/$0.60 per 1M tok · claude-sonnet-5 $3/$15(인트로 $2/$10) | 데모 수백 호출 기준 수백 원~수천 원 |
+| LLM (참고) | gpt-4o-mini $0.15/$0.60 per 1M tok | 데모 수백 호출 기준 수백 원~수천 원 |
 
-비용 안전장치: 리전 `ap-northeast-2` 하나만 사용, 로그 보존 7일, Billing 알림 $1 설정,
-종료 후 `sam delete` 한 번으로 AWS 완전 철거 (Vercel은 방치해도 $0).
+**절반 이상이 ALB 고정비다.** 그 대가로 배포 중 무중단과 콜드스타트 없는 상시 가용을 얻는다.
+
+비용 안전장치: 리전 `ap-northeast-2` 하나만 사용, 로그 보존 7일, Billing 알림 설정,
+종료 후 `./infra/scripts/teardown.sh` 로 AWS 철거 (Vercel은 방치해도 $0).
 
 ## 지도 결정 — 카드 상세·방문객 위젯 모두 Kakao Maps JS
 
@@ -116,10 +120,14 @@ Kakao 지오코딩 API ──────────┘      │  집계·스�
 
 ## 보안·시크릿
 
-- Lambda에 필요한 시크릿은 **LLM API 키뿐** (공공데이터 키는 파이프라인=로컬에서만 사용)
-- SAM 파라미터(NoEcho)로 주입 → Lambda 환경변수. 캠프 수준에서 충분, 여유 있으면 SSM Parameter Store로 이전
-- DynamoDB 권한은 SAM `DynamoDBCrudPolicy`로 해당 테이블에만 최소 부여
-- CORS: 로컬 기본값은 `localhost`/`127.0.0.1`만 허용하고, 배포 기본값은 차단 오리진이다. 배포 시
-  실제 프론트 오리진을 명시하며 `*`는 앱 시작 단계에서 거부한다 (09 문서)
+- 컨테이너에 필요한 시크릿은 **LLM API 키와 변경 API 토큰뿐** (공공데이터 키는 파이프라인=로컬에서만 사용)
+- **SSM Parameter Store SecureString** 으로만 주입한다 — CloudFormation 템플릿·스택 이벤트·태스크 정의
+  어디에도 값이 남지 않는다. 태스크 실행 역할에 `ssm:GetParameters` 를 명시로 부여한다
+  (`AmazonECSTaskExecutionRolePolicy` 에 포함되지 않아 누락 시 로그 없이 죽는다)
+- DynamoDB 권한은 태스크 역할 인라인 정책으로 **해당 테이블·인덱스에만** 최소 부여
+- **네트워크 경계**: ALB 는 `scheme: internal` 이라 인터넷에서 닿지 않고, 진입은 API Gateway 뿐이다.
+  태스크 SG 는 ALB SG 출처 8000 포트만 허용한다
+- CORS: 모든 호출이 Vercel 서버에서 오는 **서버-대-서버**라 브라우저 프리플라이트가 없다.
+  그래도 앱의 `ALLOWED_ORIGINS` 는 배포 기본값이 빈 목록이고 `*` 는 앱 시작 단계에서 거부한다 (09 §5)
 - 인증·권한을 붙이기 전 공개 데모는 `DEMO_READ_ONLY=true`로 모든 mutation을 차단한다. mutation 라우트의
   공통 dependency가 이후 조직 사용자 인증과 RBAC를 연결할 경계이며, 임시 헤더 기반 가짜 인증은 두지 않는다
