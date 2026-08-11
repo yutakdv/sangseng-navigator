@@ -279,9 +279,9 @@ cd frontend && npm install && npm run dev   # NEXT_PUBLIC_API_BASE 미설정 시
 
 | 역할 | 담당 |
 |---|---|
-| 기획 · 발표 | 팀 V.I.B.E (기획 4인 · 개발 2인) |
+| 기획 · 발표 | 팀 V.I.B.E (기획 · 개발 4인) |
 | BE · AI · 데이터 파이프라인 · AWS 배포 (+FE 지원) | 유탁 |
-| FE (Next.js 화면 전체) | 팀원 1인 (mock 우선 개발 → 실 API 전환) |
+| FE (Next.js 화면 전체) | 팀원 3인 (mock 우선 개발 → 실 API 전환) |
 
 ---
 
