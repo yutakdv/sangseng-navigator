@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useEffect, useRef, useState, useTransition } from "react";
 import { decideAction } from "@/app/actions";
 import { StatusChip } from "@/components/StatusChip";
 import { decisionPrimaryLabel } from "@/lib/cardWorkflow";
@@ -44,6 +44,26 @@ export function DecisionBar({
   const rateMissing = requireRate && !rate;
   const working = pending || busy !== null;
 
+  // fixed 바가 문서 맨 끝(레이아웃 footer)을 영구히 가리지 않도록, 떠 있는 동안 body에
+  // 자기 높이만큼 하단 패딩을 준다. 페이지의 pb-32는 본문만 보호하고 footer는 layout에
+  // 있어 여기서만 해결할 수 있다. 높이는 상태 문구·확인 모드·뷰포트 폭에 따라 변하므로
+  // ResizeObserver로 실측한다.
+  const barRef = useRef<HTMLDivElement | null>(null);
+  useEffect(() => {
+    const el = barRef.current;
+    if (!el) return;
+    const apply = () => {
+      document.body.style.paddingBottom = `${el.offsetHeight}px`;
+    };
+    apply();
+    const ro = new ResizeObserver(apply);
+    ro.observe(el);
+    return () => {
+      ro.disconnect();
+      document.body.style.paddingBottom = "";
+    };
+  }, []);
+
   const ask = (decision: CardStatus) => {
     setError(null);
     setConfirming(decision);
@@ -79,6 +99,7 @@ export function DecisionBar({
 
   return (
     <div
+      ref={barRef}
       data-tour="decision"
       className="fixed inset-x-0 bottom-0 z-40 border-t border-admin-border bg-admin-surface shadow-header lg:left-[272px]"
     >
