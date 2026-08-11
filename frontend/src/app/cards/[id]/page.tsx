@@ -500,8 +500,12 @@ export default async function CardDetailPage({
                     <th scope="col" className="text-right">
                       기존가맹포화도
                     </th>
+                    {/* 한 줄로 두면 이 열만 폭을 밀어 표가 컨테이너를 넘긴다 — 괄호 안 정의를 아래 줄로 접는다 */}
                     <th scope="col" className="text-right">
-                      반경 500m 내 (동일 업종 가맹점 / 동일 업종 상가)
+                      반경 500m 내
+                      <span className="block text-[11px] font-normal text-admin-text-muted">
+                        (동일 업종 가맹점 / 동일 업종 상가)
+                      </span>
                     </th>
                     <th scope="col">거점에서의 거리</th>
                   </tr>

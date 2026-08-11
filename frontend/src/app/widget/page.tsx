@@ -125,7 +125,8 @@ export default async function WidgetPage({ searchParams }: { searchParams: Promi
   const others = recommendations.filter((r) => !r.badge);
 
   return (
-    <div className="min-h-screen bg-slate-100 py-0 sm:py-8">
+    // 방문객 화면은 AdminShell 밖이라 랜드마크가 없다 — 본문을 main으로 감싼다 (13 §4 접근성)
+    <main className="min-h-screen bg-slate-100 py-0 sm:py-8">
       {/* 모바일에서는 한 열, 넓은 화면에서는 레퍼런스(image-2)처럼 필터와 지도를 나란히 둔다. */}
       <div className="mx-auto w-full max-w-[1180px] overflow-hidden bg-visitor-bg shadow-card-hover sm:rounded-[28px] sm:ring-1 sm:ring-black/5">
         <header className="relative overflow-hidden bg-gradient-to-br from-visitor-accent to-[#0e4a25] px-5 py-6 text-white sm:rounded-t-[28px]">
@@ -348,7 +349,7 @@ export default async function WidgetPage({ searchParams }: { searchParams: Promi
       </p>
       {/* /widget은 AdminShell을 쓰지 않으므로(방문객 화면) 여기서 직접 마운트한다 */}
       <TourOverlay />
-    </div>
+    </main>
   );
 }
 
