@@ -9,7 +9,9 @@
 하이원포인트 소비 쏠림 진단 → 2단계 스코어링 → AI 제안·반대 관점 → **담당자 승인** → 추진 트래킹 → 방문객 위젯 반영
 
 [![Live Demo](https://img.shields.io/badge/Live%20Demo-Vercel-8B7BF0?style=for-the-badge&logo=vercel&logoColor=white)](https://sangseng-navigator.vercel.app)
+<!-- 영상 업로드 후 아래 배지 주석을 해제한다 (아래 "영상 넣는 자리"와 함께)
 [![Demo Video](https://img.shields.io/badge/Demo%20Video-1%3A30-1E1840?style=for-the-badge&logo=youtube&logoColor=white)](#demo)
+-->
 [![Open Data](https://img.shields.io/badge/Open%20Data-6%20datasets-2E2560?style=for-the-badge)](#-활용-데이터)
 [![Stack](https://img.shields.io/badge/Next.js%2016%20%C2%B7%20FastAPI%20%C2%B7%20AWS-443597?style=for-the-badge)](#-기술-스택)
 [![License: MIT](https://img.shields.io/badge/License-MIT-33266B?style=for-the-badge)](LICENSE)
@@ -47,9 +49,12 @@
   └──────────────────────────────────────────────────────────────────────────────
 -->
 
+<!-- B안 사용 시: 아래 <a> 주석을 해제하고 VIDEO_ID를 실제 유튜브 ID로 바꾼다.
 <a href="https://youtu.be/VIDEO_ID">
   <img src="docs/images/demo-cover.svg" width="780" alt="상생 나침반 데모 영상 — 1분 30초">
 </a>
+-->
+<img src="docs/images/demo-cover.svg" width="780" alt="상생 나침반 데모 미리보기">
 
 <!-- C안:
 <video src="https://github.com/yutakdv/sangseng-navigator/raw/main/docs/media/demo.mp4" controls width="780"></video>
