@@ -8,6 +8,7 @@ import {
   toDecisionFields,
   type DecisionReason,
 } from "@/components/DecisionReasonPanel";
+import { DecisionSafetyReview } from "@/components/DecisionSafetyReview";
 import { StatusChip } from "@/components/StatusChip";
 import { decisionPrimaryLabel, decisionReasonRequired } from "@/lib/cardWorkflow";
 import { operator } from "@/lib/operator";
@@ -27,9 +28,9 @@ const RATES: PaybackRate[] = [3, 5, 7];
  * 필수라(05 §2) 바 안에 3·5·7% 선택 칩을 함께 둔다.
  *
  * **결정은 되돌릴 수 없으므로 원클릭으로 확정하지 않는다** — 어떤 결정이든 1차 클릭은
- * 사유 칸(확인 단계)을 펼칠 뿐이고, "확정"을 눌러야 실행된다. 사유는 반려·보류(또는 신뢰도
- * `하` 카드의 승인)에서 필수, 그 외에는 선택이다. 늘 펼쳐 두면 고정 바가 높아져 본문과
- * 가이드 투어 카드를 덮으므로 확정·취소·Esc로 다시 접힌다.
+ * 입력 패널(확인 단계)을 펼칠 뿐이고, "확정"을 눌러야 실행된다. 반려·보류는 사유를,
+ * 승인은 안전 검토 확인(저신뢰면 확인 근거도)을 받은 뒤 확정한다. 늘 펼쳐 두면 고정 바가
+ * 높아져 본문과 가이드 투어 카드를 덮으므로 확정·취소·Esc로 다시 접힌다.
  */
 export function DecisionBar({
   cardId,
@@ -55,6 +56,7 @@ export function DecisionBar({
   const [error, setError] = useState<string | null>(null);
   const [armed, setArmed] = useState<CardStatus | null>(null);
   const [draft, setDraft] = useState<DecisionReason>(emptyDecisionReason);
+  const [safetyReviewed, setSafetyReviewed] = useState(false);
 
   const decided = status !== "pending";
   const requireRate = cardType === "INCENTIVE";
@@ -62,6 +64,7 @@ export function DecisionBar({
   const working = pending || busy !== null;
   const armedRequiresReason = armed !== null && decisionReasonRequired(armed, confidence);
   const reasonMissing = armedRequiresReason && !draft.reason.trim();
+  const reviewMissing = armed === "approved" && !safetyReviewed;
 
   // fixed 바가 문서 맨 끝(레이아웃 footer)을 영구히 가리지 않도록, 떠 있는 동안 body에
   // 자기 높이만큼 하단 패딩을 준다. 페이지의 pb-32는 본문만 보호하고 footer는 layout에
@@ -95,6 +98,7 @@ export function DecisionBar({
         version,
         cooldownDays: fields.cooldownDays,
         recheckCondition: fields.recheckCondition,
+        safetyReviewed: decision === "approved" ? safetyReviewed : undefined,
       })
         .then((res) => {
           if (!res.ok) {
@@ -103,6 +107,7 @@ export function DecisionBar({
           }
           setArmed(null);
           setDraft(emptyDecisionReason());
+          setSafetyReviewed(false);
         })
         .catch(() => setError("요청을 처리하지 못했습니다. 잠시 후 다시 시도해 주세요."))
         .finally(() => setBusy(null));
@@ -111,8 +116,10 @@ export function DecisionBar({
 
   const press = (decision: CardStatus) => {
     setError(null);
-    // 사유가 선택인 결정도 바로 확정하지 않는다 — 결정은 불가역이라 확인 단계를 거친다 (P0 검수).
+    // 어떤 결정이든 바로 확정하지 않는다 — 결정은 불가역이라 확인 단계를 거친다 (P0 검수).
+    // 승인은 펼칠 때마다 안전 검토 확인을 새로 받는다(서버 감사 기록과 짝).
     // 같은 버튼을 다시 누르면 접는다: 고정 바에서 잘못 편 칸을 닫을 길이 있어야 한다.
+    if (decision === "approved") setSafetyReviewed(false);
     setArmed((current) => (current === decision ? null : decision));
   };
 
@@ -227,20 +234,33 @@ export function DecisionBar({
               ) : null}
               <span className="text-admin-text-muted"> · 확정 후 되돌릴 수 없습니다</span>
             </p>
-            <DecisionReasonPanel
-              idPrefix={`decision-bar-${cardId}`}
-              decision={armed}
-              required={armedRequiresReason}
-              value={draft}
-              onChange={setDraft}
-              disabled={working}
-              compact
-            />
+            {armed !== "approved" || armedRequiresReason ? (
+              <DecisionReasonPanel
+                idPrefix={`decision-bar-${cardId}`}
+                decision={armed}
+                required={armedRequiresReason}
+                value={draft}
+                onChange={setDraft}
+                disabled={working}
+                compact
+              />
+            ) : null}
+            {armed === "approved" ? (
+              <div className={armedRequiresReason ? "mt-2" : ""}>
+                <DecisionSafetyReview
+                  id={`decision-bar-${cardId}-safety`}
+                  checked={safetyReviewed}
+                  onChange={setSafetyReviewed}
+                  disabled={working}
+                  compact
+                />
+              </div>
+            ) : null}
             <div className="mt-2.5 flex flex-wrap items-center gap-2">
               <button
                 type="button"
                 onClick={() => submit(armed)}
-                disabled={working || reasonMissing}
+                disabled={working || reasonMissing || reviewMissing}
                 aria-busy={busy === armed}
                 className={`${buttonBase} bg-admin-primary text-white hover:bg-admin-primary-strong`}
               >
@@ -257,6 +277,7 @@ export function DecisionBar({
                 onClick={() => {
                   setArmed(null);
                   setError(null);
+                  setSafetyReviewed(false);
                 }}
                 disabled={working}
                 className="min-h-11 rounded-lg px-3 py-2 text-sm font-semibold text-admin-text-muted transition-colors hover:bg-admin-surface-sunken disabled:cursor-not-allowed disabled:opacity-45"
@@ -264,7 +285,9 @@ export function DecisionBar({
                 취소
               </button>
               <span className="text-xs leading-5 text-admin-text-muted">
-                {reasonMissing
+                {reviewMissing
+                  ? "데이터 보호 범위·서버 검증 근거·AI 비교·반대 관점을 확인해야 승인할 수 있습니다."
+                  : reasonMissing
                   ? armed === "approved"
                     ? "신뢰도가 낮은 카드라 확인 근거를 적어야 승인할 수 있습니다."
                     : "사유를 적어야 확정할 수 있습니다."

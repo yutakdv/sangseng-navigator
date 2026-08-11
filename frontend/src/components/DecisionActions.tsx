@@ -8,6 +8,7 @@ import {
   toDecisionFields,
   type DecisionReason,
 } from "@/components/DecisionReasonPanel";
+import { DecisionSafetyReview } from "@/components/DecisionSafetyReview";
 import { decisionPrimaryLabel, decisionReasonRequired } from "@/lib/cardWorkflow";
 import { operator } from "@/lib/operator";
 import { isDemoReadOnly } from "@/lib/runtime";
@@ -22,9 +23,9 @@ import type { Card, CardStatus, CardType, PaybackRate } from "@/types";
  * 여기서 카드 상태를 따로 들고 있지 않는다.
  *
  * **결정은 되돌릴 수 없으므로 원클릭으로 확정하지 않는다** — 어떤 결정이든 1차 클릭은
- * 사유 칸(확인 단계)을 펼치고, "확정"을 한 번 더 받아야 나간다. 사유는 반려·보류(그리고
- * 신뢰도 `하` 카드의 승인)에서 필수, 그 외에는 선택이다 — 사유 없이 보내면 서버가 422를
- * 내는데, 그때는 이미 무엇을 적어야 하는지 알 길이 없다.
+ * 입력 패널(확인 단계)을 펼치고, "확정"을 한 번 더 받아야 나간다. 반려·보류는 사유를,
+ * 승인은 안전 검토 확인(저신뢰면 확인 근거도)을 받은 뒤 확정한다. 서버도 같은 조건을
+ * 검사해 UI를 우회한 요청을 422로 거부한다.
  */
 const DECISIONS: { value: CardStatus; label: string; tone: string }[] = [
   {
@@ -73,6 +74,7 @@ export function DecisionActions({
   /** 사유·확인을 받는 중인 결정 — null이면 사유 칸이 접혀 있다 */
   const [armed, setArmed] = useState<CardStatus | null>(null);
   const [draft, setDraft] = useState<DecisionReason>(emptyDecisionReason);
+  const [safetyReviewed, setSafetyReviewed] = useState(false);
 
   const rateMissing = requireRate && !selectedRate;
   const working = pending || busy !== null;
@@ -80,6 +82,7 @@ export function DecisionActions({
   const hintId = `decision-hint-${cardId}`;
   const armedRequiresReason = armed !== null && decisionReasonRequired(armed, confidence);
   const reasonMissing = armedRequiresReason && !draft.reason.trim();
+  const reviewMissing = armed === "approved" && !safetyReviewed;
 
   const decisionLabel = (d: CardStatus) =>
     d === "approved"
@@ -102,6 +105,7 @@ export function DecisionActions({
         version,
         cooldownDays: fields.cooldownDays,
         recheckCondition: fields.recheckCondition,
+        safetyReviewed: decision === "approved" ? safetyReviewed : undefined,
       })
         .then((res) => {
           // 409(이미 결정됨·버전 불일치)·422(사유 누락)는 장애가 아니라 도메인 신호다 — 문구로 읽힌다
@@ -111,6 +115,7 @@ export function DecisionActions({
           }
           setArmed(null);
           setDraft(emptyDecisionReason());
+          setSafetyReviewed(false);
         })
         .catch(() => setError("요청을 처리하지 못했습니다. 잠시 후 다시 시도해 주세요."))
         .finally(() => setBusy(null));
@@ -119,8 +124,10 @@ export function DecisionActions({
 
   const press = (decision: CardStatus) => {
     setError(null);
-    // 사유가 선택인 결정도 바로 확정하지 않는다 — 결정은 불가역이라 확인 단계를 거친다 (P0 검수).
+    // 어떤 결정이든 바로 확정하지 않는다 — 결정은 불가역이라 확인 단계를 거친다 (P0 검수).
+    // 승인은 펼칠 때마다 안전 검토 확인을 새로 받는다(서버 감사 기록과 짝).
     // 같은 버튼을 다시 누르면 접는다.
+    if (decision === "approved") setSafetyReviewed(false);
     setArmed((current) => (current === decision ? null : decision));
   };
 
@@ -168,19 +175,31 @@ export function DecisionActions({
             ) : null}
             <span className="text-admin-text-muted"> · 확정 후 되돌릴 수 없습니다</span>
           </p>
-          <DecisionReasonPanel
-            idPrefix={`decision-${cardId}`}
-            decision={armed}
-            required={armedRequiresReason}
-            value={draft}
-            onChange={setDraft}
-            disabled={working}
-          />
+          {armed !== "approved" || armedRequiresReason ? (
+            <DecisionReasonPanel
+              idPrefix={`decision-${cardId}`}
+              decision={armed}
+              required={armedRequiresReason}
+              value={draft}
+              onChange={setDraft}
+              disabled={working}
+            />
+          ) : null}
+          {armed === "approved" ? (
+            <div className={armedRequiresReason ? "mt-2" : ""}>
+              <DecisionSafetyReview
+                id={`decision-${cardId}-safety`}
+                checked={safetyReviewed}
+                onChange={setSafetyReviewed}
+                disabled={working}
+              />
+            </div>
+          ) : null}
           <div className="mt-2.5 flex flex-wrap items-center gap-2">
             <button
               type="button"
               onClick={() => submit(armed)}
-              disabled={working || reasonMissing}
+              disabled={working || reasonMissing || reviewMissing}
               aria-busy={busy === armed}
               className="min-h-10 rounded-lg bg-admin-primary px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-admin-primary-strong disabled:cursor-not-allowed disabled:opacity-50"
             >
@@ -197,13 +216,18 @@ export function DecisionActions({
               onClick={() => {
                 setArmed(null);
                 setError(null);
+                setSafetyReviewed(false);
               }}
               disabled={working}
               className="min-h-10 rounded-lg px-3 py-2 text-sm font-semibold text-admin-text-muted transition-colors hover:bg-admin-surface-sunken disabled:cursor-not-allowed disabled:opacity-50"
             >
               취소
             </button>
-            {reasonMissing ? (
+            {reviewMissing ? (
+              <span className="text-xs leading-5 text-admin-text-muted">
+                데이터 보호 범위·서버 검증 근거·AI 비교·반대 관점을 확인해야 승인할 수 있습니다.
+              </span>
+            ) : reasonMissing ? (
               <span className="text-xs leading-5 text-admin-text-muted">
                 {armed === "approved"
                   ? "신뢰도가 낮은 카드라 확인 근거를 적어야 승인할 수 있습니다."

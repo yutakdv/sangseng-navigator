@@ -168,12 +168,17 @@ function HistoryList({
   const rows = [
     ...(hasGeneratedEvent(events)
       ? []
-      : [{ at: createdAt, action: "제안 카드 생성 — 담당자 검토 대기", actor: null, reason: null }]),
+      : [{ at: createdAt, action: "제안 카드 생성 — 담당자 검토 대기", actor: null, reason: null,
+           safetyReview: null }]),
     ...events.map((event) => ({
       at: event.at,
       action: eventLabel(event),
       actor: eventActorLabel(event, decision),
       reason: event.reason ?? null,
+      safetyReview:
+        event.action === "approved" && decision?.safety_review?.acknowledged
+          ? decision.safety_review
+          : null,
     })),
   ].sort((a, b) => a.at.localeCompare(b.at));
 
@@ -193,6 +198,14 @@ function HistoryList({
               {row.reason ? (
                 <p className="mt-1 break-keep text-xs leading-5 text-admin-text-soft">
                   사유 {row.reason}
+                </p>
+              ) : null}
+              {row.safetyReview ? (
+                <p
+                  className="mt-1 break-keep text-xs font-semibold leading-5 text-state-good"
+                  title={`적용 기준 ${row.safetyReview.policy}`}
+                >
+                  담당자 안전 검토 — 데이터 보호·근거 검증·편향/윤리 영향 확인
                 </p>
               ) : null}
             </div>
