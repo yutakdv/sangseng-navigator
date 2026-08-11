@@ -18,6 +18,16 @@ DEFAULT_COOLDOWN_DAYS = 90              # 분기 의사결정 주기 — 05 문�
 REASON_REQUIRED = ("rejected", "held")  # 사유 없는 반려·보류는 감사 기록이 성립하지 않는다
 LOW_CONFIDENCE = "하"
 
+# 승인 시 담당자가 확인하는 안전 검토 범위. 특정 기관의 공식 규정명을 가장하지 않고
+# 이 서비스가 실제로 강제하는 내부 기준과 버전을 기록한다. 화면의 확인 문구와 API 감사 기록이
+# 같은 범위를 가리켜야 "안전한 AI"가 발표용 문구가 아니라 재현 가능한 동작이 된다.
+SAFETY_REVIEW_POLICY = "sangseng-ai-safety-v1"
+SAFETY_REVIEW_SCOPE = (
+    "data_protection",       # 소표본 보호·공개 범위
+    "source_grounding",      # 원 순위·수치 검증 범위
+    "bias_ethics",           # 반대 관점·지역 형평·윤리 영향
+)
+
 ASSUMPTION_NOTE = "가정 기반 전망이며 실제와 다를 수 있음"   # 절대 규칙 3 — 고정 문구
 NARRATIVE_SCHEMA = {
     "type": "object",
@@ -39,6 +49,9 @@ class DecisionBody(BaseModel):
     version: int | None = None            # 낙관적 잠금 (선택, 권장 — 05 §2 결정 요청)
     cooldown_days: int = Field(DEFAULT_COOLDOWN_DAYS, ge=0, le=365)
     recheck_condition: str | None = Field(None, max_length=500)
+    # 승인에만 필수인 담당자 자기확인. 단순 UI 체크로 끝내지 않고 서버가 누락을 거부하며,
+    # 성공한 확인은 아래 decision 감사 기록에 기준 버전·범위와 함께 남긴다.
+    safety_reviewed: bool = False
 
     @field_validator("reason", "actor_name", "recheck_condition")
     @classmethod
@@ -166,6 +179,12 @@ def decide(
             detail=("신뢰도가 낮은 카드를 승인하려면 확인 근거가 필요합니다. 무엇을 별도로 "
                     "확인했는지 사유에 적어 주세요"),
         )
+    if body.decision == "approved" and not body.safety_reviewed:
+        raise HTTPException(
+            status_code=422,
+            detail=("승인 전 소표본 보호를 포함한 데이터 보호 범위·서버 검증 근거·AI 비교·반대 관점을 확인해 주세요. "
+                    "편향과 윤리 영향 검토가 기록되어야 승인할 수 있습니다"),
+        )
     if body.decision == "approved" and card.get("type") == "INCENTIVE":
         if body.selected_rate is None:
             raise HTTPException(status_code=422, detail="페이백률(3|5|7)이 필요합니다")
@@ -186,6 +205,13 @@ def decide(
         "auth": "shared_token",
         "verified": False,
         "at": now,
+        # 반려·보류는 안전 검토를 통과시킨 결정이 아니므로 기록하지 않는다. 승인만 기준 버전과
+        # 확인 범위를 남겨, 나중에 무엇을 확인하고 통과시켰는지 되짚을 수 있게 한다.
+        **({"safety_review": {
+            "policy": SAFETY_REVIEW_POLICY,
+            "acknowledged": True,
+            "scope": list(SAFETY_REVIEW_SCOPE),
+        }} if body.decision == "approved" else {}),
     }
     # 반려·보류한 대상을 곧바로 다시 제안하지 않기 위한 차단 창 (05 §8). 승인에는 붙지 않는다 —
     # 승인된 타깃은 진행 중 업무로 이미 후보에서 빠진다.
@@ -345,7 +371,10 @@ def simulate_card(
                                            or (kind == "개선" and "심화" in narrative))
     # LLM 문구를 실제로 채택했는지 = 화면이 "AI가 쓴 문장"이라고 말해도 되는지 (05 §2 narrative_source).
     # 호출 실패·내용 가드 불통과는 물론, 혼재·미미라 애초에 호출하지 않은 구간도 여기서 False가 된다.
+    # 민감 속성 판정은 카드 생성 경로와 같은 함수를 쓴다 — LLM 출력 세 곳(카드·인센티브·이 문구)
+    # 중 하나라도 빠지면 "민감 속성 서술은 폐기된다"는 README 문장이 사실이 아니게 된다.
     used_llm = (bool(narrative) and not wrong_direction
+                and not cardgen.mentions_sensitive_attribute(narrative)
                 and "예상" in narrative and "가정" in narrative)
     if not used_llm:
         narrative = _fallback_narrative(result)

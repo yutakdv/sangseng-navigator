@@ -300,6 +300,12 @@ export interface CardDecision {
   auth: string;
   verified: boolean;
   at: string;
+  /** 승인 전 담당자가 확인한 데이터·AI 안전 검토 기준. 구형 카드와 반려·보류에는 없다. */
+  safety_review?: {
+    policy: string;
+    acknowledged: boolean;
+    scope: ("data_protection" | "source_grounding" | "bias_ethics" | string)[];
+  };
 }
 
 /** 반려·보류한 타깃의 재제안 차단 창. 인센티브는 타깃이 없어 대상이 아니다 */
@@ -451,6 +457,8 @@ export interface DecisionRequest {
   version?: number;
   cooldown_days?: number;
   recheck_condition?: string;
+  /** 승인에만 필수 — 서버가 누락을 422로 거부하고 감사 기록에 기준 버전과 함께 남긴다. */
+  safety_reviewed?: boolean;
 }
 
 /* ── §2-1 추진 경과 기록·리포트 ───────────────────────────────── */

@@ -233,6 +233,52 @@ def test_evidence_ids_accept_field_level_citations_of_multi_segment_blocks():
         assert not cardgen._evidence_known(bad, whitelist), bad
 
 
+def test_ai_statements_cannot_infer_sensitive_attributes():
+    """입력에 없는 개인 특성으로 사업자·지역을 평가하는 문장은 저장 직전 폐기한다."""
+    statement = [{
+        "text": "사업자의 연령을 고려하면 계약 이행이 어려울 가능성",
+        "claim_type": "비정량리스크",
+        "evidence_ids": [],
+    }]
+    assert cardgen.verified_statements(statement, set()) == []
+
+    dissent = [
+        {"text": "기준월 이후 패턴이 달라졌을 가능성", "risk_type": "데이터시점", "evidence_ids": []},
+        {"text": "사업자의 국적 때문에 참여가 어려울 가능성", "risk_type": "사업자의사", "evidence_ids": []},
+        {"text": "계절 수요가 달라질 가능성", "risk_type": "계절성", "evidence_ids": []},
+    ]
+    assert not cardgen.dissent_ok(
+        dissent,
+        {"category": "카페"},
+        set(),
+        {"카페"},
+    )
+
+
+def test_sensitive_attribute_guard_reads_words_not_substrings():
+    """범주명만 막으면 실제 차별 서술을 놓치고, 부분 문자열로 막으면 정상 어휘를 폐기한다.
+
+    아래 통과 목록은 전부 이 도메인에서 실제로 쓰는 말이다 — 특히 "장애 요인"은 추진 기록
+    blocker 필드의 화면 라벨과 같은 표현이라, 걸리면 정당한 리스크 서술이 사라진다.
+    반대 관점은 3항 중 하나만 걸려도 세트 전체가 규칙 문구로 대체되므로 오탐 비용이 크다.
+    """
+    for text in ("가맹 시스템 연동 지연이 추진 장애 요인이 될 가능성",
+                 "예산 집행 절차가 장애물로 작용할 가능성",
+                 "업종 특성별 이용 패턴이 다를 가능성",
+                 "제도 절차 지연은 위험 요인 중 하나이며 확인이 필요함",
+                 "전국적인 소비 위축이 이어지면 효과가 줄 가능성"):
+        assert not cardgen.mentions_sensitive_attribute(text), text
+
+    for text in ("고령 사업주가 많아 계약 이행이 어려울 가능성",
+                 "외국인이 운영하는 점포는 서류 준비가 늦을 가능성",
+                 "여성 사장이 운영하는 점포는 참여 의사가 낮을 가능성",
+                 "장애인 사업자는 절차 이행이 어려울 가능성",
+                 "20대 방문객 위주라 지역 사용이 낮을 가능성",
+                 "90대 방문객을 제외해야 한다",
+                 "사업자의 연령을 고려하면 이행이 어려울 가능성"):
+        assert cardgen.mentions_sensitive_attribute(text), text
+
+
 def db_now() -> str:
     from app import db
     return db.now_iso()

@@ -8,6 +8,7 @@ LLM 최종 실패 시 규칙 기반 fallback (07 B3 — 데모 루프가 LLM 장
 """
 import json
 import logging
+import re
 from datetime import date, datetime, timedelta
 
 from app import dataload, db, korean, llm, prompts
@@ -99,6 +100,28 @@ RISK_TYPES = ["데이터시점", "추정방법", "계절성", "사업자의사",
 FORBIDDEN_NEW_BUSINESS = ("창업", "신설", "개업", "새로 생기는", "새로 문을 여")
 # 반경 500m 동일 업종 값을 지역 전체로 넓혀 단정하는 표현.
 FORBIDDEN_SCOPE_CLAIMS = ("지역 최초", "최초의", "유일한", "유일하게", "전무한", "하나도 없")
+# 입력에 존재하지 않는 민감 속성을 사업자 적격성·정책 가치 판단에 끌어오지 못하게 한다.
+# 프롬프트 지침만으로 끝내지 않고 저장 직전 서버 가드에서도 폐기한다.
+#
+# 부분 문자열로 잡으면 이 도메인의 정상 어휘가 함께 걸린다 — "추진 장애 요인"(화면의 blocker
+# 라벨과 같은 말)·"특성별"·"전국적"·"하나이며"가 각각 장애·성별·국적·나이에 히트했다(실측).
+# 반대 관점은 3항 중 하나만 걸려도 dissent_ok 가 세트 전체를 규칙 문구로 되돌리므로 오탐 비용이
+# 크다. 그래서 ① 앞 음절이 한글이면 다른 낱말의 일부로 보고, ② 사람을 가리키는 형태(장애인)만
+# 세며, ③ 범주명(성별·연령)뿐 아니라 실제 차별 서술에 쓰이는 표현(고령·외국인·여성 …)까지 센다 —
+# 범주명만 막으면 "고령 사업주라 이행이 어렵다" 같은 문장이 그대로 통과한다.
+_SENSITIVE_ATTRIBUTE_WORDS = (
+    "성별", "연령", "나이", "국적", "종교", "출신",          # 범주명
+    "장애인", "고령", "노령", "노인", "미성년", "여성", "남성",  # 사람을 가리키는 표현
+    "외국인", "이주민", "다문화", "탈북", "새터민", "학력",
+)
+_SENSITIVE_ATTRIBUTE_RE = re.compile(
+    r"(?<![가-힣])(?:" + "|".join(_SENSITIVE_ATTRIBUTE_WORDS) + r"|[1-9]0대)"
+)
+
+
+def mentions_sensitive_attribute(text: str) -> bool:
+    """입력에 없는 개인 특성을 끌어온 서술인가 — 세 LLM 출력 경로가 함께 쓰는 판정."""
+    return bool(_SENSITIVE_ATTRIBUTE_RE.search(text))
 
 _STATEMENT_SCHEMA = {
     "type": "object", "additionalProperties": False,
@@ -535,6 +558,8 @@ def _statement_ok(item, whitelist: set) -> bool:
         return False
     if any(word in text for word in FORBIDDEN_SCOPE_CLAIMS):
         return False
+    if mentions_sensitive_attribute(text):
+        return False
     return True
 
 
@@ -562,6 +587,8 @@ def dissent_ok(raw, target: dict, whitelist: set, other_categories: set) -> bool
         if not _evidence_known(d.get("evidence_ids"), whitelist):
             return False
         if any(word in text for word in FORBIDDEN_NEW_BUSINESS):
+            return False
+        if mentions_sensitive_attribute(text):
             return False
         # 대상이 아닌 표시 업종을 끌어오면 순환·무관 서술이다. 타깃 업종명은 당연히 허용한다.
         if any(cat in text for cat in other_categories if cat != target.get("category")):
@@ -667,7 +694,8 @@ def _grounded_ai(cands: list, target: dict, out: dict, cards: list,
             "dissent_source": dissent_source,
             "source": "structured",
             "checks": ["target", "score", "rank", "progress", "road_time",
-                       "evidence_ids", "claim_scope", "dissent_diversity"],
+                       "evidence_ids", "claim_scope", "dissent_diversity",
+                       "sensitive_attribute_scope"],
         },
     }
 

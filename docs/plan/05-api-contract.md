@@ -259,7 +259,8 @@ Base URL: 로컬 `http://localhost:8000` / 배포 후 API Gateway URL. 경로 �
       "dissent_source": "llm",
       "source": "structured",
       "checks": ["target", "score", "rank", "progress", "road_time",
-                 "evidence_ids", "claim_scope", "dissent_diversity"]
+                 "evidence_ids", "claim_scope", "dissent_diversity",
+                 "sensitive_attribute_scope"]
     },
     "original_ranking": [
       {"rank": 1, "candidate": "고한읍 편의점", "score": 0.59},
@@ -361,7 +362,9 @@ Base URL: 로컬 `http://localhost:8000` / 배포 후 API Gateway URL. 경로 �
   저신뢰 승인에서 필수다(§8). **`verified: false`는 지금 신원이 검증되지 않았다는 사실을 정직하게
   남기는 필드다** — 담당자 계정 체계가 없어 `actor_id`는 화면이 보낸 자기신고 값이고 인증은 공유
   토큰(`auth: "shared_token"`) 하나다. 개인 계정·권한이 도입되면 `auth`·`verified`만 바뀐다.
-  없는 값을 검증된 것처럼 저장하지 않기 위한 장치이며 화면도 이 사실을 감추지 않는다
+  없는 값을 검증된 것처럼 저장하지 않기 위한 장치이며 화면도 이 사실을 감추지 않는다.
+  승인에는 `safety_review`가 추가되어 서비스 안전 검토 기준 버전과 확인 범위
+  (`data_protection`·`source_grounding`·`bias_ethics`)를 남긴다. 반려·보류에는 이 필드가 없다
 - `reproposal_block`: 반려·보류된 EXPANSION 타깃의 재제안 차단 창(§8). `until`까지 같은 타깃은
   새 카드로 제안되지 않는다. INCENTIVE는 `target`이 없어 대상이 아니다
 - `events[]`: `{at, action}`에 더해 결정 이벤트는 `actor_id`·`reason`·`source`를, 추진 기록 이벤트는
@@ -577,7 +580,8 @@ LLM 호출이 실패하거나 애초에 호출하지 않은 카드도 **똑같�
   "decision_source": "operator_ui",
   "version": 0,
   "cooldown_days": 90,
-  "recheck_condition": "다음 분기 예산 확정 후 재검토"
+  "recheck_condition": "다음 분기 예산 확정 후 재검토",
+  "safety_reviewed": false
 }
 ```
 
@@ -594,6 +598,10 @@ LLM 호출이 실패하거나 애초에 호출하지 않은 카드도 **똑같�
   요청이 카드를 바꿨으면 **409**를 낸다. 생략하면 `status=pending` 조건만 걸린다
 - `cooldown_days`(선택, 기본 90 · 0~365)·`recheck_condition`(선택): **반려·보류에서만** 의미가 있다.
   같은 타깃을 언제까지 다시 제안하지 않을지와 무엇이 바뀌면 다시 볼지를 카드에 남긴다(§8 재제안 차단)
+- `safety_reviewed`: **승인에서만 `true`가 필수**다. 담당자가 소표본 보호를 포함한 데이터 보호 범위,
+  서버 검증 근거, AI 비교·반대 관점과 편향·윤리 영향을 확인했다는 자기확인이다. 서버는 누락을 422로
+  거부하고, 성공한 확인을 `decision.safety_review`에 기준 버전과 함께 남긴다. 특정 기관의 공식
+  규정 준수를 가장하는 필드가 아니라 이 서비스가 실제로 강제하는 내부 검토 기준이다
 
 **🔒 인증**: 위 두 GET과 `simulate`는 `Authorization: Bearer <MUTATION_API_TOKEN>` 헤더가 필요하다
 (`security.require_internal_access` — 모든 변경 계열 POST와 같은 토큰). 담당자 화면 전용 데이터라
@@ -1007,7 +1015,7 @@ FE mock 동기화: 레포 루트에서 `./scripts/sync-mocks.sh` — 위 산출 
 | `simulate`를 INCENTIVE 카드에 호출 | `400 {"detail": "INCENTIVE 카드는 scenarios를 사용합니다"}` — 시뮬레이션은 EXPANSION 전용 |
 | `simulate` 타깃 `eup`이 집계 6개 지역 밖 | `400 {"detail": "집계 대상 지역이 아닙니다: <eup> (대상: 고한읍, 사북읍, 정선군, 태백시, 영월군, 삼척시)"}` — 지역 분포에 더할 자리가 없어 조용히 `delta 0`을 내면 "효과 없음"과 구분되지 않는다 |
 | `simulate` 타깃이 소표본 억제 셀(k=5 미만) 자체 | `400 {"detail": "표본 보호(k=5)로 이 셀의 예상 효과는 산출하지 않습니다: <eup> <category>"}` — 판정은 `usage_monthly.json`의 `privacy_meta.suppressed_cells` 기준(A3 후속) |
-| 조건부 필수 body 필드 누락 | **422**. 필드가 스키마에는 선택이지만 **다른 값에 따라 필수가 되는** 경우다: ① 반려·보류의 `reason`, ② `confidence=하` 카드 승인의 `reason`(확인 근거), ③ INCENTIVE 승인의 `selected_rate`, ④ `metrics` 값에 딸린 `measured_from`·`measured_to`·`source`·`scope`, ⑤ `완료` 기록의 `completion_evidence`. **값이 있는데 유효하지 않은 것(400)과 등급을 가른다** — 없는 값을 요구하는 것과 잘못 쓴 값을 되돌리는 것은 담당자가 할 일이 다르다 |
+| 조건부 필수 body 필드 누락 | **422**. 필드가 스키마에는 선택이지만 **다른 값에 따라 필수가 되는** 경우다: ① 반려·보류의 `reason`, ② `confidence=하` 카드 승인의 `reason`(확인 근거), ③ INCENTIVE 승인의 `selected_rate`, ④ 승인 전 `safety_reviewed=true`, ⑤ `metrics` 값에 딸린 `measured_from`·`measured_to`·`source`·`scope`, ⑥ `완료` 기록의 `completion_evidence`. **값이 있는데 유효하지 않은 것(400)과 등급을 가른다** — 없는 값을 요구하는 것과 잘못 쓴 값을 되돌리는 것은 담당자가 할 일이 다르다 |
 | INCENTIVE 승인 시 `selected_rate` 범위 밖 | `400 {"detail": "selected_rate는 3|5|7 중 하나여야 합니다"}`. 누락은 위 행의 **422**다. EXPANSION decision에 온 `selected_rate`는 무시하고, **반려·보류에 실려 온 값도 무시한다**(저장하지 않음 — `selected_rate`는 승인 시점에만 확정). 이 400·422는 상태 전이 확인(409) **뒤**에 온다 — pending이 아니라 애초에 결정할 수 없는 카드의 body를 먼저 따질 이유가 없다 |
 | 결정 요청의 `version` 불일치 | `409 {"detail": ...}` — 화면이 읽은 뒤 다른 요청이 카드를 바꿨다. `version`을 생략하면 이 검사를 하지 않는다(§2 결정 요청) |
 | 빠른 상태 변경으로 `완료` 요청 | `422 {"detail": ...}` — 완료는 증빙과 함께 `progress-records`로만 기록한다. 응답 문구가 그 API로 안내한다 |
