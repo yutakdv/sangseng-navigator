@@ -141,6 +141,23 @@ def _stage_durations(grouped: dict[str, list[dict]]) -> list[dict]:
     return result
 
 
+def _metric_value(raw) -> float | None:
+    """관측값 1건에서 수치만 꺼낸다 — 저장 형태는 `{value, measured_from, …}` 객체다.
+
+    05 §2 개정으로 `metrics`의 값이 스칼라에서 객체가 됐다. 객체를 그대로 `float()`에 넘기면
+    리포트 전체가 500이 되므로 여기서 `value`만 읽는다. 개정 이전에 저장된 기록은 스칼라라
+    두 형태를 모두 받는다 — 리포트는 과거 기록까지 거슬러 집계하는 화면이다.
+    """
+    if isinstance(raw, dict):
+        raw = raw.get("value")
+    if raw is None or isinstance(raw, bool):
+        return None
+    try:
+        return float(raw)
+    except (TypeError, ValueError):
+        return None
+
+
 def _metric_changes(grouped: dict[str, list[dict]]) -> dict[str, dict]:
     result: dict[str, dict] = {}
     for metric, meta in METRIC_META.items():
@@ -148,9 +165,9 @@ def _metric_changes(grouped: dict[str, list[dict]]) -> dict[str, dict]:
         for rows in grouped.values():
             observed: list[float] = []
             for row in rows:
-                value = (row.get("metrics") or {}).get(metric)
-                if value is not None and not isinstance(value, bool):
-                    observed.append(float(value))
+                value = _metric_value((row.get("metrics") or {}).get(metric))
+                if value is not None:
+                    observed.append(value)
             if len(observed) >= 2:
                 pairs.append((observed[0], observed[-1]))
 

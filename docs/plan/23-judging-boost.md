@@ -14,7 +14,7 @@
 | 데이터활용성 | 공공데이터 6종 원천 · 10단계 파이프라인 · 가중치 95개 조합 민감도 분석 | `pipeline/p1_usage.py`~`p10_privacy.py` · `pipeline/p8_sensitivity.py` |
 | 데이터활용성 | 소표본 보호(k=5) · 데이터셋 버전 manifest · 출처 칩 | `pipeline/p10_privacy.py`(§4) · `pipeline/tests/test_privacy.py` |
 | 완성도 | LLM 인젝션 격리 · fail-closed 설계 · 자동 테스트 | `backend/app/prompts.py`(`<data>` 블록 격리) · `backend/tests/test_injection.py` |
-| 완성도 | 8개 화면 · 로딩/404/에러 경계 · mock↔실 API 이중 모드 | `frontend/src/app/`(라우트 8개) · `frontend/src/lib/api.ts` |
+| 완성도 | 8개 화면 · 로딩/404/에러 경계 · 실 API 전용(주소 누락 시 fail-fast) | `frontend/src/app/`(라우트 8개) · `frontend/src/lib/api.ts` |
 | 활용가치 | 임팩트 헤드라인과 승인 워크플로 | `data/processed/dashboard.json`(`impact_meta`, §3) · `backend/app/routes/cards.py` |
 | 활용가치 | 셀 부하 기반 투트랙 처방 분기 | `pipeline/p9_cell_load.py`(§2) · `frontend/src/components/CellExplorer.tsx` |
 | 사회적가치 | 특별법상 지역경제 진흥 책무 · 개인사업자 역산 방지 | `pipeline/p10_privacy.py`(§4) · `privacy_meta` |

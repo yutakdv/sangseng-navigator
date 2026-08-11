@@ -1,10 +1,46 @@
 import { normalizedProgress } from "@/lib/cardWorkflow";
 import { REGIONS } from "@/lib/constants";
 import { monthLabel, num } from "@/lib/format";
+import { josa } from "@/lib/korean";
 import type { Card, CardType, CandidatesResponse, Dashboard, Kpi } from "@/types";
 
 export type DashboardView = ReturnType<typeof composeDashboardView>;
 export type EvidenceView = ReturnType<typeof composeEvidence>;
+
+/**
+ * 화면이 "지역 사용 건수"로 말하는 **총계 하나** — 반올림을 타지 않는 정본을 쓴다.
+ *
+ * 공개 배열의 `count`를 더하면 총계가 배열마다 달라진다. 소표본 보호가 영향받는 합계만
+ * 100 단위로 반올림해 발행하기 때문이고, 실측으로 지역 배열은 정본보다 +25, 업종 배열은 −42
+ * 어긋난다 — 같은 화면 안에서 서로 다른 총계가 나오는 원인이었다.
+ *
+ * 폴백 순서는 정본(`canonical_total`) → 임팩트 근거의 연간 사용 건수(정의상 같은 값) →
+ * 마지막으로 배열 합. 앞의 둘이 없는 구형 응답에서까지 화면을 비우지는 않되, 그 경우에만
+ * 반올림된 합을 쓴다.
+ */
+export function canonicalTotalUses(dashboard: Dashboard): number {
+  const canonical = dashboard.privacy_meta?.canonical_total;
+  if (typeof canonical === "number") return canonical;
+  const fromImpact = dashboard.impact_meta?.annual_local_uses;
+  if (typeof fromImpact === "number") return fromImpact;
+  return (dashboard.region_share ?? []).reduce((sum, row) => sum + row.count, 0);
+}
+
+/**
+ * 공개 배열 합이 정본 총계와 얼마나 벌어지는지 — 반올림이 만든 차이를 화면이 설명할 때 쓴다.
+ * 값이 없으면(구형 응답) `null`이고, 그때는 차이를 수치로 말하지 않는다.
+ */
+export function roundingGap(
+  dashboard: Dashboard,
+  array: "region_share" | "category_share" | "monthly_by_region",
+): number | null {
+  const adjustment = dashboard.privacy_meta?.privacy_rounding_adjustment;
+  return adjustment ? adjustment[array] : null;
+}
+
+/** 부호를 붙인 표기 — 공개값이 정본보다 큰지 작은지를 감추지 않는다 */
+export const signedCount = (value: number): string =>
+  `${value > 0 ? "+" : value < 0 ? "−" : ""}${num(Math.abs(value))}`;
 
 const byPendingOrder = (a: Card, b: Card): number =>
   Number(b.ai.adjusted) - Number(a.ai.adjusted) || a.created_at.localeCompare(b.created_at);
@@ -56,7 +92,7 @@ export function composeEvidence(
   const targetCategory = card?.target?.category ?? null;
   const category = (dashboard.category_share ?? []).find((row) => row.category === targetCategory);
   const categoryInsight = category
-    ? `${category.category}은 전체 사용의 ${Math.round(category.share * 100)}%입니다. AI 제안 업종의 실제 사용 규모를 함께 확인하세요.`
+    ? `${josa(category.category, "은/는")} 전체 사용의 ${Math.round(category.share * 100)}%입니다. AI 제안 업종의 실제 사용 규모를 함께 확인하세요.`
     : "업종별 사용 비중을 비교해 제안 대상의 현재 규모를 확인합니다.";
   /**
    * 허브 미리보기용 한 줄 — **1단계 읍·시 스코어** 상위 3곳 (절대 규칙 5의 텍스트 병기).

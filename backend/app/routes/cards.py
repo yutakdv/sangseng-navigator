@@ -3,16 +3,30 @@ import json
 import logging
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Response
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 from app import dataload, db, llm, prompts, security
-from app.services import cardgen, progress_records, simulate, workflow
+from app.services import cardgen, cards_view, progress_records, simulate, workflow
 
 router = APIRouter()
 log = logging.getLogger(__name__)
 
 DECISIONS = ("approved", "rejected", "held")
 RATES = (3, 5, 7)
+DECISION_SOURCES = ("operator_ui", "api")
+DEFAULT_COOLDOWN_DAYS = 90              # 분기 의사결정 주기 — 05 문서 §2 결정 요청
+REASON_REQUIRED = ("rejected", "held")  # 사유 없는 반려·보류는 감사 기록이 성립하지 않는다
+LOW_CONFIDENCE = "하"
+
+# 승인 시 담당자가 확인하는 안전 검토 범위. 특정 기관의 공식 규정명을 가장하지 않고
+# 이 서비스가 실제로 강제하는 내부 기준과 버전을 기록한다. 화면의 확인 문구와 API 감사 기록이
+# 같은 범위를 가리켜야 "안전한 AI"가 발표용 문구가 아니라 재현 가능한 동작이 된다.
+SAFETY_REVIEW_POLICY = "sangseng-ai-safety-v1"
+SAFETY_REVIEW_SCOPE = (
+    "data_protection",       # 소표본 보호·공개 범위
+    "source_grounding",      # 원 순위·수치 검증 범위
+    "bias_ethics",           # 반대 관점·지역 형평·윤리 영향
+)
 
 ASSUMPTION_NOTE = "가정 기반 전망이며 실제와 다를 수 있음"   # 절대 규칙 3 — 고정 문구
 NARRATIVE_SCHEMA = {
@@ -26,6 +40,40 @@ NARRATIVE_SCHEMA = {
 class DecisionBody(BaseModel):
     decision: str
     selected_rate: int | None = None      # INCENTIVE 승인 시에만 필수 (05 문서 §2·§8)
+    # 반려·보류와 저신뢰 승인에서 필수. 스키마가 아니라 라우트가 요구한다 —
+    # 카드 상태(confidence·decision)에 따라 필수 여부가 갈려 pydantic 단독으로 표현되지 않는다.
+    reason: str | None = Field(None, max_length=1000)
+    actor_id: str = Field(min_length=1, max_length=100)
+    actor_name: str | None = Field(None, max_length=100)
+    decision_source: str = Field("operator_ui", max_length=40)
+    version: int | None = None            # 낙관적 잠금 (선택, 권장 — 05 §2 결정 요청)
+    cooldown_days: int = Field(DEFAULT_COOLDOWN_DAYS, ge=0, le=365)
+    recheck_condition: str | None = Field(None, max_length=500)
+    # 승인에만 필수인 담당자 자기확인. 단순 UI 체크로 끝내지 않고 서버가 누락을 거부하며,
+    # 성공한 확인은 아래 decision 감사 기록에 기준 버전·범위와 함께 남긴다.
+    safety_reviewed: bool = False
+
+    @field_validator("reason", "actor_name", "recheck_condition")
+    @classmethod
+    def _strip_optional(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        return value.strip() or None
+
+    @field_validator("actor_id")
+    @classmethod
+    def _strip_actor(cls, value: str) -> str:
+        value = value.strip()
+        if not value:
+            raise ValueError("공백이 아닌 값이 필요합니다")
+        return value
+
+    @field_validator("decision_source")
+    @classmethod
+    def _known_source(cls, value: str) -> str:
+        if value not in DECISION_SOURCES:
+            raise ValueError(f"{'|'.join(DECISION_SOURCES)} 중 하나여야 합니다")
+        return value
 
 
 class ProgressBody(BaseModel):
@@ -68,7 +116,7 @@ def get_cards(card_type: str | None = Query(None, alias="type"), status: str | N
     if status:
         cards = [c for c in cards if c.get("status") == status]
     cards.sort(key=lambda c: c.get("created_at") or "", reverse=True)
-    return {"cards": cards}
+    return {"cards": cards_view.present_all(cards)}
 
 
 @router.post("/cards/generate", status_code=201)
@@ -85,16 +133,19 @@ def generate(
     except FileNotFoundError as exc:
         raise HTTPException(status_code=503, detail=f"{exc}.json이 아직 생성되지 않았습니다") from exc
     except cardgen.NoAvailableCandidate as exc:     # 제안할 신규 후보가 하나도 없는 상태 = 409
-        raise HTTPException(status_code=409,
-                            detail="제안할 수 있는 신규 후보가 없습니다 (전 후보에 승인 대기 또는 진행 중인 업무가 있음)") from exc
+        raise HTTPException(
+            status_code=409,
+            detail=("제안할 수 있는 신규 후보가 없습니다 (전 후보에 승인 대기·진행 중인 업무가 있거나 "
+                    "반려·보류로 재제안이 차단됨)"),
+        ) from exc
     if not created:
         response.status_code = 200
-    return {"card": card}
+    return {"card": cards_view.present(card)}
 
 
 @router.get("/cards/{cid}")
 def get_one(cid: str):
-    return {"card": _get_or_404(cid)}
+    return {"card": cards_view.present(_get_or_404(cid))}
 
 
 @router.post("/cards/{cid}/decision")
@@ -105,20 +156,73 @@ def decide(
 ):
     """승인/반려/보류 — pending 카드에서만 가능 (05 문서 §8).
 
-    검사 순서는 404(없는 ID) → 400(body 값) → 409(상태 전이). 없는 카드에 잘못된 body를 보내면
-    05 §8대로 404가 나가야 하므로 카드 조회를 body 검증보다 먼저 한다.
+    검사 순서는 404(없는 ID) → 400(decision 값) → 409(상태 전이) → 422(조건부 필수) → 400(값 범위).
+    없는 카드에 잘못된 body를 보내면 05 §8대로 404가 나가야 하므로 카드 조회를 body 검증보다 먼저 한다.
+    422와 400을 가르는 기준은 "없는 값을 요구하는가, 잘못 쓴 값을 되돌리는가"다 — 담당자가 할 일이 다르다.
     """
     card = _get_or_404(cid)
     if body.decision not in DECISIONS:
         raise HTTPException(status_code=400, detail="decision은 approved|rejected|held 중 하나여야 합니다")
     if card.get("status") != "pending":
         raise HTTPException(status_code=409, detail=f"pending 카드만 결정할 수 있습니다 (현재 status={card.get('status')})")
+    if body.decision in REASON_REQUIRED and not body.reason:
+        raise HTTPException(
+            status_code=422,
+            detail=("반려·보류에는 사유가 필요합니다. 다음 분기에 같은 대상을 다시 볼 때 "
+                    "이 판단의 근거가 됩니다"),
+        )
+    # 저신뢰 승인 게이트 — confidence는 서버 산출값이고(LLM 자기평가 아님) `하`는 표본 신뢰도가
+    # 낮거나 도로 접근성이 미산출인 후보다. 근거 없이 통과시키지 않는다 (05 §2 confidence).
+    if body.decision == "approved" and card.get("confidence") == LOW_CONFIDENCE and not body.reason:
+        raise HTTPException(
+            status_code=422,
+            detail=("신뢰도가 낮은 카드를 승인하려면 확인 근거가 필요합니다. 무엇을 별도로 "
+                    "확인했는지 사유에 적어 주세요"),
+        )
+    if body.decision == "approved" and not body.safety_reviewed:
+        raise HTTPException(
+            status_code=422,
+            detail=("승인 전 소표본 보호를 포함한 데이터 보호 범위·서버 검증 근거·AI 비교·반대 관점을 확인해 주세요. "
+                    "편향과 윤리 영향 검토가 기록되어야 승인할 수 있습니다"),
+        )
     if body.decision == "approved" and card.get("type") == "INCENTIVE":
+        if body.selected_rate is None:
+            raise HTTPException(status_code=422, detail="페이백률(3|5|7)이 필요합니다")
         if body.selected_rate not in RATES:
-            raise HTTPException(status_code=400, detail="selected_rate(3|5|7)가 필요합니다")
-        card["selected_rate"] = body.selected_rate      # EXPANSION에 온 selected_rate는 무시
+            raise HTTPException(status_code=400, detail="selected_rate는 3|5|7 중 하나여야 합니다")
     # EXPANSION의 approved는 가맹 확정이 아니라 후보 접촉·검토 Work Item 시작이다.
     initial_progress = "후보 접촉·검토 시작" if card.get("type") == "EXPANSION" else "검토중"
+    now = db.now_iso()
+    # 신원이 검증되지 않았다는 사실을 함께 저장한다 — 담당자 계정 체계가 없어 actor_id는 화면이
+    # 보낸 자기신고 값이고 인증은 공유 토큰 하나다. 검증된 것처럼 저장하면 감사 기록이 형식만
+    # 남으므로, 나중에 이 기록을 읽는 사람이 신뢰 수준을 알 수 있게 명시한다 (05 §2 decision).
+    decision_record = {
+        "outcome": body.decision,
+        "reason": body.reason,
+        "actor_id": body.actor_id,
+        "actor_name": body.actor_name,
+        "source": body.decision_source,
+        "auth": "shared_token",
+        "verified": False,
+        "at": now,
+        # 반려·보류는 안전 검토를 통과시킨 결정이 아니므로 기록하지 않는다. 승인만 기준 버전과
+        # 확인 범위를 남겨, 나중에 무엇을 확인하고 통과시켰는지 되짚을 수 있게 한다.
+        **({"safety_review": {
+            "policy": SAFETY_REVIEW_POLICY,
+            "acknowledged": True,
+            "scope": list(SAFETY_REVIEW_SCOPE),
+        }} if body.decision == "approved" else {}),
+    }
+    # 반려·보류한 대상을 곧바로 다시 제안하지 않기 위한 차단 창 (05 §8). 승인에는 붙지 않는다 —
+    # 승인된 타깃은 진행 중 업무로 이미 후보에서 빠진다.
+    block = None
+    if body.decision in REASON_REQUIRED and (card.get("target") or {}).get("eup"):
+        block = {
+            "until": cardgen.cooldown_until(now, body.cooldown_days),
+            "cooldown_days": body.cooldown_days,
+            "recheck_condition": body.recheck_condition,
+            "reason": body.reason,
+        }
     try:
         updated = db.decide_card(
             cid,
@@ -129,10 +233,14 @@ def decide(
             selected_rate=(body.selected_rate
                            if card.get("type") == "INCENTIVE" and body.decision == "approved"
                            else None),
+            decision_record=decision_record,
+            reproposal_block=block,
+            expected_version=body.version,
+            now=now,
         )
     except db.ConcurrentUpdate:
         raise HTTPException(status_code=409, detail="다른 요청이 먼저 카드 결정을 변경했습니다. 새로고침 후 다시 시도하세요") from None
-    return {"card": updated}
+    return {"card": cards_view.present(updated)}
 
 
 def _direction(delta_pp: list) -> str:
@@ -169,12 +277,12 @@ def _fallback_narrative(r: dict) -> str:
     if kind == "미미":
         # 변화가 0인 이유가 둘로 갈린다 — 추정치 자체가 0인 경우(유사 가맹점 실적 없음)와
         # 추정치는 있으나 6지역 전체 규모에 견줘 작은 경우. 둘을 뭉뚱그리면 근거를 못 댄다.
-        basis = ("유사 가맹점의 최근 3개월 실적이 없어 예상 월 이용 건수 추정치가 0건이라"
+        basis = ("유사 가맹 전환 점포의 최근 3개월 실적이 없어 예상 월 이용 건수 추정치가 0건이라"
                  if not r["expected_monthly_count"]
                  else f"예상 월 이용 건수 약 {r['expected_monthly_count']}건이 6개 지역 전체 규모에 견주면 작아")
-        return (f"{r['eup']} {r['category']} 업종에 신규 가맹점이 1곳 추가되어도 {basis}, "
+        return (f"{r['eup']} {r['category']} 업종에서 기존 상가 1곳이 가맹 전환되어도 {basis}, "
                 "지역 소비 집중도는 소수점 첫째 자리 기준으로 변화가 나타나지 않을 것으로 예상됩니다. "
-                "이는 유사 가맹점의 평균 초기 실적을 가정한 전망이며, 실제 결과는 입지·홍보 여부에 따라 "
+                "이는 유사 가맹 전환 점포의 평균 초기 실적을 가정한 전망이며, 실제 결과는 입지·홍보 여부에 따라 "
                 "달라질 수 있습니다.")
     if kind == "개선":
         change = f"약 {lo}~{hi}%p 개선될"
@@ -182,9 +290,9 @@ def _fallback_narrative(r: dict) -> str:
         change = f"약 {abs(hi)}~{abs(lo)}%p 상승(집중 심화)할"
     else:
         change = f"약 {lo}~+{hi}%p 사이로 개선·심화 양방향이 모두 가능할"
-    return (f"{r['eup']} {r['category']} 업종에 신규 가맹점이 1곳 추가되면 지역 소비 집중도가 "
+    return (f"{r['eup']} {r['category']} 업종에서 기존 상가 1곳이 가맹 전환되면 지역 소비 집중도가 "
             f"{move}{change} 것으로 예상됩니다. "
-            "이는 유사 가맹점의 평균 초기 실적을 가정한 전망이며, 실제 결과는 입지·홍보 여부에 따라 "
+            "이는 유사 가맹 전환 점포의 평균 초기 실적을 가정한 전망이며, 실제 결과는 입지·홍보 여부에 따라 "
             "달라질 수 있습니다.")
 
 
@@ -241,9 +349,9 @@ def simulate_card(
         # 경로). 새 모듈을 만들지 않고 cardgen의 헬퍼를 그대로 재사용한다.
         user_payload = {
             "대상": f"{cardgen._clean_external(result['eup'])} "
-                   f"{cardgen._clean_external(result['category'])} 업종 신규 가맹점 1곳",
+                   f"{cardgen._clean_external(result['category'])} 업종 기존 상가 1곳의 하이원포인트 가맹 전환",
             "예상 변화(부호 해석 완료)": direction,
-            "신규 가맹점 예상 월 이용 건수(가정치)": result["expected_monthly_count"],
+            "가맹 전환 시 예상 월 이용 건수(가정치)": result["expected_monthly_count"],
             "관측 기반 예상 월 이용 건수 범위": result["expected_monthly_range"],
             "범위 산출 방법": result["uncertainty_method"],
             "작성 지침": ("'예상 변화'의 방향(개선/상승)과 폭을 그대로 서술하고, 주어지지 않은 "
@@ -263,7 +371,10 @@ def simulate_card(
                                            or (kind == "개선" and "심화" in narrative))
     # LLM 문구를 실제로 채택했는지 = 화면이 "AI가 쓴 문장"이라고 말해도 되는지 (05 §2 narrative_source).
     # 호출 실패·내용 가드 불통과는 물론, 혼재·미미라 애초에 호출하지 않은 구간도 여기서 False가 된다.
+    # 민감 속성 판정은 카드 생성 경로와 같은 함수를 쓴다 — LLM 출력 세 곳(카드·인센티브·이 문구)
+    # 중 하나라도 빠지면 "민감 속성 서술은 폐기된다"는 README 문장이 사실이 아니게 된다.
     used_llm = (bool(narrative) and not wrong_direction
+                and not cardgen.mentions_sensitive_attribute(narrative)
                 and "예상" in narrative and "가정" in narrative)
     if not used_llm:
         narrative = _fallback_narrative(result)
@@ -323,9 +434,14 @@ def set_progress(
                 "idempotency_key": body.idempotency_key,
                 "note": None,
                 "metrics": {},
+                # 이 경로에는 완료 증빙을 실을 자리가 없다. 완료는 위젯 배지·KPI에 직결되므로
+                # 근거 없이 만들어지면 안 되어, 서비스가 422로 막고 기록 API로 안내한다 (05 §8).
+                "allow_completion": False,
             },
             default_source="quick_status",
         )
+    except progress_records.MissingRequirement as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from None
     except progress_records.UnsupportedProgress as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from None
     except progress_records.InvalidProgressRecord as exc:
@@ -336,7 +452,7 @@ def set_progress(
         raise HTTPException(status_code=409, detail=str(exc)) from None
     except db.ConcurrentUpdate:
         raise HTTPException(status_code=409, detail="다른 요청이 먼저 추진 상태를 변경했습니다. 새로고침 후 다시 시도하세요") from None
-    return {"card": updated, "record": record, "created": created}
+    return {"card": cards_view.present(updated), "record": record, "created": created}
 
 
 @router.post("/cards/{cid}/verification")
@@ -381,4 +497,4 @@ def set_verification(
         updated = db.update_verification(cid, verification, expected_version=card.get("version"))
     except db.ConcurrentUpdate:
         raise HTTPException(status_code=409, detail="다른 요청이 먼저 적격성 정보를 변경했습니다. 새로고침 후 다시 시도하세요") from None
-    return {"card": updated}
+    return {"card": cards_view.present(updated)}

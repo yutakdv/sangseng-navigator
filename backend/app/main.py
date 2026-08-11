@@ -12,10 +12,12 @@ if not IS_DEPLOYED:                                     # 로컬에서만 .env �
     load_dotenv(Path(__file__).parents[2] / ".env")
 
 from fastapi import FastAPI, HTTPException, Request
+from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
+from fastapi.responses import JSONResponse
 
-from app import security
+from app import korean, security
 from app.routes import cards, dashboard, kpi, progress, widget
 
 
@@ -56,6 +58,77 @@ app.add_middleware(
     allow_headers=["Authorization", "Content-Type", "X-Request-ID"],
     expose_headers=["X-Dataset-Version"],   # 없으면 브라우저 JS가 이 헤더를 못 읽는다 (05 §5)
 )
+
+
+_FIELD_LABELS = {           # 화면에 그대로 나가는 문구라 필드명 대신 담당자 용어를 쓴다
+    "reason": "사유",
+    "actor_id": "담당자 식별자",
+    "decision": "결정",
+    "selected_rate": "페이백률",
+    "progress": "추진 상태",
+    "note": "메모",
+    "metrics": "관측 지표",
+    "measured_from": "측정 시작일",
+    "measured_to": "측정 종료일",
+    "source": "출처",
+    "scope": "측정 범위",
+    "value": "값",
+    "completion_evidence": "완료 증빙",
+    "recorded_at": "기록 시각",
+    "cooldown_days": "재제안 차단 기간",
+}
+
+
+_TYPE_MESSAGES = {         # 자주 나오는 제약 위반은 우리말로 — pydantic 원문은 영어다
+    "missing": "{label}이(가) 필요합니다",
+    "greater_than_equal": "{label}은(는) {limit} 이상이어야 합니다",
+    "less_than_equal": "{label}은(는) {limit} 이하여야 합니다",
+    "greater_than": "{label}은(는) {limit}보다 커야 합니다",
+    "less_than": "{label}은(는) {limit}보다 작아야 합니다",
+    "string_too_long": "{label}은(는) {limit}자를 넘을 수 없습니다",
+    "string_too_short": "{label}에 내용이 필요합니다",
+    "extra_forbidden": "{label}은(는) 받지 않는 항목입니다",
+    "json_invalid": "요청 본문이 올바른 JSON이 아닙니다",
+}
+_LIMIT_KEYS = ("ge", "le", "gt", "lt", "max_length", "min_length")
+
+
+def _describe(error: dict) -> str:
+    """pydantic 오류 1건을 담당자가 읽을 한 문장으로.
+
+    화면이 이 문자열을 붉은 문단에 그대로 표시하므로, 필드명·영어 원문·바이트 오프셋이 아니라
+    **무엇을 고쳐야 하는지**가 보여야 한다. 조사는 유틸로 만든다(05 문서 §8).
+    """
+    # 정수 loc(배열 인덱스·JSON 파싱 오프셋)은 라벨이 될 수 없다 — 걸러 낸다
+    location = [str(part) for part in error.get("loc", ())
+                if isinstance(part, str) and part not in ("body", "query", "path")]
+    label = " ".join(_FIELD_LABELS.get(part, part) for part in location) or "요청 본문"
+    error_type = str(error.get("type", ""))
+    template = _TYPE_MESSAGES.get(error_type)
+    if template is None:
+        return f"{label}: {error.get('msg', '값이 올바르지 않습니다')}"
+    context = error.get("ctx") or {}
+    limit = next((context[k] for k in _LIMIT_KEYS if k in context), "")
+    return (template.replace("{label}이(가)", korean.i_ga(label))
+                    .replace("{label}은(는)", korean.eun(label))
+                    .replace("{label}", label)
+                    .replace("{limit}", str(limit)))
+
+
+@app.exception_handler(RequestValidationError)
+async def normalize_validation_error(request: Request, exc: RequestValidationError):
+    """422의 `detail`을 단일 문자열로 정규화한다 (05 문서 머리말).
+
+    FastAPI 기본 422는 `detail`이 오류 객체 배열이라 두 가지가 깨진다 — 05 머리말의
+    `{"detail": "메시지"}` 계약, 그리고 문자열일 때만 detail을 채택하는 FE 파서(`lib/api.ts`).
+    정규화하지 않으면 담당자 화면에 사유 대신 "경로: 422"만 뜬다. 여러 건이면 앞의 3건만
+    이어 붙인다 — 화면은 이 문자열을 붉은 문단에 통째로 표시하므로 길면 읽히지 않는다.
+    """
+    errors = exc.errors()
+    detail = " / ".join(_describe(error) for error in errors[:3]) or "요청 본문이 올바르지 않습니다"
+    if len(errors) > 3:
+        detail += f" 외 {len(errors) - 3}건"
+    return JSONResponse(status_code=422, content={"detail": detail})
 
 
 @app.middleware("http")

@@ -9,9 +9,10 @@ import { DecisionBar } from "@/components/proposals/DecisionBar";
 import { EvidenceSections } from "@/components/proposals/EvidenceSections";
 import { ProposalSummary } from "@/components/proposals/ProposalSummary";
 import { api } from "@/lib/api";
-import { eventLabel, hasGeneratedEvent } from "@/lib/cardEvents";
+import { eventActorLabel, eventLabel, hasGeneratedEvent } from "@/lib/cardEvents";
 import { composeEvidence } from "@/lib/dashboardView";
 import { ApiError } from "@/lib/errors";
+import type { Card, CardEvent } from "@/types";
 
 export const dynamic = "force-dynamic";
 
@@ -116,6 +117,7 @@ export default async function ProposalDetailPage({ params }: { params: Promise<{
               createdAt={card.created_at}
               decidedAt={card.decided_at}
               events={card.events ?? []}
+              decision={card.decision}
             />
           </Panel>
         </Act>
@@ -127,6 +129,8 @@ export default async function ProposalDetailPage({ params }: { params: Promise<{
         cardType={card.type}
         status={card.status}
         initialRate={card.selected_rate ?? null}
+        confidence={card.confidence}
+        version={card.version}
       />
     </AdminShell>
   );
@@ -137,18 +141,31 @@ function HistoryList({
   createdAt,
   decidedAt,
   events,
+  decision,
 }: {
   createdAt: string;
   decidedAt: string | null;
-  events: { at: string; action: string; record_id?: string }[];
+  events: CardEvent[];
+  /** 결정 기록 — 신원 미검증 표기의 근거다 (05 §2) */
+  decision?: Card["decision"];
 }) {
   // 서버가 `generated` 이벤트를 주면 합성하지 않는다 — 같은 시각의 생성 행이 두 줄로 겹친다.
   // 내부 문자열(`generated`·`progress:추진중`)을 그대로 찍지 않도록 전부 eventLabel을 거친다.
   const rows = [
     ...(hasGeneratedEvent(events)
       ? []
-      : [{ at: createdAt, action: "제안 카드 생성 — 담당자 검토 대기" }]),
-    ...events.map((event) => ({ at: event.at, action: eventLabel(event.action) })),
+      : [{ at: createdAt, action: "제안 카드 생성 — 담당자 검토 대기", actor: null, reason: null,
+           safetyReview: null }]),
+    ...events.map((event) => ({
+      at: event.at,
+      action: eventLabel(event),
+      actor: eventActorLabel(event, decision),
+      reason: event.reason ?? null,
+      safetyReview:
+        event.action === "approved" && decision?.safety_review?.acknowledged
+          ? decision.safety_review
+          : null,
+    })),
   ].sort((a, b) => a.at.localeCompare(b.at));
 
   return (
@@ -159,7 +176,24 @@ function HistoryList({
             <span aria-hidden className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-admin-primary" />
             <div className="min-w-0 flex-1">
               <p className="break-keep text-[13px] font-semibold leading-6 text-admin-text">{row.action}</p>
-              <p className="mt-0.5 text-xs tabular-nums text-admin-text-muted">{stamp(row.at)}</p>
+              <p className="mt-0.5 flex flex-wrap items-center gap-x-2 text-xs text-admin-text-muted">
+                <span className="tabular-nums">{stamp(row.at)}</span>
+                {/* 누가 결정했는지를 지우지 않는다 — 계정 체계가 없다는 사실도 함께 적는다 */}
+                {row.actor ? <span>{row.actor}</span> : null}
+              </p>
+              {row.reason ? (
+                <p className="mt-1 break-keep text-xs leading-5 text-admin-text-soft">
+                  사유 {row.reason}
+                </p>
+              ) : null}
+              {row.safetyReview ? (
+                <p
+                  className="mt-1 break-keep text-xs font-semibold leading-5 text-state-good"
+                  title={`적용 기준 ${row.safetyReview.policy}`}
+                >
+                  담당자 안전 검토 — 데이터 보호·근거 검증·편향/윤리 영향 확인
+                </p>
+              ) : null}
             </div>
           </li>
         ))}

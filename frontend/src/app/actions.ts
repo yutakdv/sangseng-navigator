@@ -14,6 +14,7 @@
 import { revalidatePath } from "next/cache";
 import { api } from "@/lib/api";
 import { ApiError } from "@/lib/errors";
+import { operator } from "@/lib/operator";
 import { isDemoReadOnly } from "@/lib/runtime";
 import type {
   Card,
@@ -49,15 +50,50 @@ const readOnlyFailure = (): ActionResult<never> => ({
   detail: "공개 데모는 읽기 전용입니다. 운영 권한이 연결된 환경에서 변경해 주세요.",
 });
 
-/** 승인/반려/보류 — INCENTIVE 승인에는 rate(3|5|7) 필수 (05 §2). AI 제안이 확정되는 유일한 지점 */
-export async function decideAction(
-  id: string,
-  decision: CardStatus,
-  rate?: PaybackRate,
-): Promise<ActionResult<Card>> {
+/**
+ * 결정 화면이 모으는 값 — 담당자가 실제로 입력·선택하는 것만 담는다.
+ *
+ * 결정자(actor)와 경로(decision_source)는 화면이 아니라 여기서 채운다. 결정 버튼이 두 벌
+ * (`DecisionActions`·`DecisionBar`)이라 화면마다 담으면 한쪽만 빠뜨렸을 때 그 화면에서만 422가 난다.
+ */
+export interface DecisionInput {
+  decision: CardStatus;
+  /** INCENTIVE 승인에만 쓰인다 */
+  rate?: PaybackRate;
+  /** 반려·보류와 신뢰도 `하` 카드 승인에서 필수 (05 §2) */
+  reason?: string;
+  /** 화면이 읽은 카드의 version — 그 사이 카드가 바뀌었으면 서버가 409로 막는다 */
+  version?: number;
+  /** 반려·보류에서만 의미가 있다 — 같은 타깃을 언제까지 다시 제안하지 않을지 */
+  cooldownDays?: number;
+  /** 반려·보류에서만 의미가 있다 — 무엇이 바뀌면 다시 볼지 */
+  recheckCondition?: string;
+  /** 승인 전 데이터 보호·근거 검증·편향/윤리 영향 범위를 확인했는지 */
+  safetyReviewed?: boolean;
+}
+
+/** 승인/반려/보류 — AI 제안이 확정되는 유일한 지점 (절대 규칙 4) */
+export async function decideAction(id: string, input: DecisionInput): Promise<ActionResult<Card>> {
   if (isDemoReadOnly) return readOnlyFailure();
+  const reason = input.reason?.trim();
+  const recheck = input.recheckCondition?.trim();
+  const blocking = input.decision === "rejected" || input.decision === "held";
   try {
-    const { card } = await api.decide(id, decision, rate);
+    const { card } = await api.decide(id, {
+      decision: input.decision,
+      ...(input.rate ? { selected_rate: input.rate } : {}),
+      ...(reason ? { reason } : {}),
+      // 자기신고 값이다 — 서버가 verified:false·공유 토큰 인증과 함께 저장해 검증되지
+      // 않았음을 남긴다. FE가 검증된 척하지 않는다 (05 §2 decision).
+      actor_id: operator.id,
+      ...(operator.name ? { actor_name: operator.name } : {}),
+      decision_source: "operator_ui",
+      ...(input.version === undefined ? {} : { version: input.version }),
+      // 승인에 실어 보내면 서버가 무시하지만, 의미 없는 값을 보내지 않는다
+      ...(blocking && input.cooldownDays !== undefined ? { cooldown_days: input.cooldownDays } : {}),
+      ...(blocking && recheck ? { recheck_condition: recheck } : {}),
+      ...(input.decision === "approved" ? { safety_reviewed: input.safetyReviewed === true } : {}),
+    });
     revalidateAll();
     return { ok: true, data: card };
   } catch (error) {

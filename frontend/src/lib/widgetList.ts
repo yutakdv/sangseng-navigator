@@ -42,16 +42,8 @@ const fold = (s: string): string => s.toLowerCase().replace(/\s+/g, "");
 export const filterByName = (list: Recommendation[], q: string): Recommendation[] =>
   list.filter((r) => fold(r.name).includes(fold(q)));
 
-/**
- * 검색어에 붙일 조사를 고른다 — 사용자가 입력한 말이 그대로 문장에 들어가는 자리라
- * "‘없는가게이름’와"처럼 어긋나면 안 된다. 한글 음절의 종성 유무로 판단하고,
- * 한글이 아닌 글자(영문·숫자)로 끝나면 받침 없는 쪽을 쓴다.
- */
-export function particle(word: string, withJong: string, withoutJong: string): string {
-  const last = word.trim().slice(-1).charCodeAt(0);
-  const isHangulSyllable = last >= 0xac00 && last <= 0xd7a3;
-  return isHangulSyllable && (last - 0xac00) % 28 !== 0 ? withJong : withoutJong;
-}
+// 조사 판정은 `lib/korean.ts`의 particle/josa를 쓴다 — 숫자·로마자까지 다루는 공용 유틸이라
+// 여기서 한글 종성만 보던 자체 구현은 걷어냈다 (main 병합).
 
 /** 업종 정렬은 사전순이 아니라 화면 필터와 같은 표시 순서를 따른다 (constants.CATEGORIES) */
 const CATEGORY_ORDER = new Map<string, number>(CATEGORIES.map((c, i) => [c as string, i]));

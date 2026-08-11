@@ -84,6 +84,30 @@ def apply_daily(doc, pairs):
     return doc
 
 
+def _totals_meta(doc):
+    """정본 총계와 공개 배열이 반올림 때문에 얼마나 어긋났는지 (05 문서 §1).
+
+    `conversion.monthly[].local_uses`는 반올림 대상이 아니므로 그 합이 정본이다
+    (`impact_meta.annual_local_uses`와 같은 값). 실측 2026-08-11 기준 정본 507,628에 대해
+    공개 배열은 region_share +25 · category_share −42 · monthly_by_region +25로 **셋이 서로
+    다르다** — 이 값을 내보내기 전에는 같은 응답 안의 총계 세 개가 왜 다른지 화면이 댈 수 없었고,
+    실제로 화면은 그중 하나를 골라 "지역 사용 건수"로 표시하고 있었다.
+
+    반올림된 값에서 차이를 다시 재는 방식이라 **이 함수는 몇 번 실행해도 같은 값을 낸다** —
+    p10을 다시 돌려도 조정값이 0으로 무너지지 않는다.
+    """
+    canonical = sum(m.get("local_uses") or 0 for m in doc.get("conversion", {}).get("monthly", []))
+    published = {
+        "region_share": sum(e.get("count") or 0 for e in doc.get("region_share", [])),
+        "category_share": sum(e.get("count") or 0 for e in doc.get("category_share", [])),
+        "monthly_by_region": sum(
+            value for row in doc.get("monthly_by_region", [])
+            for key, value in row.items() if key != "month" and isinstance(value, (int, float))
+        ),
+    }
+    return canonical, {name: total - canonical for name, total in published.items()}
+
+
 def apply_dashboard(doc, pairs):
     eups = {e for e, _ in pairs}
     cats = {c for _, c in pairs}
@@ -97,7 +121,10 @@ def apply_dashboard(doc, pairs):
     for entry in doc.get("category_share", []):
         if entry.get("category") in cats and isinstance(entry.get("count"), (int, float)):
             entry["count"] = _round(entry["count"])
-    doc["privacy_meta"] = _meta(pairs)
+    meta = _meta(pairs)
+    # 반올림을 끝낸 **뒤에** 재야 공개값과 정본의 실제 차이가 나온다
+    meta["canonical_total"], meta["privacy_rounding_adjustment"] = _totals_meta(doc)
+    doc["privacy_meta"] = meta
     return doc
 
 

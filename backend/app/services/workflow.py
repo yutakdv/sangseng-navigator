@@ -15,6 +15,8 @@ REQUIRED_ELIGIBILITY_CHECKS = (
 
 CHECK_STATUSES = ("unverified", "verified", "failed")
 
+DONE = "완료"
+
 EXPANSION_PROGRESS = (
     "후보 접촉·검토 시작",
     "적격성 확인",

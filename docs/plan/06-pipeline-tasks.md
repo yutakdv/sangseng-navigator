@@ -113,6 +113,11 @@ COLMAP = {
 ### Task P3: 가맹점 지오코딩 (`p3_merchants.py`)
 
 - [ ] 하이원포인트 가맹점 상세정보 API → 가맹점명·주소·업종 수집 (페이징 완주 + api_cache)
+- [ ] **산출 필드**: `{merchant_id, name, category, eup, address, lat, lng}`.
+      `merchant_id`는 원응답 `FRCS_REG_NO`(가맹점 등록번호)를 **문자열로 정규화**한 안정 식별자다 —
+      Action Card에 저장되어 위젯의 "이번 분기 확충 업종" 배지가 (읍, 업종) 집합 매칭 대신
+      가맹점 ID 매칭을 쓰게 하는 조인 키라, DynamoDB·JSON 왕복에서 int/str이 흔들리지 않도록
+      표기를 하나로 고정한다. 검증 ⑤가 결측 0·중복 0을 강제한다(어기면 P3 중단)
 - [ ] `geocode(addr) -> (lat, lng) | None` 함수: Kakao Local API
       (`https://dapi.kakao.com/v2/local/search/address.json`, 헤더 `Authorization: KakaoAK {키}`)
       → 실패/키 부재 시 VWorld 폴백. 0.1초 간격 호출
@@ -123,7 +128,8 @@ COLMAP = {
 - [ ] Kakao REST 키 발급이 막히는 경우 VWorld 지오코더 폴백:
       `https://api.vworld.kr/req/address?service=address&request=getcoord&type=ROAD&address=...&key=...`
       (호출 인터페이스는 `geocode(addr) -> (lat, lng) | None` 함수 하나로 감싸 provider 교체 가능하게)
-- [ ] **검증:** 성공률 출력 (목표 ≥ 90%). 좌표가 공통 원칙 5의 유효 범위(위도 36.5~38.5, 경도 127.5~129.5) 안인지 샘플 확인
+- [ ] **검증:** 성공률 출력 (목표 ≥ 90%). 좌표가 공통 원칙 5의 유효 범위(위도 36.5~38.5, 경도 127.5~129.5) 안인지 샘플 확인.
+      `merchant_id` 결측·중복 전수 검사(⑤) — 하나라도 걸리면 `SystemExit`으로 중단
 
 ### Task P4: 소진공 상가정보 (`p4_stores.py`)
 

@@ -244,8 +244,15 @@ def write_record_and_project_card(
     require_verified: bool,
     entering_hold: bool,
     resuming_hold: bool,
+    verified_merchant_id: str | None = None,
 ) -> dict:
-    """Atomically put a record and update the card's current progress projection."""
+    """Atomically put a record and update the card's current progress projection.
+
+    ``verified_merchant_id`` lands on the card in the same transaction as the
+    completion record that carried it.  Splitting them would leave a window in
+    which the card reads as completed while the widget still has no badge
+    source, and no single request would own reconciling that.
+    """
     names = {
         "#status": "status",
         "#progress": "progress",
@@ -309,6 +316,11 @@ def write_record_and_project_card(
     if record["progress"] == "완료":
         names["#completed_at"] = "completed_at"
         sets.append("#completed_at = if_not_exists(#completed_at, :recorded_at)")
+    if verified_merchant_id:
+        names["#target"] = "target"
+        names["#verified_merchant_id"] = "verified_merchant_id"
+        values[":verified_merchant_id"] = verified_merchant_id
+        sets.append("#target.#verified_merchant_id = :verified_merchant_id")
 
     update_expression = f"SET {', '.join(sets)}"
     if removes:

@@ -72,6 +72,20 @@ export interface PrivacyMeta {
   suppressed_cells: { eup: string; category: string }[];
   aggregate_rounding: { unit: number };
   note: string;
+  /**
+   * 반올림을 타지 않는 정본 총 사용 건수. **화면이 "지역 사용 건수" 총계로 표시하는 값은 이것뿐이다** —
+   * 공개 배열의 count를 더해 총계를 만들지 않는다. 구형 응답에는 없어 옵셔널이다.
+   */
+  canonical_total?: number;
+  /**
+   * 배열별 count 합에서 canonical_total을 뺀 값(공개값 − 정본). 반올림이 만든 차이를 화면이
+   * 설명할 수 있게 하는 근거이며 셋이 서로 다르다.
+   */
+  privacy_rounding_adjustment?: {
+    region_share: number;
+    category_share: number;
+    monthly_by_region: number;
+  };
 }
 
 /**
@@ -238,6 +252,84 @@ export type CardProgress =
 export type PaybackRate = 3 | 5 | 7;
 export type EligibilityCheckStatus = "unverified" | "verified" | "failed";
 
+/**
+ * 지금 이 카드에서 고를 수 있는 다음 단계 — **서버 전이 규칙의 정본**이다.
+ *
+ * 허용되지 않는 항목도 이유와 함께 전부 실려 온다(화면이 왜 못 고르는지 말해야 하므로).
+ * FE는 순차 전이·보류 재개·적격성 게이트를 자체 판정하지 않는다 — 규칙이 어긋나면 화면이
+ * 서버가 거부할 선택지를 정상으로 제시하고 사용자는 고른 뒤 409를 본다.
+ *
+ * `allowed`인데 `reason`이 있으면 "선택은 가능하지만 이 경로로는 안 되는 단계"다 —
+ * 완료가 그렇다(증빙이 필요해 추진 기록으로만 남긴다). 화면은 그 이유를 그대로 보여 준다.
+ */
+export interface AllowedProgressOption {
+  value: CardProgress;
+  allowed: boolean;
+  reason?: string;
+}
+
+/**
+ * 확충 카드의 타깃. 두 ID는 원천이 달라 **절대 합치지 않는다** —
+ * `candidate_store_id`는 소진공 상가정보(진단 측), `verified_merchant_id`는
+ * 하이원포인트 가맹점(처방 측)이다 (절대 규칙 6).
+ */
+export interface CardTarget {
+  eup: string;
+  category: string;
+  /** 후보 상가의 안정 키 — 후보 순위 슬롯(CAND-00N)과 달리 재산출에도 같은 점포를 가리킨다 */
+  candidate_store_id?: string | null;
+  /** 그 후보가 실제 가맹점이 된 뒤 확인된 가맹점 등록번호. **확인 전 null이 정상 상태다** */
+  verified_merchant_id?: string | null;
+}
+
+export type DecisionSource = "operator_ui" | "api";
+
+/**
+ * 결정 1건의 감사 기록.
+ *
+ * `verified: false`는 지금 신원이 검증되지 않았다는 사실을 정직하게 남기는 값이다 —
+ * 담당자 계정 체계가 없어 `actor_id`는 화면이 보낸 자기신고 값이고 인증은 공유 토큰 하나다.
+ * **화면은 이 사실을 감추지 않는다**(이력의 담당자 이름 옆 작은 표기).
+ */
+export interface CardDecision {
+  outcome: CardStatus;
+  reason: string | null;
+  actor_id: string;
+  actor_name: string | null;
+  source: DecisionSource | string;
+  auth: string;
+  verified: boolean;
+  at: string;
+  /** 승인 전 담당자가 확인한 데이터·AI 안전 검토 기준. 구형 카드와 반려·보류에는 없다. */
+  safety_review?: {
+    policy: string;
+    acknowledged: boolean;
+    scope: ("data_protection" | "source_grounding" | "bias_ethics" | string)[];
+  };
+}
+
+/** 반려·보류한 타깃의 재제안 차단 창. 인센티브는 타깃이 없어 대상이 아니다 */
+export interface ReproposalBlock {
+  until: string;
+  cooldown_days: number;
+  recheck_condition: string | null;
+  reason: string | null;
+}
+
+/**
+ * 카드 이력 1행. 결정 이벤트는 결정자·사유·경로를, 추진 기록 이벤트는 record_id를 함께 싣는다 —
+ * 시각과 동작만 남으면 누가 왜 그렇게 결정했는지가 기록에서 사라진다.
+ */
+export interface CardEvent {
+  at: string;
+  action: string;
+  record_id?: string;
+  actor_id?: string;
+  actor_name?: string;
+  reason?: string;
+  source?: string;
+}
+
 export interface EligibilityCheck {
   key: string;
   label: string;
@@ -312,8 +404,10 @@ export interface Card {
   type: CardType;
   status: CardStatus;
   progress: CardProgress | null;
+  /** 서버가 요청 시점에 계산해 모든 카드 응답에 싣는 파생값 — 저장 필드가 아니다 */
+  allowed_next_progress?: AllowedProgressOption[];
   title: string;
-  target: { eup: string; category: string } | null;
+  target: CardTarget | null;
   score_rank: number | null;
   ai_rank: number | null;
   /** 진행 중인 업무 제외 후 선택 가능한 후보 안에서의 순위. */
@@ -331,7 +425,11 @@ export interface Card {
   sources: string[];
   created_at: string;
   decided_at: string | null;
-  events?: { at: string; action: string; record_id?: string }[];
+  /** 결정 1건의 감사 기록 — 결정 전에는 없다 */
+  decision?: CardDecision | null;
+  /** 반려·보류 타깃의 재제안 차단 창 — 승인에는 붙지 않는다 */
+  reproposal_block?: ReproposalBlock | null;
+  events?: CardEvent[];
   last_progress_record_at?: string | null;
   last_progress_record_id?: string | null;
   progress_before_hold?: CardProgress | null;
@@ -340,15 +438,89 @@ export interface Card {
   version?: number;
 }
 
+/**
+ * 결정 요청 본문 — 담당자 승인·반려·보류.
+ *
+ * `reason`은 **반려·보류에서 필수**이고 `confidence`가 `하`인 카드의 승인에서도 필수다(확인 근거).
+ * 누락은 서버 422이므로 화면이 사유 입력을 제공해야 한다.
+ * `cooldown_days`·`recheck_condition`은 **반려·보류에서만** 의미가 있다.
+ */
+export interface DecisionRequest {
+  decision: CardStatus;
+  selected_rate?: PaybackRate;
+  reason?: string;
+  /** 담당자 자기신고 값 — 서버가 verified:false와 함께 저장한다 */
+  actor_id: string;
+  actor_name?: string;
+  decision_source: DecisionSource;
+  /** 화면이 읽은 카드의 version. 그 사이 다른 요청이 카드를 바꿨으면 서버가 409를 낸다 */
+  version?: number;
+  cooldown_days?: number;
+  recheck_condition?: string;
+  /** 승인에만 필수 — 서버가 누락을 422로 거부하고 감사 기록에 기준 버전과 함께 남긴다. */
+  safety_reviewed?: boolean;
+}
+
 /* ── §2-1 추진 경과 기록·리포트 ───────────────────────────────── */
 
-export interface ProgressMetrics {
-  usage_count?: number | null;
-  conversion_rate_pct?: number | null;
-  active_merchant_count?: number | null;
-  spend_krw?: number | null;
-  concentration_index?: number | null;
+/**
+ * 관측값 1건의 입력 — 값과 함께 **무엇을 언제 어디서 쟀는지**를 반드시 보낸다.
+ * 다섯 필드가 전부 필수이며 누락은 서버 422다.
+ *
+ * `unit`·`is_proxy`는 **보내지 않는다** — 서버가 지표 정의에서 채워 응답에 싣는다.
+ * 단위를 자유 입력으로 열면 %와 %p를 뒤바꾼 값이 감사 기록에 남는다.
+ */
+export interface ProgressMeasurementInput {
+  value: number;
+  /** `YYYY-MM-DD` */
+  measured_from: string;
+  /** `YYYY-MM-DD` — measured_from보다 이르거나 기록 시각보다 미래일 수 없다 */
+  measured_to: string;
+  source: string;
+  scope: string;
 }
+
+/** 저장된 관측값 — 서버가 채운 단위·근사 여부가 함께 온다 */
+export interface ProgressMeasurement extends ProgressMeasurementInput {
+  /** 지표 정의의 정본은 서버 한 곳이다 — 화면 메타보다 이 값을 우선한다 */
+  unit: string;
+  /** true면 절대 규칙 2에 따라 `근사 지표` 배지를 병기한다 */
+  is_proxy: boolean;
+}
+
+export interface ProgressMetrics {
+  usage_count?: ProgressMeasurement | null;
+  conversion_rate_pct?: ProgressMeasurement | null;
+  active_merchant_count?: ProgressMeasurement | null;
+  spend_krw?: ProgressMeasurement | null;
+  concentration_index?: ProgressMeasurement | null;
+}
+
+export interface ProgressMetricsInput {
+  usage_count?: ProgressMeasurementInput;
+  conversion_rate_pct?: ProgressMeasurementInput;
+  active_merchant_count?: ProgressMeasurementInput;
+  spend_krw?: ProgressMeasurementInput;
+  concentration_index?: ProgressMeasurementInput;
+}
+
+/** 확충 완료 증빙 — 가맹 등록 ID 또는 증빙 문서 중 최소 하나 */
+export interface ExpansionCompletionEvidence {
+  /** 주면 서버가 target.verified_merchant_id에 반영하고 그때부터 위젯 확충 배지가 붙는다 */
+  merchant_registration_id?: string;
+  /** 등록 ID 없이 문서만 주면 카드는 완료되지만 위젯 반영은 대기로 남는다 */
+  document?: string;
+}
+
+/** 인센티브 완료 증빙 — 넷 다 필수이며 예산 한도 확인이 false면 완료로 넘어갈 수 없다 */
+export interface IncentiveCompletionEvidence {
+  applied_from: string;
+  applied_to: string;
+  owner: string;
+  budget_cap_confirmed: boolean;
+}
+
+export type CompletionEvidence = ExpansionCompletionEvidence | IncentiveCompletionEvidence;
 
 export interface ProgressRecordInput {
   progress: CardProgress;
@@ -360,7 +532,9 @@ export interface ProgressRecordInput {
   owner?: string;
   due_at?: string;
   source?: string;
-  metrics?: ProgressMetrics;
+  metrics?: ProgressMetricsInput;
+  /** `완료` 기록에는 필수 — 누락은 서버 422 */
+  completion_evidence?: CompletionEvidence;
   idempotency_key: string;
 }
 
@@ -381,6 +555,7 @@ export interface ProgressRecord {
   due_at: string | null;
   source: string;
   metrics: ProgressMetrics;
+  completion_evidence?: CompletionEvidence | null;
   card_snapshot: {
     type: CardType;
     title: string;
@@ -488,6 +663,12 @@ export interface Kpi {
   /** 구형 화면·응답 호환 별칭. */
   avg_approval_hours: number | null;
   regional_balance_index: number | null;
+  /**
+   * 지역 균형지수를 만든 **표본 수** = 집계 6지역 안에 타깃이 있는 승인 확충 카드 수.
+   * `counts.approved`는 인센티브를 포함해 다른 숫자이므로 표본으로 쓰면 안 된다.
+   * 구형 응답에는 없어 옵셔널이다.
+   */
+  balance_sample_count?: number;
   counts: {
     total: number;
     pending: number;
@@ -507,7 +688,10 @@ export interface Recommendation {
   address: string;
   lat: number;
   lng: number;
-  /** 완료된 EXPANSION 카드의 (읍×업종)과 매칭될 때만 표시 */
+  /**
+   * 완료된 확충 카드의 `target.verified_merchant_id`와 가맹점 등록번호가 **정확히 일치**할 때만 붙는다.
+   * 확인된 ID가 없거나 그 ID가 아직 가맹점 산출에 없으면 붙지 않으며 그 상태를 "반영 대기"라 부른다.
+   */
   badge: "이번 분기 확충 업종" | null;
   directions_url: string;
   /** 완료된 INCENTIVE 카드가 있을 때만 — rate는 그 카드의 selected_rate */
@@ -520,4 +704,13 @@ export interface WidgetResponse {
   policy_note: string;
   /** 현재 필터에 맞는 전체 가맹점 수 — 화면은 한 번에 읽기 좋은 만큼만 보여 준다. */
   total: number;
+  /**
+   * 완료된 확충 카드가 위젯에 실제로 반영된 상태 — **담당자 화면의 정보다.**
+   * 방문객 화면에는 노출하지 않는다(반영 대기는 방문객이 알 일이 아니다).
+   */
+  expansion_sync?: {
+    completed_cards: number;
+    reflected: number;
+    pending_sync: number;
+  };
 }

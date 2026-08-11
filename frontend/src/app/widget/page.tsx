@@ -17,17 +17,18 @@ import { api } from "@/lib/api";
 import { CATEGORIES, REGIONS, REGION_TOOLTIP, VISITOR_SOURCE_NOTE } from "@/lib/constants";
 import { kstWeekdayIndex, todayPickCopy, weekdayFact } from "@/lib/todayPick";
 import { fetchNowcast } from "@/lib/weather";
+// 조사는 레포 공용 유틸을 쓴다 (main에서 들어온 lib/korean.ts) — 화면마다 따로 판정하지 않는다
+import { particle } from "@/lib/korean";
 import {
   DEFAULT_SORT,
   filterByName,
   listNote,
   normalizeQuery,
-  particle,
   sortKeyOf,
   sortRecommendations,
   type SortKey,
 } from "@/lib/widgetList";
-import type { Card, DisplayCategory, Recommendation, Region } from "@/types";
+import type { DisplayCategory, Recommendation, Region } from "@/types";
 
 export const metadata: Metadata = { title: "가맹점 찾기 · 상생 나침반" };
 
@@ -158,7 +159,7 @@ export default async function WidgetPage({ searchParams }: { searchParams: Promi
     (categories.length ? categories : [undefined]).map((c) => ({ r, c })),
   );
 
-  const [widgetResults, dashboard, cand, incentiveRes, usageDaily, weather] =
+  const [widgetResults, dashboard, cand, usageDaily, weather] =
     await Promise.all([
       Promise.all(combos.map(({ r, c }) => api.widget(r, c, fetchLimit))),
       // 푸터 "데이터 기준" 한 줄 전용 — 이 엔드포인트만 죽어도 방문객 위젯 전체가 에러 화면이
@@ -167,8 +168,6 @@ export default async function WidgetPage({ searchParams }: { searchParams: Promi
       // 필터 칩의 가맹점 수 표기용 — merchants는 candidates 응답에 함께 실려 온다 (05 §1).
       // 칩 숫자는 장식이라, 이 엔드포인트가 503이어도 방문객 위젯 자체는 떠야 한다.
       api.candidates().catch(() => null),
-      // 페이백 배너용 — 필터로 추천이 0건이어도 시행 중인 정책은 알려야 하므로 카드에서 직접 읽는다
-      api.cards({ type: "INCENTIVE" }).catch(() => ({ cards: [] as Card[] })),
       // 오늘의 추천 근거 — BE 엔드포인트가 없는 파이프라인 정적 산출물이다 (05 §6)
       api.usageDaily(),
       // 기상청 실황은 있으면 좋은 곁들임이다 — 실패해도 요일 문구는 그대로 나와야 한다.
@@ -215,19 +214,14 @@ export default async function WidgetPage({ searchParams }: { searchParams: Promi
     : undefined;
 
   /**
-   * 페이백 배너 — 우선 추천 항목이 실어 온 값을 쓰고(서버 라벨이 정본), 필터 결과가 0건이라
-   * 추천이 비었을 때는 카드 상태에서 같은 조건(완료된 INCENTIVE + selected_rate,
-   * store.payback()·backend widget.py와 동일)으로 복원한다. 페이백은 전 지역 공통이라
-   * 어떤 필터에서도 시행 사실 자체는 보여야 한다.
+   * 페이백 배너 — **서버 응답이 유일한 근거다.**
+   *
+   * 예전에는 추천이 0건일 때를 메우려고 여기서 카드 목록을 따로 읽어 매칭 규칙
+   * (`완료` + 확정 페이백률)을 독자 복제했다. 규칙이 한 글자라도 갈리면 같은 위젯 안에서
+   * 배너와 카드 배지가 서로 다른 근거로 뜬다 — 방문객에게는 둘 다 사실로 읽히므로 복제를 걷어냈다.
+   * 추천이 0건이면 배너도 뜨지 않는다(붙일 가맹점 자체가 없는 화면이다).
    */
-  const donePayback = incentiveRes.cards
-    .filter((c) => c.progress === "완료" && c.selected_rate)
-    .sort((a, b) => (b.decided_at ?? "").localeCompare(a.decided_at ?? ""))[0];
-  const payback =
-    recommendations.find((r) => r.payback)?.payback ??
-    (donePayback?.selected_rate
-      ? { rate: donePayback.selected_rate, label: `지금 여기서 쓰면 ${donePayback.selected_rate}% 페이백` }
-      : null);
+  const payback = recommendations.find((r) => r.payback)?.payback ?? null;
   /**
    * 오늘의 추천 — 요일 실측이 주근거, 날씨는 상황 설명이다(추천 업종을 바꾸지 않는다).
    * 지역·업종을 여러 개 골랐으면 한 지역/한 업종의 사실로 말할 수 없으므로 "전체" 축으로 돌아간다
@@ -448,7 +442,7 @@ export default async function WidgetPage({ searchParams }: { searchParams: Promi
               {/* 검색으로 0건이 된 것과 필터로 0건이 된 것은 빠져나오는 길이 다르다 */}
               <p className="break-keep text-[15px] font-semibold text-admin-text">
                 {query
-                  ? `‘${query}’${particle(query, "과", "와")} 이름이 맞는 가맹점이 없어요`
+                  ? `‘${query}’${particle(query, "와/과")} 이름이 맞는 가맹점이 없어요`
                   : "해당 조건의 가맹점이 아직 없어요"}
               </p>
               <p className="mt-1.5 break-keep text-[13px] text-admin-text-muted">
