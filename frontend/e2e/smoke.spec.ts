@@ -86,7 +86,10 @@ const cases: RouteCase[] = [
     title: "위젯 (/widget)",
     path: () => "/widget",
     assertCoreElement: async (page) => {
-      await expect(page.getByRole("heading", { name: "지역별 하이원포인트 가맹점", exact: true })).toBeVisible();
+      // 헤더의 "지역별 하이원포인트 가맹점" 제목을 걷어내면서 이 히어로가 화면의 h1이 됐다
+      await expect(
+        page.getByRole("heading", { name: "포인트, 지역에서 가치로 이어지다", exact: true }),
+      ).toBeVisible();
     },
   },
   {
