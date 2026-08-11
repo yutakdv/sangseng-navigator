@@ -70,10 +70,12 @@ export function RankTrace({ card, size = "sm" }: { card: Card; size?: "sm" | "md
       />
       {label ? (
         <span
-          className={`ml-auto inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-semibold ring-1 ring-inset ${
-            adjusted
-              ? "bg-admin-surface text-admin-primary ring-admin-primary-line"
-              : "bg-admin-surface text-admin-text-muted ring-admin-border"
+          // 이 pill은 두 분기 모두 흰 면이고, 놓이는 자리도 흰 카드(추진 경과 리포트)와
+          // 틴트 면(카드 상세)이 섞인다 — 흰 위에 흰이면 링이 유일한 경계라 중립 링은 남긴다.
+          // 분기가 바꾸는 것은 글자색뿐이다 (인디고 링을 지운 자리에 기본색 링이 뜨지 않게
+          // 색 토큰을 베이스로 올렸다).
+          className={`ml-auto inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-semibold ring-1 ring-inset ring-admin-border ${
+            adjusted ? "bg-admin-surface text-admin-primary" : "bg-admin-surface text-admin-text-muted"
           }`}
         >
           {adjusted ? <Icon name="workflow" size={12} strokeWidth={2} /> : null}

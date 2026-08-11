@@ -170,7 +170,7 @@ export default async function IncentivePage({
             <article className="u-panel overflow-hidden">
               <div className="border-b border-admin-border bg-admin-surface-sunken p-4 sm:p-6">
                 <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
-                  <span className="rounded-md bg-admin-surface px-1.5 py-0.5 text-[11px] font-semibold tabular-nums text-admin-text-muted ring-1 ring-inset ring-admin-border">
+                  <span className="rounded-md bg-admin-surface px-1.5 py-0.5 text-[11px] font-semibold tabular-nums text-admin-text-muted">
                     {card.id}
                   </span>
                   <StatusChip status={card.status} />
@@ -288,7 +288,7 @@ export default async function IncentivePage({
                 </>
               }
             >
-              <div className="rounded-xl bg-admin-primary-soft p-4 ring-1 ring-inset ring-admin-primary-line">
+              <div className="rounded-xl bg-admin-primary-soft p-4">
                 <p className="break-keep text-[15px] leading-7 text-admin-text">
                   {card.ai.expected_effect}
                 </p>

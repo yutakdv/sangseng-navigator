@@ -245,10 +245,10 @@ export function CellExplorer({
       {/* ④ 처방 카드 ─ 반전 지점. data-tour 앵커는 가이드 투어가 가리킨다 ── */}
       <div
         data-tour="flip"
-        className={`rounded-xl p-4 ring-1 ring-inset transition-colors duration-200 ${
+        className={`rounded-xl p-4 transition-colors duration-200 ${
           flipped
-            ? "bg-state-warn-bg ring-state-warn-line"
-            : "bg-admin-primary-soft ring-admin-primary-line"
+            ? "bg-state-warn-bg"
+            : "bg-admin-primary-soft"
         }`}
       >
         <div className="flex flex-wrap items-center gap-2">

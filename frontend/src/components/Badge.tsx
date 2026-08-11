@@ -12,7 +12,7 @@ import { ASSUMPTION_NOTE, PRIVACY_NOTE } from "@/lib/constants";
  */
 
 const base =
-  "inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium leading-5 whitespace-nowrap align-middle ring-1 ring-inset";
+  "inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium leading-5 whitespace-nowrap align-middle";
 
 /**
  * `근사 지표` — "지역 전환율"이 보이는 **모든 위치**에 붙인다.
@@ -21,7 +21,7 @@ const base =
 export function ProxyBadge({ note }: { note?: string }) {
   return (
     <span
-      className={`${base} bg-state-notice-bg text-state-notice ring-state-notice-line`}
+      className={`${base} bg-state-notice-bg text-state-notice`}
       title={note}
     >
       <Icon name="info" size={12} strokeWidth={2} />
@@ -34,7 +34,7 @@ export function ProxyBadge({ note }: { note?: string }) {
 export function AssumptionBadge() {
   return (
     <span
-      className={`${base} bg-state-notice-bg text-state-notice ring-state-notice-line`}
+      className={`${base} bg-state-notice-bg text-state-notice`}
       title={ASSUMPTION_NOTE}
     >
       <Icon name="info" size={12} strokeWidth={2} />
@@ -51,7 +51,7 @@ export function AssumptionBadge() {
 export function EstimateBadge({ note }: { note: string }) {
   return (
     <span
-      className={`${base} bg-state-notice-bg text-state-notice ring-state-notice-line`}
+      className={`${base} bg-state-notice-bg text-state-notice`}
       title={note}
     >
       <Icon name="info" size={12} strokeWidth={2} />
@@ -109,7 +109,7 @@ export function AssumptionNote({
 export function NewBadge({ label = "이번 분기 확충 업종", pop = false }: { label?: string; pop?: boolean }) {
   return (
     <span
-      className={`${base} bg-state-good-bg text-state-good ring-state-good-line ${pop ? "motion-safe:animate-pop" : ""}`}
+      className={`${base} bg-state-good-bg text-state-good ${pop ? "motion-safe:animate-pop" : ""}`}
     >
       <Icon name="sparkle" size={12} strokeWidth={2} />
       {label}
@@ -137,10 +137,10 @@ export function PaybackBadge({ label, pop = false }: { label: string; pop?: bool
 export function GradeChip({ grade }: { grade: string }) {
   const tone =
     grade === "높음"
-      ? "bg-state-warn-bg text-state-warn ring-state-warn-line"
+      ? "bg-state-warn-bg text-state-warn"
       : grade === "낮음"
-        ? "bg-state-good-bg text-state-good ring-state-good-line"
-        : "bg-state-notice-bg text-state-notice ring-state-notice-line";
+        ? "bg-state-good-bg text-state-good"
+        : "bg-state-notice-bg text-state-notice";
   const hint =
     grade === "높음"
       ? "특정 지역에 소비가 몰려 있는 구간"
@@ -167,7 +167,7 @@ export function NarrativeSourceChip({ kind }: { kind: NarrativeSourceKind | null
   const { label, note } = NARRATIVE_SOURCE_TEXT[kind];
   const byAi = kind === "ai" || kind === "ai_partial" || kind === "ai_unverified";
   const tone = byAi
-    ? "bg-admin-primary-soft text-admin-primary ring-admin-primary-line"
+    ? "bg-admin-primary-soft text-admin-primary"
     : "bg-admin-surface-sunken text-admin-text-muted ring-admin-border";
   return (
     <span className={`${base} ${tone}`} title={note}>

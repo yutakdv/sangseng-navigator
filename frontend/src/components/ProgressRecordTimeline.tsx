@@ -99,7 +99,7 @@ export function ProgressRecordTimeline({
               {record.blocker || record.next_action ? (
                 <dl className="mt-3 grid gap-2 sm:grid-cols-2">
                   {record.blocker ? (
-                    <div className="rounded-lg bg-state-warn-bg px-3 py-2.5 ring-1 ring-inset ring-state-warn-line">
+                    <div className="rounded-lg bg-state-warn-bg px-3 py-2.5">
                       <dt className="flex items-center gap-1 text-[11px] font-bold text-state-warn">
                         <Icon name="warn" size={12} /> 장애 요인
                       </dt>
@@ -107,7 +107,7 @@ export function ProgressRecordTimeline({
                     </div>
                   ) : null}
                   {record.next_action ? (
-                    <div className="rounded-lg bg-admin-primary-soft px-3 py-2.5 ring-1 ring-inset ring-admin-primary-line">
+                    <div className="rounded-lg bg-admin-primary-soft px-3 py-2.5">
                       <dt className="flex items-center gap-1 text-[11px] font-bold text-admin-primary">
                         <Icon name="arrowRight" size={12} /> 다음 행동
                       </dt>

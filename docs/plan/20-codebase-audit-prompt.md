@@ -400,7 +400,7 @@ FE Server Action / 서버 컴포넌트
 | VWorld | 파이프라인 폴백 | 키 부재 시 파이프라인이 죽는지, 건너뛰는지 |
 | data.go.kr | 파이프라인 수집 | `DATA_GO_KR_API_KEY` 실제 사용 여부 — 안 쓰면 `.env.example`에서 정리 대상 |
 | Kakao Maps JS | `KakaoMapView.tsx` | `NEXT_PUBLIC_KAKAO_MAP_KEY` 미설정/도메인 미등록 시 fallback |
-| OpenFreeMap 타일 | `MapView`/MapLibre | 타일 서버 장애 시 화면 거동, CSP/외부 요청 |
+| Kakao Maps 타일 | `MapView`/`MapViewKakao` | SDK 로드 실패·도메인 미등록 시 화면 거동, CSP/외부 요청 |
 
 파이프라인은 **분기 배치**라 런타임 경로가 아니다 — 실패해도 서비스는 뜨는지(정적 JSON이 커밋돼 있으므로) 확인해 위험도를 조정한다.
 

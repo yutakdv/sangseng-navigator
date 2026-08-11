@@ -74,7 +74,7 @@ export function AdminShell({
               사이드바 바닥에 둔다(SideNav의 항목 문법과 섞이지 않는다) */}
           <TourLink className="mb-3 w-full justify-center" />
           {/* 사이드바 면보다 반 단 낮은 틴트 + 보더 — 계정 칸을 별개 블록으로 눌러 묶는다 */}
-          <div className="flex items-center gap-3 rounded-xl border border-admin-border bg-admin-surface-sunken px-3 py-3">
+          <div className="flex items-center gap-3 rounded-xl bg-admin-surface-sunken px-3 py-3">
             <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-lavender-100 text-[13px] font-bold text-lavender-700">
               {operatorInitial}
             </span>
@@ -94,7 +94,7 @@ export function AdminShell({
             <section
               role="status"
               aria-label="데이터 신선도 경고"
-              className="mx-auto mb-5 flex max-w-[1500px] items-start gap-2.5 rounded-2xl border border-state-warn-line bg-state-warn-bg px-4 py-3 text-xs leading-5 text-state-warn"
+              className="mx-auto mb-5 flex max-w-[1500px] items-start gap-2.5 rounded-2xl bg-state-warn-bg px-4 py-3 text-xs leading-5 text-state-warn"
             >
               <span aria-hidden className="mt-0.5">⚠</span>
               <p>

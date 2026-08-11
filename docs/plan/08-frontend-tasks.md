@@ -26,9 +26,9 @@
 - [ ] 설치: `recharts`, `maplibre-gl` (지도는 `"use client"` 컴포넌트 + `next/dynamic`(ssr:false)로 로드,
       `maplibre-gl/dist/maplibre-gl.css` import 필수 — Leaflet은 사용하지 않는다, 사유는 02 문서 "지도 결정")
 - [ ] 지도 스택은 화면마다 다르다 (02 문서 "지도 결정"):
-      **카드 상세 `/cards/[id]`의 500m 반경 지도 = MapLibre + OpenFreeMap**(데모 필수, 키 불필요),
+      **카드 상세 `/cards/[id]`의 500m 반경 지도 = Kakao Maps JS**(데모 필수, JS 키+Web 도메인 등록 필요),
       **허브 히어로의 지역 진단 = `RegionTileMap` 지역 배치 개념도**(외부 SDK·키 없이 진단 서사만 표시),
-      실제 위치 탐색이 필요한 카드 상세는 MapLibre를 사용하고, 방문객 위젯은 Kakao Maps JS와 지도형 fallback을 사용한다.
+      카드 상세와 방문객 위젯 모두 Kakao Maps JS를 쓰고 화면별 지도형 fallback을 둔다. SDK 로더는 `lib/kakaoMaps.ts` 하나로 공유한다.
 - [ ] 데이터 접근 계층:
 
 ```ts
@@ -73,7 +73,7 @@ export const api = {
       페이지를 오가도 유지되도록 카드 목록을 모듈 스코프 인메모리 배열로 관리
       (`cards.json`을 초기값으로 로드, `decide()`/`setProgress()`가 이 배열을 변경).
       KPI mock도 이 배열에서 파생 계산 — **mock 모드에서도 "승인→트래킹→위젯 반영" 데모 루프가 돌아가게** 하는 장치
-- [ ] 차트·지도 컴포넌트는 전부 `"use client"` (Recharts·MapLibre 모두 브라우저 전용 —
+- [ ] 차트·지도 컴포넌트는 전부 `"use client"` (Recharts·Kakao Maps SDK 모두 브라우저 전용 —
       App Router 서버 컴포넌트에서 직접 import 금지)
 - [ ] **검증:** `npm run dev` → mock으로 첫 페이지 렌더 + 승인 후 다른 페이지에서 상태 유지,
       `npm run build` 성공(빌드 오류 없음)
@@ -87,7 +87,7 @@ export const api = {
       신뢰도, 승인/반려/보류 버튼
 - [ ] 레이아웃: 상단 고정 헤더에 **"이번 분기 지역 전환율 X% [근사 지표]"** 헤드라인 (전 화면 공통)
 - [ ] 푸터에 데이터 출처 고정 표기: "데이터: 공공데이터포털(강원랜드·소상공인시장진흥공단)·국세청 |
-      지도: © OpenStreetMap contributors, OpenFreeMap" (공공데이터 출처 표기 + OSM attribution 의무)
+      지도: © Kakao Maps" (공공데이터 출처 표기 + 지도 저작자 표시 의무)
 - [ ] **검증:** Storybook 없이 `/`에서 컴포넌트 조합 렌더 확인. Gini/HHI 문자열이 코드 UI 텍스트에 없는지 grep
 
 ## Task F3: ① Action Card 허브 (`/` 첫 화면) — 최우선
@@ -106,7 +106,7 @@ export const api = {
 ## Task F4: ② 카드 상세 (`/cards/[id]` 동적 라우트 — 03 문서 구조와 동일)
 
 - [ ] AI 조정 근거 전문: 후보비교 / 근거 리스트 / 리스크 / 원 Score 순위 표(항상 병기)
-- [ ] 지도(`MapView` 컴포넌트, MapLibre GL): 가맹점 핀(merchants) + 후보 마커(candidates, 강조색)
+- [ ] 지도(`MapView` 컴포넌트, Kakao Maps JS): 가맹점 핀(merchants) + 후보 마커(candidates, 강조색)
       + 500m 반경 원 + 거점(강원랜드 카지노) 마커 — 라벨은 `ANCHOR.name` 그대로 쓴다
       ("정문"은 근거 없는 좌표라 폐기됨, 06 공통 상수)
 - [ ] 후보 상세에 `road_distance_km`·`road_minutes` 병기 — "직선 X km / 도로 Y km·Z분"으로
@@ -117,7 +117,7 @@ export const api = {
 // src/components/MapView.tsx — "use client", next/dynamic(ssr:false)으로 로드
 import maplibregl from "maplibre-gl";
 import "maplibre-gl/dist/maplibre-gl.css";
-// 스타일: 키·도메인 등록 불필요 (OpenFreeMap). attribution(OSM) 기본 표시 유지
+// 키: NEXT_PUBLIC_KAKAO_MAP_KEY (JS 키) + Kakao 앱 [플랫폼]>[Web] 도메인 등록. 저작자 표시는 SDK가 직접 그린다
 const STYLE_URL = "https://tiles.openfreemap.org/styles/liberty";
 // 마커: new maplibregl.Marker({ color }).setLngLat([lng, lat]).addTo(map)
 // 500m 반경: 중심점 기준 64각형 GeoJSON polygon 생성 → map.addSource + fill 레이어(opacity 0.15)

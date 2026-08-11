@@ -69,9 +69,9 @@ export function ScenarioLadder({
 
 /** 재원 부담은 금액이 아니라 3단 등급이다 — 색과 함께 등급 문구가 항상 붙는다 (13 §4) */
 const BUDGET_TONE: Record<string, string> = {
-  "재원 부담 낮음": "bg-state-good-bg text-state-good ring-state-good-line",
-  "재원 부담 중간": "bg-state-notice-bg text-state-notice ring-state-notice-line",
-  "재원 부담 높음": "bg-state-warn-bg text-state-warn ring-state-warn-line",
+  "재원 부담 낮음": "bg-state-good-bg text-state-good",
+  "재원 부담 중간": "bg-state-notice-bg text-state-notice",
+  "재원 부담 높음": "bg-state-warn-bg text-state-warn",
 };
 
 function ScenarioCard({
@@ -150,9 +150,9 @@ function ScenarioCard({
 
       <p className="mt-4 flex items-center gap-1.5">
         <span
-          className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-semibold ring-1 ring-inset ${
+          className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-semibold ${
             BUDGET_TONE[scenario.budget_note] ??
-            "bg-state-notice-bg text-state-notice ring-state-notice-line"
+            "bg-state-notice-bg text-state-notice"
           }`}
         >
           <Icon name="wallet" size={12} strokeWidth={2} />

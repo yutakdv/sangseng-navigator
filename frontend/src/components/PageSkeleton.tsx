@@ -79,7 +79,7 @@ export function PageSkeleton({ variant = "page" }: { variant?: "hub" | "page" })
               /* 히어로 8/4 분할 — 첫 화면에서 가장 큰 면이라 여기가 어긋나면 전환이 가장 크게 튄다 */
               <div className="grid grid-cols-1 gap-4 lg:grid-cols-12">
                 <div
-                  className="rounded-hero bg-admin-surface p-8 shadow-float ring-1 ring-inset ring-admin-primary-line lg:col-span-8"
+                  className="rounded-hero bg-admin-surface p-8 shadow-float lg:col-span-8"
                   style={{ minHeight: 520 }}
                 >
                   <div className={`${BAR} h-6 w-40 rounded-full`} />

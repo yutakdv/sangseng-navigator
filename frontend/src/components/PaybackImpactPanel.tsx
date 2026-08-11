@@ -66,7 +66,7 @@ export function PaybackImpactPanel({
               key={s.rate}
               className={`rounded-xl p-3 ${
                 on
-                  ? "bg-admin-primary-soft ring-1 ring-inset ring-admin-primary-line"
+                  ? "bg-admin-primary-soft"
                   : "bg-admin-surface-sunken"
               }`}
             >

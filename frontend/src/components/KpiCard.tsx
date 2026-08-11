@@ -21,6 +21,7 @@ export function KpiCard({
   /** 화면의 대표 지표 하나만 — 인디고 톤으로 한 단계 띄운다 */
   accent = false,
   alignDivider = false,
+  surface = "raised",
 }: {
   label: string;
   value: ReactNode;
@@ -39,23 +40,44 @@ export function KpiCard({
    * 켜는 쪽이 다른 섹션의 카드 레이아웃을 건드리지 않는다.
    */
   alignDivider?: boolean;
+  /**
+   * 타일이 앉는 바닥이 무엇인지 — 이 값이 면과 그림자를 함께 정한다.
+   *
+   * `raised`(기본): 본문 배경(admin.bg #FAFAFB) 위. 흰 면 + `shadow-card`로 떠 보인다.
+   * `sunken`: **패널(u-panel) 안쪽**. 패널도 흰 면이라 흰 타일은 사라지고,
+   *   `shadow-card`는 alpha 0.04라 같은 밝기 위에서 아무 경계도 만들지 못한다.
+   *   그래서 면을 띄우는 대신 **가라앉힌다** — 흰 면과의 단차가 admin.bg 단차의 약 3배라
+   *   선 없이도 넷이 갈라진다. 떠 있지 않으므로 hover 그림자도 걷는다.
+   */
+  surface?: "raised" | "sunken";
 }) {
+  const sunken = surface === "sunken";
   return (
-    // 테두리를 두르지 않는다 — 카드가 이미 흰 면 + 그림자로 바닥(admin.bg)에서 떠 있어
+    // 테두리를 두르지 않는다 — 카드가 이미 면의 밝기 차로 바닥에서 갈라져 있어
     // 선이 한 겹 더 붙으면 타일 넷이 격자처럼 갇힌다. 강조 카드도 테두리·링이 아니라
     // **틴트 면**으로 구분한다: 같은 축(면의 색)에서 대비가 나야 넷 중 하나가 앞으로 나온다.
     <div
-      className={`flex min-w-0 flex-col rounded-card p-4 shadow-card transition-shadow hover:shadow-card-hover sm:p-[18px] ${
-        accent ? "bg-admin-primary-soft" : "bg-admin-surface"
+      className={`flex min-w-0 flex-col rounded-card p-4 sm:p-[18px] ${
+        sunken ? "" : "shadow-card transition-shadow hover:shadow-card-hover"
+      } ${
+        accent
+          ? "bg-admin-primary-soft"
+          : sunken
+            ? "bg-admin-surface-sunken"
+            : "bg-admin-surface"
       }`}
     >
       <div className="flex items-start gap-2">
         {icon ? (
           <span
+            // 가라앉은 타일에서는 칩을 흰색으로 뒤집는다 — 칩의 기본색이 곧 타일의 면이라
+            // 그대로 두면 칩만 사라진다. 뒤집어도 [칩 : 면]의 밝기 관계는 같은 크기로 유지된다.
             className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-lg ${
               accent
                 ? "bg-admin-primary text-white"
-                : "bg-admin-surface-sunken text-admin-text-muted"
+                : sunken
+                  ? "bg-admin-surface text-admin-text-muted"
+                  : "bg-admin-surface-sunken text-admin-text-muted"
             }`}
           >
             <Icon name={icon} size={16} />

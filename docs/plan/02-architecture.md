@@ -26,7 +26,7 @@ Kakao 지오코딩 API ──────────┘      │  집계·스�
 | **BE = ECS Fargate + 내부 ALB + HTTP API(VPC Link)** | **배포 중 무중단**이 목적. 롤링 배포 + 대상그룹 드레이닝으로 진행 중 요청이 끊기지 않고, 상시 가동이라 콜드스타트가 없다. 대가는 ALB·Fargate 고정비(월 $30 수준, 09 §3) |
 | **상태 저장 = DynamoDB 온디맨드 1테이블** | Action Card 승인/상태/타임스탬프만 저장(수십 건). 온디맨드라 유휴 $0, 프리티어 25GB. RDS는 과잉 |
 | **FE = Vercel (Hobby 무료)** | git push 자동 배포 + PR별 Preview URL(2인 협업에 유용), Next.js 네이티브 지원이라 정적 export 제약(동적 라우트 등) 없음, https·CDN 기본 제공. AWS 쪽엔 순수 API 비용만 남는다 |
-| **지도 = 화면별 분리** | 카드 상세는 MapLibre GL + OpenFreeMap으로 재현성을 확보하고, 방문객 위젯은 보유한 Kakao Maps JS 키를 활용하며 키·도메인 문제에는 지도형 fallback을 둔다 |
+| **지도 = Kakao Maps JS 단일** | 카드 상세·방문객 위젯 모두 보유한 Kakao Maps JS 키를 쓰고(국내 지물 표기가 500m 축척에서 위치를 읽히게 한다), 키·도메인 문제에는 화면별 fallback을 둔다. MapLibre 구현은 원복용으로 보존 |
 | **개발 중엔 DynamoDB Local(Docker), AWS 배포는 개발 완료 후 최종 1회** | (2026-08-03 변경) 개발 기간 AWS 의존 제거 — IAM 권한 이슈·비용·네트워크와 무관하게 로컬 완결 테스트. `docker compose up`으로 BE+DynamoDB Local 기동, `db.py`가 `DYNAMO_ENDPOINT` env로 분기 (14 문서 T7). 배포는 전체 개발 완료 후 09 문서 절차로 1회 |
 | **LLM = OpenAI 단일 (`gpt-4o-mini`)** | 제출된 기획서와 일치 + 비용 최소. 초기에는 `LLM_PROVIDER` 로 Anthropic 도 택일할 수 있게 뒀으나 실제로 쓰지 않아 제거했다 — 값이 하나뿐인 스위치는 설정 표면만 늘린다 |
 | **IaC = 순수 CloudFormation 2스택** | 수명이 다른 계층을 분리한다(`sangseng-foundation` = VPC·ECR·DynamoDB·IAM / `sangseng-service` = ALB·ECS·API GW). 코드만 바뀌면 service 만 갱신해 5분에 끝나고, 신규 툴체인이 0이다 |
@@ -51,23 +51,39 @@ Kakao 지오코딩 API ──────────┘      │  집계·스�
 비용 안전장치: 리전 `ap-northeast-2` 하나만 사용, 로그 보존 7일, Billing 알림 설정,
 종료 후 `./infra/scripts/teardown.sh` 로 AWS 철거 (Vercel은 방치해도 $0).
 
-## 지도 결정 — 카드 상세는 MapLibre, 방문객 위젯은 Kakao Maps JS
+## 지도 결정 — 카드 상세·방문객 위젯 모두 Kakao Maps JS
 
 카드 상세의 지도(가맹점 핀 + 후보 마커 + 500m 반경 원)는 **2단계 스코어링 근거를 눈으로 보여주는
-데모 핵심 장면**이라 유지할 가치가 크다. 다만 스택은 과거 경험을 반영해 교체한다.
+데모 핵심 장면**이라 유지할 가치가 크다.
+
+> **갱신 이력**: 카드 상세는 원래 MapLibre GL + OpenFreeMap이었고(아래 표 그대로),
+> 실제 화면을 띄워 본 뒤 **Kakao Maps JS로 교체**했다. 사유는 국내 배경 지도의 정보량이다 —
+> OpenFreeMap은 이 지역에서 리 단위 지명과 도로만 나오고 라벨도 로마자가 앞에 오는 병기라
+> ("Gohan 고한읍"), 정작 반경 500m 축척에서 "후보가 어디인지"가 읽히지 않았다.
+> Kakao로 바꾸면 같은 축척에서 `상동읍사무소` 같은 지물이 잡혀 후보 위치가 즉시 읽힌다.
+> **좌표·근거 계산은 그대로고 그리는 도구만 바뀐 것이다.**
 
 | 후보 | 판정 | 이유 |
 |---|---|---|
-| Kakao 지도 JS SDK | ✅ 방문객 위젯 | 실제 추천 가맹점 탐색에는 보유한 JS 키를 활용한다. 키·도메인 등록이 안 된 환경은 좌표 기반 지도형 fallback으로 이어진다 |
+| **Kakao 지도 JS SDK** | ✅ 채택 (카드 상세 + 방문객 위젯) | 국내 지물·상호 표기가 촘촘해 500m 축척에서 위치가 읽힌다. 보유한 JS 키를 그대로 쓴다. 키·도메인 미등록 환경은 fallback으로 이어진다 |
 | Leaflet + OSM 래스터 타일 | ❌ | Safari 렌더 출력 문제 경험 (DOM 타일 방식) |
 | Naver 지도 | ❌ | NCP 가입 + 도메인 등록 필요 — 같은 계열 리스크 |
-| **MapLibre GL JS + OpenFreeMap** | ✅ 채택 | WebGL 캔버스 렌더라 Safari 지원 안정적. OpenFreeMap 타일은 **API 키·도메인 등록·가입 전부 불필요**(스타일 URL만 사용), 무료. 오픈소스(Mapbox GL 포크) |
+| MapLibre GL JS + OpenFreeMap | ⚠ 폴백으로 보존 | 키·도메인이 전혀 필요 없고 WebGL이라 Safari에 안정적이다. 다만 국내 지명 표기가 빈약해 주 구현에서 내렸다 |
 
-- 사용법: `maplibre-gl` npm 패키지 + 스타일 `https://tiles.openfreemap.org/styles/liberty`,
-  OpenStreetMap 저작자 표시(attribution) 유지. 구현 태스크는 08 문서 F4
-- 500m 반경 원은 GeoJSON polygon(원 근사 64각형)을 fill 레이어로 그린다 — 플러그인 불필요
+- 사용법: Kakao Maps JS SDK를 `frontend/src/lib/kakaoMaps.ts`의 **공용 로더 하나**로 불러온다
+  (카드 상세·방문객 위젯이 같은 스크립트를 공유 — 태그 중복·`window.kakao` 타입 분기 방지).
+  키는 `NEXT_PUBLIC_KAKAO_MAP_KEY`(**JavaScript 키**, 지오코딩용 REST 키와 다름)이고
+  Kakao 앱 [플랫폼]>[Web]에 배포 도메인이 등록돼 있어야 한다. 구현 태스크는 08 문서 F4
+- 500m 반경 원은 `kakao.maps.Circle`이 미터 단위 반지름을 직접 받는다 — 다각형 근사 불필요
+- 업종 점·거점·후보 핀은 data-URI SVG `MarkerImage`로 그린다. 업종×크기 조합당 이미지를
+  **재사용**한다 — 읍당 가맹점이 최대 639곳(태백시)이라 마커마다 이미지를 만들면 그만큼 객체가 늘어난다
+- **구현체 교체 지점은 한 줄**이다: `components/MapView.tsx`의 dynamic import 대상.
+  Kakao에 문제가 생기면 보존해 둔 `MapViewClient`(MapLibre)로 되돌린다 —
+  두 구현은 `components/MapViewTypes.ts`의 같은 props 계약을 쓴다
 - **카드 상세 최종 폴백**: 그래도 렌더 문제가 나오면 지도를 자르고 "후보 지점 거리 표 + 정적 지도 캡처 이미지"로
   대체한다 (데모 서사는 유지됨). 방문객 위젯은 추천 좌표를 지도형 fallback에 찍고 카카오 길찾기로 연결한다.
+- 저작자 표시: Kakao SDK가 지도 **왼쪽 아래**에 로고·축척을 직접 그린다. 화면 푸터 문구는
+  `lib/constants.ts`의 `SOURCE_NOTE`, 출처 페이지는 `/data`의 "지도 · 외부 서비스" 항목
 - 참고: 지오코딩(주소→좌표)은 지도 SDK와 무관한 **서버측 REST 호출**(파이프라인에서만 사용)이라
   이 결정의 영향을 받지 않는다 — 04 문서 참조
 
@@ -83,8 +99,9 @@ Kakao 지오코딩 API ──────────┘      │  집계·스�
 | 표기 | 실제 행정경계가 아니라 1단계 진단의 지역별 점수·비중을 보여주는 개념도라고 명시 |
 | 색 | 1단계 진단 스코어의 인디고 밝기 램프(`scoreColor`) — 무지개 금지(13 §7) |
 
-MapLibre는 카드 상세의 실제 위치 탐색용으로 유지하고, 허브는 진단 서사에 필요한 개념도만
-사용한다. 이렇게 하면 키 의존성이나 SDK 인증 실패가 첫 화면의 핵심 서사를 방해하지 않는다.
+외부 지도 SDK는 카드 상세의 실제 위치 탐색용으로만 쓰고, 허브는 진단 서사에 필요한 개념도만
+사용한다. 이렇게 하면 키 의존성이나 SDK 인증 실패가 첫 화면의 핵심 서사를 방해하지 않는다 —
+지도가 Kakao 단일이 된 뒤에도 이 분리는 그대로다(허브는 여전히 키를 쓰지 않는다).
 
 ## 데이터 흐름 상세
 
@@ -98,8 +115,8 @@ MapLibre는 카드 상세의 실제 위치 탐색용으로 유지하고, 허브�
    - 진단/후보 데이터는 JSON 그대로 서빙 (계산 없음)
    - 카드 생성 시: 스코어 JSON + DDB의 추진상태/채택이력 → LLM → 카드 초안 → DDB 저장
    - 시뮬레이션: 집중도 재계산(순수 함수, JSON 입력) + LLM 설명
-3. **프론트(런타임)** — `lib/api.ts` 래퍼 하나로 mock/실 API 전환. 카드 상세 지도는 MapLibre GL+OpenFreeMap,
-   방문객 위젯 지도는 Kakao Maps JS+fallback이다.
+3. **프론트(런타임)** — `lib/api.ts` 래퍼 하나로 실 API 접근. 카드 상세 지도와 방문객 위젯 지도
+   모두 Kakao Maps JS + 화면별 fallback이다 (공용 로더 `lib/kakaoMaps.ts`).
 
 ## 보안·시크릿
 

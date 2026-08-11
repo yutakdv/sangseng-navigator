@@ -12,7 +12,7 @@
 내부 ALB, API Gateway HTTP API + VPC Link)가 JSON 서빙 + Action Card 생성/승인(DynamoDB) + LLM 호출 →
 Next.js(Vercel)가 화면 렌더. FE는 API 계약 기반 mock으로 BE와 독립 개발 후 env 하나로 실 API 전환.
 
-**Tech Stack:** Next.js 16(App Router)+TS+Tailwind 3+Recharts+MapLibre GL(OpenFreeMap 타일)+Kakao Maps JS(방문객 위젯) /
+**Tech Stack:** Next.js 16(App Router)+TS+Tailwind 3+Recharts+Kakao Maps JS(카드 상세·방문객 위젯) /
 Python 3.12+FastAPI+uvicorn / pandas+PublicDataReader+Kakao REST 지오코딩(VWorld 폴백) /
 DynamoDB(온디맨드) / OpenAI(gpt-4o-mini) / 배포: Vercel(FE, icn1) + AWS ECS Fargate(BE, ap-northeast-2)
 
@@ -35,7 +35,7 @@ DynamoDB(온디맨드) / OpenAI(gpt-4o-mini) / 배포: Vercel(FE, icn1) + AWS EC
 
 | 구분 | 대상 작업 |
 |---|---|
-| **Fable xhigh** (복잡 — 정합성이 깨지기 쉬움) | Phase 1 초기 구축(스캐폴딩 전체 골격 + CloudFormation 템플릿 + 배포 왕복), P6 1·2단계 스코어링(계산식·단계 분리), P8 민감도 분석, B4 Action Card 생성(AI 입력 ①~⑥ 조립·프롬프트), B5 반사실 시뮬레이션, F4 지도(MapLibre·Safari 리스크) |
+| **Fable xhigh** (복잡 — 정합성이 깨지기 쉬움) | Phase 1 초기 구축(스캐폴딩 전체 골격 + CloudFormation 템플릿 + 배포 왕복), P6 1·2단계 스코어링(계산식·단계 분리), P8 민감도 분석, B4 Action Card 생성(AI 입력 ①~⑥ 조립·프롬프트), B5 반사실 시뮬레이션, F4 지도(Kakao Maps JS·Safari 리스크) |
 | **Opus high** (루틴) | P1~P4 수집·집계 스크립트, B1~B2 서빙·CRUD, B6 KPI·위젯, F2·F3·F5~F8 화면, 배포 반복, 문서 정리 |
 
 판단 기준: 계산식·API 계약의 정합성이 깨지기 쉽거나 한 결정이 여러 모듈에 파급되는 작업이면 Fable xhigh. 매핑은 기본값이며 상황에 따라 상향 조정 가능(하향은 지양).

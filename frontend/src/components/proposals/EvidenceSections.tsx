@@ -28,6 +28,18 @@ export function EvidenceSections({
 }) {
   const isExpansion = card.type === "EXPANSION";
 
+  /**
+   * 이 막이 보여주는 근거(지역별 추이·업종 비중·읍·시 스코어)는 전부 **이 카드의 지역**으로
+   * 좁혀 읽은 것이라, 헤더 액션이 6개 지역 전체 화면(`/dashboard`)으로 떨어뜨리면 방금 좁힌
+   * 문맥이 그 자리에서 풀린다. 지역이 특정되는 카드는 그 지역의 상세 분석으로 바로 보낸다.
+   *
+   * 카드 종류로 분기하지 않는다 — 기준은 `target.eup`의 유무다. 확충이든 앞으로 생길 다른
+   * 종류든 지역이 붙은 카드면 전부 지역 상세로 가고, 지역이 없는 카드(전 지역 공통 인센티브,
+   * `target: null`)만 전체 화면으로 남는다. `find`로 걸러 `/dashboard/region`이 받지 않는
+   * 값(REGIONS 밖)이 쿼리로 나가지 않게 한다.
+   */
+  const targetRegion = REGIONS.find((region) => region === evidence.targetRegion) ?? null;
+
   return (
     <>
       <Act
@@ -35,7 +47,15 @@ export function EvidenceSections({
         phase="근거"
         question="이 제안을 뒷받침하는 신호"
         title="근거를 좁혀 봅니다"
-        action={<PanelLink href="/dashboard">분석 전체 보기</PanelLink>}
+        action={
+          targetRegion ? (
+            <PanelLink href={`/dashboard/region?region=${encodeURIComponent(targetRegion)}`}>
+              {targetRegion} 상세 분석
+            </PanelLink>
+          ) : (
+            <PanelLink href="/dashboard">분석 전체 보기</PanelLink>
+          )
+        }
       >
         <div className="grid grid-cols-4 gap-4 sm:grid-cols-8 xl:grid-cols-12">
           <Panel

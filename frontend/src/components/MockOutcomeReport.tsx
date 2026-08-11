@@ -71,7 +71,7 @@ export function MockOutcomeReport({ card, dashboard }: { card: Card; dashboard: 
         <div>
           <div className="flex flex-wrap items-center gap-2">
             <h2 id={`mock-report-${card.id}`} className="text-base font-bold text-admin-text">정책 성과 리포트</h2>
-            <span className="rounded-full bg-state-warn-bg px-2.5 py-1 text-[10px] font-bold text-state-warn ring-1 ring-inset ring-state-warn-line">
+            <span className="rounded-full bg-state-warn-bg px-2.5 py-1 text-[10px] font-bold text-state-warn">
               목 데이터 · 실제 성과 아님
             </span>
           </div>
@@ -79,7 +79,7 @@ export function MockOutcomeReport({ card, dashboard }: { card: Card; dashboard: 
             {card.id} · {card.title}
           </p>
         </div>
-        <div className="rounded-xl bg-admin-primary-soft px-3 py-2 text-right ring-1 ring-inset ring-admin-primary-line">
+        <div className="rounded-xl bg-admin-primary-soft px-3 py-2 text-right">
           <p className="text-[10px] font-bold uppercase tracking-[0.12em] text-admin-primary">관측 기간 가정</p>
           <p className="mt-0.5 text-xs font-semibold text-admin-text">정책 적용 전 → 3개월 후</p>
         </div>
@@ -104,9 +104,9 @@ export function MockOutcomeReport({ card, dashboard }: { card: Card; dashboard: 
 
 function OutcomeMetric({ metric }: { metric: Metric }) {
   const tone = metric.tone === "down"
-    ? "bg-admin-primary-soft text-admin-primary ring-admin-primary-line"
+    ? "bg-admin-primary-soft text-admin-primary"
     : metric.tone === "up"
-      ? "bg-state-good-bg text-state-good ring-state-good-line"
+      ? "bg-state-good-bg text-state-good"
       : "bg-admin-surface-sunken text-admin-text-muted ring-admin-border";
 
   return (
@@ -115,7 +115,7 @@ function OutcomeMetric({ metric }: { metric: Metric }) {
         <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-admin-primary-soft text-admin-primary">
           <Icon name={metric.icon} size={17} />
         </span>
-        <span className={`rounded-full px-2.5 py-1 text-[10px] font-bold ring-1 ring-inset ${tone}`}>{metric.verdict}</span>
+        <span className={`rounded-full px-2.5 py-1 text-[10px] font-bold ${tone}`}>{metric.verdict}</span>
       </div>
       <h3 className="mt-4 break-keep text-xs font-bold text-admin-text">{metric.label}</h3>
       <div className="mt-2 flex flex-wrap items-baseline gap-2 tabular-nums">

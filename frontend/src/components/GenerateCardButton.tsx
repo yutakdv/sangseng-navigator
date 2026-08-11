@@ -20,9 +20,9 @@ import type { CardType } from "@/types";
 type Feedback = { tone: "ok" | "notice" | "bad"; text: string };
 
 const TONE: Record<Feedback["tone"], string> = {
-  ok: "bg-state-good-bg text-state-good ring-state-good-line",
-  notice: "bg-state-notice-bg text-state-notice ring-state-notice-line",
-  bad: "bg-state-bad-bg text-state-bad ring-state-bad-line",
+  ok: "bg-state-good-bg text-state-good",
+  notice: "bg-state-notice-bg text-state-notice",
+  bad: "bg-state-bad-bg text-state-bad",
 };
 
 export function GenerateCardButton({
@@ -115,7 +115,7 @@ export function GenerateCardButton({
       {feedback ? (
         <p
           role={feedback.tone === "bad" ? "alert" : "status"}
-          className={`max-w-xs break-keep rounded-lg px-2.5 py-2 text-xs font-medium leading-5 ring-1 ring-inset ${TONE[feedback.tone]}`}
+          className={`max-w-xs break-keep rounded-lg px-2.5 py-2 text-xs font-medium leading-5 ${TONE[feedback.tone]}`}
         >
           {feedback.text}
         </p>

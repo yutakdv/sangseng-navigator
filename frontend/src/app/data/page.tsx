@@ -333,15 +333,13 @@ export default async function DataPage({
           <Section
             icon="map"
             title="지도 · 외부 서비스"
-            desc="담당자 화면과 방문객 위젯이 서로 다른 지도를 쓰므로 표기도 나뉜다."
+            desc="담당자 화면(카드 상세 500m 반경)과 방문객 위젯 모두 Kakao 지도를 쓴다."
           >
             <dl className="flex flex-col gap-3">
               <div className="rounded-xl border border-admin-border p-3.5">
-                <dt className="text-[13px] font-bold text-admin-text">담당자 화면 지도</dt>
-                <dd className="u-note mt-1">© OpenStreetMap contributors · OpenFreeMap</dd>
-              </div>
-              <div className="rounded-xl border border-admin-border p-3.5">
-                <dt className="text-[13px] font-bold text-admin-text">방문객 위젯 지도</dt>
+                <dt className="text-[13px] font-bold text-admin-text">
+                  담당자 화면 지도 · 방문객 위젯 지도
+                </dt>
                 <dd className="u-note mt-1">© Kakao Maps (Kakao Maps JavaScript SDK)</dd>
               </div>
               <div className="rounded-xl border border-admin-border p-3.5">

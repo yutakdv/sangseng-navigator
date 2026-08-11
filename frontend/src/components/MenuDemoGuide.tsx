@@ -13,7 +13,7 @@ export function MenuDemoGuide({
   steps: string[];
 }) {
   return (
-    <section className="mb-4 rounded-2xl bg-admin-primary-soft p-4 ring-1 ring-inset ring-admin-primary-line sm:p-5" aria-label={`${title} 데모 안내`}>
+    <section className="mb-4 rounded-2xl bg-admin-primary-soft p-4 sm:p-5" aria-label={`${title} 데모 안내`}>
       <div className="flex items-start gap-3">
         <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-admin-primary text-white shadow-[0_5px_14px_-7px_rgb(79_70_229)]">
           <Icon name={icon} size={18} strokeWidth={2} />
