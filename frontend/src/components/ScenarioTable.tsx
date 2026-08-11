@@ -154,6 +154,26 @@ export function ScenarioTable({
       <div className="mt-4 rounded-xl bg-admin-surface-sunken p-4">
         {editable ? (
           <>
+            {/* 아래 "예상 효과" 밴드는 AI의 고정 해설이라 선택에 반응하지 않는다 — 담당자가 고른
+                시나리오의 수치는 결정 버튼 바로 위에서 즉시 확인시킨다 (표와 같은 delta_pp 원천) */}
+            {choice
+              ? (() => {
+                  const s = scenarios.find((sc) => sc.rate === choice);
+                  if (!s) return null;
+                  const lo = s.delta_pp[0].toFixed(1);
+                  const hi = s.delta_pp[s.delta_pp.length - 1].toFixed(1);
+                  return (
+                    <p className="mb-2.5 rounded-lg bg-admin-primary-soft px-3 py-2 text-[13px] leading-6 text-admin-text">
+                      선택한 <b className="tabular-nums">{choice}%</b> 적용 시 지역 전환율 약{" "}
+                      <b className="tabular-nums">{lo === hi ? lo : `${lo}~${hi}`}%p</b> 개선 예상
+                      <span className="text-admin-text-muted">
+                        {" "}
+                        — 가정 기반 전망이며 실제와 다를 수 있음
+                      </span>
+                    </p>
+                  );
+                })()
+              : null}
             <p className="u-note mb-2.5">
               AI는 세 시나리오의 효과·재원 트레이드오프를 비교해 제시할 뿐입니다. 확정 페이백률은
               담당자가 이 표에서 고른 값만 저장됩니다 — 의사결정 근거 제공이 AI의 역할입니다.
