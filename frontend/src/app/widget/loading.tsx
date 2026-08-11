@@ -15,19 +15,25 @@ export default function WidgetLoading() {
       <span className="sr-only">추천 가맹점을 불러오는 중입니다</span>
 
       <div className="mx-auto w-full max-w-[390px] bg-visitor-bg shadow-card-hover sm:rounded-[28px] sm:ring-1 sm:ring-black/5">
-        <header className="bg-gradient-to-br from-visitor-accent to-[#0e4a25] px-5 py-6 text-white sm:rounded-t-[28px]">
-          {/* 로고는 정적 자산이라 로딩 중에도 그대로 보여 준다 — 실제 화면과 첫 줄이 어긋나지 않게
-              page.tsx와 같은 크기·같은 흰색 처리를 쓴다 */}
-          <Image
-            src="/brand/sangseng-navigator-lockup.png"
-            alt="상생 나침반"
-            width={144}
-            height={28}
-            priority
-            className="h-7 w-auto brightness-0 invert"
-          />
-          <h1 className="mt-1.5 text-[22px] font-bold leading-8">지역별 하이원포인트 가맹점</h1>
-          <div className="mt-3 h-3 w-full animate-pulse rounded-md bg-white/25" />
+        {/* 헤더는 실제 화면과 같은 두 켜(브랜드 바 + 제목 밴드)로 그린다 — 로고·제목 모두 정적이라
+            로딩 중에도 그대로 보여 줄 수 있고, 뜰 때 첫 화면이 밀리지 않는다 */}
+        <header className="text-white sm:rounded-t-[28px]">
+          <div className="flex items-center bg-[#0a3a1d] px-5 py-3 sm:rounded-t-[28px]">
+            <Image
+              src="/brand/sangseng-navigator-lockup.png"
+              alt="상생 나침반"
+              width={144}
+              height={28}
+              priority
+              className="h-[22px] w-auto brightness-0 invert"
+            />
+          </div>
+          <div className="bg-gradient-to-br from-visitor-accent to-[#0e4a25] px-5 pb-7 pt-6">
+            <h1 className="max-w-[15ch] break-keep text-[26px] font-bold leading-[1.25] tracking-[-0.02em]">
+              지역별 하이원포인트 가맹점
+            </h1>
+            <div className="mt-3 h-3 w-full animate-pulse rounded-md bg-white/25" />
+          </div>
         </header>
 
         <div className="px-5 py-5">
@@ -42,10 +48,7 @@ export default function WidgetLoading() {
           {/* 추천 카드 3장 — 실제 목록과 비슷한 높이로 두어 뜰 때 화면이 밀리지 않게 한다 */}
           <div className="mt-6 flex flex-col gap-3">
             {Array.from({ length: 3 }).map((_, i) => (
-              <div
-                key={i}
-                className="flex gap-3 rounded-2xl border border-slate-200/80 bg-white p-3.5 shadow-card"
-              >
+              <div key={i} className="flex gap-3 rounded-2xl bg-visitor-surface-sunken p-4">
                 <span className="h-11 w-11 shrink-0 animate-pulse rounded-xl bg-black/[0.06]" />
                 <div className="min-w-0 flex-1">
                   <div className={`${BAR} h-4 w-32`} />

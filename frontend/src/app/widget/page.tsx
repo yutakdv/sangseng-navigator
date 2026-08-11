@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Image from "next/image";
 import Link from "next/link";
-import { NewBadge, PaybackBadge } from "@/components/Badge";
+import { PaybackBadge } from "@/components/Badge";
 import { CategoryIcon } from "@/components/CategoryIcon";
 import { Icon } from "@/components/Icon";
 import { KakaoMapView } from "@/components/KakaoMapView";
@@ -215,38 +215,53 @@ export default async function WidgetPage({ searchParams }: { searchParams: Promi
     <div className="min-h-screen bg-slate-100 py-0 sm:py-8">
       {/* 모바일에서는 한 열, 넓은 화면에서는 레퍼런스(image-2)처럼 필터와 지도를 나란히 둔다. */}
       <div className="mx-auto w-full max-w-[1180px] overflow-hidden bg-visitor-bg shadow-card-hover sm:rounded-[28px] sm:ring-1 sm:ring-black/5">
-        <header className="relative overflow-hidden bg-gradient-to-br from-visitor-accent to-[#0e4a25] px-5 py-6 text-white sm:rounded-t-[28px]">
-          <div
-            aria-hidden
-            className="pointer-events-none absolute -right-8 -top-12 h-40 w-40 rounded-full bg-white/10 blur-2xl"
-          />
-          <div className="relative flex flex-wrap items-center justify-between gap-2">
-            {/* 브랜드 자리를 텍스트 라벨("강원랜드 지역상생")에서 로고 락업으로 바꿨다 —
-                담당자 화면(AdminShell)과 같은 자산을 쓴다. 원본이 인디고라 그린 헤더 위에서
-                색이 부딪히므로 단색 흰색으로 눌러서 얹는다(brightness-0 invert). */}
+        {/**
+         * 헤더는 두 켜다 — 위는 브랜드(로고), 아래는 이 화면이 무엇인지(제목).
+         * 로고와 제목을 한 덩어리로 쌓아 두면 "상생나침반 지역별 하이원포인트 가맹점"이 한 줄기
+         * 제목처럼 읽혀 브랜드도 제목도 서지 않는다. 선을 긋는 대신 **면의 명도차**로 가른다
+         * (13 §6-1). 위 켜는 짙은 단색, 아래 켜는 그라디언트다.
+         */}
+        <header className="relative overflow-hidden text-white sm:rounded-t-[28px]">
+          <div className="flex items-center justify-between gap-3 bg-[#0a3a1d] px-5 py-3 sm:px-8">
+            {/* 담당자 화면(AdminShell)과 같은 로고 자산. 원본이 인디고라 그린 위에서 색이
+                부딪히므로 단색 흰색으로 눌러서 얹는다(brightness-0 invert) */}
             <Image
               src="/brand/sangseng-navigator-lockup.png"
               alt="상생 나침반"
               width={144}
               height={28}
               priority
-              className="h-7 w-auto brightness-0 invert"
+              className="h-[22px] w-auto brightness-0 invert"
             />
             <span className="flex items-center gap-2">
               {live ? <WidgetLiveRefresh /> : null}
               {/* 두 얼굴(담당자↔방문객) 연결 고리가 최하단에만 있으면 모바일 심사에서 폐루프
                   서사를 놓친다 (검토 §3-2) — 하단 줄은 유지하고 헤더에도 짧게 건다 */}
-              <Link href="/" className="text-[11px] font-semibold text-white/85 underline underline-offset-2">
+              <Link
+                href="/"
+                className="text-[11px] font-semibold text-white/75 underline underline-offset-2"
+              >
                 담당자 화면 →
               </Link>
             </span>
           </div>
-          <h1 className="relative mt-1.5 break-keep text-[22px] font-bold leading-8">
-            지역별 하이원포인트 가맹점
-          </h1>
-          <p className="relative mt-2 break-keep text-[13px] leading-6 text-white">
-            관심 지역과 업종을 고르면 하이원포인트를 쓸 수 있는 곳을 알려드려요. 로그인은 필요 없어요.
-          </p>
+
+          <div className="relative overflow-hidden bg-gradient-to-br from-visitor-accent to-[#0e4a25] px-5 pb-7 pt-6 sm:px-8">
+            {/* 브랜드가 나침반이니 제목 밴드의 빈 오른쪽을 나침반으로 채운다 — 그라디언트 위에
+                흐린 원을 띄우는 상투적인 처리 대신, 이름에서 나온 도형 하나만 크게 눕힌다 */}
+            <span
+              aria-hidden
+              className="pointer-events-none absolute -bottom-14 -right-10 text-white/[0.13]"
+            >
+              <Icon name="compass" size={180} strokeWidth={0.9} />
+            </span>
+            <h1 className="relative max-w-[15ch] break-keep text-[26px] font-bold leading-[1.25] tracking-[-0.02em] sm:max-w-none sm:text-[30px]">
+              지역별 하이원포인트 가맹점
+            </h1>
+            <p className="relative mt-2.5 max-w-[38ch] break-keep text-[13px] leading-6 text-white/85">
+              관심 지역과 업종을 고르면 하이원포인트를 쓸 수 있는 곳을 알려드려요. 로그인은 필요 없어요.
+            </p>
+          </div>
         </header>
 
         {/* 시행 중인 페이백은 전 항목 공통 — 목록을 스크롤하기 전에 상단에서 먼저 알린다 (카드 배지는 유지) */}
@@ -353,7 +368,16 @@ export default async function WidgetPage({ searchParams }: { searchParams: Promi
               "무엇을 담았는지"에 대한 설명이라 여기 붙이면 순서와 어긋난다 — 선정 기준은
               아래 "이 서비스는요" 블록에서 밝힌다 (거리를 "가까운 순"이라 단정하지 않는 것도
               그 자리에서 지킨다 · 05 §1·§4). */}
-          <p className="mt-1.5 break-keep text-xs leading-5 text-admin-text-muted">
+          {/* 카드마다 붙던 "하이원포인트 사용 가능" 칩을 여기로 올렸다 — 목록 전체에 해당하는
+              사실이라 한 번만 말하면 되고, 카드는 그만큼 조용해진다 */}
+          <p className="mt-1.5 flex flex-wrap items-center gap-x-1.5 gap-y-0.5 break-keep text-xs leading-5 text-admin-text-muted">
+            <span className="inline-flex items-center gap-1 font-semibold text-visitor-primary">
+              <Icon name="check" size={13} strokeWidth={2} />
+              모두 하이원포인트 사용 가능
+            </span>
+            <span aria-hidden className="text-slate-300">
+              ·
+            </span>
             {listNote(sort, fresh.length > 0)}
           </p>
 
@@ -482,45 +506,68 @@ export default async function WidgetPage({ searchParams }: { searchParams: Promi
   );
 }
 
-/** 추천 가맹점 카드 한 장 — 확충 섹션과 전체 목록이 같은 마크업을 쓴다. pop은 라이브 미리보기 전용 */
+/**
+ * 추천 가맹점 카드 한 장 — 확충 섹션과 전체 목록이 같은 마크업을 쓴다. pop은 라이브 미리보기 전용.
+ *
+ * 구조는 위에서 아래로 **누구인가(아이콘·이름·업종) → 무엇인가(한 줄 설명·주소) → 무엇을 할 수
+ * 있나(배지·길찾기)** 세 켜다. 정보를 한 덩어리로 쌓아 두면 열두 장이 같은 회색 블록으로 보인다.
+ *
+ * - 흰 패널 위 흰 카드에 테두리를 두르는 대신 `visitor-surface-sunken`으로 가라앉히고, 눌렀을 때
+ *   흰 면으로 떠오르게 한다 (13 §6-1 규칙 2 — 면이 같으면 선이 아니라 면을 옮긴다).
+ * - "하이원포인트 사용 가능" 칩은 뺐다. 모든 카드에 100% 붙는 문구라 카드마다 되풀이하면 정보가
+ *   아니라 무늬가 된다 — 목록 머리에서 한 번만 말한다.
+ * - 확충 가맹점은 아이콘 타일에 반짝임 표식을 단다. 지도 핀의 구분(점 ↔ 반짝임)과 같은 규칙이라
+ *   목록과 지도가 같은 말을 하게 된다.
+ */
 function MerchantCard({ r, pop = false }: { r: Recommendation; pop?: boolean }) {
   return (
-    <li className="rounded-2xl border border-slate-200/80 bg-white p-3.5 shadow-card">
-      <div className="flex gap-3">
-        <CategoryIcon category={r.category} />
-        <div className="min-w-0 flex-1">
-          <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
-            <span className="min-w-0 truncate text-[15px] font-bold text-admin-text">
-              {r.name}
+    <li className="flex h-full flex-col rounded-2xl bg-visitor-surface-sunken p-4 transition-colors hover:bg-white hover:shadow-card">
+      <div className="flex items-start gap-3">
+        <span className="relative shrink-0">
+          <CategoryIcon category={r.category} />
+          {r.badge ? (
+            <span
+              aria-hidden
+              className={`absolute -right-1 -top-1 flex h-[19px] w-[19px] items-center justify-center rounded-full bg-state-good text-white ${pop ? "motion-safe:animate-pop" : ""}`}
+            >
+              <Icon name="sparkle" size={11} strokeWidth={2.4} />
             </span>
-            {r.badge ? <NewBadge label={r.badge} pop={pop} /> : null}
-          </div>
-          <p className="mt-0.5 text-xs font-medium text-admin-text-muted">
+          ) : null}
+        </span>
+        <span className="min-w-0 flex-1">
+          <span className="block truncate text-[15px] font-bold leading-5 tracking-[-0.01em] text-admin-text">
+            {r.name}
+          </span>
+          <span className="mt-1 block text-[11px] font-medium text-admin-text-muted">
             {r.category}
-          </p>
-          <p className="mt-1.5 break-keep text-[13px] leading-6 text-admin-text">
-            {r.blurb}
-          </p>
-          <p className="mt-1.5 flex items-start gap-1.5 break-keep text-xs leading-5 text-admin-text-muted">
-            <Icon name="pin" size={13} className="mt-0.5" />
-            {r.address}
-          </p>
-          <a
-            href={r.directions_url}
-            target="_blank"
-            rel="noreferrer"
-            className="mt-2 inline-flex min-h-11 items-center rounded-lg px-2 text-xs font-bold text-visitor-primary underline underline-offset-4"
-          >
-            카카오맵에서 길찾기
-          </a>
-          <div className="mt-2.5 flex flex-wrap items-center gap-1.5">
-            <span className="inline-flex items-center gap-1 rounded-full bg-visitor-primary-soft px-2 py-0.5 text-xs font-semibold text-visitor-primary ring-1 ring-inset ring-visitor-primary/20">
-              <Icon name="check" size={12} strokeWidth={2} />
-              하이원포인트 사용 가능
-            </span>
-            {r.payback ? <PaybackBadge label={r.payback.label} pop={pop} /> : null}
-          </div>
-        </div>
+          </span>
+        </span>
+      </div>
+
+      <p className="mt-3 break-keep text-[13px] leading-6 text-admin-text-soft">{r.blurb}</p>
+      <p className="mb-3.5 mt-1.5 flex items-start gap-1.5 break-keep text-[11px] leading-[18px] text-admin-text-muted">
+        <Icon name="pin" size={12} className="mt-[3px]" />
+        {r.address}
+      </p>
+
+      {/* mt-auto — 한 줄에 놓인 카드들의 액션 줄이 같은 높이에서 만나게 한다 */}
+      <div className="mt-auto flex items-center justify-between gap-2 border-t border-black/[0.06] pt-3">
+        {/* 확충 배지는 카드에 달지 않는다 — 이 카드들은 "이번 분기 새로 확충된 업종" 섹션
+            안에서만 나오므로 제목이 이미 말하고 있고, 카드에는 아이콘 타일의 반짝임 표식이 있다.
+            페이백은 카드마다 있을 수도 없을 수도 있어 여기서 말해야 한다 */}
+        <span className="flex min-w-0 flex-wrap gap-1">
+          {r.payback ? <PaybackBadge label={`${r.payback.rate}% 페이백`} pop={pop} /> : null}
+        </span>
+        <a
+          href={r.directions_url}
+          target="_blank"
+          rel="noreferrer"
+          aria-label={`${r.name} 카카오맵에서 길찾기`}
+          className="inline-flex min-h-9 shrink-0 items-center gap-1 rounded-xl px-2.5 text-[12px] font-bold text-visitor-primary transition-colors hover:bg-visitor-primary-soft"
+        >
+          길찾기
+          <Icon name="arrowUpRight" size={13} strokeWidth={2.2} />
+        </a>
       </div>
     </li>
   );
