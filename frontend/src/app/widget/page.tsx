@@ -246,20 +246,22 @@ export default async function WidgetPage({ searchParams }: { searchParams: Promi
             </span>
           </div>
 
-          <div className="relative overflow-hidden bg-gradient-to-br from-visitor-accent to-[#0e4a25] px-5 pb-7 pt-6 sm:px-8">
-            {/* 브랜드가 나침반이니 제목 밴드의 빈 오른쪽을 나침반으로 채운다 — 그라디언트 위에
-                흐린 원을 띄우는 상투적인 처리 대신, 이름에서 나온 도형 하나만 크게 눕힌다 */}
+          {/* 제목("지역별 하이원포인트 가맹점")은 두지 않는다 — 바로 아래 히어로가 이 화면의
+              제목 노릇을 하고 있어서, 헤더에 또 큰 제목을 얹으면 같은 말을 두 번 크게 하는 꼴이다.
+              이 밴드는 한 줄 안내만 받는다 */}
+          <div className="relative overflow-hidden bg-gradient-to-br from-visitor-accent to-[#0e4a25] px-5 pb-6 pt-5 sm:px-8">
+            {/* 브랜드가 나침반이니 밴드의 빈 오른쪽을 나침반으로 채운다 — 그라디언트 위에 흐린
+                원을 띄우는 상투적인 처리 대신, 이름에서 나온 도형 하나만 크게 눕힌다 */}
             <span
               aria-hidden
-              className="pointer-events-none absolute -bottom-14 -right-10 text-white/[0.13]"
+              className="pointer-events-none absolute -bottom-16 -right-10 text-white/[0.13]"
             >
-              <Icon name="compass" size={180} strokeWidth={0.9} />
+              <Icon name="compass" size={150} strokeWidth={0.9} />
             </span>
-            <h1 className="relative max-w-[15ch] break-keep text-[26px] font-bold leading-[1.25] tracking-[-0.02em] sm:max-w-none sm:text-[30px]">
-              지역별 하이원포인트 가맹점
-            </h1>
-            <p className="relative mt-2.5 max-w-[38ch] break-keep text-[13px] leading-6 text-white/85">
-              관심 지역과 업종을 고르면 하이원포인트를 쓸 수 있는 곳을 알려드려요. 로그인은 필요 없어요.
+            {/* 헤더는 "이게 무엇인가"만 말한다 — "어떻게 쓰는가"는 아래 히어로가 맡는다.
+                제목을 뺀 뒤 두 문장이 거의 같은 말을 연달아 하고 있어 역할을 갈랐다 */}
+            <p className="relative max-w-[36ch] break-keep text-[14px] font-medium leading-6 text-white/90">
+              하이원포인트를 쓸 수 있는 지역 가맹점을 찾아드려요. 로그인은 필요 없어요.
             </p>
           </div>
         </header>
@@ -297,13 +299,14 @@ export default async function WidgetPage({ searchParams }: { searchParams: Promi
 
         <div className="grid gap-6 px-5 py-5 sm:px-8 sm:py-8 lg:grid-cols-[0.72fr_1.28fr] lg:items-start">
           <div>
-            <p className="text-[28px] font-bold leading-tight tracking-[-0.03em] text-emerald-950 sm:text-[34px]">
+            {/* 헤더에서 제목을 뺐으므로 이 히어로가 화면의 h1이다 (문서에 h1은 하나여야 한다) */}
+            <h1 className="text-[28px] font-bold leading-tight tracking-[-0.03em] text-emerald-950 sm:text-[34px]">
               포인트, 지역에서<br />
               가치로 이어지다
-            </p>
+            </h1>
             <p className="mt-3 max-w-md break-keep text-[14px] leading-7 text-slate-600">
-              관심 지역과 업종을 선택하면 하이원포인트를 쓸 수 있는 가맹점을 모아 보여드려요.
-              목록 순서는 이름·업종으로 바꿔 볼 수 있어요.
+              가게 이름으로 찾거나 관심 지역·업종으로 좁혀 보세요. 목록 순서는 이름·업종으로
+              바꿔 볼 수 있어요.
             </p>
             {/* 검색은 필터보다 위에 온다 — 갈 곳을 이미 아는 사람은 지역·업종을 거치지 않는다.
                 limit은 넘기지 않는다: 새 검색은 첫 페이지부터 보는 게 맞다 */}

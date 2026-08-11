@@ -28,11 +28,10 @@ export default function WidgetLoading() {
               className="h-[22px] w-auto brightness-0 invert"
             />
           </div>
-          <div className="bg-gradient-to-br from-visitor-accent to-[#0e4a25] px-5 pb-7 pt-6">
-            <h1 className="max-w-[15ch] break-keep text-[26px] font-bold leading-[1.25] tracking-[-0.02em]">
-              지역별 하이원포인트 가맹점
-            </h1>
-            <div className="mt-3 h-3 w-full animate-pulse rounded-md bg-white/25" />
+          <div className="bg-gradient-to-br from-visitor-accent to-[#0e4a25] px-5 pb-6 pt-5">
+            <p className="max-w-[36ch] break-keep text-[14px] font-medium leading-6 text-white/90">
+              하이원포인트를 쓸 수 있는 지역 가맹점을 찾아드려요. 로그인은 필요 없어요.
+            </p>
           </div>
         </header>
 
