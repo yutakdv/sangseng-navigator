@@ -62,6 +62,7 @@ from app.main import app                         # noqa: E402  (.env 로드가 a
 from app import dataload                         # noqa: E402
 from app import db                               # noqa: E402
 from app import llm                              # noqa: E402
+from app.routes import cards as cards_route      # noqa: E402
 
 # 아래 fake_llm 픽스처가 llm.generate_json 을 통째로 갈아끼우므로, 어댑터 자체를 검증하는
 # 테스트(§8)를 위해 원본을 미리 잡아 둔다.
@@ -187,6 +188,10 @@ def _decide(cid, decision, **extra):
     사유가 필수인 경로(반려·보류·저신뢰 승인)는 호출부가 `reason=`을 명시하고, 필수 여부 자체를
     검증하는 테스트는 이 헬퍼를 쓰지 않고 body를 직접 만든다.
     """
+    # 승인에는 데이터 보호·근거 검증·편향/윤리 영향 확인이 필수다. 개별 테스트가 누락 경로를
+    # 재현하지 않는 한 정상 승인 헬퍼는 실제 UI와 같은 확인값을 채운다.
+    if decision == "approved" and "safety_reviewed" not in extra:
+        extra["safety_reviewed"] = True
     return client.post(f"/api/cards/{cid}/decision", json={"decision": decision, **ACTOR, **extra})
 
 
@@ -876,6 +881,11 @@ def test_decision_approves_expansion_card():
         "actor_id": ACTOR["actor_id"], "actor_name": ACTOR["actor_name"],
         "source": "operator_ui", "auth": "shared_token", "verified": False,
         "at": card["decided_at"],
+        "safety_review": {
+            "policy": cards_route.SAFETY_REVIEW_POLICY,
+            "acknowledged": True,
+            "scope": list(cards_route.SAFETY_REVIEW_SCOPE),
+        },
     }
     assert card["reproposal_block"] is None            # 승인에는 재제안 차단이 붙지 않는다
     event = card["events"][-1]
@@ -898,6 +908,24 @@ def test_decision_requires_actor_id():
     blank = client.post("/api/cards/AC-002/decision",
                         json={"decision": "approved", "actor_id": "   ", "reason": DECISION_REASON})
     assert blank.status_code == 422
+
+
+def test_approval_requires_safety_review_acknowledgement():
+    """승인만은 원 순위·반대 관점·데이터 보호 범위 확인 없이는 통과할 수 없다.
+
+    반려·보류까지 이 체크를 강제하면 위험을 발견해 멈추려는 결정도 막히므로 승인 게이트에만 둔다.
+    """
+    missing = client.post(
+        "/api/cards/AC-002/decision",
+        json={"decision": "approved", "reason": DECISION_REASON, **ACTOR},
+    )
+    assert missing.status_code == 422
+    assert "편향" in missing.json()["detail"] and "소표본" in missing.json()["detail"]
+    assert client.get("/api/cards/AC-002").json()["card"]["status"] == "pending"
+
+    # 반려는 안전 확인 없이도 가능하고, 통과시키지 않은 검토를 감사 기록에 거짓으로 남기지 않는다.
+    rejected = _decide("AC-002", "rejected", reason="윤리 영향 추가 검토 필요").json()["card"]
+    assert "safety_review" not in rejected["decision"]
 
 
 def test_rejection_requires_reason_and_records_a_reproposal_block():
@@ -931,7 +959,8 @@ def test_low_confidence_approval_requires_a_reason():
     _put_expansion("AC-930", "태백시", "카페")
     db.put_card({**db.get_card("AC-930"), "confidence": "중"})
     assert client.post("/api/cards/AC-930/decision",
-                       json={"decision": "approved", **ACTOR}).status_code == 200
+                       json={"decision": "approved", "safety_reviewed": True,
+                             **ACTOR}).status_code == 200
 
     ok = _decide("AC-002", "approved", reason="동절기 방문 수요를 별도 확인함")
     assert ok.status_code == 200 and ok.json()["card"]["decision"]["reason"]
@@ -942,7 +971,7 @@ def test_decision_version_mismatch_returns_409():
     current = client.get("/api/cards/AC-002").json()["card"].get("version", 0)
     stale = client.post("/api/cards/AC-002/decision",
                         json={"decision": "approved", "reason": DECISION_REASON,
-                              "version": current + 5, **ACTOR})
+                              "version": current + 5, "safety_reviewed": True, **ACTOR})
     assert stale.status_code == 409
     assert client.get("/api/cards/AC-002").json()["card"]["status"] == "pending"
 
@@ -988,11 +1017,13 @@ def test_decision_error_paths():
 
 def test_incentive_approval_requires_selected_rate():
     """05 §8 — 누락은 422(없는 값 요구), 범위 밖은 400(잘못 쓴 값). EXPANSION에 온 값은 무시."""
-    missing = client.post("/api/cards/INC-001/decision", json={"decision": "approved", **ACTOR})
+    missing = client.post("/api/cards/INC-001/decision",
+                          json={"decision": "approved", "safety_reviewed": True, **ACTOR})
     assert missing.status_code == 422
     assert isinstance(missing.json()["detail"], str)
     out_of_range = client.post("/api/cards/INC-001/decision",
-                               json={"decision": "approved", "selected_rate": 4, **ACTOR})
+                               json={"decision": "approved", "selected_rate": 4,
+                                     "safety_reviewed": True, **ACTOR})
     assert out_of_range.status_code == 400
     assert "3|5|7" in out_of_range.json()["detail"]
 
@@ -1368,6 +1399,22 @@ def test_simulate_rejects_narrative_missing_required_words(fake_llm):
     assert "영월군 소매점" in sim["narrative"]                  # 규칙 기반 문구 형태 (AC-002 타깃)
 
 
+def test_simulate_rejects_narrative_inferring_sensitive_attributes(fake_llm):
+    """민감 속성 서술 폐기는 LLM 출력 **세 경로 모두**에 걸린다 — 시뮬레이션 문구도 예외가 아니다.
+
+    카드 생성(cardgen)에만 걸어 두면 "민감 속성을 쓰는 AI 문장은 폐기된다"는 README·발표 주장이
+    이 경로에서 거짓이 된다. 같은 판정 함수를 공유하는지까지 확인한다.
+    """
+    fake_llm.narrative = ("고령 사업주가 많은 지역이라 가맹 전환 효과가 낮을 것으로 예상됩니다. "
+                          "가정에 기반한 수치입니다.")
+    sim = client.post("/api/cards/AC-002/simulate").json()["simulation"]
+
+    assert fake_llm.calls == ["narrative"]                     # 호출은 됐고 내용 가드가 걸렀다
+    assert sim["narrative"] != fake_llm.narrative
+    assert sim["narrative_source"] == "rule_based"
+    assert "고령" not in sim["narrative"]
+
+
 def test_simulate_rejects_narrative_with_wrong_direction(fake_llm):
     """계산 방향과 반대로 서술한 narrative는 **양방향 모두** 버린다 (cards.py wrong_direction).
 
@@ -1569,7 +1616,8 @@ def test_kpi_reports_the_balance_index_sample_size():
     # 집계 6지역 밖 타깃은 지수에도 표본에도 들어가지 않는다
     _put_expansion("AC-940", "서울시", "카페")
     assert client.post("/api/cards/AC-940/decision",
-                       json={"decision": "approved", **ACTOR}).status_code == 200
+                       json={"decision": "approved", "safety_reviewed": True,
+                             **ACTOR}).status_code == 200
     assert client.get("/api/kpi").json()["balance_sample_count"] == 2
 
 

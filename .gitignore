@@ -39,3 +39,6 @@ MVP_상생나침반_개정판.pdf
 
 # Kakao 지오코딩 응답 캐시 — 공공데이터 아님, 재배포 제약 (docs/plan/12 §4, 06 P3)
 data/raw/api_cache/geocode.json
+
+# SAM CLI 로컬 빌드 산출물 — 배포는 CloudFormation 스택이 정본이라 커밋하지 않는다
+infra/.aws-sam/

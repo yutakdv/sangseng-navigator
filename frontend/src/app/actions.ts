@@ -68,6 +68,8 @@ export interface DecisionInput {
   cooldownDays?: number;
   /** 반려·보류에서만 의미가 있다 — 무엇이 바뀌면 다시 볼지 */
   recheckCondition?: string;
+  /** 승인 전 데이터 보호·근거 검증·편향/윤리 영향 범위를 확인했는지 */
+  safetyReviewed?: boolean;
 }
 
 /** 승인/반려/보류 — AI 제안이 확정되는 유일한 지점 (절대 규칙 4) */
@@ -90,6 +92,7 @@ export async function decideAction(id: string, input: DecisionInput): Promise<Ac
       // 승인에 실어 보내면 서버가 무시하지만, 의미 없는 값을 보내지 않는다
       ...(blocking && input.cooldownDays !== undefined ? { cooldown_days: input.cooldownDays } : {}),
       ...(blocking && recheck ? { recheck_condition: recheck } : {}),
+      ...(input.decision === "approved" ? { safety_reviewed: input.safetyReviewed === true } : {}),
     });
     revalidateAll();
     return { ok: true, data: card };
