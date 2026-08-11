@@ -44,6 +44,7 @@ export function KakaoMapView({
   useEffect(() => {
     let active = true;
     let map: KakaoMapInstance | null = null;
+    let resizeObserver: ResizeObserver | null = null;
     const markers: KakaoMarker[] = [];
     let infoWindow: KakaoInfoWindow | null = null;
 
@@ -78,7 +79,19 @@ export function KakaoMapView({
           });
         });
 
-        if (points.length > 1) map.setBounds(bounds, 48, 48, 48, 48);
+        const fit = () => {
+          if (!map) return;
+          // 컨테이너가 최종 폭에 닿기 전에 지도를 만들면 늘어난 만큼이 회색 타일로 남는다 —
+          // 크기가 바뀔 때마다 다시 재서 그리고, 뷰 영역도 같이 맞춘다
+          map.relayout();
+          if (points.length > 1) map.setBounds(bounds, 48, 48, 48, 48);
+          else map.setCenter(center);
+        };
+        fit();
+        if (typeof ResizeObserver !== "undefined" && containerRef.current) {
+          resizeObserver = new ResizeObserver(fit);
+          resizeObserver.observe(containerRef.current);
+        }
         if (active) setStatus("ready");
       })
       .catch((error: unknown) => {
@@ -93,6 +106,7 @@ export function KakaoMapView({
 
     return () => {
       active = false;
+      resizeObserver?.disconnect();
       infoWindow?.close();
       markers.forEach((marker) => marker.setMap(null));
       map = null;

@@ -280,8 +280,8 @@ export function ProgressReportDashboard({
 
       <Section
         icon="chart"
-        title="실제 관측 성과 변화"
-        desc="카드별 기간 내 첫 관측값과 마지막 관측값을 비교한 평균입니다. 방향색은 증가 빨강·감소 파랑이며, 개선 여부는 지표 의미를 따로 반영합니다. 지역 소비 집중도는 감소가 개선입니다."
+        title="담당자 입력 관측값 변화"
+        desc="카드별 기간 내 첫 관측값과 마지막 관측값을 비교한 평균입니다. 담당자가 입력한 값이며 같은 기간의 다른 요인과 분리하지 않으므로 정책의 인과 효과가 아닙니다. 방향색은 증가 빨강·감소 파랑이며, 개선 여부는 지표 의미를 따로 반영합니다. 지역 소비 집중도는 감소가 개선입니다."
       >
         <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
           {PROGRESS_METRICS.map((meta) => (
