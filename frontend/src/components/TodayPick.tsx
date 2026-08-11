@@ -57,7 +57,9 @@ export function TodayPick({
           {chipHref ? (
             <Link
               href={chipHref}
-              className="mt-2.5 inline-flex min-h-10 items-center gap-1.5 rounded-full bg-visitor-primary px-3.5 text-[13px] font-bold text-white shadow-[0_4px_12px_-4px_rgb(22_101_52_/_0.7)]"
+              /* 파스텔 — 이 칩은 목록으로 가는 지름길이지 화면의 주 버튼이 아니다.
+                 짙은 그린 알약을 쓰면 카드 안에서 가장 무거운 덩어리가 되어 헤드라인을 누른다 */
+              className="mt-2.5 inline-flex min-h-10 items-center gap-1.5 rounded-full bg-visitor-primary-soft px-3.5 text-[13px] font-bold text-visitor-primary transition-colors hover:bg-[#c9f0d6]"
             >
               {copy.chipLabel}
               <Icon name="arrowRight" size={14} strokeWidth={2.2} />

@@ -15,24 +15,17 @@ export default function WidgetLoading() {
       <span className="sr-only">추천 가맹점을 불러오는 중입니다</span>
 
       <div className="mx-auto w-full max-w-[390px] bg-visitor-bg shadow-card-hover sm:rounded-[28px] sm:ring-1 sm:ring-black/5">
-        {/* 헤더는 실제 화면과 같은 두 켜(브랜드 바 + 제목 밴드)로 그린다 — 로고·제목 모두 정적이라
-            로딩 중에도 그대로 보여 줄 수 있고, 뜰 때 첫 화면이 밀리지 않는다 */}
-        <header className="text-white sm:rounded-t-[28px]">
-          <div className="flex items-center bg-[#0a3a1d] px-5 py-3 sm:rounded-t-[28px]">
-            <Image
-              src="/brand/sangseng-navigator-lockup.png"
-              alt="상생 나침반"
-              width={144}
-              height={28}
-              priority
-              className="h-[22px] w-auto brightness-0 invert"
-            />
-          </div>
-          <div className="bg-gradient-to-br from-visitor-accent to-[#0e4a25] px-5 pb-6 pt-5">
-            <p className="max-w-[36ch] break-keep text-[14px] font-medium leading-6 text-white/90">
-              하이원포인트를 쓸 수 있는 지역 가맹점을 찾아드려요. 로그인은 필요 없어요.
-            </p>
-          </div>
+        {/* 헤더는 실제 화면과 같은 파스텔 로고 바 한 줄이다 — 로고는 정적이라 로딩 중에도 그대로
+            보여 줄 수 있고, 뜰 때 첫 화면이 밀리지 않는다 */}
+        <header className="flex items-center bg-visitor-primary-soft px-5 py-3.5 sm:rounded-t-[28px]">
+          <Image
+            src="/brand/sangseng-navigator-lockup.png"
+            alt="상생 나침반"
+            width={144}
+            height={28}
+            priority
+            className="h-[22px] w-auto"
+          />
         </header>
 
         <div className="px-5 py-5">

@@ -216,54 +216,30 @@ export default async function WidgetPage({ searchParams }: { searchParams: Promi
       {/* 모바일에서는 한 열, 넓은 화면에서는 레퍼런스(image-2)처럼 필터와 지도를 나란히 둔다. */}
       <div className="mx-auto w-full max-w-[1180px] overflow-hidden bg-visitor-bg shadow-card-hover sm:rounded-[28px] sm:ring-1 sm:ring-black/5">
         {/**
-         * 헤더는 두 켜다 — 위는 브랜드(로고), 아래는 이 화면이 무엇인지(제목).
-         * 로고와 제목을 한 덩어리로 쌓아 두면 "상생나침반 지역별 하이원포인트 가맹점"이 한 줄기
-         * 제목처럼 읽혀 브랜드도 제목도 서지 않는다. 선을 긋는 대신 **면의 명도차**로 가른다
-         * (13 §6-1). 위 켜는 짙은 단색, 아래 켜는 그라디언트다.
+         * 헤더는 로고 한 줄이다. 안내 문구는 히어로 아래 한 문단으로 합쳤다 — 짙은 그린 밴드에
+         * 같은 말을 얹으면 화면 첫 인상이 무거워지고 문장도 두 군데로 갈라진다.
+         * 면이 파스텔 그린이라 로고를 흰색으로 뒤집지 않고 원래 색 그대로 쓴다.
          */}
-        <header className="relative overflow-hidden text-white sm:rounded-t-[28px]">
-          <div className="flex items-center justify-between gap-3 bg-[#0a3a1d] px-5 py-3 sm:px-8">
-            {/* 담당자 화면(AdminShell)과 같은 로고 자산. 원본이 인디고라 그린 위에서 색이
-                부딪히므로 단색 흰색으로 눌러서 얹는다(brightness-0 invert) */}
-            <Image
-              src="/brand/sangseng-navigator-lockup.png"
-              alt="상생 나침반"
-              width={144}
-              height={28}
-              priority
-              className="h-[22px] w-auto brightness-0 invert"
-            />
-            <span className="flex items-center gap-2">
-              {live ? <WidgetLiveRefresh /> : null}
-              {/* 두 얼굴(담당자↔방문객) 연결 고리가 최하단에만 있으면 모바일 심사에서 폐루프
-                  서사를 놓친다 (검토 §3-2) — 하단 줄은 유지하고 헤더에도 짧게 건다 */}
-              <Link
-                href="/"
-                className="text-[11px] font-semibold text-white/75 underline underline-offset-2"
-              >
-                담당자 화면 →
-              </Link>
-            </span>
-          </div>
-
-          {/* 제목("지역별 하이원포인트 가맹점")은 두지 않는다 — 바로 아래 히어로가 이 화면의
-              제목 노릇을 하고 있어서, 헤더에 또 큰 제목을 얹으면 같은 말을 두 번 크게 하는 꼴이다.
-              이 밴드는 한 줄 안내만 받는다 */}
-          <div className="relative overflow-hidden bg-gradient-to-br from-visitor-accent to-[#0e4a25] px-5 pb-6 pt-5 sm:px-8">
-            {/* 브랜드가 나침반이니 밴드의 빈 오른쪽을 나침반으로 채운다 — 그라디언트 위에 흐린
-                원을 띄우는 상투적인 처리 대신, 이름에서 나온 도형 하나만 크게 눕힌다 */}
-            <span
-              aria-hidden
-              className="pointer-events-none absolute -bottom-16 -right-10 text-white/[0.13]"
+        <header className="flex items-center justify-between gap-3 bg-visitor-primary-soft px-5 py-3.5 sm:rounded-t-[28px] sm:px-8">
+          <Image
+            src="/brand/sangseng-navigator-lockup.png"
+            alt="상생 나침반"
+            width={144}
+            height={28}
+            priority
+            className="h-[22px] w-auto"
+          />
+          <span className="flex items-center gap-2">
+            {live ? <WidgetLiveRefresh /> : null}
+            {/* 두 얼굴(담당자↔방문객) 연결 고리가 최하단에만 있으면 모바일 심사에서 폐루프
+                서사를 놓친다 (검토 §3-2) — 하단 줄은 유지하고 헤더에도 짧게 건다 */}
+            <Link
+              href="/"
+              className="text-[11px] font-semibold text-visitor-primary underline underline-offset-2"
             >
-              <Icon name="compass" size={150} strokeWidth={0.9} />
-            </span>
-            {/* 헤더는 "이게 무엇인가"만 말한다 — "어떻게 쓰는가"는 아래 히어로가 맡는다.
-                제목을 뺀 뒤 두 문장이 거의 같은 말을 연달아 하고 있어 역할을 갈랐다 */}
-            <p className="relative max-w-[36ch] break-keep text-[14px] font-medium leading-6 text-white/90">
-              하이원포인트를 쓸 수 있는 지역 가맹점을 찾아드려요. 로그인은 필요 없어요.
-            </p>
-          </div>
+              담당자 화면 →
+            </Link>
+          </span>
         </header>
 
         {/* 시행 중인 페이백은 전 항목 공통 — 목록을 스크롤하기 전에 상단에서 먼저 알린다 (카드 배지는 유지) */}
@@ -304,9 +280,11 @@ export default async function WidgetPage({ searchParams }: { searchParams: Promi
               포인트, 지역에서<br />
               가치로 이어지다
             </h1>
+            {/* 헤더 밴드에 있던 안내를 여기로 합쳤다 — 무엇인가 → 어떻게 쓰는가가 한 문단에서
+                이어지고, 화면 맨 위는 브랜드만 남는다 */}
             <p className="mt-3 max-w-md break-keep text-[14px] leading-7 text-slate-600">
-              가게 이름으로 찾거나 관심 지역·업종으로 좁혀 보세요. 목록 순서는 이름·업종으로
-              바꿔 볼 수 있어요.
+              하이원포인트를 쓸 수 있는 지역 가맹점을 로그인 없이 찾아드려요. 가게 이름으로 찾거나
+              관심 지역·업종으로 좁혀 보고, 목록 순서도 이름·업종으로 바꿔 볼 수 있어요.
             </p>
             {/* 검색은 필터보다 위에 온다 — 갈 곳을 이미 아는 사람은 지역·업종을 거치지 않는다.
                 limit은 넘기지 않는다: 새 검색은 첫 페이지부터 보는 게 맞다 */}
@@ -515,8 +493,9 @@ export default async function WidgetPage({ searchParams }: { searchParams: Promi
  * 구조는 위에서 아래로 **누구인가(아이콘·이름·업종) → 무엇인가(한 줄 설명·주소) → 무엇을 할 수
  * 있나(배지·길찾기)** 세 켜다. 정보를 한 덩어리로 쌓아 두면 열두 장이 같은 회색 블록으로 보인다.
  *
- * - 흰 패널 위 흰 카드에 테두리를 두르는 대신 `visitor-surface-sunken`으로 가라앉히고, 눌렀을 때
- *   흰 면으로 떠오르게 한다 (13 §6-1 규칙 2 — 면이 같으면 선이 아니라 면을 옮긴다).
+ * - 흰 패널 위 흰 카드에 테두리를 두르는 대신 `visitor-surface-sunken`으로 가라앉힌다
+ *   (13 §6-1 규칙 2 — 면이 같으면 선이 아니라 면을 옮긴다). 호버는 흰색으로 띄우지 않고 한 단
+ *   더 가라앉힌다 — 흰 패널 위에서 흰 카드는 경계가 사라져 오히려 반응이 없는 것처럼 보인다.
  * - "하이원포인트 사용 가능" 칩은 뺐다. 모든 카드에 100% 붙는 문구라 카드마다 되풀이하면 정보가
  *   아니라 무늬가 된다 — 목록 머리에서 한 번만 말한다.
  * - 확충 가맹점은 아이콘 타일에 반짝임 표식을 단다. 지도 핀의 구분(점 ↔ 반짝임)과 같은 규칙이라
@@ -524,7 +503,7 @@ export default async function WidgetPage({ searchParams }: { searchParams: Promi
  */
 function MerchantCard({ r, pop = false }: { r: Recommendation; pop?: boolean }) {
   return (
-    <li className="flex h-full flex-col rounded-2xl bg-visitor-surface-sunken p-4 transition-colors hover:bg-white hover:shadow-card">
+    <li className="flex h-full flex-col rounded-2xl bg-visitor-surface-sunken p-4 transition-colors hover:bg-visitor-surface-hover">
       <div className="flex items-start gap-3">
         <span className="relative shrink-0">
           <CategoryIcon category={r.category} />
