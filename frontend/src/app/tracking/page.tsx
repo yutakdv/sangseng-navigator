@@ -531,8 +531,11 @@ export default async function TrackingPage({
             // 값을 0·"—"로 채우면 "채택률 0%"처럼 실제 성과로 오독된다 — 아예 못 불러왔다고 밝힌다
             <FailedChart />
           ) : (
+          // surface="sunken": 이 4장은 대시보드의 진단 지표와 달리 **패널 안**에 있다 —
+          // 패널도 흰 면이라 기본값(흰 타일 + 옅은 그림자)으로는 넷이 통째로 사라진다
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
             <KpiCard
+              surface="sunken"
               icon="check"
               label="채택률"
               value={ratioNum(kpi.adoption_rate)}
@@ -540,6 +543,7 @@ export default async function TrackingPage({
               sub={`승인 ${kpi.counts.approved} / 결정 ${kpi.counts.decided}장`}
             />
             <KpiCard
+              surface="sunken"
               icon="trend"
               label="실행 전환율"
               value={ratioNum(kpi.execution_rate)}
@@ -547,6 +551,7 @@ export default async function TrackingPage({
               sub="승인 카드 중 추진중·완료 비중"
             />
             <KpiCard
+              surface="sunken"
               icon="clock"
               label="평균 의사결정 소요"
               value={dash(kpi.avg_decision_hours)}
@@ -554,6 +559,7 @@ export default async function TrackingPage({
               sub="승인·반려·보류까지 걸린 시간의 평균"
             />
             <KpiCard
+              surface="sunken"
               icon="scale"
               label="지역 균형지수"
               value={dash(kpi.regional_balance_index)}
