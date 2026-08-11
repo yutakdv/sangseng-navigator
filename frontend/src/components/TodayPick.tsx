@@ -28,7 +28,8 @@ export function TodayPick({
   return (
     <section
       aria-label="오늘의 추천"
-      className="relative mx-5 mt-5 rounded-2xl border border-slate-200/80 bg-white px-4 py-3.5 shadow-card sm:mx-8"
+      // 바깥 여백은 두지 않는다 — 놓이는 자리(지도와 목록 사이)의 컨테이너가 정한다
+      className="relative rounded-2xl border border-slate-200/80 bg-white px-4 py-3.5 shadow-card"
     >
       <Link
         href={closeHref}

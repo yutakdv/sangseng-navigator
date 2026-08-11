@@ -250,16 +250,6 @@ export default async function WidgetPage({ searchParams }: { searchParams: Promi
           </div>
         ) : null}
 
-        {/* 오늘의 추천 — 필터로 내려가기 전에 "오늘 기준"을 한 줄로 준다. 요일 사실을 못 만들면
-            통째로 숨기고, 사용자가 닫았으면(today=off) 접어 둔다 */}
-        {todayCopy && !todayClosed ? (
-          <TodayPick
-            copy={todayCopy}
-            chipHref={todayHref}
-            closeHref={href({ today: "off" }, filters)}
-          />
-        ) : null}
-
         <div className="grid gap-6 px-5 py-5 sm:px-8 sm:py-8 lg:grid-cols-[0.72fr_1.28fr] lg:items-start">
           <div>
             {/* 헤더에서 제목을 뺐으므로 이 히어로가 화면의 h1이다 (문서에 h1은 하나여야 한다) */}
@@ -270,8 +260,8 @@ export default async function WidgetPage({ searchParams }: { searchParams: Promi
             {/* 헤더 밴드에 있던 안내를 여기로 합쳤다 — 무엇인가 → 어떻게 쓰는가가 한 문단에서
                 이어지고, 화면 맨 위는 브랜드만 남는다 */}
             <p className="mt-3 max-w-md break-keep text-[14px] leading-7 text-slate-600">
-              로그인 없이 하이원포인트 사용처를 간편하게 찾아보세요. 하이원리조트 주변의 다양한
-              맛집과 즐길거리에서 여행의 특별함을 더해보세요!
+              로그인 없이 하이원포인트 사용처를 간편하게 찾아보세요. 평소엔 가보지 못했던
+              하이원리조트 주변의 숨겨진 맛집과 즐길거리에서 여행의 특별함을 더해보세요!
             </p>
             {/* 검색은 필터보다 위에 온다 — 갈 곳을 이미 아는 사람은 지역·업종을 거치지 않는다.
                 limit은 넘기지 않는다: 새 검색은 첫 페이지부터 보는 게 맞다 */}
@@ -317,6 +307,19 @@ export default async function WidgetPage({ searchParams }: { searchParams: Promi
         </div>
 
         <div className="px-5 pb-5 sm:px-8 sm:pb-8">
+          {/* 오늘의 추천 — 지도와 목록 사이에 둔다. 목록을 훑기 직전에 "오늘 기준"을 한 줄로
+              주는 지름길이라 목록 바로 위가 제자리다. 요일 사실을 못 만들면 통째로 숨기고,
+              사용자가 닫았으면(today=off) 접어 둔다 */}
+          {todayCopy && !todayClosed ? (
+            <div className="mb-6">
+              <TodayPick
+                copy={todayCopy}
+                chipHref={todayHref}
+                closeHref={href({ today: "off" }, filters)}
+              />
+            </div>
+          ) : null}
+
           {/* 투어 6단계 대체 앵커 — 페이백 배너(widget-payback)가 없는 데모 상태에서도 이 제목 줄은
               추천 0건일 때조차 항상 렌더된다 (tourSteps.ts fallbackAnchor). 앵커를 목록 전체가 아니라
               이 작은 제목 줄에만 붙이는 이유: TourOverlay가 앵커를 `scrollIntoView({block:"center"})`로
