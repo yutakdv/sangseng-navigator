@@ -12,6 +12,32 @@ import type { Recommendation } from "@/types";
 // SDK 로더는 `lib/kakaoMaps.ts` 한 곳에만 둔다 — 카드 상세 지도(`MapViewKakao`)와 같은
 // 스크립트를 공유해야 태그가 두 번 붙지 않고 `window.kakao` 타입도 갈라지지 않는다.
 
+/**
+ * 마커 핀 — 카카오 기본 파란 핀 대신 위젯 그린(`visitor-primary` #166534)으로 그린다.
+ *
+ * SVG를 data URI로 넣어 외부 이미지 요청을 만들지 않는다(핀 하나 때문에 정적 자산과 캐시
+ * 문제를 늘리지 않는다). 확충 가맹점은 목록에서 별도 섹션으로 갈라 두었으므로 지도에서도
+ * 구분되어야 한다 — 같은 그린 계열을 쓰되 안쪽 표식을 점 → 반짝임으로 바꾸고 한 치수 키운다.
+ */
+function pinDataUri(mark: "dot" | "sparkle"): string {
+  const inner =
+    mark === "dot"
+      ? '<circle cx="12" cy="11.6" r="4.2" fill="#ffffff"/>'
+      : '<path d="M12 6.2l1.5 3.6 3.6 1.5-3.6 1.5L12 16.4l-1.5-3.6-3.6-1.5 3.6-1.5L12 6.2Z" fill="#ffffff"/>';
+  const svg =
+    '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 32">' +
+    '<path d="M12 31.2S23 19.6 23 11.6C23 5.2 18.1.8 12 .8S1 5.2 1 11.6c0 8 11 19.6 11 19.6Z"' +
+    ' fill="#166534" stroke="#ffffff" stroke-width="1.6"/>' +
+    inner +
+    "</svg>";
+  return `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`;
+}
+
+const PIN = {
+  base: { src: pinDataUri("dot"), w: 30, h: 40 },
+  fresh: { src: pinDataUri("sparkle"), w: 34, h: 45 },
+} as const;
+
 function popupContent(merchant: Recommendation): HTMLElement {
   const root = document.createElement("div");
   root.className = "min-w-[170px] px-1 py-0.5 text-[12px] leading-5";
@@ -68,7 +94,18 @@ export function KakaoMapView({
         points.forEach((merchant) => {
           const position = new kakao.maps.LatLng(merchant.lat, merchant.lng);
           bounds.extend(position);
-          const marker = new kakao.maps.Marker({ map: mapInstance, position, title: merchant.name });
+          const pin = merchant.badge ? PIN.fresh : PIN.base;
+          const marker = new kakao.maps.Marker({
+            map: mapInstance,
+            position,
+            title: merchant.name,
+            image: new kakao.maps.MarkerImage(pin.src, new kakao.maps.Size(pin.w, pin.h), {
+              // 핀 끝이 좌표를 가리키게 — 기본 offset은 이미지 왼쪽 위다
+              offset: new kakao.maps.Point(pin.w / 2, pin.h),
+            }),
+            // 확충 핀이 겹칠 때 뒤로 숨지 않게
+            zIndex: merchant.badge ? 3 : 2,
+          });
           markers.push(marker);
           kakao.maps.event.addListener(marker, "click", () => {
             if (!map) return;
@@ -105,6 +142,7 @@ export function KakaoMapView({
   const points = recommendations.filter(
     (merchant) => Number.isFinite(merchant.lat) && Number.isFinite(merchant.lng),
   );
+  const freshCount = points.filter((merchant) => merchant.badge).length;
   const visibleStatus = hasPoints ? status : "fallback";
   const visibleMessage = hasPoints ? message : "이 조건에는 지도에 표시할 가맹점이 없어요.";
 
@@ -114,13 +152,25 @@ export function KakaoMapView({
       {visibleStatus !== "ready" ? (
         <StaticMapFallback points={points} message={visibleMessage} />
       ) : null}
-      <div className="pointer-events-none absolute left-4 top-4 rounded-full bg-white/90 px-3 py-1.5 text-xs font-semibold text-slate-800 shadow-sm">
+      {/* z-10: Kakao SDK가 타일·마커 레이어를 z-index 1로 깔기 때문에, 이 칩들에 z를 주지 않으면
+          실제 지도가 뜬 순간 지도 아래로 가려진다(폴백 화면에서는 보이므로 놓치기 쉽다) */}
+      <div className="pointer-events-none absolute left-4 top-4 z-10 rounded-full bg-white/90 px-3 py-1.5 text-xs font-semibold text-slate-800 shadow-sm">
         {region ? `${region} 주변 추천 가맹점` : "하이원리조트 주변 추천 가맹점"}
       </div>
-      <div className="pointer-events-none absolute bottom-4 left-4 flex flex-wrap gap-2 rounded-full bg-white/90 px-3 py-1.5 text-[11px] font-medium text-slate-700 shadow-sm">
-        <span>● 추천 가맹점 {recommendations.length}곳</span>
-        <span className="text-slate-400">·</span>
-        <span>● 하이원포인트 사용 가능</span>
+      {/* 범례는 지도에 실제로 찍힌 핀 두 종류를 설명한다 — 표식이 둘인데 한 가지만 말하면
+          "왜 어떤 핀은 다르게 생겼나"가 지도 위에서 풀리지 않는다 */}
+      <div className="pointer-events-none absolute bottom-4 left-4 z-10 flex flex-wrap gap-2 rounded-full bg-white/90 px-3 py-1.5 text-[11px] font-medium text-slate-700 shadow-sm">
+        <span>
+          <span className="text-visitor-primary">●</span> 하이원포인트 사용 가능 {points.length}곳
+        </span>
+        {freshCount ? (
+          <>
+            <span className="text-slate-400">·</span>
+            <span>
+              <span className="text-visitor-primary">✦</span> 이번 분기 확충 {freshCount}곳
+            </span>
+          </>
+        ) : null}
       </div>
     </section>
   );
