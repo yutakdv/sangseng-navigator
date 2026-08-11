@@ -59,6 +59,8 @@ type Search = {
   q?: string;
   /** 목록 정렬 (widgetList.SortKey) */
   sort?: string;
+  /** "off"면 오늘의 추천 카드를 접어 둔다 (사용자가 닫은 상태) */
+  today?: string;
 };
 const DEFAULT_LIST_LIMIT = 12;
 const MAX_LIST_LIMIT = 120;
@@ -72,6 +74,8 @@ const href = (next: Search, current: Search): string => {
   if (merged.q) params.set("q", merged.q);
   // 기본 정렬은 URL에 남기지 않는다 — 공유된 주소가 짧고, 기본값이 바뀌어도 링크가 따라온다
   if (merged.sort && merged.sort !== DEFAULT_SORT) params.set("sort", merged.sort);
+  // 닫아 둔 상태는 필터를 눌러도 유지된다 — 눌러서 없앤 카드가 다시 튀어나오면 안 된다
+  if (merged.today === "off") params.set("today", "off");
   // 라이브 미리보기(데모)는 필터를 눌러도 꺼지지 않아야 한다
   if (merged.live) params.set("live", merged.live);
   const qs = params.toString();
@@ -91,6 +95,7 @@ export default async function WidgetPage({ searchParams }: { searchParams: Promi
   const live = sp.live === "1" ? "1" : undefined;
   const query = normalizeQuery(sp.q);
   const sort = sortKeyOf(sp.sort);
+  const todayClosed = sp.today === "off";
   const current: Search = {
     region,
     category,
@@ -98,8 +103,16 @@ export default async function WidgetPage({ searchParams }: { searchParams: Promi
     live,
     q: query,
     sort,
+    today: todayClosed ? "off" : undefined,
   };
-  const filters: Search = { region, category, live, q: query, sort };
+  const filters: Search = {
+    region,
+    category,
+    live,
+    q: query,
+    sort,
+    today: todayClosed ? "off" : undefined,
+  };
   /**
    * 목록은 항상 상한까지 받아 온다.
    *
@@ -257,8 +270,15 @@ export default async function WidgetPage({ searchParams }: { searchParams: Promi
           </div>
         ) : null}
 
-        {/* 오늘의 추천 — 필터로 내려가기 전에 "오늘 기준"을 한 줄로 준다. 요일 사실을 못 만들면 통째로 숨긴다 */}
-        {todayCopy ? <TodayPick copy={todayCopy} chipHref={todayHref} /> : null}
+        {/* 오늘의 추천 — 필터로 내려가기 전에 "오늘 기준"을 한 줄로 준다. 요일 사실을 못 만들면
+            통째로 숨기고, 사용자가 닫았으면(today=off) 접어 둔다 */}
+        {todayCopy && !todayClosed ? (
+          <TodayPick
+            copy={todayCopy}
+            chipHref={todayHref}
+            closeHref={href({ today: "off" }, filters)}
+          />
+        ) : null}
 
         <div className="grid gap-6 px-5 py-5 sm:px-8 sm:py-8 lg:grid-cols-[0.72fr_1.28fr] lg:items-start">
           <div>
@@ -275,7 +295,13 @@ export default async function WidgetPage({ searchParams }: { searchParams: Promi
             <div className="mt-6">
               <WidgetSearch
                 q={query}
-                hidden={{ region, category, live, sort: sort === DEFAULT_SORT ? undefined : sort }}
+                hidden={{
+                  region,
+                  category,
+                  live,
+                  sort: sort === DEFAULT_SORT ? undefined : sort,
+                  today: todayClosed ? "off" : undefined,
+                }}
                 clearHref={href({ q: undefined }, filters)}
               />
             </div>

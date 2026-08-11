@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import {
   loadKakaoMaps,
-  type KakaoInfoWindow,
+  type KakaoCustomOverlay,
   type KakaoMapInstance,
   type KakaoMarker,
 } from "@/lib/kakaoMaps";
@@ -38,21 +38,90 @@ const PIN = {
   fresh: { src: pinDataUri("sparkle"), w: 34, h: 45 },
 } as const;
 
-function popupContent(merchant: Recommendation): HTMLElement {
-  const root = document.createElement("div");
-  root.className = "min-w-[170px] px-1 py-0.5 text-[12px] leading-5";
-  const title = document.createElement("strong");
-  title.className = "block text-[13px] text-slate-900";
-  title.textContent = merchant.name;
-  root.appendChild(title);
-  const category = document.createElement("span");
-  category.className = "block text-slate-600";
-  category.textContent = merchant.category;
-  root.appendChild(category);
-  const address = document.createElement("span");
-  address.className = "block text-slate-500";
-  address.textContent = merchant.address;
-  root.appendChild(address);
+/** 핀 끝과 카드 사이 간격 — 카드가 핀을 덮지 않게 이만큼 띄운다 (가장 큰 핀 45px + 여백) */
+const CARD_LIFT = 52;
+
+/**
+ * 핀을 눌렀을 때 뜨는 말풍선 카드.
+ *
+ * SDK의 InfoWindow가 아니라 CustomOverlay에 넣을 DOM을 직접 만든다 — InfoWindow는 흰 프레임과
+ * 꼬리, 닫기 버튼이 전부 SDK 것이라 목록 카드(`MerchantCard`)와 같은 라운드·그림자·그린 배지를
+ * 쓸 수 없다. 지도 위에 뜨는 카드가 목록 카드와 남남처럼 보이면 같은 가맹점이라는 게 안 읽힌다.
+ *
+ * JSX가 아닌 이유는 CustomOverlay가 HTMLElement를 요구하기 때문이고, 클래스 문자열이 이 파일에
+ * 그대로 있으므로 Tailwind가 정상적으로 수집한다.
+ */
+function popupCard(merchant: Recommendation, onClose: () => void): HTMLElement {
+  const el = (tag: string, className: string, text?: string): HTMLElement => {
+    const node = document.createElement(tag);
+    node.className = className;
+    if (text) node.textContent = text;
+    return node;
+  };
+
+  // 바깥 래퍼의 아래 여백이 곧 "핀 위로 띄우는 높이"다 (yAnchor=1이 이 박스의 바닥을 좌표에 붙인다)
+  const root = el("div", "relative w-[236px]");
+  root.style.paddingBottom = `${CARD_LIFT}px`;
+
+  const card = el(
+    "div",
+    "relative rounded-2xl bg-white p-3.5 text-left shadow-[0_18px_40px_-16px_rgb(15_23_42_/_0.45)]",
+  );
+
+  const close = el(
+    "button",
+    "absolute right-2.5 top-2.5 flex h-7 w-7 items-center justify-center rounded-full text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-600",
+  );
+  close.setAttribute("type", "button");
+  close.setAttribute("aria-label", "닫기");
+  close.innerHTML =
+    '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M6 6l12 12M18 6 6 18"/></svg>';
+  close.addEventListener("click", onClose);
+  card.appendChild(close);
+
+  card.appendChild(el("strong", "block pr-7 text-[14px] font-bold leading-5 text-admin-text", merchant.name));
+  card.appendChild(el("span", "mt-0.5 block text-[11px] font-medium text-admin-text-muted", merchant.category));
+  card.appendChild(
+    el("span", "mt-1.5 block break-keep text-[11px] leading-4 text-admin-text-muted", merchant.address),
+  );
+
+  const badges = el("div", "mt-2 flex flex-wrap gap-1");
+  if (merchant.badge) {
+    badges.appendChild(
+      el(
+        "span",
+        "inline-flex items-center rounded-full bg-state-good-bg px-2 py-0.5 text-[10px] font-bold text-state-good",
+        merchant.badge,
+      ),
+    );
+  }
+  if (merchant.payback) {
+    badges.appendChild(
+      el(
+        "span",
+        "inline-flex items-center rounded-full bg-visitor-primary-soft px-2 py-0.5 text-[10px] font-bold text-visitor-primary",
+        `${merchant.payback.rate}% 페이백`,
+      ),
+    );
+  }
+  if (badges.childElementCount) card.appendChild(badges);
+
+  const link = el(
+    "a",
+    "mt-2.5 flex min-h-9 items-center justify-center rounded-xl bg-visitor-primary text-[12px] font-bold text-white",
+    "카카오맵에서 길찾기",
+  );
+  link.setAttribute("href", merchant.directions_url);
+  link.setAttribute("target", "_blank");
+  link.setAttribute("rel", "noreferrer");
+  card.appendChild(link);
+
+  // 꼬리 — 카드와 같은 흰색 사각형을 45° 돌려 카드 아래 가운데에 붙인다
+  const tail = el("div", "absolute left-1/2 h-3 w-3 -translate-x-1/2 rotate-45 bg-white");
+  tail.style.bottom = `${CARD_LIFT - 6}px`;
+
+  root.appendChild(card);
+  root.appendChild(tail);
   return root;
 }
 
@@ -66,12 +135,19 @@ export function KakaoMapView({
   const containerRef = useRef<HTMLDivElement | null>(null);
   const [status, setStatus] = useState<"loading" | "ready" | "fallback">("loading");
   const [message, setMessage] = useState("지도를 준비하고 있어요…");
+  /** 말풍선이 열려 있는 동안엔 제목 칩을 내린다 — 300px짜리 모바일 지도에서 둘이 겹친다 */
+  const [popupOpen, setPopupOpen] = useState(false);
 
   useEffect(() => {
     let active = true;
     let map: KakaoMapInstance | null = null;
     const markers: KakaoMarker[] = [];
-    let infoWindow: KakaoInfoWindow | null = null;
+    let popup: KakaoCustomOverlay | null = null;
+    const closePopup = () => {
+      popup?.setMap(null);
+      popup = null;
+      if (active) setPopupOpen(false);
+    };
 
     const points = recommendations.filter(
       (merchant) => Number.isFinite(merchant.lat) && Number.isFinite(merchant.lng),
@@ -109,11 +185,36 @@ export function KakaoMapView({
           markers.push(marker);
           kakao.maps.event.addListener(marker, "click", () => {
             if (!map) return;
-            infoWindow?.close();
-            infoWindow = new kakao.maps.InfoWindow({ content: popupContent(merchant), removable: true });
-            infoWindow.open(map, marker);
+            closePopup();
+            const card = popupCard(merchant, closePopup);
+            popup = new kakao.maps.CustomOverlay({
+              position,
+              content: card,
+              yAnchor: 1,
+              zIndex: 10,
+              clickable: true,
+            });
+            popup.setMap(map);
+            setPopupOpen(true);
+            /**
+             * 카드는 핀 위로 자라는데 지도 섹션은 `overflow-hidden`이라, 위쪽 핀을 누르면
+             * 이름·닫기 버튼이 지도 밖으로 잘려 나간다. 클릭한 핀을 가운데로 옮기고, 그래도
+             * 카드가 위로 넘칠 만큼이면 그만큼 더 내려 자리를 만든다.
+             *
+             * `panTo`(애니메이션)를 쓰면 뒤이은 `panBy`가 진행 중인 이동에 먹혀 카드가 잘린 채
+             * 남는다 — 자리 잡기는 즉시(`setCenter`) 하고, 미세 조정만 애니메이션으로 준다.
+             */
+            map.setCenter(position);
+            const viewHeight = containerRef.current?.clientHeight ?? 0;
+            requestAnimationFrame(() => {
+              const overflowAbove = card.offsetHeight + 14 - viewHeight / 2;
+              if (overflowAbove > 0) map?.panBy(0, -overflowAbove);
+            });
           });
         });
+
+        // 지도 빈 곳을 누르면 닫힌다 — 카드에 닫기 버튼이 있어도 이 동작을 기대하는 사용자가 많다
+        kakao.maps.event.addListener(mapInstance, "click", closePopup);
 
         if (points.length > 1) map.setBounds(bounds, 48, 48, 48, 48);
         if (active) setStatus("ready");
@@ -130,7 +231,7 @@ export function KakaoMapView({
 
     return () => {
       active = false;
-      infoWindow?.close();
+      closePopup();
       markers.forEach((marker) => marker.setMap(null));
       map = null;
     };
@@ -154,9 +255,11 @@ export function KakaoMapView({
       ) : null}
       {/* z-10: Kakao SDK가 타일·마커 레이어를 z-index 1로 깔기 때문에, 이 칩들에 z를 주지 않으면
           실제 지도가 뜬 순간 지도 아래로 가려진다(폴백 화면에서는 보이므로 놓치기 쉽다) */}
-      <div className="pointer-events-none absolute left-4 top-4 z-10 rounded-full bg-white/90 px-3 py-1.5 text-xs font-semibold text-slate-800 shadow-sm">
-        {region ? `${region} 주변 추천 가맹점` : "하이원리조트 주변 추천 가맹점"}
-      </div>
+      {popupOpen ? null : (
+        <div className="pointer-events-none absolute left-4 top-4 z-10 rounded-full bg-white/90 px-3 py-1.5 text-xs font-semibold text-slate-800 shadow-sm">
+          {region ? `${region} 주변 추천 가맹점` : "하이원리조트 주변 추천 가맹점"}
+        </div>
+      )}
       {/* 범례는 지도에 실제로 찍힌 핀 두 종류를 설명한다 — 표식이 둘인데 한 가지만 말하면
           "왜 어떤 핀은 다르게 생겼나"가 지도 위에서 풀리지 않는다 */}
       <div className="pointer-events-none absolute bottom-4 left-4 z-10 flex flex-wrap gap-2 rounded-full bg-white/90 px-3 py-1.5 text-[11px] font-medium text-slate-700 shadow-sm">
