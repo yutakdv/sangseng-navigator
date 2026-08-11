@@ -5,54 +5,34 @@ import maplibregl from "maplibre-gl";
 import "maplibre-gl/dist/maplibre-gl.css";
 import type { Feature, Polygon } from "geojson";
 import { ANCHOR, CATEGORIES, CATEGORY_COLORS, PRIMARY } from "@/lib/constants";
+import {
+  ANCHOR_COLOR,
+  FALLBACK_DOT,
+  MAP_BOX,
+  OTHER_CANDIDATE_COLOR,
+  SLOW_MS,
+  type MapViewProps,
+} from "@/components/MapViewTypes";
 
 /**
- * 카드 상세의 500m 반경 지도 본체 (docs/plan/08 F4 · 02 문서 "지도 결정").
+ * 카드 상세 500m 반경 지도의 **MapLibre 구현 — 현재는 폴백으로 보존만 한다.**
  *
- * MapLibre GL + OpenFreeMap — 키·도메인 등록이 필요 없고 WebGL 캔버스라 Safari에서 안정적이다.
- * 브라우저 전용이라 이 파일은 `MapView.tsx`가 `next/dynamic(ssr:false)`로만 불러온다.
+ * 화면에 실제로 붙는 구현은 `MapViewKakao`다 (02 문서 "지도 결정" 갱신: OpenFreeMap은 이
+ * 지역에서 리 단위 지명과 도로만 나오고 라벨도 로마자 병기라 반경 500m 축척에서 위치가 읽히지
+ * 않았다). 이 파일은 지우지 않는다 — Kakao 키·도메인 문제나 렌더 이슈가 나오면
+ * `MapView.tsx`의 dynamic import 대상을 이 파일로 되돌리는 한 줄이 곧 원복이다.
  *
- * ⚠ Safari 폴백 구조: 지도는 이 컴포넌트 하나에 격리돼 있다. 렌더 문제가 나면 카드 상세에서
+ * MapLibre GL + OpenFreeMap은 키·도메인 등록이 필요 없고 WebGL 캔버스라 Safari에서 안정적이다.
+ * 브라우저 전용이라 `MapView.tsx`가 `next/dynamic(ssr:false)`로만 불러온다.
+ *
+ * ⚠ 최종 폴백 구조는 그대로다: 지도는 이 컴포넌트 하나에 격리돼 있어 카드 상세에서
  *   `<MapView/>` 한 줄만 걷어내면 되고, 같은 근거(거점 거리·반경 내 가맹점 수)는 바로 아래
  *   "후보 상세" 표가 그대로 담고 있다 (02 문서 최종 폴백 = 거리 표 + 정적 캡처).
+ *
+ * props 계약(`MapViewProps`)과 표시 상수는 두 구현이 `MapViewTypes`에서 함께 읽는다.
  */
 
 const STYLE_URL = "https://tiles.openfreemap.org/styles/liberty";
-
-/** 지도 높이 — `MapView.tsx`의 로딩 자리표시자와 **같이** 바꿔야 레이아웃이 튀지 않는다 (13 §8) */
-const MAP_BOX = "h-[240px] w-full overflow-hidden rounded-lg bg-admin-bg sm:h-[380px]";
-
-const ANCHOR_COLOR = "#1E1840"; // admin.sidebar-deep (lavender-950) — 거점
-const OTHER_CANDIDATE_COLOR = "#9ca3af"; // 같은 읍의 다른 후보
-const FALLBACK_DOT = "#6b7280"; // 표시 6분류에 없는 값이 들어올 때
-/** 이 시간 안에 타일이 안 뜨면 "표로 보라"는 안내를 띄운다 — 심사위원이 고장으로 오인하지 않게 */
-const SLOW_MS = 6000;
-
-export type MapPin = {
-  name: string;
-  category: string;
-  lat: number;
-  lng: number;
-  address?: string;
-};
-
-export type MapCandidatePin = MapPin & {
-  id: string;
-  /** 이번 카드가 제안하는 후보 — 500m 원의 중심이자 강조 마커 */
-  isTarget: boolean;
-};
-
-export type MapViewProps = {
-  /** 500m 원의 중심 = 제안 후보 좌표 */
-  center: { lat: number; lng: number };
-  /** 같은 읍의 후보 전체 (제안 후보 포함) */
-  candidates: MapCandidatePin[];
-  /** 같은 읍의 하이원포인트 가맹점 — 전체(1,678건)를 넘기지 않는다 */
-  merchants: MapPin[];
-  /** 제안 후보와 같은 표시 업종 — 반경 안 동일 업종 공백이 눈에 보이게 크게 찍는다 */
-  sameCategory: string;
-  radiusM?: number;
-};
 
 /**
  * 반경 원 근사 폴리곤(64각형) — **docs/plan/08 F4의 스니펫을 그대로 가져왔다.**

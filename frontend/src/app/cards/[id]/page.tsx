@@ -467,7 +467,7 @@ export default async function CardDetailPage({
               {target.eup} 하이원포인트 가맹점 {eupMerchants.length}곳 (그중 {target.category}{" "}
               {sameCategoryMerchants}곳) · 후보 반경 500m 내 동일 업종 가맹점{" "}
               {targetCandidate.nearby_merchants}곳 / 동일 업종 상가 {targetCandidate.nearby_same_category_stores}곳.
-              지도 표기는 {ANCHOR.name} 기준이며, 지도 저작자 표시는 화면 오른쪽 아래에 있다.
+              지도 표기는 {ANCHOR.name} 기준이며, 지도 저작자 표시는 화면 왼쪽 아래에 있다.
             </p>
           </Section>
         ) : null}

@@ -1,92 +1,16 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import {
+  loadKakaoMaps,
+  type KakaoInfoWindow,
+  type KakaoMapInstance,
+  type KakaoMarker,
+} from "@/lib/kakaoMaps";
 import type { Recommendation } from "@/types";
 
-type KakaoLatLng = { getLat: () => number; getLng: () => number };
-
-type KakaoMapInstance = {
-  setBounds: (bounds: KakaoBounds, top?: number, right?: number, bottom?: number, left?: number) => void;
-};
-
-type KakaoBounds = { extend: (position: KakaoLatLng) => void };
-
-type KakaoMarker = {
-  setMap: (map: KakaoMapInstance | null) => void;
-};
-
-type KakaoInfoWindow = {
-  open: (map: KakaoMapInstance, marker: KakaoMarker) => void;
-  close: () => void;
-};
-
-type KakaoNamespace = {
-  maps: {
-    load: (callback: () => void) => void;
-    LatLng: new (lat: number, lng: number) => KakaoLatLng;
-    LatLngBounds: new () => KakaoBounds;
-    Map: new (
-      container: HTMLElement,
-      options: { center: KakaoLatLng; level: number },
-    ) => KakaoMapInstance;
-    Marker: new (options: {
-      map: KakaoMapInstance;
-      position: KakaoLatLng;
-      title?: string;
-    }) => KakaoMarker;
-    InfoWindow: new (options: { content: HTMLElement; removable?: boolean }) => KakaoInfoWindow;
-    event: { addListener: (target: KakaoMarker, type: string, listener: () => void) => void };
-  };
-};
-
-declare global {
-  interface Window {
-    kakao?: KakaoNamespace;
-  }
-}
-
-let kakaoLoader: Promise<KakaoNamespace> | null = null;
-
-function loadKakaoMaps(): Promise<KakaoNamespace> {
-  const appKey = process.env.NEXT_PUBLIC_KAKAO_MAP_KEY;
-  if (!appKey) return Promise.reject(new Error("Kakao Maps JS 키가 없습니다."));
-  if (typeof window === "undefined") return Promise.reject(new Error("브라우저에서만 지도를 불러올 수 있습니다."));
-  if (window.kakao?.maps) return Promise.resolve(window.kakao);
-  if (kakaoLoader) return kakaoLoader;
-
-  kakaoLoader = new Promise<KakaoNamespace>((resolve, reject) => {
-    const scriptId = "kakao-maps-sdk";
-    const existing = document.getElementById(scriptId) as HTMLScriptElement | null;
-    const onLoad = () => {
-      if (!window.kakao?.maps) {
-        reject(new Error("Kakao Maps SDK가 초기화되지 않았습니다."));
-        return;
-      }
-      window.kakao.maps.load(() => resolve(window.kakao as KakaoNamespace));
-    };
-
-    if (existing) {
-      if (window.kakao?.maps) onLoad();
-      else existing.addEventListener("load", onLoad, { once: true });
-      existing.addEventListener("error", () => reject(new Error("Kakao Maps SDK를 불러오지 못했습니다.")), {
-        once: true,
-      });
-      return;
-    }
-
-    const script = document.createElement("script");
-    script.id = scriptId;
-    script.async = true;
-    script.src = `https://dapi.kakao.com/v2/maps/sdk.js?appkey=${encodeURIComponent(appKey)}&autoload=false`;
-    script.addEventListener("load", onLoad, { once: true });
-    script.addEventListener("error", () => reject(new Error("Kakao Maps SDK를 불러오지 못했습니다.")), {
-      once: true,
-    });
-    document.head.appendChild(script);
-  });
-
-  return kakaoLoader;
-}
+// SDK 로더는 `lib/kakaoMaps.ts` 한 곳에만 둔다 — 카드 상세 지도(`MapViewKakao`)와 같은
+// 스크립트를 공유해야 태그가 두 번 붙지 않고 `window.kakao` 타입도 갈라지지 않는다.
 
 function popupContent(merchant: Recommendation): HTMLElement {
   const root = document.createElement("div");
