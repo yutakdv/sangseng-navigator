@@ -1,7 +1,8 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useTransition } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 
 /**
  * 라우트 에러 경계 (docs/plan/08 F9 · 12 §5).
@@ -21,11 +22,23 @@ export default function Error({
   error: Error & { digest?: string };
   reset: () => void;
 }) {
+  const router = useRouter();
+  const [retrying, startRetry] = useTransition();
+
   useEffect(() => {
     // 화면에는 내부 메시지를 노출하지 않는다(프로덕션 빌드에서는 Next가 이미 가린다).
     // 원인 추적은 콘솔·digest로 한다
     console.error(error);
   }, [error]);
+
+  // reset()만 부르면 라우터 캐시의 실패한 RSC 페이로드를 다시 그려서 서버가 복구돼도
+  // 오류 화면을 벗어나지 못한다 — refresh로 서버 컴포넌트를 재요청한 뒤 경계를 해제한다.
+  const retry = () => {
+    startRetry(() => {
+      router.refresh();
+      reset();
+    });
+  };
 
   return (
     <main className="flex min-h-screen items-center justify-center bg-admin-bg px-5 py-10">
@@ -59,10 +72,12 @@ export default function Error({
         <div className="mt-6 flex flex-wrap gap-2">
           <button
             type="button"
-            onClick={reset}
-            className="rounded-lg bg-admin-primary px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-admin-primary-strong"
+            onClick={retry}
+            disabled={retrying}
+            aria-busy={retrying}
+            className="rounded-lg bg-admin-primary px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-admin-primary-strong disabled:cursor-not-allowed disabled:opacity-60"
           >
-            다시 시도
+            {retrying ? "다시 불러오는 중…" : "다시 시도"}
           </button>
           <Link
             href="/"
