@@ -46,18 +46,17 @@ export function ExecutionStatus({
   const count = (type: CardType, stage: CardProgress) =>
     approved.filter((card) => card.type === type && normalizedProgress(card) === stage).length;
   const layerTotal = (type: CardType) => approved.filter((card) => card.type === type).length;
-  /**
-   * 균형지수는 승인된 **확충** 카드의 6지역 분포만 본다 (backend/app/routes/kpi.py) —
-   * "승인 카드"로만 적으면 인센티브까지 포함된 표본으로 읽힌다. 소표본에서는 한 장만 들어와도
-   * 0점이 되므로 3건 미만은 참고값으로 못박는다.
-   */
-  const balanceBase = approved.filter((card) => card.type === "EXPANSION").length;
-  const balanceNote =
-    `확충 승인 ${balanceBase}건의 6개 지역 분포 기준 · 인센티브 제외` +
-    (balanceBase < 3 ? " · 표본 3건 미만 참고값" : "");
   const total = approved.length;
   const quality = kpi ? sampleQuality(kpi.counts.decided) : null;
   const sampleNote = quality === "demo" ? "예시 데이터" : quality === "limited" ? "표본 부족" : null;
+  /**
+   * 지역 균형지수는 표본이 다르다 — 집계 6지역 안에 타깃이 있는 승인 확충 카드만 센다.
+   * 결정 총계로 품질을 판정하면 인센티브까지 포함한 수로 "운영 표본"이라 말하게 된다 (05 §3).
+   */
+  const balanceSample = kpi?.balance_sample_count ?? 0;
+  const balanceQuality = kpi ? sampleQuality(balanceSample) : null;
+  const balanceNote =
+    balanceQuality === "demo" ? "예시 데이터" : balanceQuality === "limited" ? "표본 부족" : null;
 
   return (
     <section
@@ -142,7 +141,8 @@ export function ExecutionStatus({
               label="지역 균형지수"
               value={dash(kpi.regional_balance_index)}
               unit={kpi.regional_balance_index === null ? undefined : "/ 100"}
-              note={balanceNote}
+              /* 지수만 크게 띄우고 그것이 카드 몇 장에서 나온 값인지 감추지 않는다 (05 §3) */
+              note={`승인 확충 카드 ${balanceSample}건의 지역 분포${balanceNote ? ` · ${balanceNote}` : ""}`}
             />
           </dl>
         ) : (

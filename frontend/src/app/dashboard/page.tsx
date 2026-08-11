@@ -17,6 +17,7 @@ import { LineTrend } from "@/components/charts/LineTrend";
 import { ScaleCompare } from "@/components/charts/ScaleCompare";
 import { api } from "@/lib/api";
 import { REGIONS, REGION_TOOLTIP, STABILITY_NOTE } from "@/lib/constants";
+import { canonicalTotalUses } from "@/lib/dashboardView";
 import { monthLabel, num, pctNum, pctUnit } from "@/lib/format";
 
 export const metadata: Metadata = { title: "전체 지역 현황 · 상생 나침반" };
@@ -93,9 +94,10 @@ export default async function DashboardPage({
       note: row ? `${Math.round(row.share * 100)}%` : "0%",
     };
   });
-  const totalUses = (d.region_share ?? []).reduce((a, b) => a + b.count, 0);
+  // 지역 배열의 count 합이 아니라 반올림 전 정본을 쓴다 — 배열 합은 실측으로 +25 어긋난다
+  const totalUses = canonicalTotalUses(d);
   /**
-   * 지역축 합계와 업종축 합계는 소표본 보호 반올림을 각각 적용해 나온 값이라 몇 건 어긋난다.
+   * 업종축 합계는 소표본 보호 반올림을 거친 값이라 정본 누적과 몇 건 어긋난다.
    * 두 숫자가 같은 화면(현황 KPI ↔ 추이·분포 도넛)에 나오므로, 차이가 있으면 왜인지 밝힌다 —
    * 설명 없는 불일치는 심사에서 데이터 오류로 읽힌다.
    */
@@ -274,7 +276,7 @@ export default async function DashboardPage({
               title="업종별 사용 비중"
               desc={
                 axisGap
-                  ? `표시 6분류 기준. 범례에 비중을 함께 표기한다. 업종축 합계 ${num(categoryTotal)}건은 지역축 합계 ${num(totalUses)}건과 ${num(axisGap)}건 다르다 — 소표본 보호 반올림을 축마다 따로 적용한 결과이며 원본 건수가 다른 것이 아니다.`
+                  ? `표시 6분류 기준. 범례에 비중을 함께 표기한다. 업종축 합계 ${num(categoryTotal)}건은 현황 KPI의 정본 누적 ${num(totalUses)}건과 ${num(axisGap)}건 다르다 — 업종축에 소표본 보호 반올림이 적용된 결과이며 원본 건수가 다른 것이 아니다.`
                   : "표시 6분류 기준. 범례에 비중을 함께 표기한다."
               }
             >

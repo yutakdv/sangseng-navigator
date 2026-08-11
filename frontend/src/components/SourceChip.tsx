@@ -81,6 +81,15 @@ export function SourceChip({
               {privacy.suppressed_cells.map((c) => `${c.eup} ${c.category}`).join(" · ")})는 건수를
               비공개 처리했고, 영향받는 합계는 {privacy.aggregate_rounding.unit} 단위로 반올림해
               발행합니다.
+              {/* 총계는 반올림 전 정본을 쓰므로 지역별 값을 더한 수와 어긋난다 — 그 차이를
+                  근거 수치로 밝혀야 "같은 화면의 총계가 왜 다르지"에 답할 수 있다 */}
+              {privacy.privacy_rounding_adjustment ? (
+                <>
+                  {" "}
+                  지역별 건수를 더한 값은 이 반올림 때문에 정본 총계와{" "}
+                  {Math.abs(privacy.privacy_rounding_adjustment.region_share)}건 차이가 납니다.
+                </>
+              ) : null}
             </span>
           </span>
         ) : null}

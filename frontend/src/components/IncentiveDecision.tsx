@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { DecisionActions } from "@/components/DecisionActions";
-import type { PaybackRate } from "@/types";
+import type { Card, PaybackRate } from "@/types";
 
 const RATES: PaybackRate[] = [3, 5, 7];
 
@@ -21,9 +21,15 @@ export function IncentiveDecision({
   cardId,
   /** 이미 확정된 페이백률(승인 후) 또는 null */
   initialRate,
+  confidence,
+  version,
 }: {
   cardId: string;
   initialRate: PaybackRate | null;
+  /** 신뢰도 `하` 카드 승인의 확인 근거 게이트 — DecisionActions로 그대로 내려간다 (05 §2) */
+  confidence?: Card["confidence"];
+  /** 낙관적 잠금 version — 같이 내려보내지 않으면 이 화면만 동시 변경을 못 잡는다 */
+  version?: number;
 }) {
   const [rate, setRate] = useState<PaybackRate | null>(initialRate);
 
@@ -56,7 +62,14 @@ export function IncentiveDecision({
       {/* requireRate는 켜 둔다 — 미선택 승인은 서버가 400으로 막고(05 §2), 힌트 문구도
           DecisionActions가 이미 갖고 있다. 읽기 전용 데모 처리도 그쪽에 있으므로 여기서
           다시 하지 않는다 (칩은 눌려도 승인 버튼이 막혀 상태는 바뀌지 않는다) */}
-      <DecisionActions cardId={cardId} cardType="INCENTIVE" requireRate selectedRate={rate} />
+      <DecisionActions
+        cardId={cardId}
+        cardType="INCENTIVE"
+        requireRate
+        selectedRate={rate}
+        confidence={confidence}
+        version={version}
+      />
     </div>
   );
 }

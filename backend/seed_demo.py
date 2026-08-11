@@ -53,6 +53,31 @@ ORIGINAL_CANDIDATE_ROAD_MINUTES = [35.2, 35.9, 44.1, 41.5, 34.2]
 ORIGINAL_CANDIDATE_EVIDENCE = [
     (0.83, 0.68, 4), (0.75, 0.71, 2), (0.83, 0.62, 4), (0.86, 0.51, 5), (0.75, 0.52, 2),
 ]
+# 후보 상가의 **안정 키** (05 §2 `target.candidate_store_id`) — candidates.json 실산출 행에
+# `cardgen.candidate_store_key()`를 적용한 값이다. `CAND-00N`을 쓰지 않는 이유는 그것이 점포
+# 식별자가 아니라 순위 슬롯이기 때문이고(05 §1), 여기 하드코딩한 값도 좌표·상호가 바뀌면
+# 다른 점포를 가리키므로 `assert_ranking_matches_pipeline`이 매 시드마다 대조한다.
+CANDIDATE_STORE_IDS = {
+    "영월군 음식점": "영월군 음식점 황금식당@37.127559,128.828150",
+    "영월군 소매점": "영월군 소매점 백민농장@37.137605,128.836843",
+    "삼척시 편의점": "삼척시 편의점 빈이슈퍼@37.222097,129.041784",
+    "삼척시 카페": "삼척시 카페 삼척맛척커피이야기@37.192380,129.031681",
+}
+# 완료된 확충 카드 AC-003이 확인한 **하이원포인트 가맹점** — merchants.json의 `킴스마켓`
+# (merchant_id=4247, 강원도 삼척시 도계읍 도계리 도계로 296). AC-003 타깃과 같은
+# (삼척시, 편의점) 셀의 가맹점 5곳 중 후보 상가(빈이슈퍼)에서 1.5km로 가장 가까운 지역
+# 독립 점포를 골랐다(나머지는 체인·휴게소 점포).
+# 이 값이 비면 데모에서 위젯 확충 배지가 영영 뜨지 않는다 — 배지는 (읍×업종) 집합이 아니라
+# 이 ID의 정확 일치로만 붙기 때문이다 (05 §4).
+# `candidate_store_id`(소진공 상가정보)와 원천이 달라 **절대 합치지 않는다** (05 §2, 절대 규칙 6).
+AC003_VERIFIED_MERCHANT_ID = "4247"
+AC003_VERIFIED_MERCHANT_NAME = "킴스마켓"
+# 시드 결정을 남긴 담당자 — 화면의 데모 담당자(frontend/src/lib/operator.ts: 홍길동·지역상생팀)와
+# 같은 사람으로 둔다. 담당자 계정 체계가 없어 이 값은 화면이 보낸 자기신고이므로
+# `verified: False`·`auth: "shared_token"`을 그대로 남긴다 (05 §2 decision).
+SEED_ACTOR_ID = "hong.gd"
+SEED_ACTOR_NAME = "홍길동"
+SEED_ACTOR_TEAM = "지역상생팀"
 EXPANSION_SOURCES = ["하이원포인트 사용현황", "가맹점 상세정보", "소진공 상가정보"]
 GROUNDING = {
     "status": "verified",
@@ -96,6 +121,50 @@ EMPTY_OPERATIONS = {
 }
 
 
+def _decision(outcome: str, at: str, reason: str | None = None) -> dict:
+    """결정 1건의 감사 기록 (05 §2 decision) — 라우트가 저장하는 형태와 같은 키를 쓴다."""
+    return {
+        "outcome": outcome,
+        "reason": reason,
+        "actor_id": SEED_ACTOR_ID,
+        "actor_name": SEED_ACTOR_NAME,
+        "source": "operator_ui",
+        "auth": "shared_token",
+        "verified": False,          # 신원 검증 체계가 없다는 사실을 감추지 않는다
+        "at": at,
+    }
+
+
+def _decision_event(outcome: str, at: str, reason: str | None = None) -> dict:
+    """결정 이벤트 — 시각·동작만 남기면 '누가 왜'가 기록에서 사라진다 (05 §7)."""
+    event = {"at": at, "action": outcome, "actor_id": SEED_ACTOR_ID, "source": "operator_ui"}
+    if reason:
+        event["reason"] = reason
+    return event
+
+
+def _measured(value, *, to_days: float, source: str, scope: str, window_days: int = 29) -> dict:
+    """관측값 1건 — 값과 함께 **무엇을 언제 어디서 쟀는지**를 싣는다 (05 §2 metrics).
+
+    `unit`·`is_proxy`는 넣지 않는다 — 서버(`progress_records.METRIC_DEFINITIONS`)가 채운다.
+    측정 종료일은 기록 시각보다 미래일 수 없으므로 기록일보다 하루 앞선 날짜를 쓴다.
+    """
+    end = (datetime.now(db.KST) - timedelta(days=to_days)).date()
+    return {
+        "value": value,
+        "measured_from": (end - timedelta(days=window_days)).isoformat(),
+        "measured_to": end.isoformat(),
+        "source": source,
+        "scope": scope,
+    }
+
+
+USAGE_SOURCE = "하이원포인트 운영 DB 월 마감"
+MERCHANT_SOURCE = "하이원포인트 가맹점 목록 월 스냅샷"
+INDEX_SOURCE = "지역 소비 집중도 월 산출 (파이프라인 P5)"
+REGION_SCOPE = "집계 6개 지역 전체"
+
+
 def assert_ranking_matches_pipeline() -> None:
     """하드코딩 순위·점수·상호명이 현재 candidates.json 과 어긋나면 즉시 중단한다.
 
@@ -134,16 +203,50 @@ def assert_ranking_matches_pipeline() -> None:
             f"  하드코딩: {ORIGINAL_CANDIDATE_EVIDENCE}\n"
             f"  실산출  : {evidence}"
         )
+    # 카드 타깃이 가리키는 후보 상가의 안정 키. 상호·좌표가 바뀌면 같은 문자열이 다른 점포를
+    # 가리키므로, 순위·점수와 같은 기준으로 대조한다 (05 §2 candidate_store_id).
+    actual_store_ids = {f"{c['eup']} {c['category']}": cardgen.candidate_store_key(c) for c in rows}
+    mismatched = {key: (value, actual_store_ids.get(key))
+                  for key, value in CANDIDATE_STORE_IDS.items()
+                  if actual_store_ids.get(key) != value}
+    if mismatched:
+        raise SystemExit(
+            "seed_demo 중단: 하드코딩한 후보 상가 키(candidate_store_id)가 candidates.json 과 "
+            "다릅니다 — 그대로 심으면 카드가 다른 점포를 가리킵니다.\n"
+            + "\n".join(f"  {key}: 하드코딩={hard} / 실산출={live}"
+                        for key, (hard, live) in mismatched.items())
+        )
+    # 완료 카드 AC-003의 확충 배지 근거. 산출물에 없는 ID를 심으면 완료해도 배지가 붙지 않는다.
+    merchant = next((m for m in dataload.load("merchants")
+                     if str(m.get("merchant_id")) == AC003_VERIFIED_MERCHANT_ID), None)
+    if (merchant is None or merchant.get("eup") != "삼척시"
+            or merchant.get("category") != "편의점"
+            or merchant.get("name") != AC003_VERIFIED_MERCHANT_NAME):
+        raise SystemExit(
+            "seed_demo 중단: AC-003 완료 증빙의 가맹 등록 ID가 merchants.json 과 다릅니다 "
+            "(위젯 확충 배지가 붙지 않습니다).\n"
+            f"  하드코딩: {AC003_VERIFIED_MERCHANT_ID} {AC003_VERIFIED_MERCHANT_NAME} (삼척시 편의점)\n"
+            f"  실산출  : {merchant}"
+        )
 
 
 def demo_cards() -> list:
     """데모 3장 — 문구의 수치는 전부 실데이터 검증본 (task-11-report.md 근거 기재)."""
     assert_ranking_matches_pipeline()
+    created_a, decided_a = _iso(48), _iso(36)
+    # 승인 사유는 `confidence`가 `중`이라 필수는 아니지만(05 §2), 감사 기록이 시각·동작만 남지
+    # 않도록 시드에서도 남긴다 — 화면의 결정 이력이 첫 화면부터 근거를 보인다.
+    reason_a = "정량 1위 후보이고 반경 500m 안에 동일 업종 하이원포인트 가맹점이 없어 후보 접촉·검토를 승인"
     # 카드 A: 후보 접촉·검토 시작 — 적격성 확인 전 가맹 확정처럼 보이지 않게 한다.
     card_a = {
         "id": "AC-001", "type": "EXPANSION", "status": "approved", "progress": "후보 접촉·검토 시작",
         "title": "영월군 음식점 업종 가맹점 확충",
-        "target": {"eup": "영월군", "category": "음식점"},
+        "target": {
+            "eup": "영월군", "category": "음식점",
+            "candidate_store_id": CANDIDATE_STORE_IDS["영월군 음식점"],
+            # 실제 가맹 전환이 확인되기 전이라 null이며 그것이 정상 상태다 (05 §2).
+            "verified_merchant_id": None,
+        },
         "score_rank": 1, "ai_rank": 1, "selection_rank": 1, "confidence": "중",
         "ai": {
             "adjusted": False,
@@ -159,7 +262,7 @@ def demo_cards() -> list:
                 SEED_NARRATIVE_NOTE,
             ],
             "risks": [
-                "신규 가맹점 초기 실적 저조 가능성",
+                "가맹 전환 직후 이용 실적이 예상보다 낮을 가능성",
                 "가맹 신청은 사업자 의사에 달려 있어 후보 접촉 후에도 계약이 성사되지 않을 가능성",
                 "영업 상태·가맹 자격·관광객 이용 적합성은 승인 전 별도 확인 필요",
             ],
@@ -172,10 +275,12 @@ def demo_cards() -> list:
         "candidate_verification": CANDIDATE_VERIFICATION,
         "operations": EMPTY_OPERATIONS,
         "sources": EXPANSION_SOURCES,
-        "created_at": _iso(48), "decided_at": _iso(36),     # 승인 소요 12.0h — 0.0h 방지 (15 §5)
+        "created_at": created_a, "decided_at": decided_a,   # 승인 소요 12.0h — 0.0h 방지 (15 §5)
+        "decision": _decision("approved", decided_a, reason_a),
+        "reproposal_block": None,                           # 승인에는 재제안 차단이 붙지 않는다
         "events": [
-            {"at": _iso(48), "action": "generated"},
-            {"at": _iso(36), "action": "approved"},
+            {"at": created_a, "action": "generated"},
+            _decision_event("approved", decided_a, reason_a),
             {"at": _iso(24), "action": "progress:후보 접촉·검토 시작"},
         ],
     }
@@ -183,7 +288,11 @@ def demo_cards() -> list:
     card_b = {
         "id": "AC-002", "type": "EXPANSION", "status": "pending", "progress": None,
         "title": "영월군 소매점 업종 가맹점 확충",
-        "target": {"eup": "영월군", "category": "소매점"},
+        "target": {
+            "eup": "영월군", "category": "소매점",
+            "candidate_store_id": CANDIDATE_STORE_IDS["영월군 소매점"],
+            "verified_merchant_id": None,
+        },
         "score_rank": 2, "ai_rank": 1, "selection_rank": 1, "confidence": "하",
         "ai": {
             "adjusted": True,
@@ -199,7 +308,7 @@ def demo_cards() -> list:
                 SEED_NARRATIVE_NOTE,
             ],
             "risks": [
-                "신규 가맹점 초기 실적 저조 가능성",
+                "가맹 전환 직후 이용 실적이 예상보다 낮을 가능성",
                 "가맹 신청은 사업자 의사에 달려 있어(상시모집·개인사업자 대상) 접촉해도 분기 내 계약이 성사되지 않을 가능성",
                 "동일 업종 상가 표본이 2곳뿐이라 업종공백도 불확실성이 큼",
                 "영업 상태·가맹 자격·관광객 이용 적합성은 승인 전 별도 확인 필요",
@@ -214,6 +323,7 @@ def demo_cards() -> list:
         "operations": EMPTY_OPERATIONS,
         "sources": EXPANSION_SOURCES,
         "created_at": _iso(3), "decided_at": None,
+        "decision": None, "reproposal_block": None,     # 미결정 카드의 정상 상태 (05 §2)
         "events": [{"at": _iso(3), "action": "generated"}],
     }
     # 카드 C: pending INCENTIVE — 05 §2 INC-001 예시 구조 재사용
@@ -254,6 +364,7 @@ def demo_cards() -> list:
         "assumption_note": "페이백률-전환율 관계는 실측 데이터가 없어 팀 설정 가정(탄력성)에 기반한 전망",
         "sources": ["하이원포인트 사용현황"],
         "created_at": _iso(5), "decided_at": None,
+        "decision": None, "reproposal_block": None,
         "events": [{"at": _iso(5), "action": "generated"}],
     }
     return [card_a, card_b, card_c]
@@ -285,7 +396,7 @@ VERIFIED_VERIFICATION = {
 
 def _history_card(cid: str, category: str, rank: int, score: float, gap: float,
                   proximity: float, road_min: float, stores: int,
-                  created_h: float, comparison: str) -> dict:
+                  created_h: float, comparison: str, approval_reason: str) -> dict:
     """이력 카드 공통 골격 — 문구 수치는 candidates.json 실산출값(위 ORIGINAL_* 상수와 대조된다).
 
     `ai_rank`/`selection_rank`는 **최종 제안 목록 내 순위**라 항상 1이다(05 §2 · cardgen과 동일).
@@ -293,10 +404,18 @@ def _history_card(cid: str, category: str, rank: int, score: float, gap: float,
     화살표 좌우가 같아지고, 4위 카드에 "정량 1순위 선택" 배지까지 붙는다.
     선택 사유는 정량 최고점도, 진행 중 제외도 아닌 **이번 분기 지역 배분 몫**이므로 그대로 적는다.
     """
+    created_at, decided_at = _iso(created_h), _iso(created_h - 24)
     return {
         "id": cid, "type": "EXPANSION", "status": "approved", "progress": None,
         "title": f"삼척시 {category} 업종 가맹점 확충",
-        "target": {"eup": "삼척시", "category": category},
+        "target": {
+            "eup": "삼척시", "category": category,
+            "candidate_store_id": CANDIDATE_STORE_IDS[f"삼척시 {category}"],
+            # 완료 기록의 `completion_evidence.merchant_registration_id`가 실릴 때 서버가 같은
+            # 트랜잭션으로 채운다(`progress_db.write_record_and_project_card`) — 시드도 그 경로를
+            # 그대로 밟으므로 여기서 미리 박지 않는다. 미완료 카드(AC-004)는 계속 null이다.
+            "verified_merchant_id": None,
+        },
         "score_rank": rank, "ai_rank": 1, "selection_rank": 1, "confidence": "중",
         "ai": {
             "adjusted": rank != 1,
@@ -309,7 +428,7 @@ def _history_card(cid: str, category: str, rank: int, score: float, gap: float,
                 SEED_NARRATIVE_NOTE,
             ],
             "risks": [
-                "신규 가맹점 초기 실적 저조 가능성",
+                "가맹 전환 직후 이용 실적이 예상보다 낮을 가능성",
                 "가맹 신청은 사업자 의사에 달려 있어 후보 접촉 후에도 계약이 성사되지 않을 가능성",
                 "삼척시는 도계읍(하이원포인트 지역가맹 대상지역)만 대상이라 후보 표본이 작음",
             ],
@@ -322,10 +441,12 @@ def _history_card(cid: str, category: str, rank: int, score: float, gap: float,
         "candidate_verification": VERIFIED_VERIFICATION,
         "operations": EMPTY_OPERATIONS,
         "sources": EXPANSION_SOURCES,
-        "created_at": _iso(created_h), "decided_at": _iso(created_h - 24),
+        "created_at": created_at, "decided_at": decided_at,
+        "decision": _decision("approved", decided_at, approval_reason),
+        "reproposal_block": None,
         "events": [
-            {"at": _iso(created_h), "action": "generated"},
-            {"at": _iso(created_h - 24), "action": "approved"},
+            {"at": created_at, "action": "generated"},
+            _decision_event("approved", decided_at, approval_reason),
         ],
     }
 
@@ -344,6 +465,7 @@ def history_cards() -> list:
             comparison=("이번 분기 선정 지역 2곳(영월군·삼척시) 가운데 삼척시 몫으로, 삼척시 후보 중 "
                         "최고점인 정량 4위 삼척시 편의점(Score 0.45)을 서버가 선택했습니다. "
                         "도로 소요시간 약 41.5분을 함께 확인했습니다."),
+            approval_reason="이번 분기 지역 배분(영월군·삼척시) 중 삼척시 몫으로 삼척시 최고점 후보를 승인",
         ),
         # 정량 5위 — 삼척시 최고점(4위 편의점)이 이미 진행 중이라 차순위. 추진중에서 멈춘 정체 표본
         _history_card(
@@ -352,6 +474,7 @@ def history_cards() -> list:
                         "정량 4위 삼척시 편의점은 이미 추진 중이라 제외하고 선택 가능한 차순위인 "
                         "정량 5위 삼척시 카페(Score 0.42)를 서버가 선택했습니다. "
                         "도로 소요시간 약 34.2분을 함께 확인했습니다."),
+            approval_reason="삼척시 몫 차순위 후보로, 편의점 건이 추진 중이라 카페 후보 접촉을 함께 승인",
         ),
     ]
 
@@ -370,6 +493,25 @@ def history_records() -> list[tuple[str, dict]]:
     def due(days: float) -> str:
         return (datetime.now(db.KST) - timedelta(days=days)).date().isoformat()
 
+    def cell(category: str) -> str:
+        return f"삼척시(도계읍) {category} 가맹점 전체"
+
+    def observed(days: float, category: str, **values) -> dict:
+        """한 기록의 관측 지표 묶음 — 지표별로 출처·측정 범위가 다르다 (05 §2).
+
+        측정 종료일은 기록일보다 하루 앞선다(기록 시각보다 미래일 수 없다).
+        `spend_krw`는 넣지 않는다 — 원천 데이터에 금액 필드가 없어 비어 있는 것이 정상이다.
+        """
+        meta = {
+            "usage_count": (USAGE_SOURCE, cell(category)),
+            "active_merchant_count": (MERCHANT_SOURCE, cell(category)),
+            "conversion_rate_pct": (USAGE_SOURCE, f"{REGION_SCOPE} (근사 지표)"),
+            "concentration_index": (INDEX_SOURCE, REGION_SCOPE),
+        }
+        return {key: _measured(value, to_days=days + 1,
+                               source=meta[key][0], scope=meta[key][1])
+                for key, value in values.items()}
+
     return [
         # AC-003 — 4단계를 모두 밟아 완료. 관측 지표가 개선 방향으로 쌓인다
         # 관측 지표는 기초·최신 두 시점이 있어야 리포트가 변화량을 만든다(한 시점만 있으면 표본 0).
@@ -378,12 +520,13 @@ def history_records() -> list[tuple[str, dict]]:
         ("AC-003", {"progress": "후보 접촉·검토 시작", "recorded_at": day(50),
                     "note": "도계읍 편의점 후보 3곳 방문 접촉. 2곳이 가맹 설명 요청",
                     "next_action": "가맹 자격·정산 연동 확인",
-                    "owner": "지역상생팀", "metrics": {"usage_count": 1180, "active_merchant_count": 31,
-                                                  "conversion_rate_pct": 20.1, "concentration_index": 43.0}}),
+                    "owner": "지역상생팀",
+                    "metrics": observed(50, "편의점", usage_count=1180, active_merchant_count=31,
+                                        conversion_rate_pct=20.1, concentration_index=43.0)}),
         ("AC-003", {"progress": "적격성 확인", "recorded_at": day(42),
                     "note": "필수 5개 항목 확인 완료 — 영업 상태·가맹 자격 이상 없음",
                     "next_action": "가맹 심사 접수", "owner": "지역상생팀",
-                    "metrics": {"usage_count": 1215}}),
+                    "metrics": observed(42, "편의점", usage_count=1215)}),
         ("AC-003", {"progress": "가맹 심사", "recorded_at": day(33),
                     "note": "가맹 심사 접수. 정산 연동 테스트 진행 중",
                     "next_action": "심사 결과 확인", "owner": "지역상생팀"}),
@@ -391,18 +534,21 @@ def history_records() -> list[tuple[str, dict]]:
                     "note": "가맹 계약 체결. 포스 연동·안내물 배치 진행",
                     "next_action": "오픈 후 첫 달 사용 건수 관측", "owner": "지역상생팀",
                     "due_at": due(15), "progress_pct": 80,
-                    "metrics": {"active_merchant_count": 32}}),
+                    "metrics": observed(25, "편의점", active_merchant_count=32)}),
+        # 완료 기록만이 가맹 등록 ID를 실을 수 있다 — 이 값이 카드의 `target.verified_merchant_id`로
+        # 같은 트랜잭션에 반영되고, 그때부터 위젯 확충 배지가 그 가맹점에 붙는다 (05 §2·§4).
         ("AC-003", {"progress": "완료", "recorded_at": day(18), "progress_pct": 100,
-                    "note": "가맹점 오픈 확인. 방문객 위젯 추천 목록에 반영됨",
+                    "note": f"가맹점 오픈 확인({AC003_VERIFIED_MERCHANT_NAME}). 방문객 위젯 추천 목록에 반영됨",
                     "owner": "지역상생팀", "due_at": due(15),
-                    "metrics": {"usage_count": 1362, "conversion_rate_pct": 21.4,
-                                "active_merchant_count": 33, "concentration_index": 42.1}}),
+                    "completion_evidence": {"merchant_registration_id": AC003_VERIFIED_MERCHANT_ID},
+                    "metrics": observed(18, "편의점", usage_count=1362, conversion_rate_pct=21.4,
+                                        active_merchant_count=33, concentration_index=42.1)}),
         # AC-004 — 추진중에서 멈춤. 마지막 기록이 22일 전이라 정체 점검(14일 기준)에 잡힌다
         ("AC-004", {"progress": "후보 접촉·검토 시작", "recorded_at": day(55),
                     "note": "도계읍 카페 후보 접촉. 사업자 참여 의향 확인",
                     "next_action": "적격성 5개 항목 확인", "owner": "지역상생팀",
-                    "metrics": {"usage_count": 402, "active_merchant_count": 8,
-                                "conversion_rate_pct": 19.8, "concentration_index": 43.4}}),
+                    "metrics": observed(55, "카페", usage_count=402, active_merchant_count=8,
+                                        conversion_rate_pct=19.8, concentration_index=43.4)}),
         ("AC-004", {"progress": "적격성 확인", "recorded_at": day(45),
                     "note": "필수 5개 항목 확인 완료", "next_action": "가맹 심사 접수",
                     "owner": "지역상생팀"}),
@@ -414,8 +560,8 @@ def history_records() -> list[tuple[str, dict]]:
                     "blocker": "사업자 측 포스 교체 일정 미정",
                     "next_action": "포스 교체 일정 재협의", "owner": "지역상생팀",
                     "due_at": due(-7),
-                    "metrics": {"usage_count": 428, "active_merchant_count": 8,
-                                "conversion_rate_pct": 20.2, "concentration_index": 43.1}}),
+                    "metrics": observed(22, "카페", usage_count=428, active_merchant_count=8,
+                                        conversion_rate_pct=20.2, concentration_index=43.1)}),
     ]
 
 

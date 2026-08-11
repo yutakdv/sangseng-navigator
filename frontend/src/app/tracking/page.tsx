@@ -13,7 +13,7 @@ import { RankTrace } from "@/components/RankTrace";
 import { Section } from "@/components/Section";
 import { WorkflowChip } from "@/components/StatusChip";
 import { api } from "@/lib/api";
-import { eventLabel } from "@/lib/cardEvents";
+import { eventActorLabel, eventLabel } from "@/lib/cardEvents";
 import { eligibilityStatus, workflowLabel } from "@/lib/cardWorkflow";
 import { REGIONS } from "@/lib/constants";
 import { dash, pctUnit, ratioNum } from "@/lib/format";
@@ -88,12 +88,22 @@ export default async function TrackingPage({
       throw error;
     });
 
-  const [dashboard, { cards }, kpi, { report, fellBack: periodFellBack }] = await Promise.all([
-    api.dashboard(),
-    api.cards({ status: "approved" }),
-    api.kpi().catch(() => null),
-    reportRequest,
-  ]);
+  const [dashboard, { cards }, kpi, { report, fellBack: periodFellBack }, expansionSync] =
+    await Promise.all([
+      api.dashboard(),
+      api.cards({ status: "approved" }),
+      api.kpi().catch(() => null),
+      reportRequest,
+      /**
+       * "완료했는데 왜 위젯에 안 보이지"에 답하는 근거 — 완료 카드 중 몇 건이 실제로 방문객
+       * 위젯에 반영됐는지는 서버가 센다. 이 값은 지역·업종·개수 필터와 무관하므로 목록은 1건만
+       * 받는다. 담당자 화면의 정보라 방문객 위젯에는 노출하지 않는다 (05 §4).
+       */
+      api
+        .widget(undefined, undefined, 1)
+        .then((res) => res.expansion_sync ?? null)
+        .catch(() => null),
+    ]);
 
   /**
    * 표시용 기간의 정본은 **응답의 report.period**다(요청값이 아니라).
@@ -118,7 +128,6 @@ export default async function TrackingPage({
 
   // 최근에 승인한 카드가 맨 위 — 허브에서 막 승인하고 넘어온 카드를 바로 조작할 수 있게 한다.
   // 타임스탬프는 전부 KST 오프셋(+09:00)이라 문자열 비교로 시간순이 나온다 (05 §8).
-  const expansionApproved = cards.filter((card) => card.type === "EXPANSION").length;
   const rows = [...cards].sort((a, b) =>
     (b.decided_at ?? b.created_at).localeCompare(a.decided_at ?? a.created_at),
   );
@@ -261,10 +270,33 @@ export default async function TrackingPage({
               수 있습니다).
               <br />
               확충 카드는 필수 적격성 5개 항목 확인 전에는 가맹 심사·추진·완료로 이동할 수
-              없습니다.
+              없으며, 완료는 증빙과 함께 추진 기록으로만 남깁니다.
             </>
           }
         >
+          {/* 완료가 곧 방문객 노출은 아니다 — 가맹 등록 ID가 확인되고 그 가맹점이 산출물에
+              들어와야 배지가 붙는다. 그 시차를 담당자 화면에서 숫자로 밝힌다 (05 §4) */}
+          {expansionSync && expansionSync.completed_cards > 0 ? (
+            <p
+              className={`mb-4 flex flex-wrap items-center gap-x-2 gap-y-1 rounded-xl px-3.5 py-2.5 text-[13px] leading-5 ${
+                expansionSync.pending_sync > 0
+                  ? "bg-state-notice-bg text-state-notice"
+                  : "bg-state-good-bg text-state-good"
+              }`}
+            >
+              <Icon name={expansionSync.pending_sync > 0 ? "clock" : "check"} size={14} />
+              <span className="font-semibold">
+                방문객 위젯 반영 {expansionSync.reflected} / 완료 확충 카드{" "}
+                {expansionSync.completed_cards}건
+              </span>
+              {expansionSync.pending_sync > 0 ? (
+                <span className="font-medium">
+                  {expansionSync.pending_sync}건은 반영 대기입니다 — 가맹 등록 ID가 확인되고 그
+                  가맹점이 다음 가맹점 목록 산출에 들어와야 배지가 붙습니다.
+                </span>
+              ) : null}
+            </p>
+          ) : null}
           {rows.length === 0 ? (
             <div className="rounded-xl border border-dashed border-admin-border bg-admin-surface-sunken px-4 py-10 text-center">
               <span className="mx-auto flex h-11 w-11 items-center justify-center rounded-full bg-admin-surface text-admin-text-muted shadow-card">
@@ -340,13 +372,7 @@ export default async function TrackingPage({
                       {/* 조작(상태 변경)은 카드의 머리 오른쪽에 둔다 — 별도 상자를 만들지 않는다.
                           ProgressSelect가 자기 라벨을 이미 갖고 있어 제목을 덧붙이면 라벨이 두 겹이 된다 */}
                       <div className="shrink-0 sm:w-48">
-                        <ProgressSelect
-                          cardId={card.id}
-                          cardType={card.type}
-                          progress={card.progress}
-                          verificationStatus={card.candidate_verification?.status}
-                          progressBeforeHold={card.progress_before_hold ?? null}
-                        />
+                        <ProgressSelect card={card} />
                       </div>
                     </div>
 
@@ -460,18 +486,31 @@ export default async function TrackingPage({
                             <summary className="u-disclosure">
                               변경 이력 {card.events.length}건
                             </summary>
-                            <ol className="mt-2 flex flex-col gap-1 rounded-lg bg-admin-surface-sunken px-3 py-2">
-                              {card.events.map((e, i) => (
-                                <li
-                                  key={`${e.at}-${i}`}
-                                  className="flex flex-wrap gap-x-2 text-xs leading-5"
-                                >
-                                  <span className="tabular-nums text-admin-text-muted">
-                                    {stamp(e.at)}
-                                  </span>
-                                  <span className="text-admin-text">{eventLabel(e.action, { compact: true })}</span>
-                                </li>
-                              ))}
+                            <ol className="mt-2 flex flex-col gap-1.5 rounded-lg bg-admin-surface-sunken px-3 py-2">
+                              {card.events.map((e, i) => {
+                                const actor = eventActorLabel(e, card.decision);
+                                return (
+                                  <li key={`${e.at}-${i}`} className="text-xs leading-5">
+                                    <span className="flex flex-wrap gap-x-2">
+                                      <span className="tabular-nums text-admin-text-muted">
+                                        {stamp(e.at)}
+                                      </span>
+                                      <span className="text-admin-text">
+                                        {eventLabel(e, { compact: true })}
+                                      </span>
+                                      {/* 결정자를 지우지 않는다 — 계정 체계가 없다는 사실도 함께 */}
+                                      {actor ? (
+                                        <span className="text-admin-text-muted">{actor}</span>
+                                      ) : null}
+                                    </span>
+                                    {e.reason ? (
+                                      <span className="mt-0.5 block break-keep text-admin-text-soft">
+                                        사유 {e.reason}
+                                      </span>
+                                    ) : null}
+                                  </li>
+                                );
+                              })}
                             </ol>
                           </details>
                         ) : null}
@@ -567,9 +606,12 @@ export default async function TrackingPage({
               label="지역 균형지수"
               value={dash(kpi.regional_balance_index)}
               unit={kpi.regional_balance_index === null ? undefined : "/ 100"}
-              /* 분모는 승인 카드 전체가 아니라 승인된 **확충** 카드다 (routes/kpi.py) */
-              sub={`확충 승인 ${expansionApproved}건의 6개 지역 분포 기준 · 인센티브 제외${
-                expansionApproved < 3 ? " · 표본 3건 미만 참고값" : ""
+              /* 표본은 승인 총계가 아니다 — 이 지수는 집계 6지역 안에 타깃이 있는 승인 확충
+                 카드만 센다(인센티브는 타깃이 없어 지역 분포에 넣을 수 없다). 승인 총계를 적으면
+                 지수를 만든 근거보다 큰 수를 표본인 것처럼 말하게 된다 (05 §3).
+                 소표본에서는 카드 한 장에도 크게 흔들리므로 3건 미만은 참고값으로 못박는다 */
+              sub={`확충 승인 표본 ${kpi.balance_sample_count ?? 0}건의 지역 분포 · 인센티브 제외${
+                (kpi.balance_sample_count ?? 0) < 3 ? " · 표본 3건 미만 참고값" : ""
               }`}
             />
           </div>
@@ -604,7 +646,17 @@ export default async function TrackingPage({
  * 완료 행은 링크를 만들지 않는다 — 바로 아래 DoneNote가 위젯 필터 조건까지 따져 더 나은 링크를 준다.
  */
 const nextAction = (card: Card): { label: string; href?: string } => {
-  if (card.progress === "완료") return { label: "방문객 위젯 반영 확인" };
+  if (card.progress === "완료") {
+    // 확충 완료 카드에 확인된 가맹점 ID가 없으면 위젯에 붙을 근거 자체가 없다 —
+    // "반영 확인"이라 적으면 아무것도 없는 위젯을 보러 보내게 된다 (05 §4)
+    if (card.type === "EXPANSION" && !card.target?.verified_merchant_id) {
+      return {
+        label: "가맹 등록 ID 기록 · 위젯 반영 대기",
+        href: `/tracking/new?card_id=${encodeURIComponent(card.id)}`,
+      };
+    }
+    return { label: "방문객 위젯 반영 확인" };
+  }
   if (card.type === "EXPANSION" && eligibilityStatus(card) !== "verified") {
     return { label: "필수 적격성 5개 항목 확인", href: `/cards/${card.id}?from=tracking#verification` };
   }
@@ -617,35 +669,53 @@ const nextAction = (card: Card): { label: string; href?: string } => {
 /**
  * 완료 행의 위젯 연결 — 데모 6→7단계의 인과를 화면에서 읽히게 하는 블록 (08 F8).
  *
- * 링크는 **업종 없이 지역만** 건다: 위젯은 완료 카드와 매칭되는 가맹점을 먼저 정렬하므로(05 §4)
- * 지역만 걸어도 `이번 분기 확충 업종` 배지가 상단에 오고, 확충 대상이 가맹점 공백 업종이라 업종까지 걸면
- * 매칭 가맹점이 0곳인 경우 빈 상태로 떨어질 수 있다.
+ * **완료를 곧 노출로 단정하지 않는다.** 확충 배지는 완료 카드의 확인된 가맹점 등록번호와
+ * 실제 가맹점이 정확히 일치할 때만 붙는다(05 §4). 등록 ID가 아직 없으면 붙을 근거 자체가
+ * 없으므로 "반영 대기"라고 적는다 — 예전 문구는 완료만으로 "추천 상단에 노출됩니다"라고
+ * 단정해, 위젯에 아무것도 없는 상태에서도 반영됐다고 말했다.
+ *
+ * 링크는 **업종 없이 지역만** 건다: 위젯은 배지가 붙는 가맹점을 먼저 정렬하므로 지역만 걸어도
+ * 상단에 오고, 확충 대상이 가맹점 공백 업종이라 업종까지 걸면 빈 상태로 떨어질 수 있다.
  */
 function DoneNote({ card }: { card: Card }) {
   const eup = card.target?.eup;
   // 위젯 필터는 6지역·표시 6분류만 받는다 — 그 밖의 값이면 필터 없이 위젯을 연다
   const region = eup && REGIONS.some((r) => r === eup) ? eup : undefined;
   const href = region ? `/widget?${new URLSearchParams({ region })}` : "/widget";
+  const reflected =
+    card.type === "INCENTIVE" ? Boolean(card.selected_rate) : Boolean(card.target?.verified_merchant_id);
+
+  const text = (): string => {
+    if (card.type === "INCENTIVE") {
+      return card.selected_rate
+        ? `완료 — 방문객 위젯 추천에 "지금 여기서 쓰면 ${card.selected_rate}% 페이백" 배지가 전 지역 공통으로 붙습니다.`
+        : "완료 — 페이백률이 확정되지 않아 위젯 배지는 붙지 않습니다.";
+    }
+    if (!card.target) return "완료 — 방문객 위젯 반영 여부는 위젯 화면에서 확인합니다.";
+    if (!card.target.verified_merchant_id) {
+      return `완료 · 반영 대기 — ${card.target.eup} ${card.target.category} 후보의 가맹 등록 ID가 아직 확인되지 않아 방문객 위젯에는 확충 업종 배지가 붙지 않습니다. 추진 기록에 가맹 등록 ID를 남기면 반영됩니다.`;
+    }
+    return `완료 · 가맹 등록 확인 — 이 가맹점이 방문객 위젯 가맹점 목록에 실리면 확충 업종 배지가 함께 붙습니다.`;
+  };
 
   return (
-    <div className="mt-3 rounded-xl bg-state-good-bg px-3.5 py-3">
+    <div className={`mt-3 rounded-xl px-3.5 py-3 ${reflected ? "bg-state-good-bg" : "bg-state-notice-bg"}`}>
       <p className="flex items-start gap-2 break-keep text-[13px] leading-5 text-admin-text">
-        <Icon name="check" size={15} strokeWidth={2} className="mt-0.5 text-state-good" />
-        <span>
-          {card.type === "INCENTIVE"
-            ? card.selected_rate
-              ? `완료 — 방문객 위젯 추천에 "지금 여기서 쓰면 ${card.selected_rate}% 페이백" 배지가 전 지역 공통으로 붙습니다.`
-              : "완료 — 페이백률이 확정되지 않아 위젯 배지는 붙지 않습니다."
-            : card.target
-              ? `완료 — 방문객 위젯에서 ${card.target.eup} ${card.target.category} 업종이 확충 업종 배지와 함께 추천 상단에 노출됩니다.`
-              : "완료 — 방문객 위젯 추천에 반영됩니다."}
-        </span>
+        <Icon
+          name={reflected ? "check" : "clock"}
+          size={15}
+          strokeWidth={2}
+          className={`mt-0.5 ${reflected ? "text-state-good" : "text-state-notice"}`}
+        />
+        <span>{text()}</span>
       </p>
       <Link
-        href={href}
-        className="mt-1.5 inline-flex items-center gap-1 pl-[23px] text-[13px] font-semibold text-state-good underline-offset-4 hover:underline"
+        href={reflected ? href : `/tracking/new?card_id=${encodeURIComponent(card.id)}`}
+        className={`mt-1.5 inline-flex items-center gap-1 pl-[23px] text-[13px] font-semibold underline-offset-4 hover:underline ${
+          reflected ? "text-state-good" : "text-state-notice"
+        }`}
       >
-        방문객 위젯에서 확인
+        {reflected ? "방문객 위젯에서 확인" : "가맹 등록 ID 기록하기"}
         <Icon name="arrowRight" size={14} strokeWidth={2} />
       </Link>
     </div>

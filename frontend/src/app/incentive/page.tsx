@@ -270,6 +270,8 @@ export default async function IncentivePage({
                   avgVisitors={avgVisitors}
                   visitorsBasis={visitorsBasis}
                   proxyNote={dashboard.conversion.is_proxy ? dashboard.conversion.proxy_note : undefined}
+                  confidence={card.confidence}
+                  version={card.version}
                 />
               ) : (
                 <p className="u-body text-admin-text-muted">이 카드에는 비교할 시나리오가 없습니다.</p>
