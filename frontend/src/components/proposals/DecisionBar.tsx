@@ -117,6 +117,14 @@ export function DecisionBar({
           <span className="hidden text-xs text-admin-text-muted md:inline">
             AI 제안은 이 결정을 거쳐야 확정됩니다
           </span>
+          {/* 신원 미검증 고지는 사유 패널을 열기 전에도 보여야 한다 — 결정을 누르기 전에 알아야
+              할 사실이고, 다른 결정 화면(DecisionActions)은 상시 노출한다. 패널 안에만 두면
+              같은 조치가 화면마다 다르게 보인다. */}
+          {!decided ? (
+            <span className="hidden text-xs text-admin-text-muted lg:inline">
+              · {operator.name} 이름으로 기록 · 신원 미검증
+            </span>
+          ) : null}
         </div>
 
         {requireRate && !decided ? (
