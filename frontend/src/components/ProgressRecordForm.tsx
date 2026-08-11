@@ -602,9 +602,24 @@ export function ProgressRecordForm({
       ) : null}
 
       <div className="sticky bottom-3 z-10 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-admin-border bg-admin-surface/95 p-3 shadow-lift backdrop-blur sm:px-4">
-        <p className="text-xs leading-5 text-admin-text-muted">
-          저장하면 카드 상태와 경과 리포트가 함께 갱신됩니다.
-        </p>
+        {/* 저장 버튼이 있는 이 바가 유일하게 항상 시야에 있다 — 결과 피드백도 여기서 바로 보여준다.
+            상세(갱신된 지표·링크)는 위의 success 블록이 계속 담당한다 */}
+        {success ? (
+          <p role="status" className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs font-semibold leading-5 text-state-good">
+            <span>{success}</span>
+            <Link href="/tracking" className="text-admin-primary underline-offset-4 hover:underline">
+              경과 리포트 보기
+            </Link>
+          </p>
+        ) : error ? (
+          <p className="text-xs font-semibold leading-5 text-state-warn">
+            저장하지 못했습니다 — {error}
+          </p>
+        ) : (
+          <p className="text-xs leading-5 text-admin-text-muted">
+            저장하면 카드 상태와 경과 리포트가 함께 갱신됩니다.
+          </p>
+        )}
         <button
           type="submit"
           disabled={working || isDemoReadOnly || !selectedCard}
