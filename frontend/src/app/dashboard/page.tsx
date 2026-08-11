@@ -329,7 +329,7 @@ export default async function DashboardPage({
                               {e.eup}
                             </span>
                             {selected ? (
-                              <span className="ml-1.5 whitespace-nowrap rounded-full bg-admin-surface px-1.5 py-0.5 text-[11px] font-semibold text-admin-primary ring-1 ring-inset ring-admin-primary-line">
+                              <span className="ml-1.5 whitespace-nowrap rounded-full bg-admin-surface px-1.5 py-0.5 text-[11px] font-semibold text-admin-primary">
                                 제안 대상
                               </span>
                             ) : null}

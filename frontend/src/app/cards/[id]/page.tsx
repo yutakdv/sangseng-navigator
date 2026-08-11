@@ -163,7 +163,7 @@ export default async function CardDetailPage({
         <div className="u-panel overflow-hidden">
           <div className="border-b border-admin-border bg-admin-surface-sunken p-4 sm:p-6">
             <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
-              <span className="rounded-md bg-admin-surface px-1.5 py-0.5 text-[11px] font-semibold tabular-nums text-admin-text-muted ring-1 ring-inset ring-admin-border">
+              <span className="rounded-md bg-admin-surface px-1.5 py-0.5 text-[11px] font-semibold tabular-nums text-admin-text-muted">
                 {card.id}
               </span>
               <span className="text-[11px] font-semibold uppercase tracking-[0.1em] text-admin-text-muted">
@@ -215,7 +215,7 @@ export default async function CardDetailPage({
                 같은 줄의 출처 칩이 지므로 여기서 AI의 역할을 단정하지 않는다 (05 §2).
                 INCENTIVE(status=partial)는 수치만 서버 고정이라 검증됨 톤을 쓰지 않는다 */}
             {card.ai.grounding?.status === "verified" ? (
-              <p className="flex items-start gap-2 rounded-xl bg-state-good-bg px-3.5 py-3 text-xs leading-5 text-state-good ring-1 ring-inset ring-state-good-line">
+              <p className="flex items-start gap-2 rounded-xl bg-state-good-bg px-3.5 py-3 text-xs leading-5 text-state-good">
                 <Icon name="check" size={14} strokeWidth={2} className="mt-0.5 shrink-0" />
                 <span>
                   서버가 정량 규칙으로 고른 대상과 화면의 후보명·Score·순위·추진 상태·도로 시간을
@@ -223,7 +223,7 @@ export default async function CardDetailPage({
                 </span>
               </p>
             ) : card.ai.grounding?.status === "partial" ? (
-              <p className="flex items-start gap-2 rounded-xl bg-admin-surface-sunken px-3.5 py-3 text-xs leading-5 text-admin-text-soft ring-1 ring-inset ring-admin-border">
+              <p className="flex items-start gap-2 rounded-xl bg-admin-surface-sunken px-3.5 py-3 text-xs leading-5 text-admin-text-soft">
                 <Icon name="info" size={14} strokeWidth={2} className="mt-0.5 shrink-0" />
                 <span>
                   3·5·7% 시나리오 수치와 필수 리스크 3종은 서버가 고정한 값입니다. 비교문·근거
@@ -252,7 +252,7 @@ export default async function CardDetailPage({
             ) : null}
 
             {card.status === "approved" ? (
-              <section id="execution" aria-labelledby={`execution-${card.id}`} className="scroll-mt-24 rounded-xl border border-admin-primary-line bg-admin-primary-soft p-4">
+              <section id="execution" aria-labelledby={`execution-${card.id}`} className="scroll-mt-24 rounded-xl bg-admin-primary-soft p-4">
                 <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
                   <div className="max-w-xl">
                     <div className="flex items-center gap-2">
@@ -276,7 +276,7 @@ export default async function CardDetailPage({
                       </Link>
                     </div>
                   </div>
-                  <div className="w-full rounded-xl bg-admin-surface p-3 ring-1 ring-inset ring-admin-border sm:w-60">
+                  <div className="w-full rounded-xl bg-admin-surface p-3 sm:w-60">
                     <ProgressSelect
                       cardId={card.id}
                       cardType={card.type}
@@ -403,7 +403,7 @@ export default async function CardDetailPage({
             </div>
 
             {/* 예상 효과는 시뮬레이션 계열 출력이라 배지 + 고지 문구를 붙인다 (절대 규칙 3) */}
-            <div className="rounded-xl bg-admin-primary-soft p-4 ring-1 ring-inset ring-admin-primary-line">
+            <div className="rounded-xl bg-admin-primary-soft p-4">
               <div className="flex flex-wrap items-center gap-2">
                 <h3 className="text-[13px] font-bold text-admin-primary">예상 효과</h3>
                 <AssumptionBadge />
@@ -518,7 +518,7 @@ export default async function CardDetailPage({
                           >
                             {c.category}
                             {isTarget ? (
-                              <span className="ml-1.5 whitespace-nowrap rounded-full bg-admin-surface px-1.5 py-0.5 text-[11px] font-semibold text-admin-primary ring-1 ring-inset ring-admin-primary-line">
+                              <span className="ml-1.5 whitespace-nowrap rounded-full bg-admin-surface px-1.5 py-0.5 text-[11px] font-semibold text-admin-primary">
                                 이번 제안 후보
                               </span>
                             ) : null}
@@ -610,7 +610,7 @@ export default async function CardDetailPage({
                       <td className="font-semibold tabular-nums">
                         {s.rate}%
                         {card.selected_rate === s.rate ? (
-                          <span className="ml-1.5 whitespace-nowrap rounded-full bg-admin-surface px-1.5 py-0.5 text-[11px] font-semibold text-admin-primary ring-1 ring-inset ring-admin-primary-line">
+                          <span className="ml-1.5 whitespace-nowrap rounded-full bg-admin-surface px-1.5 py-0.5 text-[11px] font-semibold text-admin-primary">
                             담당자 확정
                           </span>
                         ) : null}
@@ -656,7 +656,7 @@ export default async function CardDetailPage({
             title="담당자 결정"
             desc="앞의 근거·위치·효과를 확인한 뒤 결정합니다. AI는 후보와 근거만 제시하며 승인하지 않습니다."
           >
-            <div className="rounded-xl bg-admin-primary-soft p-4 ring-1 ring-inset ring-admin-primary-line">
+            <div className="rounded-xl bg-admin-primary-soft p-4">
               <p className="mb-3 flex items-start gap-2 text-[13px] leading-6 text-admin-text-soft">
                 <Icon name="info" size={14} strokeWidth={2} className="mt-1 shrink-0 text-admin-primary" />
                 <span>
@@ -695,7 +695,7 @@ export default async function CardDetailPage({
             {card.sources.map((s) => (
               <span
                 key={s}
-                className="inline-flex items-center rounded-full border border-admin-border bg-admin-surface-sunken px-2.5 py-1 text-xs font-medium text-admin-text-muted"
+                className="inline-flex items-center rounded-full bg-admin-surface-sunken px-2.5 py-1 text-xs font-medium text-admin-text-muted"
               >
                 {s}
               </span>
@@ -739,7 +739,7 @@ function ReviewStep({ href, step, label, note }: { href: string; step: string; l
   return (
     <li>
       <Link href={href} className="group flex min-h-[68px] items-center gap-3 rounded-2xl px-3 py-2.5 hover:bg-admin-primary-soft">
-        <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-admin-primary-soft text-xs font-bold text-admin-primary ring-1 ring-inset ring-admin-primary-line">
+        <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-admin-primary-soft text-xs font-bold text-admin-primary">
           {step}
         </span>
         <span className="min-w-0">

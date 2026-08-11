@@ -16,7 +16,7 @@ function RateImpact({ scenario, headlineRate, selected }: { scenario: Scenario; 
     <li
       className={`rounded-xl px-3 py-2.5 ${
         selected
-          ? "bg-admin-primary-soft ring-1 ring-inset ring-admin-primary-line"
+          ? "bg-admin-primary-soft"
           : "bg-admin-surface"
       }`}
     >
@@ -101,9 +101,9 @@ export function PolicyOutcomeGuide({ card, headlineRate }: { card: Card; headlin
       </section>
 
       {isIncentive && scenarios.length ? (
-        <section className="rounded-card bg-admin-primary-soft p-4 ring-1 ring-inset ring-admin-primary-line">
+        <section className="rounded-card bg-admin-primary-soft p-4">
           <div className="flex items-center gap-2">
-            <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-admin-surface text-admin-primary ring-1 ring-admin-primary-line">
+            <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-admin-surface text-admin-primary">
               <Icon name="gift" size={15} />
             </span>
             <div>

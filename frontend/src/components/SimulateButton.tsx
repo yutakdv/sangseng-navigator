@@ -61,14 +61,14 @@ export function SimulateButton({ cardId }: { cardId: string }) {
       {error ? (
         <p
           role="alert"
-          className="mt-2 break-keep rounded-lg bg-state-bad-bg px-2.5 py-2 text-xs leading-5 text-state-bad ring-1 ring-inset ring-state-bad-line"
+          className="mt-2 break-keep rounded-lg bg-state-bad-bg px-2.5 py-2 text-xs leading-5 text-state-bad"
         >
           {error}
         </p>
       ) : null}
 
       {result ? (
-        <div className="mt-4 animate-fade-up rounded-xl bg-admin-primary-soft p-4 ring-1 ring-inset ring-admin-primary-line">
+        <div className="mt-4 animate-fade-up rounded-xl bg-admin-primary-soft p-4">
           <div className="flex flex-wrap items-center gap-2">
             <h4 className="text-[13px] font-bold text-admin-primary">가맹 전환 시 예상 효과</h4>
             <AssumptionBadge />
@@ -118,10 +118,10 @@ export function SimulateButton({ cardId }: { cardId: string }) {
             {result.narrative}
           </p>
           <div
-            className={`mt-3 rounded-lg px-3.5 py-3 text-xs leading-5 ring-1 ring-inset ${
+            className={`mt-3 rounded-lg px-3.5 py-3 text-xs leading-5 ${
               result.effect_assessment === "개선"
-                ? "bg-state-good-bg text-state-good ring-state-good-line"
-                : "bg-state-warn-bg text-state-warn ring-state-warn-line"
+                ? "bg-state-good-bg text-state-good"
+                : "bg-state-warn-bg text-state-warn"
             }`}
           >
             <p className="font-bold">의사결정 해석 · {result.effect_assessment}</p>

@@ -143,7 +143,7 @@ export function DecisionBar({
         {error ? (
           <p
             role="alert"
-            className="w-full break-keep rounded-lg bg-state-bad-bg px-2.5 py-2 text-xs font-medium leading-5 text-state-bad ring-1 ring-inset ring-state-bad-line"
+            className="w-full break-keep rounded-lg bg-state-bad-bg px-2.5 py-2 text-xs font-medium leading-5 text-state-bad"
           >
             {error}
           </p>

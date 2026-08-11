@@ -21,19 +21,19 @@ const DIRECTION = {
   up: {
     glyph: "▲",
     label: "증가",
-    pill: "bg-trend-up-bg text-trend-up ring-trend-up-line",
+    pill: "bg-trend-up-bg text-trend-up",
     text: "text-trend-up",
   },
   down: {
     glyph: "▼",
     label: "감소",
-    pill: "bg-trend-down-bg text-trend-down ring-trend-down-line",
+    pill: "bg-trend-down-bg text-trend-down",
     text: "text-trend-down",
   },
   flat: {
     glyph: "",
     label: "변동 없음",
-    pill: "bg-trend-flat-bg text-trend-flat ring-trend-flat-line",
+    pill: "bg-trend-flat-bg text-trend-flat",
     text: "text-trend-flat",
   },
 } as const;
@@ -56,7 +56,7 @@ export function DeltaValue({
   const formatted = unavailable ? "—" : formatValue(values, unit, digits);
   const valueClass =
     variant === "pill"
-      ? `inline-flex items-center gap-0.5 rounded-full px-2 py-0.5 text-xs font-semibold leading-5 tabular-nums ring-1 ring-inset ${tone.pill}`
+      ? `inline-flex items-center gap-0.5 rounded-full px-2 py-0.5 text-xs font-semibold leading-5 tabular-nums ${tone.pill}`
       : `inline-flex items-center gap-0.5 tabular-nums ${tone.text}`;
 
   return (

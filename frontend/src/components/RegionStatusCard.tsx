@@ -129,7 +129,7 @@ export function RegionStatusCard({ status }: { status: RegionStatus }) {
               제안 대상
             </span>
           ) : s.isDiagnosisTarget ? (
-            <span className="rounded-full bg-admin-primary-soft px-2 py-0.5 text-[10px] font-semibold text-admin-primary ring-1 ring-inset ring-admin-primary-line">
+            <span className="rounded-full bg-admin-primary-soft px-2 py-0.5 text-[10px] font-semibold text-admin-primary">
               진단 대상
             </span>
           ) : null}

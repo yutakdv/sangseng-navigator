@@ -73,7 +73,7 @@ export function PeriodFilter({
       {invalid ? (
         <p
           role="status"
-          className="mt-2 flex items-start gap-2 rounded-xl bg-state-notice-bg px-3.5 py-2.5 text-xs leading-5 text-state-notice ring-1 ring-inset ring-state-notice-line"
+          className="mt-2 flex items-start gap-2 rounded-xl bg-state-notice-bg px-3.5 py-2.5 text-xs leading-5 text-state-notice"
         >
           <Icon name="warn" size={13} className="mt-0.5" />
           요청한 기간을 사용할 수 없어 최근 90일로 되돌렸습니다 — 종료일은 오늘(KST)까지, 조회 구간은

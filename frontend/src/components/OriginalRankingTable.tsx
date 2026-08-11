@@ -60,7 +60,7 @@ export function OriginalRankingTable({
                     </span>
                     {/* 색만으로 의미를 전달하지 않는다 (13 §4) */}
                     {target ? (
-                      <span className="ml-1.5 whitespace-nowrap rounded-full bg-admin-surface px-1.5 py-0.5 text-[11px] font-semibold text-admin-primary ring-1 ring-inset ring-admin-primary-line">
+                      <span className="ml-1.5 whitespace-nowrap rounded-full bg-admin-surface px-1.5 py-0.5 text-[11px] font-semibold text-admin-primary">
                         이번 제안 대상
                       </span>
                     ) : null}

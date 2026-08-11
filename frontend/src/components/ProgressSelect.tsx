@@ -124,7 +124,7 @@ export function ProgressSelect({
           (확충: 타깃 읍×업종에 가맹점 존재, 인센티브: selected_rate 확정)을 알 수 없다.
           정확한 반영 여부는 같은 행의 DoneNote가 카드 조건을 보고 말해 준다. */}
       {justCompleted ? (
-        <p className="mt-1.5 break-keep rounded-lg bg-state-good-bg px-2 py-1.5 text-xs leading-5 text-state-good ring-1 ring-inset ring-state-good-line">
+        <p className="mt-1.5 break-keep rounded-lg bg-state-good-bg px-2 py-1.5 text-xs leading-5 text-state-good">
           완료로 기록했습니다 — 방문객 위젯 반영 여부를 확인해 보세요.{" "}
           <Link href="/widget?live=1" className="font-bold underline underline-offset-4">
             위젯에서 확인

@@ -184,7 +184,7 @@ export default async function TrackingPage({
             기록이 0건일 때는 아래 빈 상태 안내가 같은 말을 더 자세히 하므로 중복해서 띄우지 않는다.
             앵커는 ProgressReportDashboard의 `#stale`(정체 점검 Section)·`#unrecorded`(미기록 목록)와 짝이다. */}
         {report === null ? (
-          <p className="flex flex-wrap items-center gap-x-2 gap-y-1 rounded-xl bg-state-notice-bg px-3.5 py-2.5 text-[13px] font-semibold leading-5 text-state-notice ring-1 ring-inset ring-state-notice-line">
+          <p className="flex flex-wrap items-center gap-x-2 gap-y-1 rounded-xl bg-state-notice-bg px-3.5 py-2.5 text-[13px] font-semibold leading-5 text-state-notice">
             <Icon name="warn" size={14} />
             추진 경과 리포트를 불러오지 못했습니다 — 담당자 화면 전용 데이터라 내부 조회 권한이
             필요합니다. 아래 업무 목록과 기록 입력은 그대로 사용할 수 있습니다.
@@ -192,7 +192,7 @@ export default async function TrackingPage({
         ) : null}
 
         {report && hasRecords && actionNeeded > 0 ? (
-          <p className="flex flex-wrap items-center gap-x-3 gap-y-1.5 rounded-xl bg-state-notice-bg px-3.5 py-2.5 text-[13px] font-semibold leading-5 text-state-notice ring-1 ring-inset ring-state-notice-line">
+          <p className="flex flex-wrap items-center gap-x-3 gap-y-1.5 rounded-xl bg-state-notice-bg px-3.5 py-2.5 text-[13px] font-semibold leading-5 text-state-notice">
             <span className="flex items-center gap-1.5">
               <Icon name="warn" size={14} />
               조치 필요

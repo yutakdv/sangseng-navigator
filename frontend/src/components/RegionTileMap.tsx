@@ -74,7 +74,7 @@ export function RegionTileMap({
               {target.eup} 우선 검토
           </span>
         ) : (
-          <span className="absolute right-3 top-3 z-10 rounded-full bg-white/80 px-2.5 py-1 text-[11px] font-semibold text-admin-primary ring-1 ring-inset ring-admin-primary-line sm:right-4 sm:top-4">
+          <span className="absolute right-3 top-3 z-10 rounded-full bg-white/80 px-2.5 py-1 text-[11px] font-semibold text-admin-primary sm:right-4 sm:top-4">
             전 지역 공통 적용
           </span>
         )}

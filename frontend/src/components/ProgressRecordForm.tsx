@@ -300,7 +300,7 @@ export function ProgressRecordForm({
     <form onSubmit={submit} className="flex flex-col gap-5" aria-busy={working}>
       <section className="rounded-panel bg-admin-surface p-4 shadow-card sm:p-5">
         <div className="flex items-start gap-3">
-          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-admin-primary-soft text-admin-primary ring-1 ring-inset ring-admin-primary-line">
+          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-admin-primary-soft text-admin-primary">
             <Icon name="workflow" size={17} />
           </span>
           <div>
@@ -511,7 +511,7 @@ export function ProgressRecordForm({
               선택 입력입니다. 같은 카드에 같은 계산 기준으로 두 번 이상 입력된 지표만 기초값 대비 변화로 리포트합니다.
             </p>
           </div>
-          <span className="rounded-full bg-state-notice-bg px-2.5 py-1 text-[11px] font-semibold text-state-notice ring-1 ring-inset ring-state-notice-line">
+          <span className="rounded-full bg-state-notice-bg px-2.5 py-1 text-[11px] font-semibold text-state-notice">
             예상값 입력 금지
           </span>
         </div>
@@ -551,17 +551,17 @@ export function ProgressRecordForm({
       </section>
 
       {isDemoReadOnly ? (
-        <p className="rounded-xl bg-state-notice-bg px-4 py-3 text-[13px] leading-5 text-state-notice ring-1 ring-inset ring-state-notice-line">
+        <p className="rounded-xl bg-state-notice-bg px-4 py-3 text-[13px] leading-5 text-state-notice">
           공개 데모는 읽기 전용입니다. 운영 권한이 연결된 환경에서 기록할 수 있습니다.
         </p>
       ) : null}
       {error ? (
-        <p role="alert" className="rounded-xl bg-state-warn-bg px-4 py-3 text-[13px] leading-5 text-state-warn ring-1 ring-inset ring-state-warn-line">
+        <p role="alert" className="rounded-xl bg-state-warn-bg px-4 py-3 text-[13px] leading-5 text-state-warn">
           {error}
         </p>
       ) : null}
       {success ? (
-        <div role="status" className="rounded-xl bg-state-good-bg px-4 py-3 ring-1 ring-inset ring-state-good-line">
+        <div role="status" className="rounded-xl bg-state-good-bg px-4 py-3">
           <p className="text-[13px] leading-5 text-state-good">{success}</p>
           {savedSummary?.metrics.length ? (
             <>
@@ -572,7 +572,7 @@ export function ProgressRecordForm({
                 {savedSummary.metrics.map((metric) => (
                   <li
                     key={metric.label}
-                    className="rounded-full bg-admin-surface px-2.5 py-1 text-[11px] font-semibold tabular-nums text-admin-text ring-1 ring-inset ring-admin-border"
+                    className="rounded-full bg-admin-surface px-2.5 py-1 text-[11px] font-semibold tabular-nums text-admin-text"
                   >
                     {metric.label} {metric.text}
                   </li>

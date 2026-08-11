@@ -125,7 +125,7 @@ export function PolicyFlow({
               {s.desc}
             </span>
             {s.count ? (
-              <span className="mt-2 inline-flex w-fit items-baseline gap-0.5 rounded-full bg-admin-surface px-2 py-0.5 text-[11px] font-bold text-admin-text ring-1 ring-inset ring-admin-border">
+              <span className="mt-2 inline-flex w-fit items-baseline gap-0.5 rounded-full bg-admin-surface px-2 py-0.5 text-[11px] font-bold text-admin-text">
                 <span className="tabular-nums">{s.count.value}</span>
                 <span className="font-semibold text-admin-text-muted">{s.count.unit}</span>
               </span>

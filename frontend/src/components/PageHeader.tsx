@@ -32,7 +32,7 @@ export function PageHeader({
     <header className="flex flex-wrap items-start justify-between gap-x-6 gap-y-4">
       <div className="min-w-0 flex-1 basis-72">
         <div className="flex items-center gap-2.5">
-          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-admin-primary-soft text-admin-primary ring-1 ring-inset ring-admin-primary-line">
+          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-admin-primary-soft text-admin-primary">
             <Icon name={icon} size={19} />
           </span>
           <div className="min-w-0">
