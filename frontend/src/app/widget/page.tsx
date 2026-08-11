@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Image from "next/image";
 import Link from "next/link";
 import { NewBadge, PaybackBadge } from "@/components/Badge";
 import { CategoryIcon } from "@/components/CategoryIcon";
@@ -6,11 +7,26 @@ import { Icon } from "@/components/Icon";
 import { KakaoMapView } from "@/components/KakaoMapView";
 import { TodayPick } from "@/components/TodayPick";
 import { TourOverlay } from "@/components/tour/TourOverlay";
+import {
+  WidgetFilterSummary,
+  WidgetSearch,
+  WidgetSelect,
+  WidgetSort,
+} from "@/components/WidgetControls";
 import { WidgetLiveRefresh } from "@/components/WidgetLiveRefresh";
 import { api } from "@/lib/api";
 import { CATEGORIES, REGIONS, REGION_TOOLTIP, VISITOR_SOURCE_NOTE } from "@/lib/constants";
 import { kstWeekdayIndex, todayPickCopy, weekdayFact } from "@/lib/todayPick";
 import { fetchNowcast } from "@/lib/weather";
+import {
+  filterByName,
+  listNote,
+  normalizeQuery,
+  particle,
+  sortKeyOf,
+  sortRecommendations,
+  type SortKey,
+} from "@/lib/widgetList";
 import type { Card, DisplayCategory, Recommendation, Region } from "@/types";
 
 export const metadata: Metadata = { title: "가맹점 찾기 · 상생 나침반" };
@@ -25,10 +41,24 @@ export const dynamic = "force-dynamic";
  * 담당자 화면(인디고)과 구분되는 그린 브랜딩 + 390px 모바일 프레임 (13 §4·F7).
  *
  * 실제로 휴대폰에서 손가락으로 누르는 화면이라, 담당자 화면보다 **탭 영역**이 중요하다.
- * 필터 칩을 11~12px에서 13px·최소 높이 36px로 올리고 카드 정보를 이름 → 업종 → 설명 →
- * 주소 → 혜택 순으로 벌려 뒀다.
+ * 컨트롤은 최소 높이 52px, 목록 항목은 46px, 카드 정보는 이름 → 업종 → 설명 → 주소 → 혜택
+ * 순으로 벌려 뒀다.
+ *
+ * 탐색은 위에서부터 검색 → 지역·업종 선택 → 정렬 순이다. 칩 14개를 두 줄로 늘어놓던 필터는
+ * 눌러서 목록이 열리는 선택 필드로 바꿨다(`WidgetControls`) — 390px에서 칩이 네 줄까지 접혀
+ * 첫 화면이 필터로 가득 찼기 때문이다. 검색·정렬은 BE 계약에 파라미터가 없어 URL 쿼리로 받아
+ * 서버에서 처리한다 (`lib/widgetList.ts`).
  */
-type Search = { region?: string; category?: string; limit?: string; live?: string };
+type Search = {
+  region?: string;
+  category?: string;
+  limit?: string;
+  live?: string;
+  /** 가맹점 이름 검색어 */
+  q?: string;
+  /** 목록 정렬 (widgetList.SortKey) */
+  sort?: string;
+};
 const DEFAULT_LIST_LIMIT = 12;
 const MAX_LIST_LIMIT = 120;
 
@@ -38,10 +68,13 @@ const href = (next: Search, current: Search): string => {
   if (merged.region) params.set("region", merged.region);
   if (merged.category) params.set("category", merged.category);
   if (merged.limit) params.set("limit", merged.limit);
+  if (merged.q) params.set("q", merged.q);
+  // 기본 정렬은 URL에 남기지 않는다 — 공유된 주소가 짧고, 기본값이 바뀌어도 링크가 따라온다
+  if (merged.sort && merged.sort !== "dist") params.set("sort", merged.sort);
   // 라이브 미리보기(데모)는 필터를 눌러도 꺼지지 않아야 한다
   if (merged.live) params.set("live", merged.live);
-  const q = params.toString();
-  return q ? `/widget?${q}` : "/widget";
+  const qs = params.toString();
+  return qs ? `/widget?${qs}` : "/widget";
 };
 
 export default async function WidgetPage({ searchParams }: { searchParams: Promise<Search> }) {
@@ -55,12 +88,27 @@ export default async function WidgetPage({ searchParams }: { searchParams: Promi
     ? Math.max(DEFAULT_LIST_LIMIT, Math.min(MAX_LIST_LIMIT, Math.floor(requestedLimit)))
     : DEFAULT_LIST_LIMIT;
   const live = sp.live === "1" ? "1" : undefined;
-  const current: Search = { region, category, limit: sp.limit ? String(listLimit) : undefined, live };
-  const filters: Search = { region, category, live };
+  const query = normalizeQuery(sp.q);
+  const sort = sortKeyOf(sp.sort);
+  const current: Search = {
+    region,
+    category,
+    limit: sp.limit ? String(listLimit) : undefined,
+    live,
+    q: query,
+    sort,
+  };
+  const filters: Search = { region, category, live, q: query, sort };
+  /**
+   * 검색·비기본 정렬은 목록 전체를 손에 들고 있어야 맞는 결과가 나온다 — 12곳만 받아 놓고
+   * 이름으로 걸러 내면 "87곳 중에 없다"가 아니라 "앞 12곳 안에 없다"를 보여 주게 된다.
+   * 그래서 그때만 상한까지 받아 온다 (05 §1에 검색·정렬 파라미터가 없어서 FE에서 처리한다).
+   */
+  const fetchLimit = query || sort !== "dist" ? MAX_LIST_LIMIT : listLimit;
 
   const [{ recommendations, policy_note, total }, dashboard, cand, incentiveRes, usageDaily, weather] =
     await Promise.all([
-      api.widget(region, category, listLimit),
+      api.widget(region, category, fetchLimit),
       // 푸터 "데이터 기준" 한 줄 전용 — 이 엔드포인트만 죽어도 방문객 위젯 전체가 에러 화면이
       // 되면 안 된다 (아래 candidates와 같은 방어 관용구).
       api.dashboard().catch(() => null),
@@ -121,8 +169,23 @@ export default async function WidgetPage({ searchParams }: { searchParams: Promi
   // 업종이 이미 선택돼 있으면 칩이 현재 필터와 같아진다 — 그때는 칩을 내리지 않는다
   const todayHref = fact && !category ? href({ category: fact.category }, filters) : null;
 
-  const fresh = recommendations.filter((r) => r.badge);
-  const others = recommendations.filter((r) => !r.badge);
+  /**
+   * 화면에 실제로 뿌릴 목록 — 이름 검색 → 정렬 → 표시 개수만큼 자르기.
+   *
+   * `total`은 서버가 센 "조건에 맞는 전체 가맹점 수"다. 검색 중에는 그 숫자가 아니라 이름이
+   * 맞는 수를 세는 게 맞다(받아 온 fetchLimit 범위 안에서 센다 — 그 밖은 애초에 없다).
+   */
+  const matched = query ? filterByName(recommendations, query) : recommendations;
+  const shown = sortRecommendations(matched, sort).slice(0, listLimit);
+  const shownTotal = query ? matched.length : total;
+  const fresh = shown.filter((r) => r.badge);
+  const others = shown.filter((r) => !r.badge);
+
+  /** 필터 요약 칩 — 누르면 그 조건만 빠진다 */
+  const summaryChips = [
+    region ? { label: region, removeHref: href({ region: undefined }, filters) } : null,
+    category ? { label: category, removeHref: href({ category: undefined }, filters) } : null,
+  ].filter((c): c is { label: string; removeHref: string } => c !== null);
 
   return (
     <div className="min-h-screen bg-slate-100 py-0 sm:py-8">
@@ -134,9 +197,17 @@ export default async function WidgetPage({ searchParams }: { searchParams: Promi
             className="pointer-events-none absolute -right-8 -top-12 h-40 w-40 rounded-full bg-white/10 blur-2xl"
           />
           <div className="relative flex flex-wrap items-center justify-between gap-2">
-            <p className="text-xs font-semibold uppercase tracking-[0.14em] text-white/90">
-              강원랜드 지역상생
-            </p>
+            {/* 브랜드 자리를 텍스트 라벨("강원랜드 지역상생")에서 로고 락업으로 바꿨다 —
+                담당자 화면(AdminShell)과 같은 자산을 쓴다. 원본이 인디고라 그린 헤더 위에서
+                색이 부딪히므로 단색 흰색으로 눌러서 얹는다(brightness-0 invert). */}
+            <Image
+              src="/brand/sangseng-navigator-lockup.png"
+              alt="상생 나침반"
+              width={144}
+              height={28}
+              priority
+              className="h-7 w-auto brightness-0 invert"
+            />
             <span className="flex items-center gap-2">
               {live ? <WidgetLiveRefresh /> : null}
               {/* 두 얼굴(담당자↔방문객) 연결 고리가 최하단에만 있으면 모바일 심사에서 폐루프
@@ -188,26 +259,41 @@ export default async function WidgetPage({ searchParams }: { searchParams: Promi
               관심 지역과 업종을 선택하면 하이원리조트 거점에서 이동을 시작하기 좋은 순서로
               하이원포인트 가맹점을 보여드려요.
             </p>
-            <Filter
-              label="관심 지역"
-              options={REGIONS}
-              selected={region}
-              makeHref={(v) => href({ region: v }, filters)}
-              titleOf={(v) => REGION_TOOLTIP[v as keyof typeof REGION_TOOLTIP]}
-              countOf={countOfRegion}
-              className="mt-6"
-            />
-            <Filter
-              label="업종"
-              options={CATEGORIES}
-              selected={category}
-              makeHref={(v) => href({ category: v }, filters)}
-              countOf={countOfCategory}
-              className="mt-4"
+            {/* 검색은 필터보다 위에 온다 — 갈 곳을 이미 아는 사람은 지역·업종을 거치지 않는다.
+                limit은 넘기지 않는다: 새 검색은 첫 페이지부터 보는 게 맞다 */}
+            <div className="mt-6">
+              <WidgetSearch
+                q={query}
+                hidden={{ region, category, live, sort: sort === "dist" ? undefined : sort }}
+                clearHref={href({ q: undefined }, filters)}
+              />
+            </div>
+
+            {/* 칩 14개를 늘어놓지 않고 눌러서 목록이 열리는 선택 필드로 준다 (WidgetControls 주석) */}
+            <div className="mt-2.5 grid grid-cols-2 gap-2">
+              <WidgetSelect
+                label="관심 지역"
+                options={REGIONS}
+                selected={region}
+                makeHref={(v) => href({ region: v }, filters)}
+                titleOf={(v) => REGION_TOOLTIP[v as keyof typeof REGION_TOOLTIP]}
+                countOf={countOfRegion}
+              />
+              <WidgetSelect
+                label="업종"
+                options={CATEGORIES}
+                selected={category}
+                makeHref={(v) => href({ category: v }, filters)}
+                countOf={countOfCategory}
+              />
+            </div>
+            <WidgetFilterSummary
+              chips={summaryChips}
+              resetHref={href({ region: undefined, category: undefined }, filters)}
             />
           </div>
 
-          <KakaoMapView recommendations={recommendations} region={region} />
+          <KakaoMapView recommendations={shown} region={region} />
         </div>
 
         <div className="px-5 pb-5 sm:px-8 sm:pb-8">
@@ -217,29 +303,46 @@ export default async function WidgetPage({ searchParams }: { searchParams: Promi
               화면 가운데 오게 스크롤하는데, 앵커가 가맹점 카드 그리드 전체처럼 뷰포트보다 훨씬 크면
               "중앙 정렬"의 결과로 앵커 상단이 뷰포트 한참 위로 올라가 안내 카드까지 화면 밖으로
               밀려난다(실측: 데스크톱 -570px, 모바일 -1321px). 제목 줄은 항상 작아 이 문제가 없다. */}
-          <div data-tour="widget-recommendations" className="flex items-baseline justify-between gap-2">
-            <h2 className="text-[17px] font-bold text-admin-text">추천 가맹점</h2>
-            <span className="rounded-full bg-visitor-primary-soft px-2 py-0.5 text-xs font-semibold text-visitor-primary">
-              {recommendations.length} / {total}곳
-            </span>
+          <div data-tour="widget-recommendations" className="flex items-baseline justify-between gap-3">
+            <div className="flex min-w-0 items-baseline gap-2">
+              <h2 className="text-[17px] font-bold text-admin-text">추천 가맹점</h2>
+              <span className="rounded-full bg-visitor-primary-soft px-2 py-0.5 text-xs font-semibold text-visitor-primary">
+                {shown.length} / {shownTotal}곳
+              </span>
+            </div>
+            <WidgetSort selected={sort} makeHref={(key: SortKey) => href({ sort: key }, current)} />
           </div>
           {/* 추천 순서는 거점 직선거리 오름차순이지만 "가까운 순"으로 라벨링하지 않는다 —
-              직선거리가 산악 지형에서 실제 접근성과 역전되기 때문 (05 §1·§4). policy_note만 그대로 노출한다 */}
-          <p className="mt-1.5 break-keep text-xs leading-5 text-admin-text-muted">{policy_note}</p>
+              직선거리가 산악 지형에서 실제 접근성과 역전되기 때문 (05 §1·§4).
+              기본 정렬에서는 policy_note를 그대로 노출하고, 사용자가 정렬을 바꾸면 그 문구가
+              화면 순서와 어긋나므로 listNote가 현재 정렬을 말하는 문장으로 바꾼다. */}
+          <p className="mt-1.5 break-keep text-xs leading-5 text-admin-text-muted">
+            {listNote(sort, policy_note, fresh.length > 0)}
+            {sort === "dist" ? (
+              <span className="block">산길에서는 실제 이동시간과 다를 수 있어요.</span>
+            ) : null}
+          </p>
 
-          {recommendations.length === 0 ? (
+          {shown.length === 0 ? (
             <div className="mt-4 rounded-2xl border border-dashed border-slate-200 bg-slate-50 px-4 py-9 text-center">
-              <p className="text-[15px] font-semibold text-admin-text">
-                해당 조건의 가맹점이 아직 없어요
+              {/* 검색으로 0건이 된 것과 필터로 0건이 된 것은 빠져나오는 길이 다르다 */}
+              <p className="break-keep text-[15px] font-semibold text-admin-text">
+                {query
+                  ? `‘${query}’${particle(query, "과", "와")} 이름이 맞는 가맹점이 없어요`
+                  : "해당 조건의 가맹점이 아직 없어요"}
               </p>
-              <p className="mt-1.5 text-[13px] text-admin-text-muted">
-                다른 지역·업종을 선택해 보세요
+              <p className="mt-1.5 break-keep text-[13px] text-admin-text-muted">
+                {query ? "가게 이름의 일부만 넣어 보세요" : "다른 지역·업종을 선택해 보세요"}
               </p>
               <Link
-                href={href({ region: undefined, category: undefined }, filters)}
-                className="mt-4 inline-flex items-center gap-1.5 rounded-full bg-visitor-primary px-4 py-2 text-[13px] font-semibold text-white"
+                href={
+                  query
+                    ? href({ q: undefined }, filters)
+                    : href({ region: undefined, category: undefined }, filters)
+                }
+                className="mt-4 inline-flex min-h-10 items-center gap-1.5 rounded-full bg-visitor-primary px-4 text-[13px] font-semibold text-white"
               >
-                조건 초기화
+                {query ? "검색어 지우기" : "조건 초기화"}
               </Link>
             </div>
           ) : (
@@ -271,10 +374,11 @@ export default async function WidgetPage({ searchParams }: { searchParams: Promi
             </>
           )}
 
-          {total > recommendations.length ? (
-            <div className="mt-5 flex flex-wrap items-center justify-between gap-3 rounded-2xl bg-slate-50 px-4 py-3 ring-1 ring-inset ring-slate-200">
+          {shownTotal > shown.length ? (
+            <div className="mt-5 flex flex-wrap items-center justify-between gap-3 rounded-2xl bg-slate-50 px-4 py-3">
               <p className="text-xs leading-5 text-admin-text-muted">
-                현재 조건의 가맹점 {total}곳 중 {recommendations.length}곳을 보고 있어요.
+                {query ? "이름이 맞는" : "현재 조건의"} 가맹점 {shownTotal}곳 중 {shown.length}곳을
+                보고 있어요.
               </p>
               <Link
                 href={href({ limit: String(Math.min(MAX_LIST_LIMIT, listLimit + DEFAULT_LIST_LIMIT)) }, current)}
@@ -283,10 +387,10 @@ export default async function WidgetPage({ searchParams }: { searchParams: Promi
                 가맹점 더 보기
               </Link>
             </div>
-          ) : recommendations.length > DEFAULT_LIST_LIMIT ? (
+          ) : shown.length > DEFAULT_LIST_LIMIT ? (
             <Link
               href={href({}, filters)}
-              className="mt-5 inline-flex min-h-10 items-center rounded-xl bg-slate-100 px-3.5 text-[13px] font-bold text-admin-text-muted ring-1 ring-inset ring-slate-200"
+              className="mt-5 inline-flex min-h-10 items-center rounded-xl bg-slate-100 px-3.5 text-[13px] font-bold text-admin-text-muted"
             >
               목록 접기
             </Link>
@@ -339,55 +443,6 @@ export default async function WidgetPage({ searchParams }: { searchParams: Promi
       </p>
       {/* /widget은 AdminShell을 쓰지 않으므로(방문객 화면) 여기서 직접 마운트한다 */}
       <TourOverlay />
-    </div>
-  );
-}
-
-function Filter({
-  label,
-  options,
-  selected,
-  makeHref,
-  titleOf,
-  countOf,
-  className = "",
-}: {
-  label: string;
-  options: readonly string[];
-  selected?: string;
-  makeHref: (value?: string) => string;
-  titleOf?: (value: string) => string | undefined;
-  /** 칩을 눌렀을 때 보게 될 가맹점 수 — 반대편 활성 필터가 반영된 값이어야 한다 */
-  countOf?: (value?: string) => number;
-  className?: string;
-}) {
-  const chip = (active: boolean) =>
-    `inline-flex min-h-[36px] items-center gap-1 rounded-full px-3.5 text-[13px] transition-colors ${
-      active
-        ? "bg-visitor-primary font-semibold text-white shadow-[0_4px_12px_-4px_rgb(22_101_52_/_0.7)]"
-        : "bg-slate-100 font-medium text-admin-text hover:bg-slate-200"
-    }`;
-  const count = (active: boolean, value?: string) =>
-    countOf ? (
-      <span className={`text-[11px] font-semibold tabular-nums ${active ? "text-white/80" : "text-admin-text-muted"}`}>
-        {countOf(value)}
-      </span>
-    ) : null;
-
-  return (
-    <div className={className}>
-      <p className="mb-2 text-xs font-semibold text-admin-text-muted">{label}</p>
-      <div className="flex flex-wrap gap-1.5">
-        <Link href={makeHref(undefined)} className={chip(!selected)}>
-          전체{count(!selected)}
-        </Link>
-        {options.map((o) => (
-          <Link key={o} href={makeHref(o)} title={titleOf?.(o)} className={chip(selected === o)}>
-            {o}
-            {count(selected === o, o)}
-          </Link>
-        ))}
-      </div>
     </div>
   );
 }

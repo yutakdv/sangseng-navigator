@@ -5,6 +5,8 @@
  * (`/tracking` → `/widget`)에서 그린 테마 위젯 직전에 인디고 화면이 한 번 번쩍인다.
  * 역할 구분(담당자=인디고, 방문객=그린)은 13 §4에서 불변 원칙이므로 로딩 중에도 유지한다.
  */
+import Image from "next/image";
+
 const BAR = "animate-pulse rounded-md bg-black/[0.06]";
 
 export default function WidgetLoading() {
@@ -14,25 +16,26 @@ export default function WidgetLoading() {
 
       <div className="mx-auto w-full max-w-[390px] bg-visitor-bg shadow-card-hover sm:rounded-[28px] sm:ring-1 sm:ring-black/5">
         <header className="bg-gradient-to-br from-visitor-accent to-[#0e4a25] px-5 py-6 text-white sm:rounded-t-[28px]">
-          <p className="text-xs font-semibold uppercase tracking-[0.14em] text-white/90">
-            강원랜드 지역상생
-          </p>
+          {/* 로고는 정적 자산이라 로딩 중에도 그대로 보여 준다 — 실제 화면과 첫 줄이 어긋나지 않게
+              page.tsx와 같은 크기·같은 흰색 처리를 쓴다 */}
+          <Image
+            src="/brand/sangseng-navigator-lockup.png"
+            alt="상생 나침반"
+            width={144}
+            height={28}
+            priority
+            className="h-7 w-auto brightness-0 invert"
+          />
           <h1 className="mt-1.5 text-[22px] font-bold leading-8">지역별 하이원포인트 가맹점</h1>
           <div className="mt-3 h-3 w-full animate-pulse rounded-md bg-white/25" />
         </header>
 
         <div className="px-5 py-5">
-          <div className={`${BAR} h-3 w-16`} />
-          <div className="mt-2 flex flex-wrap gap-1.5">
-            {Array.from({ length: 7 }).map((_, i) => (
-              <span key={i} className="h-9 w-16 animate-pulse rounded-full bg-black/[0.06]" />
-            ))}
-          </div>
-
-          <div className={`${BAR} mt-5 h-3 w-16`} />
-          <div className="mt-2 flex flex-wrap gap-1.5">
-            {Array.from({ length: 7 }).map((_, i) => (
-              <span key={i} className="h-9 w-16 animate-pulse rounded-full bg-black/[0.06]" />
+          {/* 검색 한 칸 + 선택 필드 두 칸 — 실제 컨트롤과 같은 높이(52px)로 잡아 뜰 때 밀리지 않게 */}
+          <div className="h-[52px] animate-pulse rounded-2xl bg-black/[0.06]" />
+          <div className="mt-2.5 grid grid-cols-2 gap-2">
+            {Array.from({ length: 2 }).map((_, i) => (
+              <span key={i} className="h-[52px] animate-pulse rounded-2xl bg-black/[0.06]" />
             ))}
           </div>
 
