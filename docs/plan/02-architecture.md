@@ -115,8 +115,8 @@ Kakao 지오코딩 API ──────────┘      │  집계·스�
    - 진단/후보 데이터는 JSON 그대로 서빙 (계산 없음)
    - 카드 생성 시: 스코어 JSON + DDB의 추진상태/채택이력 → LLM → 카드 초안 → DDB 저장
    - 시뮬레이션: 집중도 재계산(순수 함수, JSON 입력) + LLM 설명
-3. **프론트(런타임)** — `lib/api.ts` 래퍼 하나로 mock/실 API 전환. 카드 상세 지도는 MapLibre GL+OpenFreeMap,
-   방문객 위젯 지도는 Kakao Maps JS+fallback이다.
+3. **프론트(런타임)** — `lib/api.ts` 래퍼 하나로 실 API 접근. 카드 상세 지도와 방문객 위젯 지도
+   모두 Kakao Maps JS + 화면별 fallback이다 (공용 로더 `lib/kakaoMaps.ts`).
 
 ## 보안·시크릿
 
